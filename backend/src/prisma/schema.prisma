@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "./generated/prisma"
 }
 
 datasource db {
@@ -621,6 +621,8 @@ model User {
   updatedAt       DateTime  @updatedAt
   lastLoginAt     DateTime?
   
+  auditLogs       AuditLog[] // Inverse relation
+  
   @@index([email])
   @@index([role])
   @@map("users")
@@ -632,4 +634,28 @@ enum UserRole {
   PROPERTY_MANAGER
   ACCOUNTANT
   USER
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity      String   // Property, Unit, Lease, Invoice, etc.
+  entityId    String   // The ID of the affected record
+  
+  details     String?  @db.Text // JSON or text description of changes (old vs new values)
+  
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

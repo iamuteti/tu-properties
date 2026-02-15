@@ -1,0 +1,661 @@
+// This is your Prisma schema file for Real Estate Property Management SaaS
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// CORE ENTITIES
+// ============================================
+
+model Property {
+  id           String    @id @default(cuid())
+  code         String    @unique // Property Code
+  name         String // Property Name
+  dateAcquired DateTime? // Date Acquired
+  lrNumber     String? // LR Number (Land Registry Number)
+
+  // Location & Address
+  country       String?
+  estateArea    String? // Estate/Area
+  areaRegion    String? // Area/Region
+  roadStreet    String? // Road/Street
+  specification String? // Multi-unit/Multi-Space
+
+  // Property Classification
+  multiStoryType String? // Multi Story Type
+  numberOfFloors Int? // No. Of Floors
+
+  // Geographic Coordinates
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  // Notes & Contact Info
+  notes               String? @db.Text // Property notes/description
+  specificContactInfo String? @db.Text // Specific contact information
+
+  // Relationships
+  landlordId String?
+  landlord   Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
+
+  categoryId String?
+  category   PropertyCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  propertyTypeId String?
+  propertyType   PropertyType? @relation(fields: [propertyTypeId], references: [id], onDelete: SetNull)
+
+  // Accounting & Billing Configuration
+  accountLedgerType     String? // e.g., "Property Control Ledger in GL"
+  primaryBankAccount    String? // Primary Bank/Account/Operating Account
+  alternativeTaxPin     String? // Alternative Tax PIN
+  propertyWorkingTaxPin String? // Property Working Tax PIN
+  invoicePaymentInfo    String? @db.Text
+  holderPaymentTerms    String? @db.Text
+
+  // MPESA Configuration
+  mpesaPropertyPayNumber   String?
+  disableMpesaStkPush      Boolean @default(false)
+  disableMpesaStkNarration Boolean @default(false)
+
+  // Counters
+  tenantReceiptAccountCodeCounter Int? @default(0)
+
+  // Rent Penalty Configuration
+  lpgExempted       Boolean @default(false)
+  penaltyChargeMode String? // Penalty Charge Mode
+  penaltyDay        Int? // Penalty Day
+
+  // Landlord Banking Details
+  landlordDrawerBank    String?
+  landlordBankBranch    String?
+  landlordAccountName   String?
+  landlordAccountNumber String?
+
+  // Communication Preferences
+  exemptAllSms     Boolean @default(false)
+  exemptInvoiceSms Boolean @default(false)
+  exemptGeneralSms Boolean @default(false)
+  exemptHagueSms   Boolean @default(false)
+  exemptBalanceSms Boolean @default(false)
+
+  exemptAllEmail     Boolean @default(false)
+  exemptInvoiceEmail Boolean @default(false)
+  exemptGeneralEmail Boolean @default(false)
+  exemptReceiptEmail Boolean @default(false)
+  exemptBalanceEmail Boolean @default(false)
+
+  // Other Preferences
+  excludeInTwoSummaryReport Boolean @default(false)
+
+  // Related entities
+  units            Unit[]
+  standingCharges  PropertyStandingCharge[]
+  securityDeposits PropertySecurityDeposit[]
+
+  // Audit fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  @@index([landlordId])
+  @@index([categoryId])
+  @@index([propertyTypeId])
+  @@index([code])
+  @@map("properties")
+}
+
+model Landlord {
+  id               String  @id @default(cuid())
+  code             String  @unique
+  name             String
+  email            String?
+  phone            String?
+  alternativePhone String?
+
+  // Address
+  address    String? @db.Text
+  city       String?
+  country    String?
+  postalCode String?
+
+  // Banking Details
+  bankName      String?
+  bankBranch    String?
+  accountName   String?
+  accountNumber String?
+
+  // Tax Information
+  taxPin        String?
+  vatRegistered Boolean @default(false)
+
+  // Relationships
+  properties Property[]
+
+  // Audit fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([code])
+  @@index([email])
+  @@map("landlords")
+}
+
+model PropertyCategory {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String? @db.Text
+  code        String? @unique
+
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("property_categories")
+}
+
+model PropertyType {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String? @db.Text
+  code        String? @unique
+
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("property_types")
+}
+
+// ============================================
+// UNITS/SPACES
+// ============================================
+
+model Unit {
+  id       String @id @default(cuid())
+  code     String @unique // Unit/Space No.
+  name     String // Unit Name/Number
+  sequence Int? // Unit Sequence
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  // Pricing
+  quotedPrice     Decimal? @db.Decimal(10, 2)
+  baseRent        Decimal? @db.Decimal(10, 2) // Market Rent
+  basePerUnitArea Decimal? @db.Decimal(10, 2)
+  currency        String   @default("KES")
+
+  // Area/Space Management
+  areaSqFt   Decimal? @db.Decimal(10, 2)
+  chargePlan String?
+
+  // Unit Details & Specifications
+  floor            Int?
+  bedrooms         Int? // Bedroom(s)
+  bathrooms        Int? // Bathroom(s)
+  furnished        Boolean @default(false)
+  outSourceParking String? // Out Source/Parking
+
+  unitTypeId String?
+  unitType   UnitType? @relation(fields: [unitTypeId], references: [id], onDelete: SetNull)
+
+  // Ownership
+  ownerOccupied Boolean @default(false)
+
+  // Utility Account & Billing Numbers
+  electricityAcno    String?
+  waterAcno          String?
+  electricityMeethno String?
+  waterMeethno       String?
+
+  // Letting Details
+  takeOnLettingDate DateTime?
+
+  // Tenant/Resident Code Counter
+  tenantResidentCodeCounter Int? @default(0)
+
+  // Notes
+  apartmentNotes String? @db.Text
+
+  // Status
+  status UnitStatus @default(VACANT)
+
+  // Relationships
+  leases         Lease[]
+  serviceCharges UnitServiceCharge[]
+  meterNumbers   UnitMeterNumber[]
+  features       UnitFeature[]
+
+  // Audit fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([propertyId])
+  @@index([unitTypeId])
+  @@index([status])
+  @@map("units")
+}
+
+model UnitType {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String? @db.Text
+
+  units Unit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("unit_types")
+}
+
+enum UnitStatus {
+  VACANT
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+}
+
+// Unit-related tables
+
+model UnitServiceCharge {
+  id String @id @default(cuid())
+
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  serviceUtilityAmenity String // Service/Charge/Utility/Amenity name
+  costPerArea           Decimal? @db.Decimal(10, 2)
+  totalCost             Decimal  @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([unitId])
+  @@map("unit_service_charges")
+}
+
+model UnitMeterNumber {
+  id String @id @default(cuid())
+
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  meterNo      String
+  readingSetup String? // Reading setup configuration
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([unitId])
+  @@map("unit_meter_numbers")
+}
+
+model UnitFeature {
+  id String @id @default(cuid())
+
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  name        String
+  featureType String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([unitId])
+  @@map("unit_features")
+}
+
+// ============================================
+// CHARGES & DEPOSITS
+// ============================================
+
+model PropertyStandingCharge {
+  id String @id @default(cuid())
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  chargeUtility    String // Charge/Utility name
+  chargeMode       String // Billing mode
+  billingCurrency  String   @default("KES")
+  costPerArea      Decimal? @db.Decimal(10, 2)
+  chargeValue      Decimal  @db.Decimal(10, 2)
+  vatRate          Decimal? @db.Decimal(5, 2) // VAT percentage
+  excludesWithRent Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@map("property_standing_charges")
+}
+
+model PropertySecurityDeposit {
+  id String @id @default(cuid())
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  month               String // Month identifier
+  value               Decimal @db.Decimal(10, 2)
+  ofRentBillingAmount Boolean @default(false)
+  ofInitialRent       Boolean @default(false)
+  ofLastEscalation    Boolean @default(false)
+  excludesWithRent    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@map("property_security_deposits")
+}
+
+// ============================================
+// TENANTS & LEASES
+// ============================================
+
+model Tenant {
+  id            String @id @default(cuid())
+  accountNumber String @unique // Account Number
+  code          String @unique
+
+  // Tenant Type & Personal Info
+  tenantType String? // Individual, Corporate, etc.
+  surname    String // Surname
+  otherNames String? // Other Name(s)
+  gender     String? // Gender
+
+  // Contact Information
+  email            String?
+  phone            String // Mobile Number
+  town             String?
+  sendMobileNumber Boolean @default(false)
+
+  // Identification & Tax
+  idNoRegNo String? // ID No./REG No.
+  taxPin    String? // Tax PIN
+
+  // Address
+  postalAddress String? @db.Text
+  postalCode    String?
+  country       String?
+
+  // Photo
+  photoUrl String? // URL to uploaded photo
+
+  // Relationships
+  leases            Lease[]
+  emergencyContacts TenantEmergencyContact[]
+
+  // Audit fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([accountNumber])
+  @@index([code])
+  @@index([email])
+  @@index([phone])
+  @@map("tenants")
+}
+
+model TenantEmergencyContact {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactName  String
+  relationship String?
+  phone        String?
+  email        String?
+
+  // Priority (1 = primary, 2 = secondary)
+  priority Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("tenant_emergency_contacts")
+}
+
+model Lease {
+  id   String @id @default(cuid())
+  code String @unique
+
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  // Lease Terms
+  startDate  DateTime
+  endDate    DateTime?
+  rentAmount Decimal   @db.Decimal(10, 2)
+  currency   String    @default("KES")
+  paymentDay Int       @default(1) // Day of month rent is due
+
+  // Security Deposit
+  securityDeposit Decimal? @db.Decimal(10, 2)
+
+  // Status
+  status LeaseStatus @default(DRAFT)
+
+  // Relationships
+  invoices Invoice[]
+  payments Payment[]
+
+  // Audit fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([unitId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("leases")
+}
+
+enum LeaseStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+}
+
+// ============================================
+// BILLING & PAYMENTS
+// ============================================
+
+model Invoice {
+  id            String @id @default(cuid())
+  invoiceNumber String @unique
+
+  leaseId String
+  lease   Lease  @relation(fields: [leaseId], references: [id], onDelete: Restrict)
+
+  // Invoice Details
+  issueDate   DateTime @default(now())
+  dueDate     DateTime
+  amount      Decimal  @db.Decimal(10, 2)
+  vatAmount   Decimal? @db.Decimal(10, 2)
+  totalAmount Decimal  @db.Decimal(10, 2)
+  currency    String   @default("KES")
+
+  // Status
+  status InvoiceStatus @default(PENDING)
+
+  // Payment tracking
+  paidAmount    Decimal @default(0) @db.Decimal(10, 2)
+  balanceAmount Decimal @db.Decimal(10, 2)
+
+  // Relationships
+  invoiceItems InvoiceItem[]
+  payments     Payment[]
+
+  // Audit fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leaseId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id String @id @default(cuid())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Decimal  @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
+  vatRate     Decimal? @db.Decimal(5, 2)
+  vatAmount   Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Payment {
+  id            String @id @default(cuid())
+  receiptNumber String @unique
+
+  leaseId String
+  lease   Lease  @relation(fields: [leaseId], references: [id], onDelete: Restrict)
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  // Payment Details
+  paymentDate DateTime @default(now())
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("KES")
+
+  // Payment Method
+  paymentMethod    PaymentMethod
+  paymentReference String? // Bank ref, M-Pesa code, etc.
+
+  // MPESA specific
+  mpesaReceiptNumber String?
+  mpesaPhoneNumber   String?
+
+  // Notes
+  notes String? @db.Text
+
+  // Audit fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leaseId])
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@index([paymentMethod])
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  MPESA
+  CARD
+  OTHER
+}
+
+// ============================================
+// SYSTEM & AUDIT
+// ============================================
+
+model User {
+  id        String  @id @default(cuid())
+  email     String  @unique
+  firstName String
+  lastName  String
+  phone     String?
+
+  // Authentication
+  passwordHash String
+
+  // Role & Permissions
+  role UserRole @default(USER)
+
+  // Status
+  isActive      Boolean @default(true)
+  emailVerified Boolean @default(false)
+
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  auditLogs AuditLog[] // Inverse relation
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PROPERTY_MANAGER
+  ACCOUNTANT
+  USER
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  action   String // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity   String // Property, Unit, Lease, Invoice, etc.
+  entityId String // The ID of the affected record
+
+  details String? @db.Text // JSON or text description of changes (old vs new values)
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
