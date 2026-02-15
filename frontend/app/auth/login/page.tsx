@@ -33,8 +33,11 @@ export default function LoginPage() {
         setError(null);
         try {
             const response = await authApi.login(data.email, data.password);
-
             const { access_token, user } = response.data;
+            if (!access_token || !user) {
+                setError("Login failed: invalid server response.");
+                return;
+            }
             login(access_token, user);
         } catch (err: any) {
             setError(

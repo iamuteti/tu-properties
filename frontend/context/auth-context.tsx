@@ -25,14 +25,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedToken = localStorage.getItem("auth_token");
         const storedUser = localStorage.getItem("auth_user");
 
+        console.log('Auth Context - storedToken:', !!storedToken);
+        console.log('Auth Context - storedUser:', storedUser);
+
         if (storedToken && storedUser) {
             setToken(storedToken);
-            setUser(JSON.parse(storedUser));
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (e) {
+                console.error('Failed to parse stored user:', e);
+            }
         }
         setIsLoading(false);
     }, []);
 
     const login = (newToken: string, newUser: User) => {
+        console.log('Login called with user:', newUser);
         setToken(newToken);
         setUser(newUser);
         localStorage.setItem("auth_token", newToken);

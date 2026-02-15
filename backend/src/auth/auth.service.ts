@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -6,6 +6,8 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         private usersService: UsersService,
         private jwtService: JwtService,
@@ -22,8 +24,11 @@ export class AuthService {
 
     async login(user: any) {
         const payload = { email: user.email, sub: user.id, role: user.role };
+        this.logger.log('Login payload: ' + JSON.stringify(payload));
+        const token = this.jwtService.sign(payload);
+        this.logger.log('Generated token (first 50 chars): ' + token.substring(0, 50) + '...');
         return {
-            access_token: this.jwtService.sign(payload),
+            access_token: token,
             user,
         };
     }

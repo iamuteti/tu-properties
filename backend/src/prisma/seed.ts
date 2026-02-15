@@ -42,7 +42,7 @@ async function main() {
 
     const admin = await prisma.user.create({
         data: {
-            email: 'admin@tuhame.com',
+            email: 'admin@tuhame.co.ke',
             firstName: 'Super',
             lastName: 'Admin',
             phone: '+254700000001',
@@ -53,7 +53,7 @@ async function main() {
 
     const manager = await prisma.user.create({
         data: {
-            email: 'manager@tuhame.com',
+            email: 'manager@tuhame.co.ke',
             firstName: 'Property',
             lastName: 'Manager',
             phone: '+254700000002',
@@ -64,7 +64,7 @@ async function main() {
 
     const accountant = await prisma.user.create({
         data: {
-            email: 'accountant@tuhame.com',
+            email: 'accountant@tuhame.co.ke',
             firstName: 'Finance',
             lastName: 'Accountant',
             phone: '+254700000003',
@@ -80,7 +80,7 @@ async function main() {
             data: {
                 code: 'LL001',
                 name: 'James Mwangi',
-                email: 'james.mwangi@example.com',
+                email: 'james.mwangi@example.co.ke',
                 phone: '+254711222333',
                 address: 'Kilimani, Nairobi',
                 bankName: 'Equity Bank',
@@ -91,7 +91,7 @@ async function main() {
             data: {
                 code: 'LL002',
                 name: 'Sarah Chen',
-                email: 'sarah.chen@example.com',
+                email: 'sarah.chen@example.co.ke',
                 phone: '+254722333444',
                 address: 'Westlands, Nairobi',
                 bankName: 'KCB Bank',
@@ -191,7 +191,7 @@ async function main() {
                 code: 'T001',
                 surname: 'Doe',
                 otherNames: 'John',
-                email: 'john.doe@example.com',
+                email: 'john.doe@example.co.ke',
                 phone: '+254799000111',
             },
         }),
@@ -201,7 +201,7 @@ async function main() {
                 code: 'T002',
                 surname: 'Smith',
                 otherNames: 'Mary',
-                email: 'mary.smith@example.com',
+                email: 'mary.smith@example.co.ke',
                 phone: '+254799000222',
             },
         }),
@@ -211,7 +211,7 @@ async function main() {
                 code: 'T003',
                 surname: 'Kamau',
                 otherNames: 'Peter',
-                email: 'peter.kamau@example.com',
+                email: 'peter.kamau@example.co.ke',
                 phone: '+254799000333',
             },
         }),

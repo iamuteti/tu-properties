@@ -1,18 +1,43 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-    constructor() {
+    private readonly logger = new Logger(JwtStrategy.name);
+    private readonly secretKey: string;
+
+    constructor(
+        private configService: ConfigService,
+        private usersService: UsersService,
+    ) {
+        const secret = configService.get<string>('JWT_SECRET') || 'superSecretKey';
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: process.env.JWT_SECRET || 'superSecretKey', // TODO: Move to env var
+            secretOrKey: secret,
         });
+        this.secretKey = secret;
     }
 
     async validate(payload: any) {
-        return { userId: payload.sub, email: payload.email, role: payload.role };
+        if (!payload.sub) {
+            this.logger.error('Invalid token payload: missing sub');
+            throw new UnauthorizedException('Invalid token payload');
+        }
+        
+        try {
+            const user = await this.usersService.findOne(payload.sub);
+            if (!user) {
+                this.logger.error('User not found for id: ' + payload.sub);
+                throw new UnauthorizedException();
+            }
+            return { userId: payload.sub, email: payload.email, role: payload.role };
+        } catch (error: any) {
+            this.logger.error('Error validating user: ' + (error?.message || 'Unknown error'));
+            throw new UnauthorizedException('User validation failed');
+        }
     }
 }

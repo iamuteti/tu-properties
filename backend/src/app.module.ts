@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule } from '@nestjs/config';
+
+import { PublicGuard } from './common/guards/public.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -11,9 +15,31 @@ import { BillingModule } from './billing/billing.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 
+import { PrismaService } from './prisma/prisma.service';
+
 @Module({
-  imports: [PrismaModule, PropertiesModule, UsersModule, UnitsModule, TenantsModule, LeasesModule, BillingModule, AuditModule, AuthModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    PrismaModule,
+    PropertiesModule,
+    UsersModule,
+    UnitsModule,
+    TenantsModule,
+    LeasesModule,
+    BillingModule,
+    AuditModule,
+    AuthModule
+  ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    PrismaService,
+    {
+      provide: APP_GUARD,
+      useClass: PublicGuard,
+    },
+    AppService
+  ],
 })
-export class AppModule {}
+export class AppModule { }
