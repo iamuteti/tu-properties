@@ -1,6 +1,6 @@
-# Testing Guide - Tuhame Property Management System
+# Testing Guide - TU Properties (Multi-Tenant SAAS)
 
-This guide outlines how to test the system using the provided seed data.
+This guide outlines how to test the multi-tenant functionality using the provided seed data.
 
 ## 1. Setup
 
@@ -19,40 +19,96 @@ npx prisma db seed
 
 ## 2. Test User Accounts
 
-The system comes with three default accounts representing different roles. The password for all accounts is `Password123!`.
+The system comes with demo accounts representing different roles and organizations. The password for all accounts is `Password123!`.
 
-| Role | Email | Purpose |
-| :--- | :--- | :--- |
-| **Super Admin** | `admin@tuhame.com` | User management, system configuration, full access. |
-| **Property Manager** | `manager@tuhame.com` | Managing properties, units, tenants, and leases. |
-| **Accountant** | `accountant@tuhame.com` | Managing invoices, payments, and financial reports. |
+### Super Admin Account (Platform Admin)
+| Role | Email | Password | Organization |
+| :--- | :--- | :--- | :--- |
+| **Super Admin** | `admin@tuhame.co.ke` | `Password123!` | None (Access to ALL organizations) |
 
-## 3. Scenarios to Test
+**Purpose**: Can access all organizations, create new organizations, manage platform settings
 
-### Property & Unit Management
-- **Dashboard**: Log in as `manager@tuhame.com` and check if "Riverside Heights" and "Westlands Plaza" appear.
-- **Unit Status**: Verify that some units are marked as `OCCUPIED` (e.g., `RIV-101`) and others as `VACANT` (e.g., `RIV-104`).
+---
 
-### Tenant & Lease Management
-- **Active Leases**: Check for the active lease of `John Doe` in `Riverside Heights`.
-- **Tenant Directory**: Verify `John Doe`, `Mary Smith`, and `Peter Kamau` are in the system.
+### Organization 1: Westhill Properties
 
-### Financials (Billing & Payments)
-- **Invoices**: Log in as `accountant@tuhame.com`. You should see:
-    - Paid Invoice: `INV-2024-001` (History)
-    - Pending Invoice: `INV-2024-002` (Overdue or Due shortly)
-- **Payments**: Check the payment history for `John Doe` to see receipt `REC-001`.
+| Role | Email | Password | Organization |
+| :--- | :--- | :--- | :--- |
+| **Property Manager** | `manager@tuhame.co.ke` | `Password123!` | Westhill Properties |
+| **Accountant** | `accountant@tuhame.co.ke` | `Password123!` | Westhill Properties |
 
-## 4. Manual Testing Steps
+**Purpose**: Can only see data for "Westhill Properties" organization
 
-1. **Login**: Test authentication with the provided email/password combinations.
-2. **Navigation**: Navigate through Properties -> Units -> Tenants.
-3. **Lease Lifecycle**: Try creating a new lease for a `VACANT` unit.
-4. **Billing**: Generate a new invoice for an active lease.
-5. **Collection**: Record a payment against a `PENDING` invoice.
+---
 
-## 5. Troubleshooting
+### Organization 2: Acme Properties
+
+| Role | Email | Password | Organization |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `manager@acme.co.ke` | `Password123!` | Acme Properties |
+
+**Purpose**: Can only see data for "Acme Properties" organization (different from TU Properties)
+
+---
+
+## 3. Multi-Tenancy Test Scenarios
+
+### Scenario 1: Data Isolation
+1. Login as `manager@tuhame.co.ke` (TU Properties)
+2. Note the properties: "Riverside Heights", "Westlands Plaza"
+3. Logout and login as `manager@acme.co.ke` (Acme Properties)
+4. Verify NO properties are visible (or only Acme-specific properties)
+
+### Scenario 2: Super Admin Access
+1. Login as `admin@tuhame.co.ke` (Super Admin)
+2. Navigate to Dashboard → Organizations
+3. Verify you can see ALL organizations
+4. Create a new organization
+5. Verify you can see data from ALL organizations
+
+### Scenario 3: Role-Based Access
+1. Login as `accountant@tuhame.co.ke`
+2. Navigate to Properties
+3. Verify you can see properties but cannot edit/delete
+4. Try navigating to Settings - should be restricted
+
+---
+
+## 4. Test Data
+
+### Organizations
+| Name | Slug | Subdomain | Plan |
+| :--- | :--- | :--- | :--- |
+| Westhill Properties | tu-properties | demo | PROFESSIONAL |
+| Acme Properties | acme-properties | acme | STARTER |
+
+### Properties (Westhill Properties)
+- Riverside Heights (5 units)
+- Westlands Plaza (3 units)
+
+### Properties (Acme Properties)
+- (None - fresh organization)
+
+---
+
+## 5. Testing Steps
+
+1. **Database Reset**: Run `npx prisma migrate reset` and `npx prisma db seed`
+2. **Test Data Isolation**: 
+   - Login as manager@tuhame.co.ke → Should see properties
+   - Login as manager@acme.co.ke → Should NOT see properties
+3. **Test Super Admin**: 
+   - Login as admin@tuhame.co.ke → Access Organizations page
+4. **Test New Organization**:
+   - As Super Admin, create new organization
+   - Create user for that organization
+   - Login as new user → Should only see their org data
+
+---
+
+## 6. Troubleshooting
 
 If you encounter issues:
-1. **Database Connection**: Verify `DATABASE_URL` in `.env`.
-2. **Re-seed**: If data gets messy, run `npx prisma migrate reset` and then `npx prisma db seed` to start fresh.
+1. **Database Connection**: Verify `DATABASE_URL` in `.env`
+2. **Re-seed**: If data gets messy, run `npx prisma migrate reset` and then `npx prisma db seed`
+3. **Check Organization ID**: Users without `organizationId` can only be Super Admins

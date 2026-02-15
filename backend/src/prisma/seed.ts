@@ -16,7 +16,6 @@ async function main() {
 
     // 1. Clean the database
     console.log('Cleaning database...');
-    await prisma.auditLog.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.invoiceItem.deleteMany();
     await prisma.invoice.deleteMany();
@@ -35,8 +34,36 @@ async function main() {
     await prisma.propertyCategory.deleteMany();
     await prisma.landlord.deleteMany();
     await prisma.user.deleteMany();
+    await prisma.organization.deleteMany();
 
-    // 2. Create Users
+    // 2. Create default Organization
+    console.log('Creating organizations...');
+    const defaultOrg = await prisma.organization.create({
+        data: {
+            name: 'Westhill Properties',
+            slug: 'westhill-properties',
+            subdomain: 'demo',
+            plan: 'PROFESSIONAL',
+            maxUsers: 10,
+            maxProperties: 100,
+            isActive: true,
+        },
+    });
+
+    // 3. Create a second organization for testing multi-tenancy
+    const secondOrg = await prisma.organization.create({
+        data: {
+            name: 'Acme Properties',
+            slug: 'acme-properties',
+            subdomain: 'acme',
+            plan: 'STARTER',
+            maxUsers: 3,
+            maxProperties: 10,
+            isActive: true,
+        },
+    });
+
+    // 4. Create Users
     console.log('Creating users...');
     const passwordHash = await bcrypt.hash('Password123!', 10);
 
@@ -59,6 +86,7 @@ async function main() {
             phone: '+254700000002',
             passwordHash,
             role: UserRole.PROPERTY_MANAGER,
+            organizationId: defaultOrg.id,
         },
     });
 
@@ -70,10 +98,24 @@ async function main() {
             phone: '+254700000003',
             passwordHash,
             role: UserRole.ACCOUNTANT,
+            organizationId: defaultOrg.id,
         },
     });
 
-    // 3. Create Landlords
+    // Create a user for the second organization
+    const acmeManager = await prisma.user.create({
+        data: {
+            email: 'manager@acme.co.ke',
+            firstName: 'Acme',
+            lastName: 'Manager',
+            phone: '+254700000004',
+            passwordHash,
+            role: UserRole.ADMIN,
+            organizationId: secondOrg.id,
+        },
+    });
+
+    // 5. Create Landlords
     console.log('Creating landlords...');
     const landlords = await Promise.all([
         prisma.landlord.create({
@@ -85,6 +127,7 @@ async function main() {
                 address: 'Kilimani, Nairobi',
                 bankName: 'Equity Bank',
                 accountNumber: '1234567890',
+                organizationId: defaultOrg.id,
             },
         }),
         prisma.landlord.create({
@@ -96,6 +139,7 @@ async function main() {
                 address: 'Westlands, Nairobi',
                 bankName: 'KCB Bank',
                 accountNumber: '0987654321',
+                organizationId: defaultOrg.id,
             },
         }),
     ]);
@@ -112,7 +156,7 @@ async function main() {
         prisma.propertyType.create({ data: { name: 'Townhouse', code: 'TWN' } }),
     ]);
 
-    // 5. Create Properties
+    // 7. Create Properties
     console.log('Creating properties...');
     const properties = await Promise.all([
         prisma.property.create({
@@ -125,6 +169,7 @@ async function main() {
                 categoryId: categories[0].id,
                 propertyTypeId: pTypes[0].id,
                 mpesaPropertyPayNumber: '543210',
+                organizationId: defaultOrg.id,
             },
         }),
         prisma.property.create({
@@ -137,6 +182,7 @@ async function main() {
                 categoryId: categories[1].id,
                 propertyTypeId: pTypes[1].id,
                 mpesaPropertyPayNumber: '123456',
+                organizationId: defaultOrg.id,
             },
         }),
     ]);
@@ -182,7 +228,7 @@ async function main() {
         units.push(unit);
     }
 
-    // 8. Create Tenants
+    // 10. Create Tenants
     console.log('Creating tenants...');
     const tenants = await Promise.all([
         prisma.tenant.create({
@@ -193,6 +239,7 @@ async function main() {
                 otherNames: 'John',
                 email: 'john.doe@example.co.ke',
                 phone: '+254799000111',
+                organizationId: defaultOrg.id,
             },
         }),
         prisma.tenant.create({
@@ -203,6 +250,7 @@ async function main() {
                 otherNames: 'Mary',
                 email: 'mary.smith@example.co.ke',
                 phone: '+254799000222',
+                organizationId: defaultOrg.id,
             },
         }),
         prisma.tenant.create({
@@ -213,11 +261,12 @@ async function main() {
                 otherNames: 'Peter',
                 email: 'peter.kamau@example.co.ke',
                 phone: '+254799000333',
+                organizationId: defaultOrg.id,
             },
         }),
     ]);
 
-    // 9. Create Leases, Invoices, Payments
+    // 11. Create Leases, Invoices, Payments
     console.log('Creating leases, invoices and payments...');
 
     // Create an active lease for Tenant 1
@@ -229,6 +278,7 @@ async function main() {
             startDate: new Date('2024-01-01'),
             rentAmount: units[0].baseRent!,
             status: LeaseStatus.ACTIVE,
+            organizationId: defaultOrg.id,
         },
     });
 

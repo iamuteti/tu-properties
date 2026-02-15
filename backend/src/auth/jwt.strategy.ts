@@ -34,7 +34,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
                 this.logger.error('User not found for id: ' + payload.sub);
                 throw new UnauthorizedException();
             }
-            return { userId: payload.sub, email: payload.email, role: payload.role };
+            return { 
+                userId: payload.sub, 
+                email: payload.email, 
+                role: payload.role,
+                organizationId: payload.organizationId || user.organizationId
+            };
         } catch (error: any) {
             this.logger.error('Error validating user: ' + (error?.message || 'Unknown error'));
             throw new UnauthorizedException('User validation failed');

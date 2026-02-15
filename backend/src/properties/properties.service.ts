@@ -4,28 +4,62 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PropertiesService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+    ) { }
 
-    create(data: Prisma.PropertyCreateInput) {
+    create(data: Prisma.PropertyCreateInput, tenantId?: string) {
+        if (tenantId) {
+            data.organization = { connect: { id: tenantId } };
+        }
         return this.prisma.property.create({ data });
     }
 
-    findAll() {
-        return this.prisma.property.findMany();
+    findAll(tenantId?: string) {
+        const where = tenantId ? { organizationId: tenantId } : {};
+        return this.prisma.property.findMany({ 
+            where,
+            include: {
+                landlord: true,
+                category: true,
+                propertyType: true,
+                _count: {
+                    select: { units: true },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
     }
 
-    findOne(id: string) {
-        return this.prisma.property.findUnique({ where: { id } });
+    findOne(id: string, tenantId?: string) {
+        const where = tenantId 
+            ? { id, organizationId: tenantId }
+            : { id };
+        return this.prisma.property.findUnique({ 
+            where,
+            include: {
+                landlord: true,
+                category: true,
+                propertyType: true,
+                units: true,
+            },
+        });
     }
 
-    update(id: string, data: Prisma.PropertyUpdateInput) {
+    update(id: string, data: Prisma.PropertyUpdateInput, tenantId?: string) {
+        const where = tenantId 
+            ? { id, organizationId: tenantId }
+            : { id };
         return this.prisma.property.update({
-            where: { id },
+            where,
             data,
         });
     }
 
-    remove(id: string) {
-        return this.prisma.property.delete({ where: { id } });
+    remove(id: string, tenantId?: string) {
+        const where = tenantId 
+            ? { id, organizationId: tenantId }
+            : { id };
+        return this.prisma.property.delete({ where });
     }
 }

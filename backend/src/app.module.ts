@@ -14,6 +14,7 @@ import { LeasesModule } from './leases/leases.module';
 import { BillingModule } from './billing/billing.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 import { PrismaService } from './prisma/prisma.service';
 
@@ -30,7 +31,8 @@ import { PrismaService } from './prisma/prisma.service';
     LeasesModule,
     BillingModule,
     AuditModule,
-    AuthModule
+    AuthModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [

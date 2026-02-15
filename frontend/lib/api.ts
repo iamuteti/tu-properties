@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -43,6 +43,30 @@ export const authApi = {
 
     getProfile: () =>
         api.get('/auth/profile'),
+};
+
+// Organizations API
+export const organizationsApi = {
+    create: (data: { name: string; slug: string; subdomain?: string }) =>
+        api.post<Organization>('/organizations', data),
+
+    findAll: () =>
+        api.get<Organization[]>('/organizations'),
+
+    findOne: (id: string) =>
+        api.get<Organization>(`/organizations/${id}`),
+
+    update: (id: string, data: Partial<{ name: string; subdomain: string; customDomain: string; plan: string }>) =>
+        api.patch<Organization>(`/organizations/${id}`, data),
+
+    remove: (id: string) =>
+        api.delete(`/organizations/${id}`),
+
+    checkSlug: (slug: string) =>
+        api.get<boolean>(`/organizations/check/slug/${slug}`),
+
+    checkSubdomain: (subdomain: string) =>
+        api.get<boolean>(`/organizations/check/subdomain/${subdomain}`),
 };
 
 // Properties API

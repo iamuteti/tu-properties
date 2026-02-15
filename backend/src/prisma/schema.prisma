@@ -13,6 +13,48 @@ datasource db {
 // SYSTEM & AUDIT
 // ============================================
 
+// Organization/Tenant model - represents each company/organization in the system
+model Organization {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique // For URL identification
+
+  // Subdomain configuration
+  subdomain    String? @unique // e.g., "company1" from company1.tuhame.co.ke
+  customDomain String? @unique // e.g., "app.company1.com"
+
+  isActive Boolean @default(true)
+
+  // Subscription
+  plan          String @default("FREE") // FREE, STARTER, PROFESSIONAL, ENTERPRISE
+  maxUsers      Int    @default(3)
+  maxProperties Int    @default(10)
+
+  // Branding (optional white-label)
+  logoUrl      String?
+  primaryColor String?
+
+  // Contact
+  contactEmail String?
+  contactPhone String?
+
+  // Relationships
+  users      User[]
+  properties Property[]
+  tenants    Tenant[]
+  landlords  Landlord[]
+  leases     Lease[]
+  invoices   Invoice[]
+  payments   Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([subdomain])
+  @@map("organizations")
+}
+
 model User {
   id        String  @id @default(cuid())
   email     String  @unique
@@ -25,6 +67,10 @@ model User {
 
   // Role & Permissions
   role UserRole @default(USER)
+
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Status
   isActive      Boolean @default(true)
@@ -39,6 +85,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([organizationId])
   @@map("users")
 }
 
@@ -102,6 +149,10 @@ model Landlord {
   taxPin        String?
   vatRegistered Boolean @default(false)
 
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Relationships
   properties Property[]
 
@@ -112,6 +163,7 @@ model Landlord {
 
   @@index([code])
   @@index([email])
+  @@index([organizationId])
   @@map("landlords")
 }
 
@@ -179,6 +231,10 @@ model Property {
   propertyTypeId String?
   propertyType   PropertyType? @relation(fields: [propertyTypeId], references: [id], onDelete: SetNull)
 
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Accounting & Billing Configuration
   accountLedgerType     String? // e.g., "Property Control Ledger in GL"
   primaryBankAccount    String? // Primary Bank/Account/Operating Account
@@ -236,6 +292,7 @@ model Property {
   @@index([categoryId])
   @@index([propertyTypeId])
   @@index([code])
+  @@index([organizationId])
   @@map("properties")
 }
 
@@ -457,6 +514,10 @@ model Tenant {
   // Photo
   photoUrl String? // URL to uploaded photo
 
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Relationships
   leases            Lease[]
   emergencyContacts TenantEmergencyContact[]
@@ -470,6 +531,7 @@ model Tenant {
   @@index([code])
   @@index([email])
   @@index([phone])
+  @@index([organizationId])
   @@map("tenants")
 }
 
@@ -517,6 +579,10 @@ model Lease {
   // Status
   status LeaseStatus @default(DRAFT)
 
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Relationships
   invoices Invoice[]
   payments Payment[]
@@ -531,6 +597,7 @@ model Lease {
   @@index([status])
   @@index([startDate])
   @@index([endDate])
+  @@index([organizationId])
   @@map("leases")
 }
 
@@ -568,6 +635,10 @@ model Invoice {
   paidAmount    Decimal @default(0) @db.Decimal(10, 2)
   balanceAmount Decimal @db.Decimal(10, 2)
 
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Relationships
   invoiceItems InvoiceItem[]
   payments     Payment[]
@@ -579,6 +650,7 @@ model Invoice {
   @@index([leaseId])
   @@index([status])
   @@index([dueDate])
+  @@index([organizationId])
   @@map("invoices")
 }
 
@@ -637,6 +709,10 @@ model Payment {
   // Notes
   notes String? @db.Text
 
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Audit fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -645,6 +721,7 @@ model Payment {
   @@index([invoiceId])
   @@index([paymentDate])
   @@index([paymentMethod])
+  @@index([organizationId])
   @@map("payments")
 }
 

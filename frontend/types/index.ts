@@ -1,9 +1,29 @@
+export interface Organization {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain?: string;
+    customDomain?: string;
+    isActive: boolean;
+    plan: string;
+    maxUsers: number;
+    maxProperties: number;
+    logoUrl?: string;
+    primaryColor?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface User {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     role: 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
+    organizationId?: string;
+    organization?: Organization;
 }
 
 export interface AuthResponse {

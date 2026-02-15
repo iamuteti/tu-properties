@@ -6,22 +6,31 @@ import { Prisma } from '@prisma/client';
 export class LeasesService {
     constructor(private prisma: PrismaService) { }
 
-    create(data: Prisma.LeaseCreateInput) {
+    create(data: Prisma.LeaseCreateInput, tenantId?: string) {
+        if (tenantId) {
+            data.organization = { connect: { id: tenantId } };
+        }
         return this.prisma.lease.create({ data });
     }
 
-    findAll() {
+    findAll(tenantId?: string) {
+        const where = tenantId ? { organizationId: tenantId } : {};
         return this.prisma.lease.findMany({
+            where,
             include: {
                 unit: true,
                 tenant: true,
             },
+            orderBy: { createdAt: 'desc' },
         });
     }
 
-    findOne(id: string) {
+    findOne(id: string, tenantId?: string) {
+        const where = tenantId
+            ? { id, organizationId: tenantId }
+            : { id };
         return this.prisma.lease.findUnique({
-            where: { id },
+            where,
             include: {
                 unit: true,
                 tenant: true,
@@ -31,14 +40,20 @@ export class LeasesService {
         });
     }
 
-    update(id: string, data: Prisma.LeaseUpdateInput) {
+    update(id: string, data: Prisma.LeaseUpdateInput, tenantId?: string) {
+        const where = tenantId
+            ? { id, organizationId: tenantId }
+            : { id };
         return this.prisma.lease.update({
-            where: { id },
+            where,
             data,
         });
     }
 
-    remove(id: string) {
-        return this.prisma.lease.delete({ where: { id } });
+    remove(id: string, tenantId?: string) {
+        const where = tenantId
+            ? { id, organizationId: tenantId }
+            : { id };
+        return this.prisma.lease.delete({ where });
     }
 }

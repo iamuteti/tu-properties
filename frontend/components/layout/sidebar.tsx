@@ -16,6 +16,7 @@ import {
     Settings,
     Shield,
     Landmark,
+    Building,
 } from "lucide-react";
 
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
@@ -29,6 +30,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
+    { href: "/dashboard/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
     { href: "/dashboard/properties", label: "Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
     { href: "/dashboard/units", label: "Units", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
     { href: "/dashboard/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
