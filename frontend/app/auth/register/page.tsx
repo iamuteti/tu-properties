@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import axios from "axios";
+import { authApi } from "@/lib/api";
 
 // Zod schema for validation
 const registerSchema = z
@@ -45,13 +45,10 @@ export default function RegisterPage() {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 email: data.email,
-                passwordHash: data.password, // Backend expects passwordHash for now, or auth service handles hashing
+                password: data.password,
             };
 
-            const response = await axios.post(
-                "http://localhost:3000/auth/register",
-                payload
-            );
+            const response = await authApi.register(payload);
 
             const { access_token, user } = response.data;
             login(access_token, user);

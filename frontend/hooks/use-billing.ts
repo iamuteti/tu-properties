@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import { billingApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Invoice, Payment } from "@/types";
 
@@ -16,12 +17,8 @@ export function useBilling() {
         setError(null);
         try {
             const [invoicesRes, paymentsRes] = await Promise.all([
-                axios.get("http://localhost:3000/billing/invoices", {
-                    headers: { Authorization: `Bearer ${token}` },
-                }),
-                axios.get("http://localhost:3000/billing/payments", {
-                    headers: { Authorization: `Bearer ${token}` },
-                }),
+                billingApi.findAllInvoices(),
+                billingApi.findAllPayments(),
             ]);
             setInvoices(invoicesRes.data);
             setPayments(paymentsRes.data);

@@ -9,8 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import axios from "axios";
 import { ChevronLeft } from "lucide-react";
+import { tenantsApi } from "@/lib/api";
 
 // Zod schema for tenant validation
 const tenantSchema = z.object({
@@ -42,13 +42,7 @@ export default function NewTenantPage() {
     const onSubmit = async (data: TenantFormValues) => {
         setError(null);
         try {
-            await axios.post(
-                "http://localhost:3000/tenants",
-                data,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
+            await tenantsApi.create(data);
             router.push("/dashboard/tenants");
             router.refresh();
         } catch (err: any) {

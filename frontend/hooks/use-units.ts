@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import { unitsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Unit } from "@/types";
 
@@ -13,9 +14,7 @@ export function useUnits() {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:3000/units", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await unitsApi.findAll();
             setUnits(response.data);
             setError(null);
         } catch (err: unknown) {

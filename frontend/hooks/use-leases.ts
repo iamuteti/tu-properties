@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import { leasesApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Lease } from "@/types";
 
@@ -13,9 +14,7 @@ export function useLeases() {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:3000/leases", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await leasesApi.findAll();
             setLeases(response.data);
             setError(null);
         } catch (err: unknown) {

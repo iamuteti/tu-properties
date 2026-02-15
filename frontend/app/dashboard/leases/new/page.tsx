@@ -11,8 +11,8 @@ import { useTenants } from "@/hooks/use-tenants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import axios from "axios";
 import { ChevronLeft } from "lucide-react";
+import { leasesApi } from "@/lib/api";
 
 // Zod schema for lease validation
 const leaseSchema = z.object({
@@ -65,17 +65,12 @@ export default function NewLeasePage() {
             // Ensure dates are in ISO-8601 format
             const payload = {
                 ...data,
+                status: "ACTIVE",
                 startDate: new Date(data.startDate).toISOString(),
                 endDate: new Date(data.endDate).toISOString(),
             };
 
-            await axios.post(
-                "http://localhost:3000/leases",
-                payload,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
+            await leasesApi.create(payload);
             router.push("/dashboard/leases");
             router.refresh();
         } catch (err: any) {

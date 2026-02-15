@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import axios from "axios";
+import { authApi } from "@/lib/api";
 
 // Zod schema for validation
 const loginSchema = z.object({
@@ -32,11 +32,7 @@ export default function LoginPage() {
     const onSubmit = async (data: LoginFormValues) => {
         setError(null);
         try {
-            // Direct call to backend
-            const response = await axios.post(
-                "http://localhost:3000/auth/login", // Assuming backend runs on 3000
-                data
-            );
+            const response = await authApi.login(data.email, data.password);
 
             const { access_token, user } = response.data;
             login(access_token, user);

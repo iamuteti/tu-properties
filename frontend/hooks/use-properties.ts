@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import { propertiesApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Property } from "@/types";
 
@@ -13,9 +14,7 @@ export function useProperties() {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:3000/properties", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await propertiesApi.findAll();
             setProperties(response.data);
             setError(null);
         } catch (err: unknown) {

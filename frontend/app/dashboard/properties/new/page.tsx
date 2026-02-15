@@ -9,8 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import axios from "axios";
 import { ChevronLeft } from "lucide-react";
+import { propertiesApi } from "@/lib/api";
 
 // Zod schema for property validation
 const propertySchema = z.object({
@@ -40,13 +40,7 @@ export default function NewPropertyPage() {
     const onSubmit = async (data: PropertyFormValues) => {
         setError(null);
         try {
-            await axios.post(
-                "http://localhost:3000/properties",
-                data,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
+            await propertiesApi.create(data);
             router.push("/dashboard/properties");
             router.refresh();
         } catch (err: any) {

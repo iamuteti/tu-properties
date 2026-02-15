@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import { tenantsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Tenant } from "@/types";
 
@@ -13,9 +14,7 @@ export function useTenants() {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await axios.get("http://localhost:3000/tenants", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await tenantsApi.findAll();
             setTenants(response.data);
             setError(null);
         } catch (err: unknown) {
