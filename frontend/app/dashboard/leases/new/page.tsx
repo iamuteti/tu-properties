@@ -10,7 +10,7 @@ import { useUnits } from "@/hooks/use-units";
 import { useTenants } from "@/hooks/use-tenants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/simple-select";
 import { ChevronLeft } from "lucide-react";
 import { leasesApi } from "@/lib/api";
 

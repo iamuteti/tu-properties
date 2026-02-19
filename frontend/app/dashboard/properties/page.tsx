@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
 import { useProperties } from "@/hooks/use-properties";
 import { Button } from "@/components/ui/button";
@@ -45,9 +44,10 @@ export default function PropertiesPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead>Code</TableHead>
                             <TableHead>Name</TableHead>
-                            <TableHead>Address</TableHead>
-                            <TableHead>Type</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Floors</TableHead>
                             <TableHead>Units</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -56,7 +56,7 @@ export default function PropertiesPage() {
                         {properties.length === 0 ? (
                             <TableRow>
                                 <TableCell
-                                    colSpan={5}
+                                    colSpan={6}
                                     className="h-24 text-center text-muted-foreground"
                                 >
                                     No properties found. Add one to get started.
@@ -65,14 +65,19 @@ export default function PropertiesPage() {
                         ) : (
                             properties.map((property) => (
                                 <TableRow key={property.id}>
-                                    <TableCell className="font-medium">
+                                    <TableCell className="font-medium">{property.code}</TableCell>
+                                    <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Building2 className="h-4 w-4 text-muted-foreground" />
                                             {property.name}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{property.address}</TableCell>
-                                    <TableCell>{property.type}</TableCell>
+                                    <TableCell>
+                                        {[property.estateArea, property.areaRegion, property.country]
+                                            .filter(Boolean)
+                                            .join(', ')}
+                                    </TableCell>
+                                    <TableCell>{property.numberOfFloors || '-'}</TableCell>
                                     <TableCell>{property._count?.units || 0}</TableCell>
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon">

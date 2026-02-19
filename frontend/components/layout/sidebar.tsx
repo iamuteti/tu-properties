@@ -17,6 +17,7 @@ import {
     Shield,
     Landmark,
     Building,
+    LogOut,
 } from "lucide-react";
 
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
@@ -50,7 +51,7 @@ const roleLabels: Record<UserRole, string> = {
 
 export function Sidebar() {
     const pathname = usePathname();
-    const { user, isLoading } = useAuth();
+    const { user, isLoading, logout } = useAuth();
 
     console.log('User: ', user);
     console.log('IsLoading: ', isLoading);
@@ -89,18 +90,27 @@ export function Sidebar() {
                 })}
             </nav>
             <div className="border-t p-4">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
-                        {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || ''}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
+                            {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || ''}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium">
+                                {user ? `${user.firstName} ${user.lastName}` : 'User Name'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {user ? roleLabels[user.role] || user.role : 'Admin'}
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                            {user ? `${user.firstName} ${user.lastName}` : 'User Name'}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                            {user ? roleLabels[user.role] || user.role : 'Admin'}
-                        </span>
-                    </div>
+                    <button
+                        onClick={() => logout()}
+                        className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        title="Logout"
+                    >
+                        <LogOut className="h-4 w-4" />
+                    </button>
                 </div>
             </div>
         </aside>

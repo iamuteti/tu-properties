@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useProperties } from "@/hooks/use-properties";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/simple-select";
 import { ChevronLeft } from "lucide-react";
 import { unitsApi } from "@/lib/api";
 

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -71,7 +71,7 @@ export const organizationsApi = {
 
 // Properties API
 export const propertiesApi = {
-    create: (data: { name: string; address: string; type: string }) =>
+    create: (data: Partial<Property>) =>
         api.post<Property>('/properties', data),
 
     findAll: () =>
@@ -85,6 +85,24 @@ export const propertiesApi = {
 
     remove: (id: string) =>
         api.delete(`/properties/${id}`),
+};
+
+// Landlords API
+export const landlordsApi = {
+    create: (data: Partial<Landlord>) =>
+        api.post<Landlord>('/landlords', data),
+
+    findAll: () =>
+        api.get<Landlord[]>('/landlords'),
+
+    findOne: (id: string) =>
+        api.get<Landlord>(`/landlords/${id}`),
+
+    update: (id: string, data: Partial<Landlord>) =>
+        api.patch<Landlord>(`/landlords/${id}`, data),
+
+    remove: (id: string) =>
+        api.delete(`/landlords/${id}`),
 };
 
 // Units API

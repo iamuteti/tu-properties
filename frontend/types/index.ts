@@ -1,3 +1,44 @@
+export interface PropertyCategory {
+    id: string;
+    name: string;
+    code?: string;
+    description?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PropertyType {
+    id: string;
+    name: string;
+    code?: string;
+    description?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Landlord {
+    id: string;
+    code: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    alternativePhone?: string;
+    address?: string;
+    city?: string;
+    country?: string;
+    postalCode?: string;
+    bankName?: string;
+    bankBranch?: string;
+    accountName?: string;
+    accountNumber?: string;
+    taxPin?: string;
+    vatRegistered?: boolean;
+    organizationId?: string;
+    createdAt: string;
+    updatedAt: string;
+    deletedAt?: string;
+}
+
 export interface Organization {
     id: string;
     name: string;
@@ -39,11 +80,96 @@ export interface ApiResponse<T> {
 
 export interface Property {
     id: string;
+    code: string;
     name: string;
-    address: string;
-    type: string;
+    dateAcquired?: string;
+    lrNumber?: string;
+    
+    // Location & Address
+    country?: string;
+    estateArea?: string; // Estate/Area
+    areaRegion?: string; // Area/Region
+    roadStreet?: string; // Road/Street
+    specification?: string; // Multi-unit/Multi-Space
+    
+    // Property Classification
+    multiStoryType?: string; // Multi Story Type
+    numberOfFloors?: number; // No. Of Floors
+    
+    // Geographic Coordinates
+    latitude?: number;
+    longitude?: number;
+    
+    // Notes & Contact Info
+    notes?: string; // Property notes/description
+    specificContactInfo?: string; // Specific contact information
+    
+    // Relationships
+    landlordId?: string;
+    landlord?: any;
+    
+    categoryId?: string;
+    category?: PropertyCategory;
+    
+    propertyTypeId?: string;
+    propertyType?: PropertyType;
+    
+    // Organization/Tenant association
+    organizationId?: string;
+    organization?: any;
+    
+    // Accounting & Billing Configuration
+    accountLedgerType?: string; // e.g., "Property Control Ledger in GL"
+    primaryBankAccount?: string; // Primary Bank/Account/Operating Account
+    alternativeTaxPin?: string; // Alternative Tax PIN
+    propertyWorkingTaxPin?: string; // Property Working Tax PIN
+    invoicePaymentInfo?: string;
+    holderPaymentTerms?: string;
+    
+    // MPESA Configuration
+    mpesaPropertyPayNumber?: string;
+    disableMpesaStkPush?: boolean;
+    disableMpesaStkNarration?: boolean;
+    
+    // Counters
+    tenantReceiptAccountCodeCounter?: number;
+    
+    // Rent Penalty Configuration
+    lpgExempted?: boolean;
+    penaltyChargeMode?: string; // Penalty Charge Mode
+    penaltyDay?: number; // Penalty Day
+    
+    // Landlord Banking Details
+    landlordDrawerBank?: string;
+    landlordBankBranch?: string;
+    landlordAccountName?: string;
+    landlordAccountNumber?: string;
+    
+    // Communication Preferences
+    exemptAllSms?: boolean;
+    exemptInvoiceSms?: boolean;
+    exemptGeneralSms?: boolean;
+    exemptHagueSms?: boolean;
+    exemptBalanceSms?: boolean;
+    
+    exemptAllEmail?: boolean;
+    exemptInvoiceEmail?: boolean;
+    exemptGeneralEmail?: boolean;
+    exemptReceiptEmail?: boolean;
+    exemptBalanceEmail?: boolean;
+    
+    // Other Preferences
+    excludeInTwoSummaryReport?: boolean;
+    
+    // Related entities
+    units?: any[];
+    standingCharges?: any[];
+    securityDeposits?: any[];
+    
     createdAt: string;
     updatedAt: string;
+    deletedAt?: string;
+    
     _count?: {
         units: number;
     };
