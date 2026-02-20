@@ -73,3 +73,56 @@ export const PROPERTY_TYPES = [
   { id: "9", name: "Office Space" },
   { id: "10", name: "Retail Space" },
 ];
+
+export const UNIT_TYPES = [
+  { id: "1", name: "Two Bedroom" },
+  { id: "2", name: "One Bedroom" },
+  { id: "3", name: "Studio" },
+  { id: "4", name: "Executive Suite" },
+  { id: "5", name: "Commercial Space" },
+  { id: "6", name: "Warehouse" },
+  { id: "7", name: "Office" },
+  { id: "8", name: "Retail" },
+];
+
+export const TRANSACTION_CLASSES = [
+  { value: "RENT", label: "Rent" },
+  { value: "A/C AND HEATING", label: "A/C and Heating" },
+  { value: "ELECTRICITY", label: "Electricity" },
+  { value: "FIXTURES/HEATING", label: "Fixtures/Heating" },
+  { value: "GARBAGE", label: "Garbage" },
+  { value: "GRASS/GARDEN", label: "Grass/Garden" },
+  { value: "PARKING", label: "Parking" },
+  { value: "SECURITY", label: "Security" },
+  { value: "SERVICE CHARGE", label: "Service Charge" },
+  { value: "WATER", label: "Water" },
+];
+
+export const CURRENCIES = [
+  { value: "KES", label: "Kenyan Shilling [KES]" },
+  { value: "USD", label: "US Dollar [USD]" },
+  { value: "EUR", label: "Euro [EUR]" },
+  { value: "GBP", label: "British Pound [GBP]" },
+];
+
+export const ACCOUNTS_RECEIVABLE = [
+  { value: "1", label: "Accounts Receivable" },
+  { value: "2", label: "Rent Receivable" },
+  { value: "3", label: "Utilities Receivable" },
+];
+
+export const INCOME_ACCOUNTS = [
+  { value: "1", label: "Rental Income" },
+  { value: "2", label: "Service Charge Income" },
+  { value: "3", label: "Utility Income" },
+  { value: "4", label: "Parking Income" },
+];
+
+export const PAYMENT_METHODS = [
+  { value: "CASH", label: "Cash" },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "MPESA", label: "M-Pesa" },
+  { value: "CARD", label: "Card" },
+  { value: "OTHER", label: "Other" },
+];

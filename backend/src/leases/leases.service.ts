@@ -18,7 +18,11 @@ export class LeasesService {
         return this.prisma.lease.findMany({
             where,
             include: {
-                unit: true,
+                unit: {
+                    include: {
+                        property: true,
+                    },
+                },
                 tenant: true,
             },
             orderBy: { createdAt: 'desc' },

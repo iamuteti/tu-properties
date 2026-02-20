@@ -45,7 +45,7 @@ export default function UnitsPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Unit Number</TableHead>
+                            <TableHead>Unit Name</TableHead>
                             <TableHead>Property</TableHead>
                             <TableHead>Type</TableHead>
                             <TableHead>Status</TableHead>
@@ -69,11 +69,11 @@ export default function UnitsPage() {
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">
                                             <DoorOpen className="h-4 w-4 text-muted-foreground" />
-                                            {unit.unitNumber}
+                                            {unit.name}
                                         </div>
                                     </TableCell>
                                     <TableCell>{unit.property?.name || "N/A"}</TableCell>
-                                    <TableCell>{unit.type}</TableCell>
+                                    <TableCell>{unit.unitType?.name || "N/A"}</TableCell>
                                     <TableCell>
                                         <span
                                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${unit.status === "VACANT"
@@ -84,7 +84,7 @@ export default function UnitsPage() {
                                             {unit.status}
                                         </span>
                                     </TableCell>
-                                    <TableCell>${unit.rentAmount}</TableCell>
+                                    <TableCell>{unit.baseRent ? `$${unit.baseRent}` : "N/A"}</TableCell>
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon">
                                             <MoreHorizontal className="h-4 w-4" />

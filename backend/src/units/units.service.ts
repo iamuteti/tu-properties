@@ -6,12 +6,26 @@ import { Prisma } from '@prisma/client';
 export class UnitsService {
     constructor(private prisma: PrismaService) { }
 
-    create(data: Prisma.UnitCreateInput, tenantId?: string) {
+    async create(data: any, tenantId?: string) {
         if (tenantId) {
             data.property = { connect: { id: data.property?.connect?.id } };
             // Note: Property should already have organizationId set
         }
-        return this.prisma.unit.create({ data });
+
+        // Generate unique unit code
+        const count = await this.prisma.unit.count();
+        const nextNumber = count + 1;
+        const code = `UNIT-${String(nextNumber).padStart(3, '0')}`;
+
+        data.code = code;
+
+        return this.prisma.unit.create({ 
+            data: data as Prisma.UnitCreateInput,
+            include: {
+                property: true,
+                unitType: true,
+            },
+        });
     }
 
     findAll(tenantId?: string) {

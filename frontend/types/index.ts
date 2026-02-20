@@ -1,3 +1,5 @@
+import { ColumnDef } from '@tanstack/react-table';
+
 export interface PropertyCategory {
     id: string;
     name: string;
@@ -177,25 +179,96 @@ export interface Property {
 
 export interface Unit {
     id: string;
-    unitNumber: string;
-    type: string;
-    status: string;
-    rentAmount: number;
+    code: string;
+    name: string;
+    sequence?: number;
     propertyId: string;
     property?: Property;
+
+    // Pricing
+    quotedPrice?: number;
+    baseRent?: number;
+    basePerUnitArea?: number;
+    currency?: string;
+
+    // Area/Space Management
+    areaSqFt?: number;
+    chargePlan?: string;
+
+    // Unit Details & Specifications
+    floor?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    furnished?: boolean;
+    outSourceParking?: string;
+    unitTypeId?: string;
+    unitType?: any;
+
+    // Ownership
+    ownerOccupied?: boolean;
+
+    // Utility Account & Billing Numbers
+    electricityAcno?: string;
+    waterAcno?: string;
+    electricityMeethno?: string;
+    waterMeethno?: string;
+
+    // Letting Details
+    takeOnLettingDate?: string;
+
+    // Tenant/Resident Code Counter
+    tenantResidentCodeCounter?: number;
+
+    // Notes
+    apartmentNotes?: string;
+
+    // Status
+    status: string;
+
+    // Relationships
+    leases?: any[];
+    serviceCharges?: any[];
+    meterNumbers?: any[];
+    features?: any[];
+
+    // Audit fields
     createdAt: string;
     updatedAt: string;
+    deletedAt?: string;
+}
+
+export interface TenantEmergencyContact {
+    id?: string;
+    contactName?: string;
+    relationship?: string;
+    phone?: string;
+    email?: string;
+    priority?: number;
 }
 
 export interface Tenant {
     id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phoneNumber: string;
-    status: string;
+    accountNumber: string;
+    code: string;
+    tenantType?: string;
+    surname: string;
+    otherNames?: string;
+    gender?: string;
+    email?: string;
+    phone: string;
+    town?: string;
+    sendMobileNumber?: boolean;
+    idNoRegNo?: string;
+    taxPin?: string;
+    postalAddress?: string;
+    postalCode?: string;
+    country?: string;
+    photoUrl?: string;
+    organizationId?: string;
+    emergencyContacts?: TenantEmergencyContact[];
     createdAt: string;
     updatedAt: string;
+    deletedAt?: string;
 }
 
 export interface Lease {
@@ -208,6 +281,7 @@ export interface Lease {
     status: string;
     unit?: Unit;
     tenant?: Tenant;
+    invoices?: any[];
     createdAt: string;
     updatedAt: string;
 }
@@ -235,4 +309,41 @@ export interface Payment {
     createdAt: string;
     updatedAt: string;
     invoice?: Invoice;
+}
+
+export interface DataTableProps<T> {
+  data: T[];
+  columns: ColumnDef<T>[];
+  searchPlaceholder?: string;
+  searchColumn?: keyof T;
+  emptyMessage?: string;
+  emptyIcon?: React.ReactNode;
+  pageSizeOptions?: number[];
+  defaultPageSize?: number;
+}
+
+export interface ImageCarouselProps {
+  images?: string[];
+  height?: string;
+  onChange?: (index: number) => void;
+}
+
+export interface ImageData {
+  src: string;
+  name: string;
+  file: File;
+}
+
+export interface ImagePickerProps {
+  max?: number;
+  min?: number;
+  required?: boolean;
+  onChange?: (files: File[]) => void;
+  existingImages?: string[];
+  hint?: string;
+}
+
+export interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requireAdmin?: boolean;
 }

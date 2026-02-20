@@ -2,28 +2,39 @@
 
 import React from "react";
 import Link from "next/link";
-import { useTenants } from "@/hooks/use-tenants";
+import { useTenantTableData } from "@/hooks/use-tenant-table-data";
+import { TenantsTable } from "@/components/ui/tenants-table";
 import { Button } from "@/components/ui/button";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { Plus, Users, MoreHorizontal, Mail, Phone } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export default function TenantsPage() {
-    const { tenants, isLoading, error } = useTenants();
+    const { data: tenants, isLoading, error, refetch } = useTenantTableData();
 
     if (isLoading) {
-        return <div>Loading tenants...</div>;
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-muted-foreground">Loading tenants...</div>
+            </div>
+        );
     }
 
     if (error) {
-        return <div className="text-destructive">Error: {error}</div>;
+        return (
+            <div className="text-destructive p-4">
+                Error: {error}
+            </div>
+        );
     }
+
+    const handleRowClick = (tenant: any) => {
+        console.log("Tenant clicked:", tenant);
+        // Could navigate to detail page or open a modal
+    };
+
+    const handleRowSelect = (selectedRows: any[]) => {
+        console.log("Selected rows:", selectedRows);
+        // Handle bulk actions on selected rows
+    };
 
     return (
         <div className="space-y-6">
@@ -41,69 +52,11 @@ export default function TenantsPage() {
                 </Link>
             </div>
 
-            <div className="rounded-md border">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {tenants.length === 0 ? (
-                            <TableRow>
-                                <TableCell
-                                    colSpan={5}
-                                    className="h-24 text-center text-muted-foreground"
-                                >
-                                    No tenants found. Add one to get started.
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            tenants.map((tenant) => (
-                                <TableRow key={tenant.id}>
-                                    <TableCell className="font-medium">
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-4 w-4 text-muted-foreground" />
-                                            {tenant.firstName} {tenant.lastName}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Mail className="h-3 w-3 text-muted-foreground" />
-                                            {tenant.email}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Phone className="h-3 w-3 text-muted-foreground" />
-                                            {tenant.phoneNumber}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span
-                                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${tenant.status === "ACTIVE"
-                                                    ? "bg-green-100 text-green-800"
-                                                    : "bg-gray-100 text-gray-800"
-                                                }`}
-                                        >
-                                            {tenant.status}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
+            <TenantsTable 
+                data={tenants} 
+                onRowClick={handleRowClick}
+                onRowSelect={handleRowSelect}
+            />
         </div>
     );
 }

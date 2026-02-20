@@ -9,7 +9,7 @@ export class UnitsController {
     constructor(private readonly unitsService: UnitsService) { }
 
     @Post()
-    create(@Body() createUnitDto: Prisma.UnitCreateInput) {
+    create(@Body() createUnitDto: any) {
         return this.unitsService.create(createUnitDto);
     }
 

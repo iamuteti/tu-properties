@@ -107,7 +107,7 @@ export const landlordsApi = {
 
 // Units API
 export const unitsApi = {
-    create: (data: { unitNumber: string; type: string; status: string; rentAmount: number; propertyId: string }) =>
+    create: (data: Partial<Unit>) =>
         api.post<Unit>('/units', data),
 
     findAll: () =>
@@ -116,7 +116,7 @@ export const unitsApi = {
     findOne: (id: string) =>
         api.get<Unit>(`/units/${id}`),
 
-    update: (id: string, data: Partial<{ unitNumber: string; type: string; status: string; rentAmount: number; propertyId: string }>) =>
+    update: (id: string, data: Partial<Unit>) =>
         api.patch<Unit>(`/units/${id}`, data),
 
     remove: (id: string) =>
@@ -125,7 +125,7 @@ export const unitsApi = {
 
 // Tenants API
 export const tenantsApi = {
-    create: (data: { firstName: string; lastName: string; email: string; phoneNumber: string; status: string }) =>
+    create: (data: Partial<Tenant>) =>
         api.post<Tenant>('/tenants', data),
 
     findAll: () =>
@@ -134,7 +134,7 @@ export const tenantsApi = {
     findOne: (id: string) =>
         api.get<Tenant>(`/tenants/${id}`),
 
-    update: (id: string, data: Partial<{ firstName: string; lastName: string; email: string; phoneNumber: string; status: string }>) =>
+    update: (id: string, data: Partial<Tenant>) =>
         api.patch<Tenant>(`/tenants/${id}`, data),
 
     remove: (id: string) =>

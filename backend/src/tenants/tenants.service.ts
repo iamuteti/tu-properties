@@ -6,11 +6,36 @@ import { Prisma } from '@prisma/client';
 export class TenantsService {
     constructor(private prisma: PrismaService) { }
 
-    create(data: Prisma.TenantCreateInput, tenantId?: string) {
+    async create(data: any, tenantId?: string) {
         if (tenantId) {
             data.organization = { connect: { id: tenantId } };
         }
-        return this.prisma.tenant.create({ data });
+
+        // Generate unique account number and code
+        const count = await this.prisma.tenant.count();
+        const nextNumber = count + 1;
+        const accountNumber = `TEN-${String(nextNumber).padStart(3, '0')}`;
+        const code = `T${String(nextNumber).padStart(3, '0')}`;
+
+        data.accountNumber = accountNumber;
+        data.code = code;
+
+        // Handle emergency contacts
+        if (data.emergencyContacts) {
+            data.emergencyContacts = {
+                create: data.emergencyContacts.filter((contact: any) => contact.contactName).map((contact: any, index: number) => ({
+                    ...contact,
+                    priority: index + 1,
+                })),
+            };
+        }
+
+        return this.prisma.tenant.create({ 
+            data: data as Prisma.TenantCreateInput,
+            include: {
+                emergencyContacts: true,
+            },
+        });
     }
 
     findAll(tenantId?: string) {
