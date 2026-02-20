@@ -126,3 +126,25 @@ export const PAYMENT_METHODS = [
   { value: "CARD", label: "Card" },
   { value: "OTHER", label: "Other" },
 ];
+
+export const PERIODS = [
+  { value: "custom", label: "Custom Dates" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "todayYesterday", label: "Today & Yesterday" },
+  { value: "thisWeek", label: "This Week" },
+  { value: "lastWeek", label: "Last Week" },
+  { value: "lastWeekToDate", label: "Last Week To Date" },
+  { value: "lastWeekButOne", label: "Last Week But One" },
+  { value: "lastTwoWeeks", label: "Last Two Weeks" },
+  { value: "thisMonth", label: "This Month" },
+  { value: "lastMonth", label: "Last Month" },
+  { value: "lastMonthToDate", label: "Last Month To Date" },
+  { value: "lastMonthButOne", label: "Last Month But One" },
+  { value: "lastTwoMonths", label: "Last Two Months" },
+  { value: "thisQuarter", label: "This Quarter" },
+  { value: "lastQuarter", label: "Last Quarter" },
+  { value: "thisYear", label: "This Year" },
+  { value: "financialYearToLastMonth", label: "Financial Year To Last Month" },
+  { value: "lastYear", label: "Last Year" },
+];

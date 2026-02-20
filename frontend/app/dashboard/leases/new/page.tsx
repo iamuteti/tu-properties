@@ -55,7 +55,7 @@ export default function NewLeasePage() {
         const unitId = e.target.value;
         const selectedUnit = units.find((u) => u.id === unitId);
         if (selectedUnit) {
-            setValue("rentAmount", selectedUnit.rentAmount);
+            setValue("rentAmount", selectedUnit.baseRent || 0);
         }
     };
 
@@ -118,7 +118,7 @@ export default function NewLeasePage() {
                                     .filter((u) => u.status === "VACANT")
                                     .map((unit) => (
                                         <option key={unit.id} value={unit.id}>
-                                            {unit.unitNumber} ({unit.type}) - ${unit.rentAmount}
+                                            {unit.name} ({unit.unitType?.name || 'Unknown'}) - {unit.currency || 'KES'} {unit.baseRent?.toFixed(2) || '0.00'}
                                         </option>
                                     ))}
                             </Select>
@@ -137,7 +137,7 @@ export default function NewLeasePage() {
                                 <option value="">Select a tenant</option>
                                 {tenants.map((tenant) => (
                                     <option key={tenant.id} value={tenant.id}>
-                                        {tenant.firstName} {tenant.lastName}
+                                        {tenant.surname} {tenant.otherNames}
                                     </option>
                                 ))}
                             </Select>

@@ -2,12 +2,20 @@ import { useState, useEffect, useCallback } from "react";
 import { AxiosError } from "axios";
 import { billingApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
-import { Invoice, Payment } from "@/types";
+import { Invoice, Payment, Lease } from "@/types";
 
-export function useBilling() {
+export interface UseBillingOptions {
+    invoices?: boolean;
+    payments?: boolean;
+    leases?: boolean;
+}
+
+export function useBilling(options: UseBillingOptions = {}) {
+    const { invoices: fetchInvoices = false, payments: fetchPayments = false, leases: fetchLeases = false } = options;
     const { token } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
+    const [leases, setLeases] = useState<Lease[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -16,12 +24,30 @@ export function useBilling() {
         setIsLoading(true);
         setError(null);
         try {
-            const [invoicesRes, paymentsRes] = await Promise.all([
-                billingApi.findAllInvoices(),
-                billingApi.findAllPayments(),
-            ]);
-            setInvoices(invoicesRes.data);
-            setPayments(paymentsRes.data);
+            const fetchPromises: Promise<{ data: unknown }>[] = [];
+            const fetchKeys: string[] = [];
+
+            if (fetchInvoices) {
+                fetchPromises.push(billingApi.findAllInvoices());
+                fetchKeys.push('invoices');
+            }
+            if (fetchPayments) {
+                fetchPromises.push(billingApi.findAllPayments());
+                fetchKeys.push('payments');
+            }
+            if (fetchLeases) {
+                fetchPromises.push(billingApi.findAllLeases());
+                fetchKeys.push('leases');
+            }
+
+            const results = await Promise.all(fetchPromises);
+
+            results.forEach((result, index) => {
+                const key = fetchKeys[index];
+                if (key === 'invoices') setInvoices(result.data as Invoice[]);
+                if (key === 'payments') setPayments(result.data as Payment[]);
+                if (key === 'leases') setLeases(result.data as Lease[]);
+            });
         } catch (err: unknown) {
             if (err instanceof AxiosError) {
                 setError(err.response?.data?.message || err.message || "Failed to fetch billing data");
@@ -33,12 +59,16 @@ export function useBilling() {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [token, fetchInvoices, fetchPayments, fetchLeases]);
 
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        if (fetchInvoices || fetchPayments || fetchLeases) {
+            fetchData();
+        } else {
+            setIsLoading(false);
+        }
+    }, [fetchData, fetchInvoices, fetchPayments, fetchLeases]);
 
-    return { invoices, payments, isLoading, error, refetch: fetchData };
+    return { invoices, payments, leases, isLoading, error, refetch: fetchData };
 }

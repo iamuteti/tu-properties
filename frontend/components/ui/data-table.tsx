@@ -32,19 +32,14 @@ interface DataTableProps<T> {
   data: T[];
   columns: ColumnDef<T>[];
   searchPlaceholder?: string;
-  /**
-   * @deprecated Use searchColumns for multiple or virtual search fields.
-   */
-  searchColumn?: keyof T;
   searchColumns?: SearchTarget<T>[];
   emptyMessage?: string;
   emptyIcon?: React.ReactNode;
   enableMultiSearch?: boolean;
   pageSizeOptions?: number[];
   defaultPageSize?: number;
-  /** Enable row selection */
   enableRowSelection?: boolean;
-  /** Callback when rows are selected */
+  enableSearch?: boolean;
   onRowSelectionChange?: (selectedRows: T[]) => void;
 }
 
@@ -52,7 +47,6 @@ export function DataTable<T extends Record<string, any>>({
   data,
   columns,
   searchPlaceholder = 'Search...',
-  searchColumn,
   searchColumns,
   emptyMessage = 'No data available',
   emptyIcon,
@@ -61,6 +55,7 @@ export function DataTable<T extends Record<string, any>>({
   enableMultiSearch = false,
   enableRowSelection = false,
   onRowSelectionChange,
+  enableSearch = true,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -94,11 +89,10 @@ export function DataTable<T extends Record<string, any>>({
 
   const searchTargets = React.useMemo(() => {
     if (searchColumns?.length) return searchColumns;
-    if (searchColumn) return [searchColumn] as SearchTarget<T>[];
     return [] as SearchTarget<T>[];
-  }, [searchColumn, searchColumns]);
+  }, [searchColumns]);
 
-  const hasSearch = Boolean(searchColumn || searchColumns?.length);
+  const hasSearch = Boolean(searchColumns?.length && enableSearch);
 
   const globalSearchFn = React.useCallback<FilterFn<T>>(
     (row, _columnId, filterValue) => {
@@ -190,13 +184,6 @@ export function DataTable<T extends Record<string, any>>({
         const newSelection = typeof updater === 'function' 
           ? updater(prevRowSelection) 
           : updater;
-        if (onRowSelectionChange) {
-          const selectedRows = Object.keys(newSelection)
-            .filter((key) => newSelection[key]) // Only get selected rows
-            .map((key) => table.getRow(key)?.original)
-            .filter(Boolean);
-          onRowSelectionChange(selectedRows as T[]);
-        }
         return newSelection;
       });
     },
@@ -208,6 +195,17 @@ export function DataTable<T extends Record<string, any>>({
       rowSelection,
     },
   });
+
+  // Callback for row selection changes (moved after table declaration)
+  React.useEffect(() => {
+    if (onRowSelectionChange && table) {
+      const selectedRows = Object.keys(rowSelection)
+        .filter((key) => rowSelection[key])
+        .map((key) => table.getRow(key)?.original)
+        .filter(Boolean);
+      onRowSelectionChange(selectedRows as T[]);
+    }
+  }, [rowSelection, onRowSelectionChange, table]);
 
   return (
     <div className="space-y-4">
@@ -262,7 +260,7 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="bg-white/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-slate-200">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">

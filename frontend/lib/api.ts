@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord, CreateInvoiceData  } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -159,10 +159,9 @@ export const leasesApi = {
         api.delete(`/leases/${id}`),
 };
 
-// Billing API
 export const billingApi = {
     // Invoices
-    createInvoice: (data: { leaseId: string; amount: number; dueDate: string; status: string; type: string }) =>
+    createInvoice: (data: CreateInvoiceData) =>
         api.post<Invoice>('/billing/invoices', data),
 
     findAllInvoices: () =>
@@ -171,10 +170,20 @@ export const billingApi = {
     findOneInvoice: (id: string) =>
         api.get<Invoice>(`/billing/invoices/${id}`),
 
+    deleteInvoice: (id: string) =>
+        api.delete(`/billing/invoices/${id}`),
+
+    deleteInvoices: (ids: string[]) =>
+        api.post('/billing/invoices/bulk-delete', { ids }),
+
     // Payments
     recordPayment: (data: { invoiceId: string; amount: number; paymentDate: string; method: string; reference?: string }) =>
         api.post<Payment>('/billing/payments', data),
 
     findAllPayments: () =>
         api.get<Payment[]>('/billing/payments'),
+
+    // Get all leases for customer selection
+    findAllLeases: () =>
+        api.get<Lease[]>('/billing/leases'),
 };

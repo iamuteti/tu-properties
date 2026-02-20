@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { useForm, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useLandlords } from "@/hooks/use-landlords";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,13 +18,14 @@ import {
   TRANSACTION_CLASSES,
   CURRENCIES,
   ACCOUNTS_RECEIVABLE,
-  INCOME_ACCOUNTS,
 } from "@/lib/constants";
+import { billingApi } from "@/lib/api";
+import {CreateInvoiceData} from "@/types"
 
 // Zod schema for invoice validation
 const invoiceSchema = z.object({
   transactionClass: z.string().min(1, "Transaction class is required"),
-  customerId: z.string().min(1, "Customer is required"),
+  landlordId: z.string().min(1, "Landlord is required"),
   acReceivable: z.string().min(1, "A/C Receivable is required"),
   billTo: z.string().optional(),
   invoiceDate: z.string().min(1, "Invoice date is required"),
@@ -55,6 +57,7 @@ interface InvoiceLine {
 export default function NewInvoicePage() {
   const { token } = useAuth();
   const router = useRouter();
+  const { landlords, isLoading: isLoadingLandlords, refetch } = useLandlords();
   const [error, setError] = useState<string | null>(null);
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([
     { id: 1, revenueExpenseItem: "", particular: "", incomeAccount: "", unitCost: 0, qty: 0, taxRate: 0, taxAmount: 0, lineTotal: 0, className: "" },
@@ -68,7 +71,7 @@ export default function NewInvoicePage() {
     resolver: zodResolver(invoiceSchema) as Resolver<InvoiceFormValues>,
     defaultValues: {
       transactionClass: "",
-      customerId: "",
+      landlordId: "",
       acReceivable: "",
       billTo: "",
       invoiceDate: new Date().toISOString().split("T")[0],
@@ -143,10 +146,51 @@ export default function NewInvoicePage() {
   const onSubmit = async (data: InvoiceFormValues) => {
     setError(null);
     try {
-      // For now, just log the data since we're focusing on UI
-      console.log("Invoice data:", { ...data, invoiceLines, subTotal, taxes, total });
-      // TODO: Implement actual API call when backend is ready
-      router.push("/dashboard/billing");
+      // Get the selected landlord to build billTo
+      const selectedLandlord = landlords.find(l => l.id === data.landlordId);
+      const billTo = data.billTo || (selectedLandlord ? `${selectedLandlord.name || ''} - ${selectedLandlord.email || ''} - ${selectedLandlord.phone || ''}` : '');
+
+      const invoiceData: CreateInvoiceData = {
+        // Invoice header
+        invoiceNumber: data.invoiceNumber || undefined,
+        landlordId: data.landlordId,
+        transactionClass: data.transactionClass,
+        acReceivable: data.acReceivable,
+        billTo: billTo,
+        issueDate: data.invoiceDate,
+        dueDate: data.dueDate,
+        currency: data.currency,
+        spotRate: data.spotRate,
+        lpoNumber: data.lpoNumber || undefined,
+        signOnEfims: data.signOnEfims || false,
+        paymentInfo: data.paymentInfo || undefined,
+        termsConditions: data.termsConditions || undefined,
+        
+        // Amounts
+        amount: subTotal,
+        vatAmount: taxes,
+        totalAmount: total,
+        paidAmount: 0,
+        balanceAmount: total,
+        status: 'PENDING',
+        
+        // Invoice items
+        invoiceItems: invoiceLines.filter(line => line.revenueExpenseItem || line.particular).map(item => ({
+          revenueExpenseItem: item.revenueExpenseItem,
+          particular: item.particular,
+          incomeAccount: item.incomeAccount,
+          unitCost: item.unitCost,
+          qty: item.qty,
+          taxRate: item.taxRate,
+          taxAmount: item.taxAmount,
+          lineTotal: item.lineTotal,
+          className: item.className,
+        })),
+      };
+
+      await billingApi.createInvoice(invoiceData);
+      refetch();
+      router.push("/dashboard/invoices");
     } catch (err: any) {
       setError(
         err.response?.data?.message || "Failed to create invoice. Please try again."
@@ -154,8 +198,22 @@ export default function NewInvoicePage() {
     }
   };
 
+  // Format landlord options for the dropdown
+  const landlordOptions = landlords.map(landlord => ({
+    value: landlord.id,
+    label: `${landlord.name || ''} (${landlord.code || ''}) - ${landlord.email || ''}`,
+  }));
+
+  if (isLoadingLandlords) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ChevronLeft className="h-4 w-4" />
@@ -188,23 +246,19 @@ export default function NewInvoicePage() {
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor="customerId" className="text-sm font-medium leading-none">
-                Customer <span className="text-red-500">*</span>
+              <label htmlFor="landlordId" className="text-sm font-medium leading-none">
+                Landlord <span className="text-red-500">*</span>
               </label>
               <Select
-                id="customerId"
-                options={[
-                  { value: "1", label: "John Doe" },
-                  { value: "2", label: "Jane Smith" },
-                  { value: "3", label: "ABC Company Ltd" },
-                ]}
-                value={watch("customerId")}
-                onChange={(e) => setValue("customerId", e.target.value)}
+                id="landlordId"
+                options={landlordOptions}
+                value={watch("landlordId")}
+                onChange={(e) => setValue("landlordId", e.target.value)}
                 disabled={isSubmitting}
                 search
               />
-              {errors.customerId && (
-                <p className="text-xs text-destructive">{errors.customerId.message}</p>
+              {errors.landlordId && (
+                <p className="text-xs text-destructive">{errors.landlordId.message}</p>
               )}
             </div>
           </div>
@@ -455,10 +509,12 @@ export default function NewInvoicePage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
+                        <Select
+                          options={TRANSACTION_CLASSES}
                           value={line.className}
                           onChange={(e) => updateLine(line.id, 'className', e.target.value)}
                           disabled={isSubmitting}
+                          placeholder="Select class"
                           className="border-0 bg-transparent h-8"
                         />
                       </TableCell>

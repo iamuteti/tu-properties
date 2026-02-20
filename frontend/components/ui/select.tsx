@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Circle, CircleCheck, ChevronDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface SelectOption {
@@ -20,9 +19,10 @@ export interface SelectProps
     name?: string
     disabled?: boolean
     required?: boolean
+    children?: React.ReactNode
 }
 
-const Select = React.forwardRef<HTMLDivElement, SelectProps>(
+export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
     (
         {
             className,
@@ -37,6 +37,7 @@ const Select = React.forwardRef<HTMLDivElement, SelectProps>(
             name,
             disabled,
             required,
+            children,
             ...props
         },
         ref
@@ -45,11 +46,30 @@ const Select = React.forwardRef<HTMLDivElement, SelectProps>(
         const [searchQuery, setSearchQuery] = React.useState("")
         const dropdownRef = React.useRef<HTMLDivElement>(null)
 
+        // Parse children options if no options prop provided
+        const childOptions = React.useMemo(() => {
+            if (options.length > 0) return []
+            
+            const optionElements: SelectOption[] = []
+            React.Children.forEach(children, (child) => {
+                if (React.isValidElement(child) && child.type === 'option') {
+                    const childProps = child.props as { value: string; children?: string }
+                    optionElements.push({
+                        value: childProps.value,
+                        label: childProps.children || childProps.value
+                    })
+                }
+            })
+            return optionElements
+        }, [children, options])
+
+        const displayOptions = options.length > 0 ? options : childOptions
+
         const filteredOptions = search
-            ? options.filter(option =>
+            ? displayOptions.filter(option =>
                 option.label.toLowerCase().includes(searchQuery.toLowerCase())
             )
-            : options
+            : displayOptions
 
         React.useEffect(() => {
             const handleClickOutside = (event: MouseEvent) => {
@@ -68,39 +88,59 @@ const Select = React.forwardRef<HTMLDivElement, SelectProps>(
             onSearch?.(value)
         }
 
-        const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder
+        const selectedOption = displayOptions.find(opt => opt.value === value)
+        const selectedLabel = selectedOption?.label || placeholder
+
+        const handleSelect = (optionValue: string) => {
+            onChange?.({ target: { value: optionValue, name } })
+            setIsOpen(false)
+        }
 
         const selectContent = (
             <div className="relative" ref={dropdownRef}>
                 <button
                     type="button"
                     className={cn(
-                        "flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-white/50 px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
+                        "flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
                         className,
                         error && "border-red-500 focus:ring-red-500"
                     )}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     disabled={disabled}
                 >
-                    <span className="truncate">
+                    <span className={cn("truncate", !value && "text-slate-400")}>
                         {selectedLabel}
                     </span>
-                    <ChevronDown className={cn("h-4 w-4 opacity-50", isOpen && "rotate-180")} />
+                    <svg
+                        className={cn("h-4 w-4 opacity-50", isOpen && "rotate-180")}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                 </button>
 
-                {isOpen && (
-                    <div className="absolute z-50 mt-1 w-full rounded-xl border border-slate-200 bg-white text-slate-950 shadow-lg animate-in fade-in-0 zoom-in-95">
+                {isOpen && displayOptions.length > 0 && (
+                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-slate-200 bg-white text-slate-950 shadow-lg">
                         {search && (
                             <div className="relative p-2 border-b border-slate-100">
-                                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Search..."
-                                    className="w-full bg-transparent pl-10 pr-4 py-1.5 text-sm outline-none placeholder:text-slate-400"
+                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-slate-400 border border-slate-200 rounded-md"
                                     value={searchQuery}
                                     onChange={handleSearchChange}
                                     autoFocus
                                 />
+                                <svg
+                                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
                             </div>
                         )}
                         <div className="p-1 max-h-60 overflow-auto">
@@ -109,24 +149,16 @@ const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                                     <div
                                         key={option.value}
                                         className={cn(
-                                            "relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-slate-100 hover:text-slate-900",
-                                            option.value === value && "bg-slate-100/50 text-slate-900"
+                                            "relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 px-3 text-sm outline-none hover:bg-slate-100 hover:text-slate-900 cursor-pointer",
+                                            option.value === value && "bg-slate-100/50 text-slate-900 font-medium"
                                         )}
-                                        onClick={() => {
-                                            onChange?.({ target: { value: option.value, name } })
-                                            setIsOpen(false)
-                                        }}
+                                        onClick={() => handleSelect(option.value)}
                                     >
-                                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                                            {option.value === value ?
-                                                <CircleCheck className="h-4 w-4 text-cyan-600" /> :
-                                                <Circle className="h-4 w-4 text-cyan-600" />}
-                                        </span>
                                         <span>{option.label}</span>
                                     </div>
                                 ))
                             ) : (
-                                <div className="px-2 py-1.5 text-sm text-slate-500">
+                                <div className="px-3 py-2 text-sm text-slate-500">
                                     No options found
                                 </div>
                             )}
@@ -152,5 +184,3 @@ const Select = React.forwardRef<HTMLDivElement, SelectProps>(
 )
 
 Select.displayName = "Select"
-
-export { Select }

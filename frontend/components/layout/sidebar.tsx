@@ -23,22 +23,47 @@ import {
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
 
 interface NavItem {
-    href: string;
+    href?: string;
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     roles: UserRole[];
+    children?: NavItem[];
 }
 
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
     { href: "/dashboard/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
     { href: "/dashboard/landlords", label: "Landlords", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-    { href: "/dashboard/properties", label: "Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+    { 
+        label: "Properties", 
+        icon: Building2, 
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        children: [
+            { href: "/dashboard/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/dashboard/properties/new", label: "Add Property", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+        ]
+    },
     { href: "/dashboard/units", label: "Units", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
     { href: "/dashboard/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
     { href: "/dashboard/leases", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-    { href: "/dashboard/billing", label: "Billing", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
-    { href: "/dashboard/reports", label: "Reports", icon: BarChart, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+    { 
+        label: "Billing & Finance", 
+        icon: CreditCard, 
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        children: [
+            { href: "/dashboard/billing", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/dashboard/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/dashboard/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+        ]
+    },
+    // For ACCOUNTANT role: show children as separate parent items
+    { href: "/dashboard/invoices", label: "Invoices", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/dashboard/payments", label: "Payments", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/dashboard/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/dashboard/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
+
+    // { href: "/dashboard/reports", label: "Reports", icon: BarChart, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+
     { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
@@ -53,6 +78,7 @@ const roleLabels: Record<UserRole, string> = {
 export function Sidebar() {
     const pathname = usePathname();
     const { user, isLoading, logout } = useAuth();
+    const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
     console.log('User: ', user);
     console.log('IsLoading: ', isLoading);
@@ -63,6 +89,73 @@ export function Sidebar() {
         (item) => user && item.roles.includes(user.role)
     );
 
+    const toggleItem = (label: string) => {
+        setExpandedItems(prev => 
+            prev.includes(label) 
+                ? prev.filter(item => item !== label)
+                : [...prev, label]
+        );
+    };
+
+    const renderNavItem = (item: NavItem) => {
+        const isActive = item.href && pathname === item.href;
+        const hasChildren = item.children && item.children.length > 0;
+        const isExpanded = expandedItems.includes(item.label);
+
+        if (hasChildren) {
+            return (
+                <div key={item.label} className="space-y-1">
+                    <button
+                        onClick={() => toggleItem(item.label)}
+                        className={cn(
+                            "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                            isActive
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <item.icon className="h-4 w-4" />
+                            {item.label}
+                        </div>
+                        <svg
+                            className={cn(
+                                "h-4 w-4 transition-transform",
+                                isExpanded ? "rotate-180" : ""
+                            )}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {isExpanded && (
+                        <div className="ml-4 space-y-1 border-l border-muted pl-3">
+                            {item.children?.map(child => renderNavItem(child))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        return (
+            <Link
+                key={item.href}
+                href={item.href!}
+                className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+            >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+            </Link>
+        );
+    };
+
     return (
         <aside className="hidden h-screen w-64 flex-col border-r bg-card text-card-foreground md:flex">
             <div className="flex h-16 items-center border-b px-6">
@@ -71,24 +164,7 @@ export function Sidebar() {
                 </span>
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-                {filteredNavItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                                isActive
-                                    ? "bg-primary text-primary-foreground"
-                                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                            )}
-                        >
-                            <item.icon className="h-4 w-4" />
-                            {item.label}
-                        </Link>
-                    );
-                })}
+                {filteredNavItems.map(renderNavItem)}
             </nav>
             <div className="border-t p-4">
                 <div className="flex items-center justify-between">

@@ -281,6 +281,7 @@ export interface Lease {
     status: string;
     unit?: Unit;
     tenant?: Tenant;
+    property?: Property;
     invoices?: any[];
     createdAt: string;
     updatedAt: string;
@@ -288,14 +289,33 @@ export interface Lease {
 
 export interface Invoice {
     id: string;
-    leaseId: string;
-    amount: number;
+    invoiceNumber: string;
+    landlordId?: string;
+    leaseId?: string;
+    issueDate: string;
     dueDate: string;
-    status: 'PAID' | 'UNPAID' | 'OVERDUE' | 'PARTIALLY_PAID';
-    type: 'RENT' | 'UTILITY' | 'FEE';
+    amount: number;
+    vatAmount?: number;
+    totalAmount: number;
+    currency: string;
+    transactionClass?: string;
+    acReceivable?: string;
+    billTo?: string;
+    spotRate?: number;
+    lpoNumber?: string;
+    signOnEfims?: boolean;
+    paymentInfo?: string;
+    termsConditions?: string;
+    memo?: string;
+    status: 'DRAFT' | 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+    paidAmount: number;
+    balanceAmount: number;
+    organizationId?: string;
     createdAt: string;
     updatedAt: string;
+    landlord?: Landlord;
     lease?: Lease;
+    invoiceItems?: any[];
     payments?: Payment[];
 }
 
@@ -346,4 +366,47 @@ export interface ImagePickerProps {
 export interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+}
+
+// Billing API
+export interface InvoiceLineItem {
+    revenueExpenseItem: string;
+    particular: string;
+    incomeAccount: string;
+    unitCost: number;
+    qty: number;
+    taxRate: number;
+    taxAmount: number;
+    lineTotal: number;
+    className: string;
+}
+
+export interface CreateInvoiceData {
+    // Invoice header
+    invoiceNumber?: string;
+    landlordId?: string;
+    leaseId?: string;
+    transactionClass: string;
+    acReceivable: string;
+    billTo?: string;
+    issueDate: string;
+    dueDate: string;
+    currency: string;
+    spotRate: number;
+    lpoNumber?: string;
+    signOnEfims: boolean;
+    paymentInfo?: string;
+    termsConditions?: string;
+    memo?: string;
+    
+    // Amounts
+    amount: number;
+    vatAmount?: number;
+    totalAmount: number;
+    paidAmount?: number;
+    balanceAmount: number;
+    status?: string;
+    
+    // Invoice items
+    invoiceItems?: InvoiceLineItem[];
 }
