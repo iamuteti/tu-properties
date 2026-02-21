@@ -299,7 +299,6 @@ async function main() {
     // Create a payment for Invoice 1
     await prisma.payment.create({
         data: {
-            receiptNumber: 'REC-001',
             leaseId: lease1.id,
             invoiceId: inv1.id,
             amount: units[0].baseRent!,

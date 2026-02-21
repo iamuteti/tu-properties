@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord, CreateInvoiceData  } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -186,4 +186,55 @@ export const billingApi = {
     // Get all leases for customer selection
     findAllLeases: () =>
         api.get<Lease[]>('/billing/leases'),
+};
+
+// Finance API (new modular endpoints)
+export const financeApi = {
+    // Invoices
+    createInvoice: (data: CreateInvoiceData) =>
+        api.post<Invoice>('/finance/invoices', data),
+
+    findAllInvoices: () =>
+        api.get<Invoice[]>('/finance/invoices'),
+
+    findOneInvoice: (id: string) =>
+        api.get<Invoice>(`/finance/invoices/${id}`),
+
+    deleteInvoice: (id: string) =>
+        api.delete(`/finance/invoices/${id}`),
+
+    deleteInvoices: (ids: string[]) =>
+        api.post('/finance/invoices/bulk-delete', { ids }),
+
+    // Payments
+    createPayment: (data: CreatePaymentData) =>
+        api.post<Payment>('/finance/payments', data),
+
+    recordPayment: (data: { invoiceId: string; amount: number; paymentDate: string; method: string; reference?: string }) =>
+        api.post<Payment>('/finance/payments', data),
+
+    findAllPayments: () =>
+        api.get<Payment[]>('/finance/payments'),
+
+    deletePayment: (id: string) =>
+        api.delete(`/finance/payments/${id}`),
+
+    deletePayments: (ids: string[]) =>
+        api.post('/finance/payments/bulk-delete', { ids }),
+
+    // Receipts
+    createReceipt: (data: Record<string, unknown>) =>
+        api.post<Receipt>('/finance/receipts', data),
+
+    findAllReceipts: () =>
+        api.get<Receipt[]>('/finance/receipts'),
+
+    findOneReceipt: (id: string) =>
+        api.get<Receipt>(`/finance/receipts/${id}`),
+
+    deleteReceipt: (id: string) =>
+        api.delete(`/finance/receipts/${id}`),
+
+    deleteReceipts: (ids: string[]) =>
+        api.post('/finance/receipts/bulk-delete', { ids }),
 };

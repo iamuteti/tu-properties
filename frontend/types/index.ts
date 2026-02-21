@@ -319,16 +319,96 @@ export interface Invoice {
     payments?: Payment[];
 }
 
-export interface Payment {
+export interface Receipt {
     id: string;
-    invoiceId: string;
-    amount: number;
-    paymentDate: string;
-    method: 'CASH' | 'BANK_TRANSFER' | 'MOBILE_MONEY' | 'CHECK';
-    reference?: string;
+    receiptId: string;
+    receiptType: 'ApplyToInvoice' | 'CashReceipt';
+    receiptCategory: 'Rent' | 'General';
+    
+    // Common fields
+    receivedFrom: string;
+    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+    depositIntoAc?: string;
+    refNo?: string;
+    chequeNo?: string;
+    chequeDate?: string;
+    recordingDate: string;
+    amountReceived: number;
+    notes?: string;
+    
+    // Rent receipt specific fields
+    tenantId?: string;
+    tenant?: Tenant;
+    landlordId?: string;
+    landlord?: Landlord;
+    recordDate?: string;
+    bankingDate?: string;
+    paymentRefNo?: string;
+    amountVatInclusive?: boolean;
+    receiptTo?: 'Landlord' | 'GeneralLedger';
+    drtOrDrf?: 'DirectReceipt' | 'DepositRefund';
+    memo?: string;
+    paymentBank?: string;
+    currency?: string;
+    spotRate?: number;
+    
+    // Reversal properties
+    isReversed?: boolean;
+    reversalPeriod?: string;
+    
+    // Relationships
+    payments?: Payment[];
+    receiptLines?: ReceiptLine[];
+    
+    organizationId?: string;
     createdAt: string;
     updatedAt: string;
+    recordedBy?: string;
+}
+
+export interface Payment {
+    id: string;
+    invoiceId?: string;
+    leaseId?: string;
+    receiptId?: string;
+    paymentDate: string;
+    amount: number;
+    currency?: string;
+    spotRate?: number;
+    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+    paymentReference?: string;
+    payee?: string;
+    paidFrom?: string;
+    paidTo?: string;
+    paymentType?: 'ApplyToBill' | 'CashPayment';
+    chequeNumber?: string;
+    chequeDate?: string;
+    mpesaReceiptNumber?: string;
+    mpesaPhoneNumber?: string;
+    notes?: string;
+    attachments?: string;
+    organizationId?: string;
+    createdAt: string;
+    updatedAt: string;
+    recordedBy?: string;
     invoice?: Invoice;
+    lease?: Lease;
+    receipt?: Receipt;
+}
+
+export interface ReceiptLine {
+    id?: string;
+    date: string;
+    invNo?: string;
+    particular: string;
+    invoiceTotal: number;
+    prevReceipts: number;
+    amtDue: number;
+    payment: number;
+    newBalance: number;
+    whtTax?: number;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface DataTableProps<T> {
@@ -409,4 +489,25 @@ export interface CreateInvoiceData {
     
     // Invoice items
     invoiceItems?: InvoiceLineItem[];
+}
+
+export interface CreatePaymentData {
+    invoiceId?: string;
+    leaseId?: string;
+    receiptId?: string;
+    paymentDate: string;
+    amount: number;
+    currency?: string;
+    spotRate?: number;
+    paymentMethod: string;
+    paymentReference?: string;
+    payee?: string;
+    paidFrom?: string;
+    paidTo?: string;
+    paymentType?: string;
+    chequeNumber?: string;
+    chequeDate?: string;
+    mpesaReceiptNumber?: string;
+    mpesaPhoneNumber?: string;
+    notes?: string;
 }

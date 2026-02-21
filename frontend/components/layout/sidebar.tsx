@@ -32,39 +32,44 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
-    { href: "/dashboard/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
-    { href: "/dashboard/landlords", label: "Landlords", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-    { 
-        label: "Properties", 
-        icon: Building2, 
+    { href: "/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
+    { href: "/landlords", label: "Landlords", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+    {
+        label: "Properties",
+        icon: Building2,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         children: [
-            { href: "/dashboard/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/dashboard/properties/new", label: "Add Property", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
         ]
     },
-    { href: "/dashboard/units", label: "Units", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-    { href: "/dashboard/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-    { href: "/dashboard/leases", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-    { 
-        label: "Billing & Finance", 
-        icon: CreditCard, 
+    {
+        label: "Tenants & Leases",
+        icon: Users,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         children: [
-            { href: "/dashboard/billing", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/dashboard/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/dashboard/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/leases", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
+        ]
+    },
+    {
+        label: "Billing & Finance",
+        icon: CreditCard,
+        roles: ['SUPER_ADMIN','ADMIN'],
+        children: [
+            { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['ACCOUNTANT'] },
+            { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['ACCOUNTANT'] },
+            { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
+            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] }
         ]
     },
     // For ACCOUNTANT role: show children as separate parent items
-    { href: "/dashboard/invoices", label: "Invoices", icon: CreditCard, roles: ['ACCOUNTANT'] },
-    { href: "/dashboard/payments", label: "Payments", icon: CreditCard, roles: ['ACCOUNTANT'] },
-    { href: "/dashboard/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
-    { href: "/dashboard/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
+    { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['ACCOUNTANT'] },
 
-    // { href: "/dashboard/reports", label: "Reports", icon: BarChart, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-
-    { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -80,18 +85,14 @@ export function Sidebar() {
     const { user, isLoading, logout } = useAuth();
     const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
-    console.log('User: ', user);
-    console.log('IsLoading: ', isLoading);
-    console.log('User: ', user);
-
     // Filter nav items based on user role
     const filteredNavItems = navItems.filter(
         (item) => user && item.roles.includes(user.role)
     );
 
     const toggleItem = (label: string) => {
-        setExpandedItems(prev => 
-            prev.includes(label) 
+        setExpandedItems(prev =>
+            prev.includes(label)
                 ? prev.filter(item => item !== label)
                 : [...prev, label]
         );

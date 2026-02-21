@@ -1,6 +1,5 @@
 "use client";
 
-import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -12,8 +11,6 @@ export interface InvoiceFiltersState {
   period: string;
   fromDate: string;
   toDate: string;
-  startDate: string;
-  endDate: string;
   status: string;
   customer: string;
   transactionClass: string;
@@ -44,18 +41,19 @@ export function InvoiceFilters({
     filters.period !== 'all' ||
     filters.fromDate ||
     filters.toDate ||
-    filters.startDate ||
-    filters.endDate ||
     filters.status ||
     filters.customer ||
     filters.transactionClass
   );
 
   return (
-    <div className="relative z-20 bg-white/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-slate-200 p-6">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Invoice #</label>
+    <div className="rounded-lg border bg-card p-4 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {/* Invoice Number */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none">
+            Invoice #
+          </label>
           <Input
             type="text"
             placeholder="Search invoice number..."
@@ -64,91 +62,84 @@ export function InvoiceFilters({
           />
         </div>
 
-        <PeriodSelector
-          period={filters.period}
-          onPeriodChange={(period) => handleFilterChange('period', period)}
-          fromDate={filters.fromDate}
-          onFromDateChange={(date) => handleFilterChange('fromDate', date)}
-          toDate={filters.toDate}
-          onToDateChange={(date) => handleFilterChange('toDate', date)}
-          showCustomRange
-        />
-
-        <div className="min-w-[150px]">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
-          <Input
-            type="date"
-            value={filters.startDate}
-            onChange={(e) => handleFilterChange('startDate', e.target.value)}
+        {/* Period with custom date range */}
+        <div className="md:col-span-2">
+          <PeriodSelector
+            period={filters.period}
+            onPeriodChange={(period) => handleFilterChange('period', period)}
+            fromDate={filters.fromDate}
+            onFromDateChange={(date) => handleFilterChange('fromDate', date)}
+            toDate={filters.toDate}
+            onToDateChange={(date) => handleFilterChange('toDate', date)}
+            showCustomRange
           />
         </div>
 
-        <div className="min-w-[150px]">
-          <label className="block text-sm font-medium text-slate-700 mb-2">End Date</label>
-          <Input
-            type="date"
-            value={filters.endDate}
-            onChange={(e) => handleFilterChange('endDate', e.target.value)}
-          />
-        </div>
-
-        <div className="min-w-[150px]">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+        {/* Status */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none">
+            Status
+          </label>
           <Select
             value={filters.status || ''}
             onChange={(e) => handleFilterChange('status', e.target.value)}
-          >
-            <option value="">All</option>
-            <option value="DRAFT">Draft</option>
-            <option value="PENDING">Pending</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-            <option value="PAID">Paid</option>
-            <option value="OVERDUE">Overdue</option>
-            <option value="CANCELLED">Cancelled</option>
-          </Select>
+            options={[
+              { value: '', label: 'All' },
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'PENDING', label: 'Pending' },
+              { value: 'PARTIALLY_PAID', label: 'Partially Paid' },
+              { value: 'PAID', label: 'Paid' },
+              { value: 'OVERDUE', label: 'Overdue' },
+              { value: 'CANCELLED', label: 'Cancelled' },
+            ]}
+          />
         </div>
 
-        <div className="min-w-[150px]">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Customer</label>
+        {/* Customer */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none">
+            Customer
+          </label>
           <Select
-            value={filters.customer}
+            value={filters.customer || ''}
             onChange={(e) => handleFilterChange('customer', e.target.value)}
-          >
-            <option value="">All</option>
-            {uniqueCustomers.map((customer) => (
-              <option key={customer} value={customer}>
-                {customer}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: '', label: 'All' },
+              ...uniqueCustomers.map((customer) => ({ 
+                value: customer, 
+                label: customer 
+              })),
+            ]}
+          />
         </div>
 
-        <div className="min-w-[150px]">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Transaction Class</label>
+        {/* Transaction Class */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none">
+            Transaction Class
+          </label>
           <Select
-            value={filters.transactionClass}
+            value={filters.transactionClass || ''}
             onChange={(e) => handleFilterChange('transactionClass', e.target.value)}
-          >
-            <option value="">All</option>
-            {TRANSACTION_CLASSES.map((cls) => (
-              <option key={cls.value} value={cls.value}>
-                {cls.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="flex items-end gap-2">
-          <Button onClick={onReset} variant="outline" size="icon" title="Reset filters">
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          {hasActiveFilters && (
-            <Button onClick={onReset} variant="ghost" size="icon" title="Clear all filters">
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+            options={[
+              { value: '', label: 'All' },
+              ...TRANSACTION_CLASSES.map((cls) => ({ 
+                value: cls.value, 
+                label: cls.label 
+              })),
+            ]}
+          />
         </div>
       </div>
+
+      {/* Reset Filters */}
+      {hasActiveFilters && (
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" onClick={onReset}>
+            Reset Filters
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

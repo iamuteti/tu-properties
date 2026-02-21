@@ -46,6 +46,7 @@ model Organization {
   leases     Lease[]
   invoices   Invoice[]
   payments   Payment[]
+  receipts   Receipt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -156,6 +157,7 @@ model Landlord {
   // Relationships
   properties Property[]
   invoices   Invoice[]
+  receipts   Receipt[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -522,6 +524,7 @@ model Tenant {
   // Relationships
   leases            Lease[]
   emergencyContacts TenantEmergencyContact[]
+  receipts          Receipt[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -732,31 +735,107 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+model Receipt {
+  id String @id @default(cuid())
+  receiptId String @unique // Receipt ID
+  receiptType ReceiptType @default(ApplyToInvoice)
+  receiptCategory ReceiptCategory @default(Rent)
+  
+  // Common fields
+  receivedFrom String
+  paymentMethod PaymentMethod
+  depositIntoAc String?
+  refNo String?
+  chequeNo String?
+  chequeDate DateTime?
+  recordingDate DateTime @default(now())
+  amountReceived Decimal @db.Decimal(10, 2)
+  notes String? @db.Text
+  
+  // Rent receipt specific fields
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  landlordId String?
+  landlord Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
+  recordDate DateTime?
+  bankingDate DateTime?
+  paymentRefNo String?
+  amountVatInclusive Boolean @default(true)
+  receiptTo ReceiptTo @default(Landlord)
+  drtOrDrf DRTOrDRF @default(DepositRefund)
+  memo String? @db.Text
+  paymentBank String?
+  currency String @default("KES")
+  spotRate Decimal? @db.Decimal(10, 4)
+  
+  // Relationships
+  payments Payment[]
+  receiptLines ReceiptLine[]
+  
+  // Organization/Tenant association
+  organizationId String?
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  
+  // Audit fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  recordedBy String?
+  
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([receiptType])
+  @@index([receiptCategory])
+  @@index([recordingDate])
+  @@index([paymentMethod])
+  @@index([organizationId])
+  @@map("receipts")
+}
+
+enum ReceiptCategory {
+  Rent
+  General
+}
+
 model Payment {
   id            String @id @default(cuid())
-  receiptNumber String @unique
-
-  leaseId String
-  lease   Lease  @relation(fields: [leaseId], references: [id], onDelete: Restrict)
-
-  invoiceId String?
-  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  
+  leaseId String?
+  lease   Lease? @relation(fields: [leaseId], references: [id], onDelete: SetNull)
+  
+  receiptId String?
+  receipt   Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
 
   // Payment Details
   paymentDate DateTime @default(now())
   amount      Decimal  @db.Decimal(10, 2)
   currency    String   @default("KES")
+  spotRate    Decimal? @db.Decimal(10, 4) // Spot Rate
 
   // Payment Method
   paymentMethod    PaymentMethod
-  paymentReference String? // Bank ref, M-Pesa code, etc.
+  paymentReference String? // Ref No. (Bank ref, M-Pesa code, etc.)
+
+  // Payment Parties
+  payee        String?
+  paidFrom     String?
+  paidTo       String?
+
+  // Payment Type
+  paymentType PaymentType @default(ApplyToBill)
+
+  // Cheque details
+  chequeNumber String?
+  chequeDate   DateTime?
 
   // MPESA specific
   mpesaReceiptNumber String?
   mpesaPhoneNumber   String?
 
-  // Notes
-  notes String? @db.Text
+  // Notes and Attachments
+  notes        String? @db.Text
+  attachments  String? // JSON or comma-separated file paths
 
   // Organization/Tenant association
   organizationId String?
@@ -765,13 +844,20 @@ model Payment {
   // Audit fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  recordedBy String?
+  
   @@index([leaseId])
   @@index([invoiceId])
+  @@index([receiptId])
   @@index([paymentDate])
   @@index([paymentMethod])
   @@index([organizationId])
   @@map("payments")
+}
+
+enum PaymentType {
+  ApplyToBill
+  CashPayment
 }
 
 enum PaymentMethod {
@@ -781,4 +867,41 @@ enum PaymentMethod {
   MPESA
   CARD
   OTHER
+}
+
+enum ReceiptType {
+  ApplyToInvoice
+  CashReceipt
+}
+
+enum ReceiptTo {
+  Landlord
+  GeneralLedger
+}
+
+enum DRTOrDRF {
+  DirectReceipt
+  DepositRefund
+}
+
+model ReceiptLine {
+  id String @id @default(cuid())
+  receiptId String
+  receipt Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  
+  date DateTime
+  invNo String?
+  particular String
+  invoiceTotal Decimal @db.Decimal(10, 2)
+  prevReceipts Decimal @db.Decimal(10, 2) @default(0)
+  amtDue Decimal @db.Decimal(10, 2)
+  payment Decimal @db.Decimal(10, 2)
+  newBalance Decimal @db.Decimal(10, 2)
+  whtTax Decimal @db.Decimal(10, 2) @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([receiptId])
+  @@map("receipt_lines")
 }
