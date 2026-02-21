@@ -3,16 +3,25 @@ import { PaymentsService } from './payments.service';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
+import { UsersService } from '@/modules/users/users.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('finance/payments')
 export class PaymentsController {
-    constructor(private readonly paymentsService: PaymentsService) { }
+    constructor(
+        private readonly paymentsService: PaymentsService,
+        private readonly usersService: UsersService
+    ) { }
 
     @Post()
-    create(@Body() createPaymentDto: Prisma.PaymentCreateInput, @Request() req) {
+    async create(@Body() createPaymentDto: Prisma.PaymentCreateInput, @Request() req) {
         const tenantId = getTenantId(req);
-        return this.paymentsService.create(createPaymentDto, tenantId);
+        const user = await this.usersService.findOne(req.user.userId);
+        const recordedBy = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
+        return this.paymentsService.create({
+            ...createPaymentDto,
+            recordedBy
+        }, tenantId);
     }
 
     @Get()

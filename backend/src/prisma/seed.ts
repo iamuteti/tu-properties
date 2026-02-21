@@ -304,6 +304,7 @@ async function main() {
             amount: units[0].baseRent!,
             paymentMethod: PaymentMethod.MPESA,
             paymentReference: 'RBT98V7W6X',
+            recordedBy: 'MASHABAZI GIDEON',
         },
     });
 

@@ -15,51 +15,8 @@ import { getDateRangeForPeriod } from "@/components/filters/period-selector";
 // Define columns for the DataTable
 const columns: ColumnDef<Payment>[] = [
   {
-    accessorKey: "paymentDate",
-    header: "Payment Date",
-    cell: ({ row }) => new Date(row.original.paymentDate).toLocaleDateString(),
-  },
-  {
-    accessorKey: "invoice",
-    header: "Invoice #",
-    cell: ({ row }) => (
-      row.original.invoice ? (
-        <Link href={`/dashboard/invoices/${row.original.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800">
-          {row.original.invoice.invoiceNumber}
-        </Link>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      )
-    ),
-  },
-  {
-    accessorKey: "receipt",
-    header: "Receipt #",
-    cell: ({ row }) => (
-      row.original.receipt ? (
-        <span className="font-medium">{row.original.receipt.receiptId}</span>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      )
-    ),
-  },
-  {
-    accessorKey: "payee",
-    header: "Payee",
-    cell: ({ row }) => row.original.payee || row.original.lease?.tenant?.surname || "Unknown",
-  },
-  {
-    accessorKey: "amount",
-    header: "Amount",
-    cell: ({ row }) => (
-      <div className="text-right font-medium">
-        {row.original.currency} {Number(row.original.amount).toFixed(2)}
-      </div>
-    ),
-  },
-  {
     accessorKey: "paymentMethod",
-    header: "Payment Method",
+    header: "Method",
     cell: ({ row }) => {
       const method = row.original.paymentMethod;
       let methodColor = "";
@@ -86,14 +43,14 @@ const columns: ColumnDef<Payment>[] = [
       
       return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${methodColor}`}>
-          {method}
+          {method.replace('_', ' ')}
         </span>
       );
     },
   },
   {
     accessorKey: "paymentReference",
-    header: "Reference",
+    header: "Ref. No.",
     cell: ({ row }) => (
       <div className="max-w-xs truncate" title={row.original.paymentReference || "No reference"}>
         {row.original.paymentReference || "-"}
@@ -101,13 +58,53 @@ const columns: ColumnDef<Payment>[] = [
     ),
   },
   {
-    accessorKey: "paymentType",
-    header: "Payment Type",
+    accessorKey: "paymentDate",
+    header: "Date",
+    cell: ({ row }) => new Date(row.original.paymentDate).toLocaleDateString(),
+  },
+  {
+    accessorKey: "particulars",
+    header: "Particulars",
+    cell: ({ row }) => {
+      const payment = row.original;
+      // Try to get meaningful particulars from invoice or lease
+      if (payment.invoice) {
+        return (
+          <Link href={`/dashboard/invoices/${payment.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800">
+            {payment.invoice.invoiceNumber}
+          </Link>
+        );
+      } else if (payment.lease?.tenant) {
+        return `${payment.lease.tenant.surname}, ${payment.lease.tenant.otherNames}`;
+      } else if (payment.payee) {
+        return payment.payee;
+      }
+      return "-";
+    },
+  },
+  {
+    accessorKey: "paidFrom",
+    header: "Paid From",
+    cell: ({ row }) => row.original.paidFrom || "-",
+  },
+  {
+    accessorKey: "paidTo",
+    header: "Paid To",
+    cell: ({ row }) => row.original.paidTo || "-",
+  },
+  {
+    accessorKey: "amount",
+    header: "Amount",
     cell: ({ row }) => (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-        {row.original.paymentType || "ApplyToBill"}
-      </span>
+      <div className="text-right font-medium">
+        {row.original.currency} {Number(row.original.amount).toFixed(2)}
+      </div>
     ),
+  },
+  {
+    accessorKey: "recordedBy",
+    header: "Recorded By",
+    cell: ({ row }) => row.original.recordedBy || "-",
   },
 ];
 

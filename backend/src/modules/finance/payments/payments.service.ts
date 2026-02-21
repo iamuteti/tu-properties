@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { UsersService } from '@/modules/users/users.service';
 
 @Injectable()
 export class PaymentsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private prisma: PrismaService, private usersService: UsersService) { }
 
-    create(data: Prisma.PaymentCreateInput, tenantId?: string) {
+    async create(data: Prisma.PaymentCreateInput & { recordedBy?: string }, tenantId?: string) {
         const paymentData: Prisma.PaymentCreateInput = { ...data };
         
         // Add tenant organization if provided
