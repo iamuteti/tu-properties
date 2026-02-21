@@ -23,7 +23,6 @@ export class UnitsService {
             data: data as Prisma.UnitCreateInput,
             include: {
                 property: true,
-                unitType: true,
             },
         });
     }
@@ -36,7 +35,6 @@ export class UnitsService {
             where,
             include: {
                 property: true,
-                unitType: true,
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -50,7 +48,6 @@ export class UnitsService {
             where,
             include: {
                 property: true,
-                unitType: true,
                 leases: true,
             },
         });

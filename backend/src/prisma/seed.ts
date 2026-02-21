@@ -1,8 +1,9 @@
-import { PrismaClient, UserRole, UnitStatus, LeaseStatus, InvoiceStatus, PaymentMethod, Unit } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
+import { generateDemoData } from './demo-data';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ async function main() {
     // 1. Clean the database
     console.log('Cleaning database...');
     await prisma.payment.deleteMany();
+    await prisma.receipt.deleteMany();
     await prisma.invoiceItem.deleteMany();
     await prisma.invoice.deleteMany();
     await prisma.lease.deleteMany();
@@ -26,17 +28,14 @@ async function main() {
     await prisma.unitMeterNumber.deleteMany();
     await prisma.unitServiceCharge.deleteMany();
     await prisma.unit.deleteMany();
-    await prisma.unitType.deleteMany();
     await prisma.propertySecurityDeposit.deleteMany();
     await prisma.propertyStandingCharge.deleteMany();
     await prisma.property.deleteMany();
-    await prisma.propertyType.deleteMany();
-    await prisma.propertyCategory.deleteMany();
     await prisma.landlord.deleteMany();
     await prisma.user.deleteMany();
     await prisma.organization.deleteMany();
 
-    // 2. Create default Organization
+    // 2. Create default Organization (Westhill Properties - for basic testing)
     console.log('Creating organizations...');
     const defaultOrg = await prisma.organization.create({
         data: {
@@ -50,15 +49,15 @@ async function main() {
         },
     });
 
-    // 3. Create a second organization for testing multi-tenancy
-    const secondOrg = await prisma.organization.create({
+    // 3. Create Rohi Estate Management Organization (for demo data)
+    const rohiOrg = await prisma.organization.create({
         data: {
-            name: 'Acme Properties',
-            slug: 'acme-properties',
-            subdomain: 'acme',
-            plan: 'STARTER',
-            maxUsers: 3,
-            maxProperties: 10,
+            name: 'Rohi Estate Management',
+            slug: 'rohi-estate-management',
+            subdomain: 'rohi',
+            plan: 'ENTERPRISE',
+            maxUsers: 50,
+            maxProperties: 500,
             isActive: true,
         },
     });
@@ -67,7 +66,8 @@ async function main() {
     console.log('Creating users...');
     const passwordHash = await bcrypt.hash('Password123!', 10);
 
-    const admin = await prisma.user.create({
+    // Super Admin (no organization)
+    await prisma.user.create({
         data: {
             email: 'admin@tuhame.co.ke',
             firstName: 'Super',
@@ -78,249 +78,60 @@ async function main() {
         },
     });
 
-    const manager = await prisma.user.create({
+    // Admin for Westhill Properties
+    await prisma.user.create({
         data: {
-            email: 'manager@tuhame.co.ke',
+            email: 'admin@westhill.co.ke',
+            firstName: 'Westhill',
+            lastName: 'Admin',
+            phone: '+254700000002',
+            passwordHash,
+            role: UserRole.ADMIN,
+            organizationId: defaultOrg.id,
+        },
+    });
+
+    // Property Manager for Westhill Properties
+    await prisma.user.create({
+        data: {
+            email: 'manager@westhill.co.ke',
             firstName: 'Property',
             lastName: 'Manager',
-            phone: '+254700000002',
+            phone: '+254700000003',
             passwordHash,
             role: UserRole.PROPERTY_MANAGER,
             organizationId: defaultOrg.id,
         },
     });
 
-    const accountant = await prisma.user.create({
+    // Accountant for Westhill Properties
+    await prisma.user.create({
         data: {
-            email: 'accountant@tuhame.co.ke',
+            email: 'accountant@westhill.co.ke',
             firstName: 'Finance',
             lastName: 'Accountant',
-            phone: '+254700000003',
+            phone: '+254700000004',
             passwordHash,
             role: UserRole.ACCOUNTANT,
             organizationId: defaultOrg.id,
         },
     });
 
-    // Create a user for the second organization
-    const acmeManager = await prisma.user.create({
+    // Admin for Rohi Estate Management
+    await prisma.user.create({
         data: {
-            email: 'manager@acme.co.ke',
-            firstName: 'Acme',
-            lastName: 'Manager',
-            phone: '+254700000004',
+            email: 'admin@rohi.co.ke',
+            firstName: 'Rohi',
+            lastName: 'Admin',
+            phone: '+254700000005',
             passwordHash,
             role: UserRole.ADMIN,
-            organizationId: secondOrg.id,
+            organizationId: rohiOrg.id,
         },
     });
 
-    // 5. Create Landlords
-    console.log('Creating landlords...');
-    const landlords = await Promise.all([
-        prisma.landlord.create({
-            data: {
-                code: 'LL001',
-                name: 'James Mwangi',
-                email: 'james.mwangi@example.co.ke',
-                phone: '+254711222333',
-                address: 'Kilimani, Nairobi',
-                bankName: 'Equity Bank',
-                accountNumber: '1234567890',
-                organizationId: defaultOrg.id,
-            },
-        }),
-        prisma.landlord.create({
-            data: {
-                code: 'LL002',
-                name: 'Sarah Chen',
-                email: 'sarah.chen@example.co.ke',
-                phone: '+254722333444',
-                address: 'Westlands, Nairobi',
-                bankName: 'KCB Bank',
-                accountNumber: '0987654321',
-                organizationId: defaultOrg.id,
-            },
-        }),
-    ]);
-
-    // 4. Property Categories & Types
-    const categories = await Promise.all([
-        prisma.propertyCategory.create({ data: { name: 'Residential', code: 'RES' } }),
-        prisma.propertyCategory.create({ data: { name: 'Commercial', code: 'COM' } }),
-    ]);
-
-    const pTypes = await Promise.all([
-        prisma.propertyType.create({ data: { name: 'Apartment', code: 'APT' } }),
-        prisma.propertyType.create({ data: { name: 'Office Block', code: 'OFF' } }),
-        prisma.propertyType.create({ data: { name: 'Townhouse', code: 'TWN' } }),
-    ]);
-
-    // 7. Create Properties
-    console.log('Creating properties...');
-    const properties = await Promise.all([
-        prisma.property.create({
-            data: {
-                code: 'PROP-001',
-                name: 'Riverside Heights',
-                estateArea: 'Riverside',
-                country: 'Kenya',
-                landlordId: landlords[0].id,
-                categoryId: categories[0].id,
-                propertyTypeId: pTypes[0].id,
-                mpesaPropertyPayNumber: '543210',
-                organizationId: defaultOrg.id,
-            },
-        }),
-        prisma.property.create({
-            data: {
-                code: 'PROP-002',
-                name: 'Westlands Plaza',
-                estateArea: 'Westlands',
-                country: 'Kenya',
-                landlordId: landlords[1].id,
-                categoryId: categories[1].id,
-                propertyTypeId: pTypes[1].id,
-                mpesaPropertyPayNumber: '123456',
-                organizationId: defaultOrg.id,
-            },
-        }),
-    ]);
-
-    // 6. Unit Types
-    const uTypes = await Promise.all([
-        prisma.unitType.create({ data: { name: 'Two Bedroom' } }),
-        prisma.unitType.create({ data: { name: 'One Bedroom' } }),
-        prisma.unitType.create({ data: { name: 'Studio' } }),
-        prisma.unitType.create({ data: { name: 'Executive Suite' } }),
-    ]);
-
-    // 7. Create Units
-    console.log('Creating units...');
-    const units: Unit[] = [];
-    // Property 1 Units (Riverside)
-    for (let i = 1; i <= 5; i++) {
-        const unit = await prisma.unit.create({
-            data: {
-                code: `RIV-${100 + i}`,
-                name: `Apartment ${100 + i}`,
-                propertyId: properties[0].id,
-                unitTypeId: uTypes[i % 3].id,
-                baseRent: 50000 + i * 5000,
-                status: i < 4 ? UnitStatus.OCCUPIED : UnitStatus.VACANT,
-            },
-        });
-        units.push(unit);
-    }
-
-    // Property 2 Units (Westlands)
-    for (let i = 1; i <= 3; i++) {
-        const unit = await prisma.unit.create({
-            data: {
-                code: `WP-${i}F`,
-                name: `Floor ${i}`,
-                propertyId: properties[1].id,
-                unitTypeId: uTypes[3].id,
-                baseRent: 200000 + i * 20000,
-                status: i === 1 ? UnitStatus.OCCUPIED : UnitStatus.VACANT,
-            },
-        });
-        units.push(unit);
-    }
-
-    // 10. Create Tenants
-    console.log('Creating tenants...');
-    const tenants = await Promise.all([
-        prisma.tenant.create({
-            data: {
-                accountNumber: 'TEN-001',
-                code: 'T001',
-                surname: 'Doe',
-                otherNames: 'John',
-                email: 'john.doe@example.co.ke',
-                phone: '+254799000111',
-                organizationId: defaultOrg.id,
-            },
-        }),
-        prisma.tenant.create({
-            data: {
-                accountNumber: 'TEN-002',
-                code: 'T002',
-                surname: 'Smith',
-                otherNames: 'Mary',
-                email: 'mary.smith@example.co.ke',
-                phone: '+254799000222',
-                organizationId: defaultOrg.id,
-            },
-        }),
-        prisma.tenant.create({
-            data: {
-                accountNumber: 'TEN-003',
-                code: 'T003',
-                surname: 'Kamau',
-                otherNames: 'Peter',
-                email: 'peter.kamau@example.co.ke',
-                phone: '+254799000333',
-                organizationId: defaultOrg.id,
-            },
-        }),
-    ]);
-
-    // 11. Create Leases, Invoices, Payments
-    console.log('Creating leases, invoices and payments...');
-
-    // Create an active lease for Tenant 1
-    const lease1 = await prisma.lease.create({
-        data: {
-            code: 'L-001',
-            unitId: units[0].id,
-            tenantId: tenants[0].id,
-            startDate: new Date('2024-01-01'),
-            rentAmount: units[0].baseRent!,
-            status: LeaseStatus.ACTIVE,
-            organizationId: defaultOrg.id,
-        },
-    });
-
-    // Create an invoice for Lease 1
-    const inv1 = await prisma.invoice.create({
-        data: {
-            invoiceNumber: 'INV-2024-001',
-            leaseId: lease1.id,
-            dueDate: new Date('2024-01-05'),
-            amount: units[0].baseRent!,
-            totalAmount: units[0].baseRent!,
-            balanceAmount: 0,
-            paidAmount: units[0].baseRent!,
-            status: InvoiceStatus.PAID,
-        },
-    });
-
-    // Create a payment for Invoice 1
-    await prisma.payment.create({
-        data: {
-            leaseId: lease1.id,
-            invoiceId: inv1.id,
-            amount: units[0].baseRent!,
-            paymentMethod: PaymentMethod.MPESA,
-            paymentReference: 'RBT98V7W6X',
-            recordedBy: 'MASHABAZI GIDEON',
-        },
-    });
-
-    // Create a pending invoice for Lease 1 (current month)
-    await prisma.invoice.create({
-        data: {
-            invoiceNumber: 'INV-2024-002',
-            leaseId: lease1.id,
-            dueDate: new Date('2025-02-05'),
-            amount: units[0].baseRent!,
-            totalAmount: units[0].baseRent!,
-            balanceAmount: units[0].baseRent!,
-            paidAmount: 0,
-            status: InvoiceStatus.PENDING,
-        },
-    });
+    // 5. Generate demo data for Rohi Estate Management
+    await generateDemoData(prisma, rohiOrg.id);
 
     console.log('Database seeded successfully!');
 }

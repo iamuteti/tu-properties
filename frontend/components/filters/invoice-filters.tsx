@@ -105,9 +105,9 @@ export function InvoiceFilters({
             onChange={(e) => handleFilterChange('customer', e.target.value)}
             options={[
               { value: '', label: 'All' },
-              ...uniqueCustomers.map((customer) => ({ 
-                value: customer, 
-                label: customer 
+              ...uniqueCustomers.map((customer) => ({
+                value: customer,
+                label: customer
               })),
             ]}
           />
@@ -123,9 +123,9 @@ export function InvoiceFilters({
             onChange={(e) => handleFilterChange('transactionClass', e.target.value)}
             options={[
               { value: '', label: 'All' },
-              ...TRANSACTION_CLASSES.map((cls) => ({ 
-                value: cls.value, 
-                label: cls.label 
+              ...TRANSACTION_CLASSES.map((cls: any) => ({
+                value: cls.value,
+                label: cls.label
               })),
             ]}
           />

@@ -163,7 +163,7 @@ export function PeriodSelector({
           <Select
             value={period || 'all'}
             onChange={(e) => onPeriodChange(e.target.value)}
-            options={[{ value: 'all', label: 'All' }, ...PERIODS.map(p => ({ value: p.value, label: p.label }))]}
+            options={[{ value: 'all', label: 'All' }, ...PERIODS.map((p: any) => ({ value: p.value, label: p.label }))]}
           />
         </div>
       )}

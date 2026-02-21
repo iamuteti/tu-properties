@@ -21,8 +21,6 @@ export class PropertiesService {
             where,
             include: {
                 landlord: true,
-                category: true,
-                propertyType: true,
                 _count: {
                     select: { units: true },
                 },
@@ -39,8 +37,6 @@ export class PropertiesService {
             where,
             include: {
                 landlord: true,
-                category: true,
-                propertyType: true,
                 units: true,
             },
         });

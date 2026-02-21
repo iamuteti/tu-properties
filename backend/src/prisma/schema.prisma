@@ -170,34 +170,6 @@ model Landlord {
   @@map("landlords")
 }
 
-model PropertyCategory {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  description String? @db.Text
-  code        String? @unique
-
-  properties Property[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("property_categories")
-}
-
-model PropertyType {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  description String? @db.Text
-  code        String? @unique
-
-  properties Property[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("property_types")
-}
-
 model Property {
   id           String    @id @default(cuid())
   code         String    @unique // Property Code
@@ -205,12 +177,16 @@ model Property {
   dateAcquired DateTime? // Date Acquired
   lrNumber     String? // LR Number (Land Registry Number)
 
+  agencyRole    String? // Managing | Letting | Both
+  category      String?
+  type          String?
+  specification String? // Multi-unit/Multi-Space
+
   // Location & Address
   country       String?
   estateArea    String? // Estate/Area
   areaRegion    String? // Area/Region
   roadStreet    String? // Road/Street
-  specification String? // Multi-unit/Multi-Space
 
   // Property Classification
   multiStoryType String? // Multi Story Type
@@ -227,12 +203,6 @@ model Property {
   // Relationships
   landlordId String?
   landlord   Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
-
-  categoryId String?
-  category   PropertyCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  propertyTypeId String?
-  propertyType   PropertyType? @relation(fields: [propertyTypeId], references: [id], onDelete: SetNull)
 
   // Organization/Tenant association
   organizationId String?
@@ -292,8 +262,6 @@ model Property {
   deletedAt DateTime? // Soft delete
 
   @@index([landlordId])
-  @@index([categoryId])
-  @@index([propertyTypeId])
   @@index([code])
   @@index([organizationId])
   @@map("properties")
@@ -303,24 +271,12 @@ model Property {
 // UNITS & SPACES
 // ============================================
 
-model UnitType {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  description String? @db.Text
-
-  units Unit[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("unit_types")
-}
-
 model Unit {
   id       String @id @default(cuid())
   code     String @unique // Unit/Space No.
   name     String // Unit Name/Number
   sequence Int? // Unit Sequence
+  type     String?
 
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -341,9 +297,6 @@ model Unit {
   bathrooms        Int? // Bathroom(s)
   furnished        Boolean @default(false)
   outSourceParking String? // Out Source/Parking
-
-  unitTypeId String?
-  unitType   UnitType? @relation(fields: [unitTypeId], references: [id], onDelete: SetNull)
 
   // Ownership
   ownerOccupied Boolean @default(false)
@@ -378,7 +331,6 @@ model Unit {
   deletedAt DateTime?
 
   @@index([propertyId])
-  @@index([unitTypeId])
   @@index([status])
   @@map("units")
 }
