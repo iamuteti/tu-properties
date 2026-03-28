@@ -19,7 +19,6 @@ import { LandlordsModule } from './modules/landlords/landlords.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -44,7 +43,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
       provide: APP_GUARD,
       useClass: PublicGuard,
     },
-    AppService
+    AppService,
   ],
 })
-export class AppModule { }
+export class AppModule {}

@@ -5,15 +5,18 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('audit')
 export class AuditController {
-    constructor(private readonly auditService: AuditService) { }
+  constructor(private readonly auditService: AuditService) {}
 
-    @Get('user/:userId')
-    getLogsByUser(@Param('userId') userId: string) {
-        return this.auditService.getLogsByUser(userId);
-    }
+  @Get('user/:userId')
+  getLogsByUser(@Param('userId') userId: string) {
+    return this.auditService.getLogsByUser(userId);
+  }
 
-    @Get('entity/:entity/:entityId')
-    getLogsForEntity(@Param('entity') entity: string, @Param('entityId') entityId: string) {
-        return this.auditService.getLogsForEntity(entity, entityId);
-    }
+  @Get('entity/:entity/:entityId')
+  getLogsForEntity(
+    @Param('entity') entity: string,
+    @Param('entityId') entityId: string,
+  ) {
+    return this.auditService.getLogsForEntity(entity, entityId);
+  }
 }

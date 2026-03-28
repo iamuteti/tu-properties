@@ -23,7 +23,7 @@ async function bootstrap() {
   } catch (err) {
     console.error('Failed to create uploads directory:', err);
   }
-  
+
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS
