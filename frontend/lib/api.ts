@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt, PaginatedResponse } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -74,8 +74,28 @@ export const propertiesApi = {
     create: (data: Partial<Property>) =>
         api.post<Property>('/properties', data),
 
-    findAll: () =>
-        api.get<Property[]>('/properties'),
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        type?: string;
+        category?: string;
+        landlordId?: string;
+    }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+        if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+        if (params?.type) queryParams.append('type', params.type);
+        if (params?.category) queryParams.append('category', params.category);
+        if (params?.landlordId) queryParams.append('landlordId', params.landlordId);
+        const query = queryParams.toString();
+        return api.get<PaginatedResponse<Property>>(`/properties${query ? `?${query}` : ''}`);
+    },
 
     findOne: (id: string) =>
         api.get<Property>(`/properties/${id}`),
@@ -110,8 +130,28 @@ export const unitsApi = {
     create: (data: Partial<Unit>) =>
         api.post<Unit>('/units', data),
 
-    findAll: () =>
-        api.get<Unit[]>('/units'),
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        propertyId?: string;
+        status?: string;
+        type?: string;
+    }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+        if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+        if (params?.propertyId) queryParams.append('propertyId', params.propertyId);
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.type) queryParams.append('type', params.type);
+        const query = queryParams.toString();
+        return api.get<PaginatedResponse<Unit>>(`/units${query ? `?${query}` : ''}`);
+    },
 
     findOne: (id: string) =>
         api.get<Unit>(`/units/${id}`),

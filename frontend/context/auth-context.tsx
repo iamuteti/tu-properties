@@ -27,9 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedToken = localStorage.getItem("auth_token");
         const storedUser = localStorage.getItem("auth_user");
 
-        console.log('Auth Context - storedToken:', !!storedToken);
-        console.log('Auth Context - storedUser:', storedUser);
-
         if (storedToken && storedUser) {
             setToken(storedToken);
             try {
@@ -47,7 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = (newToken: string, newUser: User) => {
-        console.log('Login called with user:', newUser);
         setToken(newToken);
         setUser(newUser);
         if (newUser.organization) {

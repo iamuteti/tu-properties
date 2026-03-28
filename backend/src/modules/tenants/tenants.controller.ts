@@ -8,8 +8,9 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
-import { TenantsService } from './tenants.service';
+import { TenantsService, PaginationParams, TenantFilters } from './tenants.service';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
@@ -26,9 +27,29 @@ export class TenantsController {
   }
 
   @Get()
-  findAll(@Request() req) {
+  findAll(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    @Query('tenantType') tenantType?: string,
+    @Query('gender') gender?: string,
+  ) {
     const tenantId = getTenantId(req);
-    return this.tenantsService.findAll(tenantId);
+    const params: PaginationParams = {
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 10,
+      search,
+      sortBy,
+      sortOrder,
+    };
+    const filters: TenantFilters = {
+      tenantType,
+      gender,
+    };
+    return this.tenantsService.findAll(tenantId, params, filters);
   }
 
   @Get(':id')

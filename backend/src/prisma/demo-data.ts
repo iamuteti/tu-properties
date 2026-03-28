@@ -677,6 +677,7 @@ async function main() {
 
   try {
     // Clean the database (in correct order to handle foreign keys)
+    // Preserve super admin user
     console.log('Cleaning database...');
     await prisma.payment.deleteMany();
     await prisma.receiptLine.deleteMany();
@@ -694,7 +695,13 @@ async function main() {
     await prisma.propertyStandingCharge.deleteMany();
     await prisma.property.deleteMany();
     await prisma.landlord.deleteMany();
-    await prisma.user.deleteMany();
+    await prisma.user.deleteMany({
+      where: {
+        role: {
+          not: UserRole.SUPER_ADMIN,
+        },
+      },
+    });
     await prisma.organization.deleteMany();
 
     // Create organizations

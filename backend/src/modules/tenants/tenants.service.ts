@@ -2,6 +2,29 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface TenantFilters {
+  tenantType?: string;
+  gender?: string;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 @Injectable()
 export class TenantsService {
   constructor(private prisma: PrismaService) {}
@@ -40,11 +63,52 @@ export class TenantsService {
     });
   }
 
-  findAll(tenantId?: string) {
-    const where = tenantId ? { organizationId: tenantId } : {};
-    return this.prisma.tenant.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
+  findAll(
+    tenantId?: string,
+    params?: PaginationParams,
+    filters?: TenantFilters,
+  ): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = params || {};
+    const skip = (page - 1) * limit;
+
+    const where: any = tenantId ? { organizationId: tenantId } : {};
+
+    if (search) {
+      where.OR = [
+        { surname: { contains: search, mode: 'insensitive' } },
+        { otherNames: { contains: search, mode: 'insensitive' } },
+        { accountNumber: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (filters) {
+      if (filters.tenantType) where.tenantType = filters.tenantType;
+      if (filters.gender) where.gender = filters.gender;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const [data, total] = await Promise.all([
+        tx.tenant.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+        }),
+        tx.tenant.count({ where }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
     });
   }
 

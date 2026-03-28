@@ -80,6 +80,16 @@ export interface ApiResponse<T> {
     error?: string;
 }
 
+export interface PaginatedResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
 export interface Property {
     id: string;
     code: string;
@@ -201,8 +211,7 @@ export interface Unit {
     bathrooms?: number;
     furnished?: boolean;
     outSourceParking?: string;
-    unitTypeId?: string;
-    unitType?: any;
+    type?: any;
 
     // Ownership
     ownerOccupied?: boolean;
@@ -226,7 +235,7 @@ export interface Unit {
     status: string;
 
     // Relationships
-    leases?: any[];
+    leases?: Lease[];
     serviceCharges?: any[];
     meterNumbers?: any[];
     features?: any[];

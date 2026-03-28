@@ -42,7 +42,7 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      email: 'admin@tuhame.co.ke',
+      email: 'admin@tuproperties.co.ke',
       firstName: 'Super',
       lastName: 'Admin',
       phone: '+254700000001',

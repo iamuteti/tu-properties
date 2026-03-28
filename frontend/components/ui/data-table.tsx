@@ -13,6 +13,7 @@ import {
   type RowSelectionState,
   type Column,
   type Table as TableType,
+  type PaginationState,
 } from '@tanstack/react-table';
 import { Button } from './button';
 import { Input } from './input';
@@ -28,6 +29,13 @@ type SearchTargetObject<T> = {
 
 type SearchTarget<T> = SearchTargetObject<T> | keyof T;
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface DataTableProps<T> {
   data: T[];
   columns: ColumnDef<T>[];
@@ -41,6 +49,12 @@ interface DataTableProps<T> {
   enableRowSelection?: boolean;
   enableSearch?: boolean;
   onRowSelectionChange?: (selectedRows: T[]) => void;
+  // Server-side pagination props
+  serverSidePagination?: boolean;
+  paginationMeta?: PaginationMeta;
+  onPaginationChange?: (pagination: { page: number; limit: number }) => void;
+  onSearchChange?: (search: string) => void;
+  onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -56,16 +70,39 @@ export function DataTable<T extends Record<string, any>>({
   enableRowSelection = false,
   onRowSelectionChange,
   enableSearch = true,
+  serverSidePagination = false,
+  paginationMeta,
+  onPaginationChange,
+  onSearchChange,
+  onSortChange,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [multiSearchValues, setMultiSearchValues] = React.useState<Record<string, string>>({});
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-  const [pagination, setPagination] = React.useState({
+  const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
     pageSize: defaultPageSize,
   });
+
+  // Use refs for callbacks to avoid stale closures and infinite loops
+  const onSearchChangeRef = React.useRef(onSearchChange);
+  const onPaginationChangeRef = React.useRef(onPaginationChange);
+  const onSortChangeRef = React.useRef(onSortChange);
+
+  React.useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
+  React.useEffect(() => {
+    onPaginationChangeRef.current = onPaginationChange;
+  }, [onPaginationChange]);
+  React.useEffect(() => {
+    onSortChangeRef.current = onSortChange;
+  }, [onSortChange]);
+
+  // Track previous values to avoid notifying on initial render
+  const prevPaginationRef = React.useRef<{ pageIndex: number; pageSize: number } | null>(null);
 
   // Debounce global filter
   const [debouncedGlobalFilter, setDebouncedGlobalFilter] = React.useState(globalFilter);
@@ -73,9 +110,43 @@ export function DataTable<T extends Record<string, any>>({
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedGlobalFilter(globalFilter);
+      if (serverSidePagination && onSearchChangeRef.current) {
+        onSearchChangeRef.current(globalFilter);
+      }
     }, 300);
     return () => clearTimeout(timer);
-  }, [globalFilter]);
+  }, [globalFilter, serverSidePagination]);
+
+  // Notify parent of pagination changes in server-side mode
+  React.useEffect(() => {
+    if (!serverSidePagination) return;
+    const prev = prevPaginationRef.current;
+    const current = { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize };
+    // Skip initial render
+    if (prev && (prev.pageIndex !== current.pageIndex || prev.pageSize !== current.pageSize)) {
+      onPaginationChangeRef.current?.({
+        page: current.pageIndex + 1,
+        limit: current.pageSize,
+      });
+    }
+    prevPaginationRef.current = current;
+  }, [pagination.pageIndex, pagination.pageSize, serverSidePagination]);
+
+  // Notify parent of sort changes in server-side mode
+  const prevSortingRef = React.useRef<SortingState | null>(null);
+
+  React.useEffect(() => {
+    if (!serverSidePagination) return;
+    const prev = prevSortingRef.current;
+    if (sorting.length > 0) {
+      const currentSort = { id: sorting[0].id, desc: sorting[0].desc };
+      const prevSort = prev && prev.length > 0 ? { id: prev[0].id, desc: prev[0].desc } : null;
+      if (!prevSort || prevSort.id !== currentSort.id || prevSort.desc !== currentSort.desc) {
+        onSortChangeRef.current?.(currentSort.id, currentSort.desc ? 'desc' : 'asc');
+      }
+    }
+    prevSortingRef.current = sorting;
+  }, [sorting, serverSidePagination]);
 
   // Debounce multi-search values
   const [debouncedMultiSearch, setDebouncedMultiSearch] = React.useState<Record<string, string>>({});
@@ -169,8 +240,8 @@ export function DataTable<T extends Record<string, any>>({
     columns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: serverSidePagination ? undefined : getPaginationRowModel(),
+    getSortedRowModel: serverSidePagination ? undefined : getSortedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     globalFilterFn: hasSearch ? globalSearchFn : 'includesString',
@@ -187,6 +258,9 @@ export function DataTable<T extends Record<string, any>>({
         return newSelection;
       });
     },
+    manualPagination: serverSidePagination,
+    manualSorting: serverSidePagination,
+    pageCount: serverSidePagination ? (paginationMeta?.totalPages ?? -1) : undefined,
     state: {
       sorting,
       columnFilters,
@@ -350,7 +424,7 @@ export function DataTable<T extends Record<string, any>>({
       </div>
 
       {/* Pagination */}
-      {table.getPageCount() >= 1 && (
+      {(table.getPageCount() >= 1 || (serverSidePagination && paginationMeta && paginationMeta.totalPages > 0)) && (
         <div className="flex items-center justify-between px-2">
           <div className="flex-1 flex justify-between sm:hidden">
             <Button
@@ -387,7 +461,11 @@ export function DataTable<T extends Record<string, any>>({
                 {' '}of{' '}
                 <span className="font-medium">{table.getPageCount()}</span>
                 {' '}({' '}
-                <span className="font-medium">{table.getFilteredRowModel().rows.length}</span>
+                <span className="font-medium">
+                  {serverSidePagination 
+                    ? (paginationMeta?.total ?? table.getFilteredRowModel().rows.length)
+                    : table.getFilteredRowModel().rows.length}
+                </span>
                 {' '}total items)
               </p>
             </div>
