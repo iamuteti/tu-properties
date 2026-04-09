@@ -83,8 +83,10 @@ export default function UnitsPage() {
                 id: "tenant",
                 header: "Tenant/Resident",
                 cell: ({ row }) => {
-                    const lease = row.original.leases?.[0];
-                    const tenant = lease?.tenant;
+                    const activeAgreement = row.original.rentalAgreements?.find(
+                        (ra) => ra.status === "ACTIVE"
+                    );
+                    const tenant = activeAgreement?.tenant;
                     if (!tenant) return <span className="text-muted-foreground">-</span>;
                     return (
                         <div className="flex flex-col gap-0.5">

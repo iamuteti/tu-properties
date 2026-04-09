@@ -235,7 +235,7 @@ export interface Unit {
     status: string;
 
     // Relationships
-    leases?: Lease[];
+    rentalAgreements?: RentalAgreement[];
     serviceCharges?: any[];
     meterNumbers?: any[];
     features?: any[];
@@ -280,13 +280,21 @@ export interface Tenant {
     deletedAt?: string;
 }
 
-export interface Lease {
+export interface RentalAgreement {
     id: string;
     unitId: string;
     tenantId: string;
+    agreementType?: 'LEASE' | 'RENTAL';
     startDate: string;
-    endDate: string;
+    endDate?: string;
     rentAmount: number;
+    currency?: string;
+    paymentDay?: number;
+    termMonths?: number;
+    securityDeposit?: number;
+    escalationRate?: number;
+    escalationMonth?: number;
+    noticePeriodDays?: number;
     status: string;
     unit?: Unit;
     tenant?: Tenant;
@@ -300,7 +308,7 @@ export interface Invoice {
     id: string;
     invoiceNumber: string;
     landlordId?: string;
-    leaseId?: string;
+    rentalAgreementId?: string;
     issueDate: string;
     dueDate: string;
     amount: number;
@@ -323,7 +331,7 @@ export interface Invoice {
     createdAt: string;
     updatedAt: string;
     landlord?: Landlord;
-    lease?: Lease;
+    rentalAgreement?: RentalAgreement;
     invoiceItems?: any[];
     payments?: Payment[];
 }
@@ -378,7 +386,7 @@ export interface Receipt {
 export interface Payment {
     id: string;
     invoiceId?: string;
-    leaseId?: string;
+    rentalAgreementId?: string;
     receiptId?: string;
     paymentDate: string;
     amount: number;
@@ -401,7 +409,7 @@ export interface Payment {
     updatedAt: string;
     recordedBy?: string;
     invoice?: Invoice;
-    lease?: Lease;
+    rentalAgreement?: RentalAgreement;
     receipt?: Receipt;
 }
 
@@ -474,7 +482,7 @@ export interface CreateInvoiceData {
     // Invoice header
     invoiceNumber?: string;
     landlordId?: string;
-    leaseId?: string;
+    rentalAgreementId?: string;
     transactionClass: string;
     acReceivable: string;
     billTo?: string;
@@ -502,7 +510,7 @@ export interface CreateInvoiceData {
 
 export interface CreatePaymentData {
     invoiceId?: string;
-    leaseId?: string;
+    rentalAgreementId?: string;
     receiptId?: string;
     paymentDate: string;
     amount: number;

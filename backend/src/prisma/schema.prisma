@@ -43,7 +43,7 @@ model Organization {
   properties Property[]
   tenants    Tenant[]
   landlords  Landlord[]
-  leases     Lease[]
+  leases     RentalAgreement[]
   invoices   Invoice[]
   payments   Payment[]
   receipts   Receipt[]
@@ -320,7 +320,7 @@ model Unit {
   status UnitStatus @default(VACANT)
 
   // Relationships
-  leases         Lease[]
+  rentalAgreements RentalAgreement[]
   serviceCharges UnitServiceCharge[]
   meterNumbers   UnitMeterNumber[]
   features       UnitFeature[]
@@ -340,6 +340,12 @@ enum UnitStatus {
   OCCUPIED
   MAINTENANCE
   RESERVED
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
 }
 
 model UnitServiceCharge {
@@ -451,6 +457,9 @@ model Tenant {
   otherNames String? // Other Name(s)
   gender     String? // Gender
 
+  // Status
+  status TenantStatus @default(ACTIVE)
+
   // Contact Information
   email            String?
   phone            String // Mobile Number
@@ -474,7 +483,7 @@ model Tenant {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  leases            Lease[]
+  rentalAgreements RentalAgreement[]
   emergencyContacts TenantEmergencyContact[]
   receipts          Receipt[]
 
@@ -512,7 +521,7 @@ model TenantEmergencyContact {
   @@map("tenant_emergency_contacts")
 }
 
-model Lease {
+model RentalAgreement {
   id   String @id @default(cuid())
   code String @unique
 
@@ -522,18 +531,29 @@ model Lease {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  // Lease Terms
+  // Agreement Type
+  agreementType AgreementType @default(RENTAL)
+
+  // Agreement Terms
   startDate  DateTime
   endDate    DateTime?
   rentAmount Decimal   @db.Decimal(10, 2)
   currency   String    @default("KES")
-  paymentDay Int       @default(1) // Day of month rent is due
+  paymentDay Int       @default(1)
+
+  // Term Duration
+  termMonths Int? // Lease term in months (null for rental)
 
   // Security Deposit
   securityDeposit Decimal? @db.Decimal(10, 2)
 
+  // Lease-specific fields (commercial)
+  escalationRate     Decimal? @db.Decimal(5, 2)  // % increase per year
+  escalationMonth   Int?                      // Month when rent escalates
+  noticePeriodDays  Int?                      // Notice period for termination
+
   // Status
-  status LeaseStatus @default(DRAFT)
+  status AgreementStatus @default(DRAFT)
 
   // Organization/Tenant association
   organizationId String?
@@ -554,10 +574,15 @@ model Lease {
   @@index([startDate])
   @@index([endDate])
   @@index([organizationId])
-  @@map("leases")
+  @@map("rental_agreements")
 }
 
-enum LeaseStatus {
+enum AgreementType {
+  LEASE    // Commercial - long term
+  RENTAL   // Residential - monthly
+}
+
+enum AgreementStatus {
   DRAFT
   ACTIVE
   EXPIRED
@@ -577,9 +602,9 @@ model Invoice {
   landlordId String?
   landlord   Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
 
-  // Keep lease reference for backward compatibility and property tracking
-  leaseId String?
-  lease   Lease?  @relation(fields: [leaseId], references: [id], onDelete: SetNull)
+  // Keep rental agreement reference for backward compatibility and property tracking
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement?  @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
 
   // Invoice Details
   issueDate   DateTime @default(now())
@@ -635,7 +660,7 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([leaseId])
+  @@index([rentalAgreementId])
   @@index([status])
   @@index([dueDate])
   @@index([organizationId])
@@ -753,8 +778,8 @@ model Payment {
   invoiceId     String?
   invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   
-  leaseId String?
-  lease   Lease? @relation(fields: [leaseId], references: [id], onDelete: SetNull)
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
   
   receiptId String?
   receipt   Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
@@ -798,7 +823,7 @@ model Payment {
   updatedAt DateTime @updatedAt
   recordedBy String?
   
-  @@index([leaseId])
+  @@index([rentalAgreementId])
   @@index([invoiceId])
   @@index([receiptId])
   @@index([paymentDate])

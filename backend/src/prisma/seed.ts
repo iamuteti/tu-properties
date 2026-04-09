@@ -22,7 +22,7 @@ async function main() {
   await prisma.receipt.deleteMany();
   await prisma.invoiceItem.deleteMany();
   await prisma.invoice.deleteMany();
-  await prisma.lease.deleteMany();
+  await prisma.rentalAgreement.deleteMany();
   await prisma.tenantEmergencyContact.deleteMany();
   await prisma.tenant.deleteMany();
   await prisma.unitFeature.deleteMany();

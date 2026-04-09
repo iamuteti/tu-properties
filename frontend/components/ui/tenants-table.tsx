@@ -47,8 +47,8 @@ export interface TenantTableData {
   phone?: string;
   email?: string;
   leaseId: string;
-  leaseStartDate: string;
-  leaseEndDate: string;
+  agreementStartDate: string;
+  agreementEndDate: string;
   rentAmount: number;
   rentBalance: number;
   daysToExpire?: number;
@@ -280,13 +280,13 @@ export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProp
       size: 150,
     },
     {
-      accessorKey: 'leaseStartDate',
-      header: 'Lease Period',
+      accessorKey: 'agreementStartDate',
+      header: 'Agreement Period',
       cell: ({ row }) => (
         <div className="text-sm">
-          <span className="text-slate-600">{formatDate(row.original.leaseStartDate)}</span>
+          <span className="text-slate-600">{formatDate(row.original.agreementStartDate)}</span>
           <span className="text-slate-400 mx-1">-</span>
-          <span className="text-slate-600">{formatDate(row.original.leaseEndDate)}</span>
+          <span className="text-slate-600">{formatDate(row.original.agreementEndDate)}</span>
         </div>
       ),
       size: 180,

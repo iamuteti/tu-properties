@@ -64,7 +64,7 @@ export class ReceiptsController {
       }[];
       payments?: {
         invoiceId?: string;
-        leaseId?: string;
+        rentalAgreementId?: string;
         paymentDate: string | Date;
         amount: number;
         currency?: string;

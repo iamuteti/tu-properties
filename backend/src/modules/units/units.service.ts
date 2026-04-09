@@ -83,7 +83,7 @@ export class UnitsService {
           take: limit,
           include: {
             property: true,
-            leases: {
+            rentalAgreements: {
               orderBy: { startDate: 'desc' },
               take: 1,
               include: { tenant: true },
@@ -114,7 +114,7 @@ export class UnitsService {
       where,
       include: {
         property: true,
-        leases: true,
+        rentalAgreements: true,
       },
     });
   }

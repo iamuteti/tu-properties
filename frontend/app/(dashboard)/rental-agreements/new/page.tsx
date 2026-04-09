@@ -12,34 +12,43 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/simple-select";
 import { ChevronLeft } from "lucide-react";
-import { leasesApi } from "@/lib/api";
+import { rentalAgreementsApi } from "@/lib/api";
 
-// Zod schema for lease validation
-const leaseSchema = z.object({
+const rentalAgreementSchema = z.object({
     unitId: z.string().min(1, "Unit is required"),
     tenantId: z.string().min(1, "Tenant is required"),
+    agreementType: z.enum(["LEASE", "RENTAL"]).default("RENTAL"),
     startDate: z.string().min(1, "Start date is required"),
-    endDate: z.string().min(1, "End date is required"),
+    endDate: z.string().optional(),
     rentAmount: z.coerce.number().min(0, "Rent amount must be positive"),
+    termMonths: z.coerce.number().optional(),
+    securityDeposit: z.coerce.number().optional(),
+    escalationRate: z.coerce.number().optional(),
+    noticePeriodDays: z.coerce.number().optional(),
 });
 
-type LeaseFormValues = z.infer<typeof leaseSchema>;
+type RentalAgreementFormValues = z.infer<typeof rentalAgreementSchema>;
 
-export default function NewLeasePage() {
+export default function NewRentalAgreementPage() {
     const { token } = useAuth();
     const { units } = useUnits();
     const { tenants } = useTenants();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
 
-    const form = useForm<LeaseFormValues>({
-        resolver: zodResolver(leaseSchema) as Resolver<LeaseFormValues>,
+    const form = useForm<RentalAgreementFormValues>({
+        resolver: zodResolver(rentalAgreementSchema) as Resolver<RentalAgreementFormValues>,
         defaultValues: {
             rentAmount: 0,
             unitId: "",
             tenantId: "",
+            agreementType: "RENTAL",
             startDate: "",
             endDate: "",
+            termMonths: undefined,
+            securityDeposit: undefined,
+            escalationRate: undefined,
+            noticePeriodDays: undefined,
         },
     });
 
@@ -48,9 +57,11 @@ export default function NewLeasePage() {
         handleSubmit,
         formState: { errors, isSubmitting },
         setValue,
+        watch,
     } = form;
 
-    // Helper to auto-fill rent when unit is selected
+    const agreementType = watch("agreementType");
+
     const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const unitId = e.target.value;
         const selectedUnit = units.find((u) => u.id === unitId);
@@ -59,23 +70,22 @@ export default function NewLeasePage() {
         }
     };
 
-    const onSubmit: SubmitHandler<LeaseFormValues> = async (data) => {
+    const onSubmit: SubmitHandler<RentalAgreementFormValues> = async (data) => {
         setError(null);
         try {
-            // Ensure dates are in ISO-8601 format
             const payload = {
                 ...data,
                 status: "ACTIVE",
                 startDate: new Date(data.startDate).toISOString(),
-                endDate: new Date(data.endDate).toISOString(),
+                endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
             };
 
-            await leasesApi.create(payload);
-            router.push("/dashboard/leases");
+            await rentalAgreementsApi.create(payload);
+            router.push("/dashboard/rental-agreements");
             router.refresh();
         } catch (err: any) {
             setError(
-                err.response?.data?.message || "Failed to create lease. Please try again."
+                err.response?.data?.message || "Failed to create rental agreement. Please try again."
             );
         }
     };
@@ -87,9 +97,9 @@ export default function NewLeasePage() {
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Create New Lease</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Create New Rental Agreement</h1>
                     <p className="text-muted-foreground">
-                        Generate a lease agreement between a tenant and a unit
+                        Generate a rental agreement between a tenant and a unit
                     </p>
                 </div>
             </div>
@@ -118,7 +128,7 @@ export default function NewLeasePage() {
                                     .filter((u) => u.status === "VACANT")
                                     .map((unit) => (
                                         <option key={unit.id} value={unit.id}>
-                                            {unit.name} ({unit.unitType?.name || 'Unknown'}) - {unit.currency || 'KES'} {unit.baseRent?.toFixed(2) || '0.00'}
+                                            {unit.name} ({unit.type}) - {unit.currency || 'KES'} {unit.baseRent?.toFixed(2) || '0.00'}
                                         </option>
                                     ))}
                             </Select>
@@ -149,6 +159,24 @@ export default function NewLeasePage() {
                         </div>
                     </div>
 
+                    <div className="space-y-2">
+                        <label
+                            htmlFor="agreementType"
+                            className="text-sm font-medium leading-none"
+                        >
+                            Agreement Type
+                        </label>
+                        <Select id="agreementType" {...register("agreementType")} disabled={isSubmitting}>
+                            <option value="RENTAL">Monthly Rental (Residential)</option>
+                            <option value="LEASE">Long-term Lease (Commercial)</option>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            {agreementType === "LEASE" 
+                                ? "Long-term lease typically 1-5 years with escalation clauses"
+                                : "Monthly rental agreement, rolls over automatically"}
+                        </p>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label
@@ -174,7 +202,7 @@ export default function NewLeasePage() {
                                 htmlFor="endDate"
                                 className="text-sm font-medium leading-none"
                             >
-                                End Date
+                                End Date {agreementType === "RENTAL" && "(Optional)"}
                             </label>
                             <Input
                                 id="endDate"
@@ -190,12 +218,83 @@ export default function NewLeasePage() {
                         </div>
                     </div>
 
+                    {agreementType === "LEASE" && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="termMonths"
+                                    className="text-sm font-medium leading-none"
+                                >
+                                    Term (Months)
+                                </label>
+                                <Input
+                                    id="termMonths"
+                                    type="number"
+                                    placeholder="12"
+                                    {...register("termMonths")}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="securityDeposit"
+                                    className="text-sm font-medium leading-none"
+                                >
+                                    Security Deposit
+                                </label>
+                                <Input
+                                    id="securityDeposit"
+                                    type="number"
+                                    placeholder="0.00"
+                                    {...register("securityDeposit")}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {agreementType === "LEASE" && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="escalationRate"
+                                    className="text-sm font-medium leading-none"
+                                >
+                                    Annual Escalation Rate (%)
+                                </label>
+                                <Input
+                                    id="escalationRate"
+                                    type="number"
+                                    placeholder="5"
+                                    step="0.1"
+                                    {...register("escalationRate")}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="noticePeriodDays"
+                                    className="text-sm font-medium leading-none"
+                                >
+                                    Notice Period (Days)
+                                </label>
+                                <Input
+                                    id="noticePeriodDays"
+                                    type="number"
+                                    placeholder="30"
+                                    {...register("noticePeriodDays")}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <label
                             htmlFor="rentAmount"
                             className="text-sm font-medium leading-none"
                         >
-                            Rent Amount ($)
+                            Rent Amount (KES)
                         </label>
                         <Input
                             id="rentAmount"
@@ -230,7 +329,7 @@ export default function NewLeasePage() {
                             Cancel
                         </Button>
                         <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? "Creating..." : "Create Lease"}
+                            {isSubmitting ? "Creating..." : "Create Rental Agreement"}
                         </Button>
                     </div>
                 </form>

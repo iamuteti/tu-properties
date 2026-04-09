@@ -1,25 +1,25 @@
 import { useState, useEffect, useCallback } from "react";
 import { AxiosError } from "axios";
-import { leasesApi } from "@/lib/api";
+import { rentalAgreementsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
-import { Lease } from "@/types";
+import { RentalAgreement } from "@/types";
 
-export function useLeases() {
+export function useRentalAgreements() {
     const { token } = useAuth();
-    const [leases, setLeases] = useState<Lease[]>([]);
+    const [rentalAgreements, setRentalAgreements] = useState<RentalAgreement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchLeases = useCallback(async () => {
+    const fetchRentalAgreements = useCallback(async () => {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await leasesApi.findAll();
-            setLeases(response.data);
+            const response = await rentalAgreementsApi.findAll();
+            setRentalAgreements(response.data);
             setError(null);
         } catch (err: unknown) {
             if (err instanceof AxiosError) {
-                setError(err.response?.data?.message || err.message || "Failed to fetch leases");
+                setError(err.response?.data?.message || err.message || "Failed to fetch rental agreements");
             } else if (err instanceof Error) {
                 setError(err.message);
             } else {
@@ -31,8 +31,8 @@ export function useLeases() {
     }, [token]);
 
     useEffect(() => {
-        fetchLeases();
-    }, [fetchLeases]);
+        fetchRentalAgreements();
+    }, [fetchRentalAgreements]);
 
-    return { leases, isLoading, error, refetch: fetchLeases };
+    return { rentalAgreements, isLoading, error, refetch: fetchRentalAgreements };
 }

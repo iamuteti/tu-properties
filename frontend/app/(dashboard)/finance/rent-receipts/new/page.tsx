@@ -7,7 +7,7 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenants } from "@/hooks/use-tenants";
-import { useLeases } from "@/hooks/use-leases";
+import { useRentalAgreements } from "@/hooks/use-rental-agreements";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,7 @@ import { PAYMENT_METHODS, CURRENCIES } from "@/lib/constants";
 const rentReceiptSchema = z.object({
   receiptNumber: z.string().min(1, "Receipt number is required"),
   tenantId: z.string().min(1, "Tenant is required"),
-  leaseId: z.string().min(1, "Lease is required"),
+  rentalAgreementId: z.string().min(1, "Rental Agreement is required"),
   paymentDate: z.string().min(1, "Payment date is required"),
   paymentMethod: z.string().min(1, "Payment method is required"),
   paymentReference: z.string().optional(),
@@ -35,7 +35,7 @@ type RentReceiptFormValues = z.infer<typeof rentReceiptSchema>;
 export default function NewRentReceiptPage() {
   const { token } = useAuth();
   const { tenants } = useTenants();
-  const { leases } = useLeases();
+  const { rentalAgreements } = useRentalAgreements();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [appliedInvoices, setAppliedInvoices] = useState<string[]>([]);
@@ -45,7 +45,7 @@ export default function NewRentReceiptPage() {
     defaultValues: {
       receiptNumber: `RR-${Date.now()}`,
       tenantId: "",
-      leaseId: "",
+      rentalAgreementId: "",
       paymentDate: new Date().toISOString().split("T")[0],
       paymentMethod: "CASH",
       paymentReference: "",
@@ -64,24 +64,24 @@ export default function NewRentReceiptPage() {
     watch,
   } = form;
 
-  const handleLeaseChange = (e: { target: { value: string } }) => {
-    const leaseId = e.target.value;
-    setValue("leaseId", leaseId);
-    const selectedLease = leases.find((lease) => lease.id === leaseId);
-    if (selectedLease && selectedLease.tenant) {
-      setValue("tenantId", selectedLease.tenantId);
+  const handleRentalAgreementChange = (e: { target: { value: string } }) => {
+    const rentalAgreementId = e.target.value;
+    setValue("rentalAgreementId", rentalAgreementId);
+    const selectedRentalAgreement = rentalAgreements.find((agreement) => agreement.id === rentalAgreementId);
+    if (selectedRentalAgreement && selectedRentalAgreement.tenant) {
+      setValue("tenantId", selectedRentalAgreement.tenantId);
     }
   };
 
   const handleTenantChange = (e: { target: { value: string } }) => {
     const tenantId = e.target.value;
     setValue("tenantId", tenantId);
-    // Filter leases to only those belonging to the selected tenant
-    const tenantLeases = leases.filter((lease) => lease.tenantId === tenantId);
-    if (tenantLeases.length > 0) {
-      setValue("leaseId", tenantLeases[0].id);
+    // Filter rental agreements to only those belonging to the selected tenant
+    const tenantRentalAgreements = rentalAgreements.filter((agreement) => agreement.tenantId === tenantId);
+    if (tenantRentalAgreements.length > 0) {
+      setValue("rentalAgreementId", tenantRentalAgreements[0].id);
     } else {
-      setValue("leaseId", "");
+      setValue("rentalAgreementId", "");
     }
   };
 
@@ -112,14 +112,14 @@ export default function NewRentReceiptPage() {
     }
   };
 
-  // Get invoices associated with the selected lease
-  const selectedLease = leases.find((lease) => lease.id === watch("leaseId"));
-  const associatedInvoices = selectedLease?.invoices || [];
+  // Get invoices associated with the selected rental agreement
+  const selectedRentalAgreement = rentalAgreements.find((agreement) => agreement.id === watch("rentalAgreementId"));
+  const associatedInvoices = selectedRentalAgreement?.invoices || [];
 
-  // Filter leases to match selected tenant
-  const filteredLeases = watch("tenantId") 
-    ? leases.filter((lease) => lease.tenantId === watch("tenantId"))
-    : leases;
+  // Filter rental agreements to match selected tenant
+  const filteredRentalAgreements = watch("tenantId") 
+    ? rentalAgreements.filter((agreement) => agreement.tenantId === watch("tenantId"))
+    : rentalAgreements;
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -190,21 +190,21 @@ export default function NewRentReceiptPage() {
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor="leaseId" className="text-sm font-medium leading-none">
-                Lease <span className="text-red-500">*</span>
+              <label htmlFor="rentalAgreementId" className="text-sm font-medium leading-none">
+                Rental Agreement <span className="text-red-500">*</span>
               </label>
               <Select
-                id="leaseId"
-                options={filteredLeases.map((lease) => ({
-                  value: lease.id,
-                  label: `Lease #${lease.id.slice(0, 8)}`,
+                id="rentalAgreementId"
+                options={filteredRentalAgreements.map((agreement) => ({
+                  value: agreement.id,
+                  label: `${agreement.agreementType || 'RENTAL'} #${agreement.id.slice(0, 8)}`,
                 }))}
-                value={watch("leaseId")}
-                onChange={handleLeaseChange}
-                disabled={isSubmitting || filteredLeases.length === 0}
+                value={watch("rentalAgreementId")}
+                onChange={handleRentalAgreementChange}
+                disabled={isSubmitting || filteredRentalAgreements.length === 0}
               />
-              {errors.leaseId && (
-                <p className="text-xs text-destructive">{errors.leaseId.message}</p>
+              {errors.rentalAgreementId && (
+                <p className="text-xs text-destructive">{errors.rentalAgreementId.message}</p>
               )}
             </div>
           </div>

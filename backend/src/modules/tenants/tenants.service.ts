@@ -117,7 +117,7 @@ export class TenantsService {
     return this.prisma.tenant.findUnique({
       where,
       include: {
-        leases: true,
+        rentalAgreements: true,
         emergencyContacts: true,
       },
     });

@@ -12,7 +12,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { UsersModule } from './modules/users/users.module';
 import { UnitsModule } from './modules/units/units.module';
-import { LeasesModule } from './modules/leases/leases.module';
+import { RentalAgreementsModule } from './modules/leases/rental-agreements.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { LandlordsModule } from './modules/landlords/landlords.module';
@@ -29,7 +29,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
     UsersModule,
     UnitsModule,
     TenantsModule,
-    LeasesModule,
+    RentalAgreementsModule,
     FinanceModule,
     AuditModule,
     AuthModule,

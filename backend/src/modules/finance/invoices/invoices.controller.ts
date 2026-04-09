@@ -23,7 +23,7 @@ export class InvoicesController {
     createInvoiceDto: {
       invoiceNumber?: string;
       landlordId?: string;
-      leaseId?: string;
+      rentalAgreementId?: string;
       transactionClass: string;
       acReceivable?: string;
       billTo?: string;

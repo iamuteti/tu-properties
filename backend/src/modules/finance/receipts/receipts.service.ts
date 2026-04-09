@@ -62,7 +62,7 @@ export class ReceiptsService {
       }[];
       payments?: {
         invoiceId?: string;
-        leaseId?: string;
+        rentalAgreementId?: string;
         paymentDate: string | Date;
         amount: number;
         currency?: string;
@@ -179,9 +179,9 @@ export class ReceiptsService {
           ...(payment.invoiceId && {
             invoice: { connect: { id: payment.invoiceId } },
           }),
-          // Add lease relation if provided
-          ...(payment.leaseId && {
-            lease: { connect: { id: payment.leaseId } },
+          // Add rental agreement relation if provided
+          ...(payment.rentalAgreementId && {
+            rentalAgreement: { connect: { id: payment.rentalAgreementId } },
           }),
         })),
       };
@@ -199,7 +199,7 @@ export class ReceiptsService {
         payments: {
           include: {
             invoice: true,
-            lease: true,
+            rentalAgreement: true,
           },
         },
         receiptLines: true,
@@ -216,7 +216,7 @@ export class ReceiptsService {
         payments: {
           include: {
             invoice: true,
-            lease: true,
+            rentalAgreement: true,
           },
         },
         receiptLines: true,

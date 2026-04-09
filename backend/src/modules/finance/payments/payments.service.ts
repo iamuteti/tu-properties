@@ -30,7 +30,7 @@ export class PaymentsService {
       where,
       include: {
         invoice: true,
-        lease: true,
+        rentalAgreement: true,
         receipt: true,
       },
     });
@@ -42,7 +42,7 @@ export class PaymentsService {
       where,
       include: {
         invoice: true,
-        lease: true,
+        rentalAgreement: true,
         receipt: true,
       },
     });

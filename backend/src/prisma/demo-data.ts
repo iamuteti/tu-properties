@@ -1,7 +1,5 @@
 import {
   PrismaClient,
-  UnitStatus,
-  LeaseStatus,
   InvoiceStatus,
   PaymentMethod,
   ReceiptType,
@@ -13,7 +11,11 @@ import {
   Property,
   Unit,
   Tenant,
-  Lease,
+  TenantStatus,
+  RentalAgreement,
+  UnitStatus,
+  AgreementStatus,
+  AgreementType,
   Invoice,
   UserRole,
 } from '@prisma/client';
@@ -426,8 +428,7 @@ export async function generateDemoData(
           propertyId: property.id,
           type: unitType.value,
           baseRent,
-          status:
-            Math.random() > 0.25 ? UnitStatus.OCCUPIED : UnitStatus.VACANT,
+          status: UnitStatus.VACANT, // Will be updated based on rental agreement
         },
       });
       units.push(unit);
@@ -435,12 +436,12 @@ export async function generateDemoData(
   }
   console.log(`Generated ${units.length} units`);
 
-  // ========== Tenants (one per occupied unit, no leases for 99.9% residential) ==========
-  console.log('Generating tenants...');
+  // ========== Mark some units as occupied for demo ==========
+  // We DON'T set them to OCCUPIED here - we set status AFTER creating rental agreements
+  // to ensure consistency. For now, keep them as VACANT.
+  const occupiedUnits = units.slice(0, Math.floor(units.length * 0.75)); // 75% will be occupied
+
   const tenants: Tenant[] = [];
-  const occupiedUnits = units.filter(
-    (unit) => unit.status === UnitStatus.OCCUPIED,
-  );
 
   for (let i = 1; i <= occupiedUnits.length; i++) {
     const name = randomName();
@@ -455,6 +456,7 @@ export async function generateDemoData(
         town: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret'][
           Math.floor(Math.random() * 5)
         ],
+        status: TenantStatus.ACTIVE,
         organizationId,
       },
     });
@@ -462,55 +464,82 @@ export async function generateDemoData(
   }
   console.log(`Generated ${tenants.length} tenants`);
 
-  // ========== Leases (only 20% of commercial, almost none for residential) ==========
-  console.log('Generating leases...');
-  const leases: (Lease & { tenant: Tenant; unit: Unit })[] = [];
-  let leaseIndex = 0;
+  // ========== Rental Agreements (all occupied units get agreements) ==========
+  console.log('Generating rental agreements...');
+  const rentalAgreements: (RentalAgreement & { tenant: Tenant; unit: Unit })[] = [];
+  let agreementIndex = 0;
 
   for (let i = 0; i < occupiedUnits.length; i++) {
     const unit = occupiedUnits[i];
     const property = properties.find((p) => p.id === unit.propertyId)!;
 
-    // Determine if we should create a lease based on property category
-    let leaseProbability: number;
-    if (property.category === 'residential') {
-      leaseProbability = 0.001; // Only 0.1% of residential units have formal leases
+    // Determine agreement type based on property category
+    const isResidential = property.category === 'residential';
+    const agreementType = isResidential ? AgreementType.RENTAL : AgreementType.LEASE;
+
+    const tenant = tenants[i];
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - Math.floor(Math.random() * 365));
+
+    // For leases (commercial), set a fixed end date; for rentals (residential), endDate is null (monthly)
+    let endDate: Date | null = null;
+    let termMonths: number | null = null;
+    let securityDeposit: number | null = null;
+
+    if (agreementType === AgreementType.LEASE) {
+      // Commercial lease: 1-3 year term
+      const years = Math.floor(Math.random() * 3) + 1;
+      endDate = new Date(startDate);
+      endDate.setFullYear(endDate.getFullYear() + years);
+      termMonths = years * 12;
+
+      // 90% of leases have security deposits
+      if (Math.random() < 0.9) {
+        securityDeposit = Number(unit.baseRent) * 2;
+      }
     } else {
-      leaseProbability = 0.2; // 20% of commercial units have formal leases
+      // Residential rental: no fixed end date (monthly), but we can set a past end date for history
+      // For demo purposes, make some have ended (previous tenants) and some active
+      if (Math.random() < 0.2) {
+        // 20% are previous tenants (agreement has ended)
+        endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + Math.floor(Math.random() * 12) + 1);
+      }
+      // 30% have security deposits for rentals
+      if (Math.random() < 0.3) {
+        securityDeposit = Number(unit.baseRent);
+      }
     }
 
-    if (Math.random() < leaseProbability) {
-      const tenant = tenants[i]; // Use the tenant at the same index as the unit
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - Math.floor(Math.random() * 365));
+    const rentalAgreement = await prisma.rentalAgreement.create({
+      data: {
+        code: `${orgPrefix}-RA-${String(agreementIndex + 1).padStart(4, '0')}`,
+        unitId: unit.id,
+        tenantId: tenant.id,
+        agreementType,
+        startDate,
+        endDate,
+        termMonths,
+        rentAmount: Number(unit.baseRent),
+        currency: 'KES',
+        paymentDay: 1,
+        securityDeposit,
+        status: endDate && endDate < new Date() ? AgreementStatus.EXPIRED : AgreementStatus.ACTIVE,
+        organizationId,
+      },
+    });
 
-      const endDate = new Date(startDate);
-      endDate.setFullYear(endDate.getFullYear() + 1); // 1 year lease
+    // Update unit status based on rental agreement status
+    const unitStatus = endDate && endDate < new Date() ? UnitStatus.VACANT : UnitStatus.OCCUPIED;
+    await prisma.unit.update({
+      where: { id: unit.id },
+      data: { status: unitStatus },
+    });
 
-      // 90% of tenancies have security deposits
-      const hasSecurityDeposit = Math.random() < 0.9;
-      const securityDeposit = hasSecurityDeposit
-        ? Number(unit.baseRent) * 2
-        : null; // Typically 2 months rent
-
-      const lease = await prisma.lease.create({
-        data: {
-          code: `${orgPrefix}-L-${String(leaseIndex + 1).padStart(4, '0')}`,
-          unitId: unit.id,
-          tenantId: tenant.id,
-          startDate,
-          endDate,
-          rentAmount: Number(unit.baseRent),
-          securityDeposit,
-          status: LeaseStatus.ACTIVE,
-          organizationId,
-        },
-      });
-      leases.push({ ...lease, tenant, unit });
-      leaseIndex++;
-    }
+    rentalAgreements.push({ ...rentalAgreement, tenant, unit });
+    agreementIndex++;
   }
-  console.log(`Generated ${leases.length} leases`);
+  console.log(`Generated ${rentalAgreements.length} rental agreements`);
 
   // ========== Invoices, Payments, and Receipts (for all occupied units) ==========
   console.log('Generating invoices, payments, and receipts...');
@@ -522,15 +551,15 @@ export async function generateDemoData(
   let paymentCount = 0;
   let receiptCount = 0;
 
-  // Create invoices for all occupied units (tenants with or without formal leases)
+  // Create invoices for all occupied units (tenants with rental agreements)
   for (let i = 0; i < occupiedUnits.length; i++) {
     const unit = occupiedUnits[i];
     const property = properties.find((p) => p.id === unit.propertyId)!;
     const tenant = tenants[i]; // Each occupied unit has a corresponding tenant
 
-    // Find if there's a lease for this unit
-    const lease = leases.find((l) => l.unit.id === unit.id);
-    const leaseId = lease ? lease.id : null;
+    // Find the rental agreement for this unit
+    const rentalAgreement = rentalAgreements.find((ra) => ra.unit.id === unit.id);
+    const rentalAgreementId = rentalAgreement ? rentalAgreement.id : null;
 
     for (let month = 0; month < months; month++) {
       const invoiceDate = new Date(startDate);
@@ -556,7 +585,7 @@ export async function generateDemoData(
       const invoice = await prisma.invoice.create({
         data: {
           invoiceNumber: `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, '0')}-${invoiceCount}${randomString(4)}`,
-          leaseId,
+          rentalAgreementId,
           issueDate: invoiceDate,
           dueDate,
           amount: Number(unit.baseRent),
@@ -587,7 +616,7 @@ export async function generateDemoData(
 
         const payment = await prisma.payment.create({
           data: {
-            leaseId,
+            rentalAgreementId,
             invoiceId: invoice.id,
             paymentDate,
             amount: paidAmount,
@@ -655,7 +684,7 @@ export async function generateDemoData(
     properties: properties.length,
     units: units.length,
     tenants: tenants.length,
-    leases: leases.length,
+    rentalAgreements: rentalAgreements.length,
     invoices: invoiceCount,
     payments: paymentCount,
     receipts: receiptCount,
@@ -684,7 +713,7 @@ async function main() {
     await prisma.receipt.deleteMany();
     await prisma.invoiceItem.deleteMany();
     await prisma.invoice.deleteMany();
-    await prisma.lease.deleteMany();
+    await prisma.rentalAgreement.deleteMany();
     await prisma.tenantEmergencyContact.deleteMany();
     await prisma.tenant.deleteMany();
     await prisma.unitFeature.deleteMany();

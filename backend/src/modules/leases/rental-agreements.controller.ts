@@ -9,47 +9,47 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { LeasesService } from './leases.service';
+import { RentalAgreementsService } from './rental-agreements.service';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 
 @UseGuards(JwtAuthGuard)
-@Controller('leases')
-export class LeasesController {
-  constructor(private readonly leasesService: LeasesService) {}
+@Controller('rental-agreements')
+export class RentalAgreementsController {
+  constructor(private readonly rentalAgreementsService: RentalAgreementsService) {}
 
   @Post()
-  create(@Body() createLeaseDto: Prisma.LeaseCreateInput, @Request() req) {
+  create(@Body() createRentalAgreementDto: Prisma.RentalAgreementCreateInput, @Request() req) {
     const tenantId = getTenantId(req);
-    return this.leasesService.create(createLeaseDto, tenantId);
+    return this.rentalAgreementsService.create(createRentalAgreementDto, tenantId);
   }
 
   @Get()
   findAll(@Request() req) {
     const tenantId = getTenantId(req);
-    return this.leasesService.findAll(tenantId);
+    return this.rentalAgreementsService.findAll(tenantId);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
-    return this.leasesService.findOne(id, tenantId);
+    return this.rentalAgreementsService.findOne(id, tenantId);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() updateLeaseDto: Prisma.LeaseUpdateInput,
+    @Body() updateRentalAgreementDto: Prisma.RentalAgreementUpdateInput,
     @Request() req,
   ) {
     const tenantId = getTenantId(req);
-    return this.leasesService.update(id, updateLeaseDto, tenantId);
+    return this.rentalAgreementsService.update(id, updateRentalAgreementDto, tenantId);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
-    return this.leasesService.remove(id, tenantId);
+    return this.rentalAgreementsService.remove(id, tenantId);
   }
 }

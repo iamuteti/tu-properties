@@ -21,7 +21,7 @@ export class InvoicesService {
     data: {
       invoiceNumber?: string;
       landlordId?: string;
-      leaseId?: string;
+      rentalAgreementId?: string;
       transactionClass: string;
       acReceivable?: string;
       billTo?: string;
@@ -86,9 +86,9 @@ export class InvoicesService {
       invoiceData.landlord = { connect: { id: data.landlordId } };
     }
 
-    // Add lease relation if provided (backward compatibility)
-    if (data.leaseId) {
-      invoiceData.lease = { connect: { id: data.leaseId } };
+    // Add rental agreement relation if provided (backward compatibility)
+    if (data.rentalAgreementId) {
+      invoiceData.rentalAgreement = { connect: { id: data.rentalAgreementId } };
     }
 
     // Add invoice items if provided
@@ -117,7 +117,7 @@ export class InvoicesService {
       where,
       include: {
         landlord: true,
-        lease: {
+        rentalAgreement: {
           include: {
             tenant: true,
             unit: true,
@@ -136,7 +136,7 @@ export class InvoicesService {
         invoiceItems: true,
         payments: true,
         landlord: true,
-        lease: {
+        rentalAgreement: {
           include: {
             tenant: true,
             unit: true,

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, Lease, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt, PaginatedResponse } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt, PaginatedResponse } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -181,22 +181,22 @@ export const tenantsApi = {
         api.delete(`/tenants/${id}`),
 };
 
-// Leases API
-export const leasesApi = {
-    create: (data: { unitId: string; tenantId: string; startDate: string; endDate: string; rentAmount: number; status: string }) =>
-        api.post<Lease>('/leases', data),
+// Rental Agreements API
+export const rentalAgreementsApi = {
+    create: (data: { unitId: string; tenantId: string; agreementType?: string; startDate: string; endDate?: string; rentAmount: number; status: string }) =>
+        api.post<RentalAgreement>('/rental-agreements', data),
 
     findAll: () =>
-        api.get<Lease[]>('/leases'),
+        api.get<RentalAgreement[]>('/rental-agreements'),
 
     findOne: (id: string) =>
-        api.get<Lease>(`/leases/${id}`),
+        api.get<RentalAgreement>(`/rental-agreements/${id}`),
 
-    update: (id: string, data: Partial<{ unitId: string; tenantId: string; startDate: string; endDate: string; rentAmount: number; status: string }>) =>
-        api.patch<Lease>(`/leases/${id}`, data),
+    update: (id: string, data: Partial<{ unitId: string; tenantId: string; agreementType: string; startDate: string; endDate: string; rentAmount: number; status: string }>) =>
+        api.patch<RentalAgreement>(`/rental-agreements/${id}`, data),
 
     remove: (id: string) =>
-        api.delete(`/leases/${id}`),
+        api.delete(`/rental-agreements/${id}`),
 };
 
 export const billingApi = {
@@ -223,9 +223,9 @@ export const billingApi = {
     findAllPayments: () =>
         api.get<Payment[]>('/billing/payments'),
 
-    // Get all leases for customer selection
-    findAllLeases: () =>
-        api.get<Lease[]>('/billing/leases'),
+    // Get all rental agreements for customer selection
+    findAllRentalAgreements: () =>
+        api.get<RentalAgreement[]>('/billing/rental-agreements'),
 };
 
 // Finance API (new modular endpoints)
