@@ -48,27 +48,38 @@ export interface TenantTableData {
   email?: string;
   leaseId: string;
   agreementStartDate: string;
-  agreementEndDate: string;
+  agreementEndDate?: string;
   rentAmount: number;
   rentBalance: number;
   daysToExpire?: number;
-  variationType?: string;
-  status: 'active' | 'expiring' | 'expired' | 'overdue';
+  status: 'active' | 'inactive' | 'archived';
 }
 
 interface TenantsTableProps {
   data: TenantTableData[];
   onRowSelect?: (selectedRows: TenantTableData[]) => void;
   onRowClick?: (row: TenantTableData) => void;
+  serverSidePagination?: boolean;
+  paginationMeta?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  } | null;
+  onPaginationChange?: (pagination: { page: number; limit: number }) => void;
+  onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
+  onSearchChange?: (search: string) => void;
+  columns?: ColumnDef<TenantTableData>[];
+  expandedRowComponent?: React.ComponentType<{ row: TenantTableData }>;
+  pagination?: { pageIndex: number; pageSize: number };
 }
 
 // Status indicator component
 const StatusIndicator = ({ status }: { status: TenantTableData['status'] }) => {
   const config = {
     active: { color: 'bg-green-500', label: 'Active', icon: CheckCircle2 },
-    expiring: { color: 'bg-yellow-500', label: 'Expiring Soon', icon: AlertTriangle },
-    expired: { color: 'bg-red-500', label: 'Expired', icon: AlertCircle },
-    overdue: { color: 'bg-red-600', label: 'Overdue', icon: AlertCircle },
+    inactive: { color: 'bg-gray-500', label: 'Inactive', icon: AlertCircle },
+    archived: { color: 'bg-blue-500', label: 'Archived', icon: Info },
   };
 
   const { color, label, icon: Icon } = config[status];
@@ -138,10 +149,6 @@ const ExpandedRowDetails = ({ row }: { row: TenantTableData }) => {
           <p className="text-sm font-medium text-slate-900">{row.email || 'N/A'}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Variation Type</p>
-          <p className="text-sm font-medium text-slate-900">{row.variationType || 'None'}</p>
-        </div>
-        <div>
           <p className="text-xs text-slate-500 uppercase tracking-wide">Property ID</p>
           <p className="text-sm font-medium text-slate-900">{row.propertyId}</p>
         </div>
@@ -151,14 +158,14 @@ const ExpandedRowDetails = ({ row }: { row: TenantTableData }) => {
 };
 
 // Format date helper
-const formatDate = (dateString: string) => {
+const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 // Calculate days until expiry
-const calculateDaysToExpire = (endDate: string): number => {
+const calculateDaysToExpire = (endDate?: string): number => {
   if (!endDate) return 0;
   const end = new Date(endDate);
   const today = new Date();
@@ -167,35 +174,110 @@ const calculateDaysToExpire = (endDate: string): number => {
 };
 
 // Determine status based on days to expire and balance
-const determineStatus = (daysToExpire: number, balance: number): TenantTableData['status'] => {
-  if (balance > 0) return 'overdue';
-  if (daysToExpire <= 0) return 'expired';
-  if (daysToExpire <= 30) return 'expiring';
-  return 'active';
-};
+// const determineStatus = (daysToExpire: number, balance: number): TenantTableData['status'] => {
+//   if (balance > 0) return 'overdue';
+//   if (daysToExpire <= 0) return 'expired';
+//   if (daysToExpire <= 30) return 'expiring';
+//   return 'active';
+// };
 
-export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProps) {
+export function TenantsTable({
+  data,
+  onRowSelect,
+  onRowClick,
+  serverSidePagination = false,
+  paginationMeta,
+  onPaginationChange,
+  onSortChange,
+  onSearchChange,
+  columns: customColumns,
+  expandedRowComponent: ExpandedRowDetailsComponent,
+  pagination: controlledPagination,
+}: TenantsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<ExpandedState>({});
-  const [pagination, setPagination] = useState({
+  const [pagination, setPagination] = useState(controlledPagination || {
     pageIndex: 0,
     pageSize: 10,
   });
+
+  React.useEffect(() => {
+    if (controlledPagination) {
+      setPagination(controlledPagination);
+    }
+  }, [controlledPagination]);
+
+  // Debounce global filter
+  const [debouncedGlobalFilter, setDebouncedGlobalFilter] = useState(globalFilter);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedGlobalFilter(globalFilter);
+      if (serverSidePagination && onSearchChange) {
+        onSearchChange(globalFilter);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [globalFilter, serverSidePagination, onSearchChange]);
+
+  // Track previous pagination to avoid initial notify
+  const prevPaginationRef = React.useRef<{ pageIndex: number; pageSize: number } | null>(null);
+
+  // Notify parent of pagination changes in server-side mode
+  React.useEffect(() => {
+    if (!serverSidePagination) return;
+    const prev = prevPaginationRef.current;
+    const current = { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize };
+    if (prev && (prev.pageIndex !== current.pageIndex || prev.pageSize !== current.pageSize)) {
+      onPaginationChange?.({
+        page: current.pageIndex + 1,
+        limit: current.pageSize,
+      });
+    }
+    prevPaginationRef.current = current;
+  }, [pagination.pageIndex, pagination.pageSize, serverSidePagination, onPaginationChange]);
+
+  // Notify parent of sort changes in server-side mode
+  const prevSortingRef = React.useRef<SortingState | null>(null);
+
+  React.useEffect(() => {
+    if (!serverSidePagination) return;
+    const prev = prevSortingRef.current;
+    if (sorting.length > 0) {
+      const currentSort = { id: sorting[0].id, desc: sorting[0].desc };
+      const prevSort = prev && prev.length > 0 ? { id: prev[0].id, desc: prev[0].desc } : null;
+      if (!prevSort || prevSort.id !== currentSort.id || prevSort.desc !== currentSort.desc) {
+        onSortChange?.(currentSort.id, currentSort.desc ? 'desc' : 'asc');
+      }
+    }
+    prevSortingRef.current = sorting;
+  }, [sorting, serverSidePagination, onSortChange]);
 
   // Process data to add computed fields
   const processedData = useMemo(() => {
     return data.map(row => ({
       ...row,
-      daysToExpire: calculateDaysToExpire(row.leaseEndDate),
-      status: determineStatus(calculateDaysToExpire(row.leaseEndDate), row.rentBalance),
+      leaseDaysToExpire: row.agreementEndDate ? calculateDaysToExpire(row.agreementEndDate) : 99999,
+      leaseStatus: (() => {
+        const hasEndDate = !!row.agreementEndDate;
+        const days = hasEndDate ? calculateDaysToExpire(row.agreementEndDate) : 99999;
+        const balance = row.rentBalance;
+        if (balance > 0) return 'overdue';
+        if (days <= 0) {
+          if (!hasEndDate) return 'active';
+          return 'expired';
+        }
+        if (days <= 30 && hasEndDate) return 'expiring';
+        return 'active';
+      })(),
     }));
   }, [data]);
 
-  // Column definitions
-  const columns = useMemo<ColumnDef<TenantTableData>[]>(() => [
+  // Default column definitions
+  const defaultColumns = useMemo<ColumnDef<any>[]>(() => [
     {
       id: 'select',
       header: ({ table }) => (
@@ -347,13 +429,16 @@ export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProp
     },
   ], []);
 
+  // Use custom columns or default
+  const columns = customColumns || defaultColumns;
+
   const table = useReactTable({
     data: processedData,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: serverSidePagination ? undefined : getFilteredRowModel(),
+    getPaginationRowModel: serverSidePagination ? undefined : getPaginationRowModel(),
+    getSortedRowModel: serverSidePagination ? undefined : getSortedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -368,10 +453,13 @@ export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProp
     },
     onExpandedChange: setExpanded,
     getRowId: (row) => row.id,
+    manualPagination: serverSidePagination,
+    manualSorting: serverSidePagination,
+    pageCount: serverSidePagination ? (paginationMeta?.totalPages ?? -1) : undefined,
     state: {
       sorting,
       columnFilters,
-      globalFilter,
+      globalFilter: serverSidePagination ? debouncedGlobalFilter : globalFilter,
       rowSelection,
       expanded,
       pagination,
@@ -396,7 +484,9 @@ export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProp
           />
         </div>
         <div className="text-sm text-slate-500">
-          {table.getFilteredRowModel().rows.length} total records
+          {serverSidePagination
+            ? (paginationMeta?.total ?? table.getFilteredRowModel().rows.length)
+            : table.getFilteredRowModel().rows.length} total records
         </div>
       </div>
 
@@ -466,7 +556,11 @@ export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProp
                     {row.getIsExpanded() && (
                       <tr key={`${row.id}-expanded`}>
                         <td colSpan={columns.length} className="p-0">
-                          <ExpandedRowDetails row={row.original} />
+                          {ExpandedRowDetailsComponent ? (
+                            <ExpandedRowDetailsComponent row={row.original} />
+                          ) : (
+                            <ExpandedRowDetails row={row.original} />
+                          )}
                         </td>
                       </tr>
                     )}
@@ -503,15 +597,19 @@ export function TenantsTable({ data, onRowSelect, onRowClick }: TenantsTableProp
               <p className="text-sm text-slate-700 whitespace-nowrap">per page</p>
             </div>
             <div className="h-5 w-px bg-slate-300" />
-            <p className="text-sm text-slate-700">
-              Page{' '}
-              <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>
-              {' '}of{' '}
-              <span className="font-medium">{table.getPageCount()}</span>
-              {' '}({' '}
-              <span className="font-medium">{table.getFilteredRowModel().rows.length}</span>
-              {' '}total records)
-            </p>
+              <p className="text-sm text-slate-700">
+                Page{' '}
+                <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>
+                {' '}of{' '}
+                <span className="font-medium">{table.getPageCount()}</span>
+                {' '}({' '}
+                <span className="font-medium">
+                  {serverSidePagination
+                    ? (paginationMeta?.total ?? table.getFilteredRowModel().rows.length)
+                    : table.getFilteredRowModel().rows.length}
+                </span>
+                {' '}total records)
+              </p>
           </div>
           <div>
             <nav className="relative z-0 inline-flex rounded-xl -space-x-px gap-2" aria-label="Pagination">

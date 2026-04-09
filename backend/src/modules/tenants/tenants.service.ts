@@ -11,8 +11,9 @@ export interface PaginationParams {
 }
 
 export interface TenantFilters {
-  tenantType?: string;
   gender?: string;
+  status?: string;
+  agreementType?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -84,10 +85,20 @@ export class TenantsService {
       ];
     }
 
+    const agreementType = filters?.agreementType || 'RENTAL';
+
+    where.rentalAgreements = {
+      some: {
+        agreementType: agreementType
+      }
+    };
+
     if (filters) {
-      if (filters.tenantType) where.tenantType = filters.tenantType;
+      if (filters.status) where.status = filters.status;
       if (filters.gender) where.gender = filters.gender;
     }
+
+    console.log('Where: ', where);
 
     return this.prisma.$transaction(async (tx) => {
       const [data, total] = await Promise.all([
@@ -96,12 +107,38 @@ export class TenantsService {
           skip,
           take: limit,
           orderBy: { [sortBy]: sortOrder },
+          include: {
+            rentalAgreements: {
+              include: {
+                unit: {
+                  include: {
+                    property: true
+                  }
+                },
+                invoices: true
+              }
+            }
+          },
         }),
         tx.tenant.count({ where }),
       ]);
 
+      // Format data to include rentalAgreement as single object instead of array
+      const formattedData = data.map(tenant => {
+        const rentalAgreement = tenant.rentalAgreements?.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0] || null;
+        const lastPaidInvoice = rentalAgreement?.invoices
+          ?.filter(inv => inv.status === 'PAID')
+          ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+
+        return {
+          ...tenant,
+          rentalAgreement,
+          lastPaidInvoice
+        };
+      });
+
       return {
-        data,
+        data: formattedData,
         meta: {
           total,
           page,

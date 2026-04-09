@@ -169,8 +169,26 @@ export const tenantsApi = {
     create: (data: Partial<Tenant>) =>
         api.post<Tenant>('/tenants', data),
 
-    findAll: () =>
-        api.get<Tenant[]>('/tenants'),
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        status?: string;
+        agreementType?: string;
+    }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+        if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.agreementType) queryParams.append('agreementType', params.agreementType);
+        const query = queryParams.toString();
+        return api.get<PaginatedResponse<Tenant>>(`/tenants${query ? `?${query}` : ''}`);
+    },
 
     findOne: (id: string) =>
         api.get<Tenant>(`/tenants/${id}`),

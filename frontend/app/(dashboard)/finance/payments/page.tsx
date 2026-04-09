@@ -67,15 +67,15 @@ const columns: ColumnDef<Payment>[] = [
     header: "Particulars",
     cell: ({ row }) => {
       const payment = row.original;
-      // Try to get meaningful particulars from invoice or lease
+      // Try to get meaningful particulars from invoice or rental agreement
       if (payment.invoice) {
         return (
           <Link href={`/dashboard/invoices/${payment.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800">
             {payment.invoice.invoiceNumber}
           </Link>
         );
-      } else if (payment.lease?.tenant) {
-        return `${payment.lease.tenant.surname}, ${payment.lease.tenant.otherNames}`;
+      } else if (payment.rentalAgreement?.tenant) {
+        return `${payment.rentalAgreement.tenant.surname}, ${payment.rentalAgreement.tenant.otherNames}`;
       } else if (payment.payee) {
         return payment.payee;
       }
@@ -165,9 +165,9 @@ export default function PaymentsPage() {
       // Payee filter
       if (filters.payee) {
         const payeeLower = filters.payee.toLowerCase();
-        const matchesPayee = 
+        const matchesPayee =
           payment.payee?.toLowerCase().includes(payeeLower) ||
-          payment.lease?.tenant?.surname?.toLowerCase().includes(payeeLower);
+          payment.rentalAgreement?.tenant?.surname?.toLowerCase().includes(payeeLower);
         if (!matchesPayee) return false;
       }
 

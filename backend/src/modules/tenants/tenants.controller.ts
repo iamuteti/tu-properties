@@ -34,7 +34,8 @@ export class TenantsController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    @Query('tenantType') tenantType?: string,
+    @Query('agreementType') agreementType?: string,
+    @Query('status') status?: string,
     @Query('gender') gender?: string,
   ) {
     const tenantId = getTenantId(req);
@@ -46,7 +47,8 @@ export class TenantsController {
       sortOrder,
     };
     const filters: TenantFilters = {
-      tenantType,
+      agreementType,
+      status,
       gender,
     };
     return this.tenantsService.findAll(tenantId, params, filters);

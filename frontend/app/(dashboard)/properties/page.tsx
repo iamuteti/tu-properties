@@ -30,6 +30,8 @@ export default function PropertiesPage() {
         landlordId: "",
     });
 
+    const [search, setSearch] = useState("");
+
     const { landlords } = useLandlords();
 
     const landlordOptions = useMemo(
@@ -46,7 +48,7 @@ export default function PropertiesPage() {
     const { properties, paginationMeta, isLoading, error } = useProperties({
         page,
         limit,
-        search: effectiveSearch,
+        search: search || effectiveSearch,
         sortBy,
         sortOrder,
         landlordId: appliedFilters.landlordId || undefined,
@@ -123,6 +125,11 @@ export default function PropertiesPage() {
     const handleSortChange = useCallback((newSortBy: string, newSortOrder: "asc" | "desc") => {
         setSortBy(newSortBy);
         setSortOrder(newSortOrder);
+        setPage(1);
+    }, []);
+
+    const handleSearchChange = useCallback((s: string) => {
+        setSearch(s);
         setPage(1);
     }, []);
 
@@ -229,6 +236,7 @@ export default function PropertiesPage() {
                 paginationMeta={meta}
                 onPaginationChange={handlePaginationChange}
                 onSortChange={handleSortChange}
+                onSearchChange={handleSearchChange}
             />
         </div>
     );

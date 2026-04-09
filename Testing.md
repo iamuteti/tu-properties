@@ -24,7 +24,7 @@ The system comes with demo accounts representing different roles and organizatio
 ### Super Admin Account (Platform Admin)
 | Role | Email | Password | Organization |
 | :--- | :--- | :--- | :--- |
-| **Super Admin** | `admin@tuhame.co.ke` | `Password123!` | None (Access to ALL organizations) |
+| **Super Admin** | `admin@tuproperties.co.ke` | `Password123!` | None (Access to ALL organizations) |
 
 **Purpose**: Can access all organizations, create new organizations, manage platform settings
 
@@ -34,40 +34,40 @@ The system comes with demo accounts representing different roles and organizatio
 
 | Role | Email | Password | Organization |
 | :--- | :--- | :--- | :--- |
-| **Property Manager** | `manager@tuhame.co.ke` | `Password123!` | Westhill Properties |
-| **Accountant** | `accountant@tuhame.co.ke` | `Password123!` | Westhill Properties |
+| **Admin** | `admin@westhill.co.ke` | `Password123!` | Westhill Properties |
+| **Accountant** | `accountant@westhill.co.ke` | `Password123!` | Westhill Properties |
 
 **Purpose**: Can only see data for "Westhill Properties" organization
 
 ---
 
-### Organization 2: Acme Properties
+### Organization 2: Rohi Properties
 
 | Role | Email | Password | Organization |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `manager@acme.co.ke` | `Password123!` | Acme Properties |
+| **Admin** | `manager@rohi.co.ke` | `Password123!` | Rohi Properties |
 
-**Purpose**: Can only see data for "Acme Properties" organization (different from TU Properties)
+**Purpose**: Can only see data for "Rohi Properties" organization (different from TU Properties)
 
 ---
 
 ## 3. Multi-Tenancy Test Scenarios
 
 ### Scenario 1: Data Isolation
-1. Login as `manager@tuhame.co.ke` (TU Properties)
+1. Login as `admin@westhill.co.ke` (Westhill Properties)
 2. Note the properties: "Riverside Heights", "Westlands Plaza"
-3. Logout and login as `manager@acme.co.ke` (Acme Properties)
-4. Verify NO properties are visible (or only Acme-specific properties)
+3. Logout and login as `admin@rohi.co.ke` (Rohi Properties)
+4. Verify NO properties are visible (or only Rohi-specific properties)
 
 ### Scenario 2: Super Admin Access
-1. Login as `admin@tuhame.co.ke` (Super Admin)
+1. Login as `admin@tuproperties.co.ke` (Super Admin)
 2. Navigate to Dashboard → Organizations
 3. Verify you can see ALL organizations
 4. Create a new organization
 5. Verify you can see data from ALL organizations
 
 ### Scenario 3: Role-Based Access
-1. Login as `accountant@tuhame.co.ke`
+1. Login as `accountant@rohi.co.ke`
 2. Navigate to Properties
 3. Verify you can see properties but cannot edit/delete
 4. Try navigating to Settings - should be restricted
@@ -80,13 +80,13 @@ The system comes with demo accounts representing different roles and organizatio
 | Name | Slug | Subdomain | Plan |
 | :--- | :--- | :--- | :--- |
 | Westhill Properties | tu-properties | demo | PROFESSIONAL |
-| Acme Properties | acme-properties | acme | STARTER |
+| Rohi Properties | rohi-properties | rohi | STARTER |
 
 ### Properties (Westhill Properties)
 - Riverside Heights (5 units)
 - Westlands Plaza (3 units)
 
-### Properties (Acme Properties)
+### Properties (Rohi Properties)
 - (None - fresh organization)
 
 ---
@@ -95,10 +95,10 @@ The system comes with demo accounts representing different roles and organizatio
 
 1. **Database Reset**: Run `npx prisma migrate reset` and `npx prisma db seed`
 2. **Test Data Isolation**: 
-   - Login as manager@tuhame.co.ke → Should see properties
-   - Login as manager@acme.co.ke → Should NOT see properties
+   - Login as admin@rohi.co.ke → Should see properties
+   - Login as manager@rohi.co.ke → Should NOT see properties
 3. **Test Super Admin**: 
-   - Login as admin@tuhame.co.ke → Access Organizations page
+   - Login as admin@tuproperties.co.ke → Access Organizations page
 4. **Test New Organization**:
    - As Super Admin, create new organization
    - Create user for that organization

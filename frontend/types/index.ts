@@ -274,7 +274,10 @@ export interface Tenant {
     country?: string;
     photoUrl?: string;
     organizationId?: string;
+    rentalAgreement?: RentalAgreement;
+    lastPaidInvoice?: Invoice;
     emergencyContacts?: TenantEmergencyContact[];
+    status: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
