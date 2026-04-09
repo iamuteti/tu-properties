@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User, AuthResponse, Organization } from "@/types";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 interface AuthContextType {
     user: User | null;
@@ -54,14 +55,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/dashboard");
     };
 
-    const logout = () => {
+    const logout = useCallback(() => {
         setToken(null);
         setUser(null);
         setOrganization(null);
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
         router.push("/auth/login");
-    };
+    }, [router]);
+
+    useEffect(() => {
+        const handleUnauthorized = () => logout();
+        window.addEventListener('unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('unauthorized', handleUnauthorized);
+    }, [logout]);
 
     return (
         <AuthContext.Provider value={{ user, organization, token, login, logout, isLoading }}>

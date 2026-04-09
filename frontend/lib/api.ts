@@ -26,7 +26,8 @@ api.interceptors.response.use(
             // Handle unauthorized access - use Next.js router instead of window.location
             localStorage.removeItem('auth_token');
             localStorage.removeItem('auth_user');
-            // Instead of window.location.href, let the auth context handle the redirect
+            // Dispatch event to trigger logout in auth context
+            window.dispatchEvent(new CustomEvent('unauthorized'));
             console.warn('Unauthorized access - token cleared');
         }
         return Promise.reject(error);
