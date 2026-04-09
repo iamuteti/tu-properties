@@ -28,10 +28,18 @@ export interface PaginatedResult<T> {
 export class LandlordsService {
   constructor(private prisma: PrismaService) {}
 
-  create(data: Prisma.LandlordCreateInput, tenantId?: string) {
+  async create(data: Prisma.LandlordCreateInput, tenantId?: string) {
     if (tenantId) {
       data.organization = { connect: { id: tenantId } };
     }
+
+    if (!data.code) {
+      const count = await this.prisma.landlord.count({
+        where: tenantId ? { organizationId: tenantId } : {},
+      });
+      data.code = `LLD-${(count + 1).toString().padStart(3, '0')}`;
+    }
+
     return this.prisma.landlord.create({ data });
   }
 

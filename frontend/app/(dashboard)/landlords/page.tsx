@@ -5,10 +5,12 @@ import { useLandlords } from "@/hooks/use-landlords";
 import { Button } from "@/components/ui/button";
 import { ExpandableTable, TableData } from "@/components/ui/expandable-table";
 import { LandlordFilters, LandlordFiltersState } from "@/components/filters/landlords-filter";
-import { Plus, Landmark, MoreHorizontal, Mail, Phone, Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { AddLandlordModal } from "@/components/ui/modals/add-landlord-modal";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { landlordsApi } from "@/lib/api";
+import { Plus, Landmark, Mail, Phone, Building2, ChevronDown, ChevronRight, Edit, Trash2, MoreVertical } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
-
-
+import { toast } from "sonner";
 
 interface LandlordTableData extends TableData {
     landlordId: string;
@@ -26,6 +28,11 @@ export default function LandlordsPage() {
     const [limit, setLimit] = useState(10);
     const [sortBy, setSortBy] = useState<string>("createdAt");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [landlordToDelete, setLandlordToDelete] = useState<string | null>(null);
+    const [editingLandlord, setEditingLandlord] = useState<any | null>(null);
 
     // Filter state (unapplied)
     const [filterState, setFilterState] = useState({
@@ -47,7 +54,7 @@ export default function LandlordsPage() {
         return parts.join(" ") || undefined;
     }, [appliedFilters.code, appliedFilters.name]);
 
-    const { landlords, paginationMeta, isLoading, error } = useLandlords({
+    const { landlords, paginationMeta, isLoading, error, refetch } = useLandlords({
         page,
         limit,
         search: effectiveSearch,
@@ -85,7 +92,22 @@ export default function LandlordsPage() {
         setPage(1);
     }, []);
 
+    const handleDeleteLandlord = useCallback(async () => {
+        if (!landlordToDelete) return;
 
+        try {
+            await landlordsApi.remove(landlordToDelete);
+            toast.success("Landlord deleted successfully!");
+            // Refresh the data
+            refetch();
+        } catch (error) {
+            console.error("Failed to delete landlord:", error);
+            toast.error("Failed to delete landlord. Please try again.");
+        } finally {
+            setDeleteDialogOpen(false);
+            setLandlordToDelete(null);
+        }
+    }, [landlordToDelete]);
 
     if (isLoading && !landlords.length) {
         return <div>Loading landlords...</div>;
@@ -188,9 +210,41 @@ export default function LandlordsPage() {
             id: 'actions',
             header: 'Actions',
             cell: ({ row }) => (
-                <Button variant="ghost" size="icon">
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <div className="relative">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setOpenDropdown(openDropdown === row.original.id ? null : row.original.id)}
+                    >
+                        <MoreVertical className="h-4 w-4" />
+                    </Button>
+                    {openDropdown === row.original.id && (
+                        <div className="absolute right-0 mt-1 w-32 bg-white border border-slate-200 rounded-md shadow-lg z-10">
+                            <button
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                onClick={() => {
+                                    setEditingLandlord(row.original);
+                                    setIsModalOpen(true);
+                                    setOpenDropdown(null);
+                                }}
+                            >
+                                <Edit className="h-3 w-3" />
+                                Edit
+                            </button>
+                            <button
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-red-600"
+                                onClick={() => {
+                                    setLandlordToDelete(row.original.id);
+                                    setDeleteDialogOpen(true);
+                                    setOpenDropdown(null);
+                                }}
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                Delete
+                            </button>
+                        </div>
+                    )}
+                </div>
             ),
             size: 80,
         },
@@ -230,7 +284,10 @@ export default function LandlordsPage() {
                         Manage your landlords directory
                     </p>
                 </div>
-                <Button>
+                <Button onClick={() => {
+                    setEditingLandlord(null);
+                    setIsModalOpen(true);
+                }}>
                     <Plus className="mr-2 h-4 w-4" /> Add Landlord
                 </Button>
             </div>
@@ -261,6 +318,27 @@ export default function LandlordsPage() {
                 onPaginationChange={handlePaginationChange}
                 onSortChange={handleSortChange}
                 onSearchChange={handleSearchChange}
+            />
+
+            <AddLandlordModal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingLandlord(null);
+                }}
+                onSuccess={() => {
+                    // Refresh the data by triggering a re-fetch
+                    refetch();
+                }}
+                landlord={editingLandlord}
+            />
+
+            <ConfirmDialog
+                isOpen={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}
+                onConfirm={handleDeleteLandlord}
+                title="Delete Landlord"
+                message="Are you sure you want to delete this landlord? This action cannot be undone."
             />
         </div>
     );
