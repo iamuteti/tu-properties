@@ -137,6 +137,24 @@ export default function TenantsPage() {
             size: 100,
         },
         {
+            accessorKey: 'status',
+            header: 'Status',
+            cell: ({ row }) => {
+                const status = row.original.status;
+                const colorMap = {
+                    active: 'bg-green-100 text-green-800',
+                    inactive: 'bg-gray-100 text-gray-800',
+                    archived: 'bg-blue-100 text-blue-800',
+                };
+                return (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-gray-800'}`}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </span>
+                );
+            },
+            size: 100,
+        },
+        {
             accessorKey: 'tenantName',
             header: 'Name',
             cell: ({ row }) => (
@@ -159,24 +177,6 @@ export default function TenantsPage() {
                 </div>
             ),
             size: 150,
-        },
-        {
-            accessorKey: 'status',
-            header: 'Status',
-            cell: ({ row }) => {
-                const status = row.original.status;
-                const colorMap = {
-                    active: 'bg-green-100 text-green-800',
-                    inactive: 'bg-gray-100 text-gray-800',
-                    archived: 'bg-blue-100 text-blue-800',
-                };
-                return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-gray-800'}`}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </span>
-                );
-            },
-            size: 100,
         },
         {
             accessorKey: 'agreementStartDate',

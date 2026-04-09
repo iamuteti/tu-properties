@@ -52,6 +52,7 @@ export interface TenantTableData {
   rentAmount: number;
   rentBalance: number;
   daysToExpire?: number;
+  invoices?: any[];
   status: 'active' | 'inactive' | 'archived';
 }
 
