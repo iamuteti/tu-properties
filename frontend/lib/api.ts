@@ -113,8 +113,15 @@ export const landlordsApi = {
     create: (data: Partial<Landlord>) =>
         api.post<Landlord>('/landlords', data),
 
-    findAll: () =>
-        api.get<Landlord[]>('/landlords'),
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        status?: string;
+    }) =>
+        api.get<{ data: Landlord[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/landlords', { params }),
 
     findOne: (id: string) =>
         api.get<Landlord>(`/landlords/${id}`),

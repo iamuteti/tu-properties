@@ -22,6 +22,7 @@ export interface Landlord {
     id: string;
     code: string;
     name: string;
+    status: string;
     email?: string;
     phone?: string;
     alternativePhone?: string;
@@ -39,6 +40,7 @@ export interface Landlord {
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
+    properties?: Property[];
 }
 
 export interface Organization {

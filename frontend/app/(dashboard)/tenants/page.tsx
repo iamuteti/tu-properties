@@ -97,10 +97,11 @@ export default function TenantsPage() {
         setPage(1);
     }, []);
 
-    const handleApplyFilters = useCallback(() => {
-        setAppliedFilters(filterState);
+    const handleApplyFilters = useCallback((newFilters: TenantFiltersState) => {
+        setFilterState(newFilters);
+        setAppliedFilters(newFilters);
         setPage(1);
-    }, [filterState]);
+    }, []);
 
     const handleResetFilters = useCallback(() => {
         const resetState = { code: "", name: "", status: "", withDeposit: false };
@@ -284,7 +285,7 @@ export default function TenantsPage() {
             {/* Filters */}
             <TenantFilters
                 filters={filterState}
-                onFiltersChange={setFilterState}
+                onFiltersChange={handleApplyFilters}
                 onReset={handleResetFilters}
             />
 

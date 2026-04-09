@@ -131,6 +131,7 @@ model Landlord {
   id               String  @id @default(cuid())
   code             String  @unique
   name             String
+  status           TenantStatus @default(ACTIVE)
   email            String?
   phone            String?
   alternativePhone String?

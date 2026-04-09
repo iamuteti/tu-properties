@@ -4,19 +4,17 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
 import { Search, X } from "lucide-react";
 
-export interface TenantFiltersState {
+export interface LandlordFiltersState {
   code: string;
   name: string;
   status: string;
-  withDeposit: boolean;
 }
 
-interface TenantFiltersProps {
-  filters: TenantFiltersState;
-  onFiltersChange: (filters: TenantFiltersState) => void;
+interface LandlordFiltersProps {
+  filters: LandlordFiltersState;
+  onFiltersChange: (filters: LandlordFiltersState) => void;
   onReset: () => void;
 }
 
@@ -27,18 +25,18 @@ const statusOptions = [
   { value: "ARCHIVED", label: "Archived" }
 ];
 
-export function TenantFilters({
+export function LandlordFilters({
   filters,
   onFiltersChange,
   onReset,
-}: TenantFiltersProps) {
-  const [localFilters, setLocalFilters] = useState<TenantFiltersState>(filters);
+}: LandlordFiltersProps) {
+  const [localFilters, setLocalFilters] = useState<LandlordFiltersState>(filters);
 
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
 
-  const handleFilterChange = (key: keyof TenantFiltersState, value: string | boolean) => {
+  const handleFilterChange = (key: keyof LandlordFiltersState, value: string) => {
     setLocalFilters(prev => ({
       ...prev,
       [key]: value,
@@ -48,8 +46,7 @@ export function TenantFilters({
   const hasActiveFilters = Boolean(
     localFilters.code ||
     localFilters.name ||
-    localFilters.status ||
-    localFilters.withDeposit
+    localFilters.status
   );
 
   const handleApplyFilters = () => {
@@ -82,13 +79,6 @@ export function TenantFilters({
             value={localFilters.status}
             onChange={(e) => handleFilterChange('status', e.target.value)}
             placeholder="All statuses"
-          />
-        </div>
-        <div className="flex-1 min-w-[200px] max-w-xs">
-          <Toggle
-            label="Deposit Required"
-            checked={localFilters.withDeposit}
-            onChange={(checked) => handleFilterChange('withDeposit', checked)}
           />
         </div>
         <div className="flex gap-2">
