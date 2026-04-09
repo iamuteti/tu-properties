@@ -45,7 +45,7 @@ The system comes with demo accounts representing different roles and organizatio
 
 | Role | Email | Password | Organization |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `manager@rohi.co.ke` | `Password123!` | Rohi Properties |
+| **Admin** | `admin@rohi.co.ke` | `Password123!` | Rohi Properties |
 
 **Purpose**: Can only see data for "Rohi Properties" organization (different from TU Properties)
 

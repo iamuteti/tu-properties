@@ -531,3 +531,21 @@ export interface CreatePaymentData {
     mpesaPhoneNumber?: string;
     notes?: string;
 }
+
+export interface MoveOutRequest {
+    id: string;
+    organizationId: string;
+    tenantId: string;
+    rentalAgreementId: string;
+    moveoutDate: string;
+    approvalDate?: string;
+    approvedBy?: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    depositRefunded: boolean;
+    depositRefundAmount?: number;
+    notes?: string;
+    createdAt: string;
+    updatedAt: string;
+    tenant?: Tenant;
+    rentalAgreement?: RentalAgreement;
+}

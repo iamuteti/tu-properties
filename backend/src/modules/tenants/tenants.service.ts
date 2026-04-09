@@ -14,6 +14,8 @@ export interface TenantFilters {
   gender?: string;
   status?: string;
   agreementType?: string;
+  propertyId?: string;
+  withDeposit?: boolean;
 }
 
 export interface PaginatedResult<T> {
@@ -96,9 +98,27 @@ export class TenantsService {
     if (filters) {
       if (filters.status) where.status = filters.status;
       if (filters.gender) where.gender = filters.gender;
+      if (filters.propertyId) {
+        where.rentalAgreements = {
+          ...where.rentalAgreements,
+          some: {
+            ...where.rentalAgreements.some,
+            unit: {
+              propertyId: filters.propertyId
+            }
+          }
+        };
+      }
+      if (filters.withDeposit !== undefined) {
+        where.rentalAgreements = {
+          ...where.rentalAgreements,
+          some: {
+            ...where.rentalAgreements.some,
+            securityDeposit: filters.withDeposit ? { not: null } : { equals: null }
+          }
+        };
+      }
     }
-
-    console.log('Where: ', where);
 
     return this.prisma.$transaction(async (tx) => {
       const [data, total] = await Promise.all([

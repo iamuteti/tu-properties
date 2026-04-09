@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt, PaginatedResponse } from '@/types';
+import { AuthResponse, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt, PaginatedResponse, MoveOutRequest } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -177,6 +177,8 @@ export const tenantsApi = {
         sortOrder?: 'asc' | 'desc';
         status?: string;
         agreementType?: string;
+        propertyId?: string;
+        withDeposit?: boolean;
     }) => {
         const queryParams = new URLSearchParams();
         if (params?.page) queryParams.append('page', params.page.toString());
@@ -186,6 +188,8 @@ export const tenantsApi = {
         if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
         if (params?.status) queryParams.append('status', params.status);
         if (params?.agreementType) queryParams.append('agreementType', params.agreementType);
+        if (params?.propertyId) queryParams.append('propertyId', params.propertyId);
+        if (params?.withDeposit !== undefined) queryParams.append('withDeposit', params.withDeposit.toString());
         const query = queryParams.toString();
         return api.get<PaginatedResponse<Tenant>>(`/tenants${query ? `?${query}` : ''}`);
     },
@@ -296,4 +300,38 @@ export const financeApi = {
 
     deleteReceipts: (ids: string[]) =>
         api.post('/finance/receipts/bulk-delete', { ids }),
+};
+
+// Moveouts API
+export const moveoutsApi = {
+    create: (data: Partial<MoveOutRequest>) =>
+        api.post<MoveOutRequest>('/moveouts', data),
+
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        status?: string;
+    }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+        if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+        if (params?.status) queryParams.append('status', params.status);
+        const query = queryParams.toString();
+        return api.get<PaginatedResponse<MoveOutRequest>>(`/moveouts${query ? `?${query}` : ''}`);
+    },
+
+    findOne: (id: string) =>
+        api.get<MoveOutRequest>(`/moveouts/${id}`),
+
+    update: (id: string, data: Partial<MoveOutRequest>) =>
+        api.patch<MoveOutRequest>(`/moveouts/${id}`, data),
+
+    remove: (id: string) =>
+        api.delete(`/moveouts/${id}`),
 };

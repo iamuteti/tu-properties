@@ -3,7 +3,7 @@ import { AxiosError } from "axios";
 import { tenantsApi, rentalAgreementsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Tenant, RentalAgreement, Unit, Property } from "@/types";
-import { TenantTableData } from "@/components/ui/tenants-table";
+import { TenantTableData } from "@/components/ui/expandable-table";
 
 interface RentalAgreementWithRelations extends RentalAgreement {
     unit?: Unit & { property?: Property };

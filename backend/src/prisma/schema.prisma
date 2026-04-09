@@ -44,6 +44,7 @@ model Organization {
   tenants    Tenant[]
   landlords  Landlord[]
   leases     RentalAgreement[]
+  moveOutRequests MoveOutRequest[]
   invoices   Invoice[]
   payments   Payment[]
   receipts   Receipt[]
@@ -486,6 +487,7 @@ model Tenant {
   rentalAgreements RentalAgreement[]
   emergencyContacts TenantEmergencyContact[]
   receipts          Receipt[]
+  moveOutRequests MoveOutRequest[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -562,11 +564,14 @@ model RentalAgreement {
   // Relationships
   invoices Invoice[]
   payments Payment[]
+  moveOutRequests MoveOutRequest[]
 
   // Audit fields
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  terminatedAt DateTime?
+  depositRefunded Boolean @default(false)
 
   @@index([unitId])
   @@index([tenantId])
@@ -575,6 +580,34 @@ model RentalAgreement {
   @@index([endDate])
   @@index([organizationId])
   @@map("rental_agreements")
+}
+
+model MoveOutRequest {
+  id                String @id @default(cuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rentalAgreementId String
+  rentalAgreement   RentalAgreement @relation(fields: [rentalAgreementId], references: [id], onDelete: Cascade)
+  moveoutDate       DateTime
+  approvalDate      DateTime?
+  approvedBy        String? // User ID who approved
+  status            MoveOutStatus @default(PENDING)
+  depositRefunded   Boolean @default(false)
+  depositRefundAmount Decimal? @db.Decimal(10, 2)
+  notes             String? @db.Text
+
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([rentalAgreementId])
+  @@index([status])
+  @@index([organizationId])
+  @@map("move_out_requests")
 }
 
 enum AgreementType {
@@ -588,6 +621,12 @@ enum AgreementStatus {
   EXPIRED
   TERMINATED
   RENEWED
+}
+
+enum MoveOutStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // ============================================
@@ -771,6 +810,7 @@ model Receipt {
 enum ReceiptCategory {
   Rent
   General
+  Refund
 }
 
 model Payment {

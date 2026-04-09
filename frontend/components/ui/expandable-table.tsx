@@ -30,36 +30,17 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 
-// Types for tenant table data
-export interface TenantTableData {
+// Generic table data interface
+export interface TableData {
   id: string;
-  tenantId: string;
-  tenantName: string;
-  tenantCode: string;
-  unitName: string;
-  unitId: string;
-  propertyName: string;
-  propertyId: string;
-  idNoRegNo?: string;
-  taxPin?: string;
-  agreementType?: string;
-  tenancyType?: string;
-  phone?: string;
-  email?: string;
-  leaseId: string;
-  agreementStartDate: string;
-  agreementEndDate?: string;
-  rentAmount: number;
-  rentBalance: number;
-  daysToExpire?: number;
-  invoices?: any[];
-  status: 'active' | 'inactive' | 'archived';
+  [key: string]: any;
 }
 
-interface TenantsTableProps {
-  data: TenantTableData[];
-  onRowSelect?: (selectedRows: TenantTableData[]) => void;
-  onRowClick?: (row: TenantTableData) => void;
+interface ExpandableTableProps<TData extends TableData> {
+  data: TData[];
+  columns: ColumnDef<TData>[];
+  onRowSelect?: (selectedRows: TData[]) => void;
+  onRowClick?: (row: TData) => void;
   serverSidePagination?: boolean;
   paginationMeta?: {
     total: number;
@@ -70,93 +51,11 @@ interface TenantsTableProps {
   onPaginationChange?: (pagination: { page: number; limit: number }) => void;
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
   onSearchChange?: (search: string) => void;
-  columns?: ColumnDef<TenantTableData>[];
-  expandedRowComponent?: React.ComponentType<{ row: TenantTableData }>;
+  expandedRowComponent?: React.ComponentType<{ row: TData }>;
   pagination?: { pageIndex: number; pageSize: number };
 }
 
-// Status indicator component
-const StatusIndicator = ({ status }: { status: TenantTableData['status'] }) => {
-  const config = {
-    active: { color: 'bg-green-500', label: 'Active', icon: CheckCircle2 },
-    inactive: { color: 'bg-gray-500', label: 'Inactive', icon: AlertCircle },
-    archived: { color: 'bg-blue-500', label: 'Archived', icon: Info },
-  };
 
-  const { color, label, icon: Icon } = config[status];
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className={`w-2 h-2 rounded-full ${color}`} />
-      <span className="text-xs font-medium text-slate-600">{label}</span>
-    </div>
-  );
-};
-
-// Rent balance progress bar
-const RentProgressBar = ({ balance, rentAmount }: { balance: number; rentAmount: number }) => {
-  const percentage = rentAmount > 0 ? Math.min((balance / rentAmount) * 100, 100) : 0;
-  
-  const getColor = () => {
-    if (percentage >= 100) return 'bg-red-500';
-    if (percentage >= 75) return 'bg-yellow-500';
-    if (percentage >= 50) return 'bg-blue-500';
-    return 'bg-green-500';
-  };
-
-  return (
-    <div className="w-full">
-      <div className="flex justify-between text-xs mb-1">
-        <span className="text-slate-600">KES {balance.toLocaleString()}</span>
-        <span className="text-slate-400">/ KES {rentAmount.toLocaleString()}</span>
-      </div>
-      <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-        <div 
-          className={`h-full rounded-full transition-all duration-300 ${getColor()}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
-  );
-};
-
-// Expanded row component showing tenant details
-const ExpandedRowDetails = ({ row }: { row: TenantTableData }) => {
-  return (
-    <div className="bg-slate-50 p-4 border-l-4 border-cyan-500 ml-4">
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">ID/REG Number</p>
-          <p className="text-sm font-medium text-slate-900">{row.idNoRegNo || 'N/A'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Tax PIN</p>
-          <p className="text-sm font-medium text-slate-900">{row.taxPin || 'N/A'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Agreement Type</p>
-          <p className="text-sm font-medium text-slate-900">{row.agreementType || 'N/A'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Tenancy Type</p>
-          <p className="text-sm font-medium text-slate-900">{row.tenancyType || 'N/A'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Phone</p>
-          <p className="text-sm font-medium text-slate-900">{row.phone || 'N/A'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Email</p>
-          <p className="text-sm font-medium text-slate-900">{row.email || 'N/A'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Property ID</p>
-          <p className="text-sm font-medium text-slate-900">{row.propertyId}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Format date helper
 const formatDate = (dateString?: string) => {
@@ -182,7 +81,7 @@ const calculateDaysToExpire = (endDate?: string): number => {
 //   return 'active';
 // };
 
-export function TenantsTable({
+export function ExpandableTable<TData extends TableData>({
   data,
   onRowSelect,
   onRowClick,
@@ -194,7 +93,7 @@ export function TenantsTable({
   columns: customColumns,
   expandedRowComponent: ExpandedRowDetailsComponent,
   pagination: controlledPagination,
-}: TenantsTableProps) {
+}: ExpandableTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -257,181 +156,13 @@ export function TenantsTable({
     prevSortingRef.current = sorting;
   }, [sorting, serverSidePagination, onSortChange]);
 
-  // Process data to add computed fields
+  // Process data to add computed fields if needed
   const processedData = useMemo(() => {
-    return data.map(row => ({
-      ...row,
-      leaseDaysToExpire: row.agreementEndDate ? calculateDaysToExpire(row.agreementEndDate) : 99999,
-      leaseStatus: (() => {
-        const hasEndDate = !!row.agreementEndDate;
-        const days = hasEndDate ? calculateDaysToExpire(row.agreementEndDate) : 99999;
-        const balance = row.rentBalance;
-        if (balance > 0) return 'overdue';
-        if (days <= 0) {
-          if (!hasEndDate) return 'active';
-          return 'expired';
-        }
-        if (days <= 30 && hasEndDate) return 'expiring';
-        return 'active';
-      })(),
-    }));
+    return data; // For generic table, no specific processing
   }, [data]);
 
-  // Default column definitions
-  const defaultColumns = useMemo<ColumnDef<any>[]>(() => [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Select row"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-      size: 40,
-    },
-    {
-      id: 'expander',
-      header: () => null,
-      cell: ({ row }) => {
-        // Always show expander for all rows (manual expansion, not hierarchical)
-        return (
-          <button
-            className="p-1 hover:bg-slate-100 rounded transition-colors"
-            onClick={() => row.toggleExpanded()}
-            aria-label={row.getIsExpanded() ? 'Collapse row' : 'Expand row'}
-          >
-            {row.getIsExpanded() ? (
-              <ChevronDown className="h-4 w-4 text-slate-500" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-slate-500" />
-            )}
-          </button>
-        );
-      },
-      enableSorting: false,
-      enableHiding: false,
-      size: 40,
-    },
-    {
-      id: 'serial',
-      header: '#',
-      cell: ({ row }) => {
-        return row.index + 1;
-      },
-      size: 40,
-    },
-    {
-      accessorKey: 'tenantName',
-      header: 'Tenant Name',
-      cell: ({ row }) => (
-        <div className="font-medium text-slate-900">
-          {row.original.tenantName}
-        </div>
-      ),
-      size: 180,
-    },
-    {
-      accessorKey: 'tenantCode',
-      header: 'Code',
-      cell: ({ row }) => (
-        <span className="text-slate-500 font-mono text-sm">
-          {row.original.tenantCode}
-        </span>
-      ),
-      size: 100,
-    },
-    {
-      accessorKey: 'unitName',
-      header: 'Unit',
-      cell: ({ row }) => (
-        <div>
-          <div className="font-medium text-slate-900">{row.original.unitName}</div>
-          <div className="text-xs text-slate-500">{row.original.propertyName}</div>
-        </div>
-      ),
-      size: 150,
-    },
-    {
-      accessorKey: 'agreementStartDate',
-      header: 'Agreement Period',
-      cell: ({ row }) => (
-        <div className="text-sm">
-          <span className="text-slate-600">{formatDate(row.original.agreementStartDate)}</span>
-          <span className="text-slate-400 mx-1">-</span>
-          <span className="text-slate-600">{formatDate(row.original.agreementEndDate)}</span>
-        </div>
-      ),
-      size: 180,
-    },
-    {
-      accessorKey: 'daysToExpire',
-      header: 'Days to Expire',
-      cell: ({ row }) => {
-        const days = row.original.daysToExpire ?? 0;
-        const getDaysColor = () => {
-          if (days <= 0) return 'text-red-600 font-semibold';
-          if (days <= 30) return 'text-yellow-600 font-medium';
-          return 'text-green-600';
-        };
-        return (
-          <span className={`text-sm ${getDaysColor()}`}>
-            {days > 0 ? `${days} days` : 'Expired'}
-          </span>
-        );
-      },
-      size: 120,
-    },
-    {
-      accessorKey: 'rentBalance',
-      header: 'Rent Balance',
-      cell: ({ row }) => (
-        <RentProgressBar 
-          balance={row.original.rentBalance} 
-          rentAmount={row.original.rentAmount} 
-        />
-      ),
-      size: 160,
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <StatusIndicator status={row.original.status} />
-      ),
-      size: 100,
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      ),
-      size: 50,
-    },
-  ], []);
-
-  // Use custom columns or default
-  const columns = customColumns || defaultColumns;
+  // Use provided columns
+  const columns = customColumns;
 
   const table = useReactTable({
     data: processedData,
@@ -478,7 +209,7 @@ export function TenantsTable({
         <div className="flex-1 max-w-sm">
           <Input
             type="text"
-            placeholder="Search tenants..."
+            placeholder="Search..."
             value={globalFilter ?? ''}
             onChange={(event) => setGlobalFilter(String(event.target.value))}
             className="w-full"
@@ -557,10 +288,8 @@ export function TenantsTable({
                     {row.getIsExpanded() && (
                       <tr key={`${row.id}-expanded`}>
                         <td colSpan={columns.length} className="p-0">
-                          {ExpandedRowDetailsComponent ? (
+                          {ExpandedRowDetailsComponent && (
                             <ExpandedRowDetailsComponent row={row.original} />
-                          ) : (
-                            <ExpandedRowDetails row={row.original} />
                           )}
                         </td>
                       </tr>
@@ -572,7 +301,7 @@ export function TenantsTable({
                   <td colSpan={columns.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <Info className="h-12 w-12 text-slate-400" />
-                      <h3 className="mt-2 text-sm font-light text-slate-900">No tenants found</h3>
+                      <h3 className="mt-2 text-sm font-light text-slate-900">No data found</h3>
                       <p className="text-sm text-slate-500">Try adjusting your search or filters</p>
                     </div>
                   </td>
@@ -638,4 +367,4 @@ export function TenantsTable({
   );
 }
 
-export default TenantsTable;
+export default ExpandableTable;

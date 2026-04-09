@@ -3,12 +3,36 @@
 import Link from "next/link";
 import { useState, useMemo, useCallback } from "react";
 import { useTenants } from "@/hooks/use-tenants";
-import { TenantsTable, TenantTableData } from "@/components/ui/tenants-table";
+import { ExpandableTable, TableData } from "@/components/ui/expandable-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Search, X, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
+
+interface LeaseTableData extends TableData {
+  tenantId: string;
+  tenantName: string;
+  tenantCode: string;
+  unitName: string;
+  unitId: string;
+  propertyName: string;
+  propertyId: string;
+  idNoRegNo?: string;
+  taxPin?: string;
+  agreementType?: string;
+  tenancyType?: string;
+  phone?: string;
+  email?: string;
+  leaseId: string;
+  agreementStartDate: string;
+  agreementEndDate?: string;
+  rentAmount: number;
+  rentBalance: number;
+  invoices: any[];
+  rentStatus: string;
+  status: 'active' | 'inactive' | 'archived';
+}
 
 const statusOptions = [
     { value: "ACTIVE", label: "Active" },
@@ -105,7 +129,7 @@ export default function LeasesPage() {
         // Handle bulk actions on selected rows
     };
 
-    const leasesColumns: ColumnDef<TenantTableData>[] = [
+    const leasesColumns: ColumnDef<LeaseTableData>[] = [
         {
             id: 'expander',
             header: () => null,
@@ -210,8 +234,8 @@ export default function LeasesPage() {
         },
     ];
 
-    // Custom expanded row component for tenants
-    const TenantExpandedDetails = ({ row }: { row: TenantTableData }) => {
+    // Custom expanded row component for leases
+    const LeaseExpandedDetails = ({ row }: { row: LeaseTableData }) => {
         return (
             <div className="bg-slate-50 p-4 border-l-4 border-cyan-500 ml-4">
                 <div className="grid grid-cols-3 gap-4">
@@ -236,14 +260,14 @@ export default function LeasesPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Tenants</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Leases</h1>
                     <p className="text-muted-foreground">
-                        Manage your tenants directory
+                        Manage your lease agreements
                     </p>
                 </div>
-                <Link href="/dashboard/tenants/new">
+                <Link href="/dashboard/leases/new">
                     <Button>
-                        <Plus className="mr-2 h-4 w-4" /> Add Tenant
+                        <Plus className="mr-2 h-4 w-4" /> Add Lease
                     </Button>
                 </Link>
             </div>
@@ -289,7 +313,7 @@ export default function LeasesPage() {
                 </div>
             </div>
 
-            <TenantsTable
+            <ExpandableTable
                 data={tenants.map(tenant => ({
                     id: tenant.id,
                     tenantId: tenant.id,
@@ -315,7 +339,7 @@ export default function LeasesPage() {
                     status: tenant?.status === 'ACTIVE' ? 'active' : tenant.status === 'INACTIVE' ? 'inactive' : 'archived' as 'active' | 'inactive' | 'archived'
                 }))}
                 columns={leasesColumns}
-                expandedRowComponent={TenantExpandedDetails}
+                expandedRowComponent={LeaseExpandedDetails}
                 onRowClick={handleRowClick}
                 onRowSelect={handleRowSelect}
                 pagination={{ pageIndex: page - 1, pageSize: limit }}

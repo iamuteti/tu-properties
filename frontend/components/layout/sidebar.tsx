@@ -49,7 +49,8 @@ const navItems: NavItem[] = [
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         children: [
             { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/leases", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
+            { href: "/leases", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
         ]
     },
     {

@@ -14,6 +14,7 @@ import { UsersModule } from './modules/users/users.module';
 import { UnitsModule } from './modules/units/units.module';
 import { RentalAgreementsModule } from './modules/leases/rental-agreements.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { MoveoutsModule } from './modules/moveouts/moveouts.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { LandlordsModule } from './modules/landlords/landlords.module';
 import { PropertiesModule } from './modules/properties/properties.module';
@@ -29,6 +30,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
     UsersModule,
     UnitsModule,
     TenantsModule,
+    MoveoutsModule,
     RentalAgreementsModule,
     FinanceModule,
     AuditModule,

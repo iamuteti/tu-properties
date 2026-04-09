@@ -2,13 +2,38 @@
 
 import Link from "next/link";
 import { useState, useMemo, useCallback } from "react";
+import { Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { useTenants } from "@/hooks/use-tenants";
-import { TenantsTable, TenantTableData } from "@/components/ui/tenants-table";
+import { ExpandableTable, TableData } from "@/components/ui/expandable-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Search, X, Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { Toggle } from "@/components/ui/toggle";
 import { ColumnDef } from "@tanstack/react-table";
+import { TenantFilters, TenantFiltersState } from "@/components/filters/tenants-filter";
+
+interface TenantTableData extends TableData {
+    tenantId: string;
+    tenantName: string;
+    tenantCode: string;
+    unitName: string;
+    unitId: string;
+    propertyName: string;
+    propertyId: string;
+    idNoRegNo?: string;
+    taxPin?: string;
+    agreementType?: string;
+    tenancyType?: string;
+    phone?: string;
+    email?: string;
+    leaseId: string;
+    agreementStartDate: string;
+    agreementEndDate?: string;
+    rentAmount: number;
+    rentBalance: number;
+    rentStatus: string;
+    status: 'active' | 'inactive' | 'archived';
+}
 
 const statusOptions = [
     { value: "ACTIVE", label: "Active" },
@@ -23,15 +48,19 @@ export default function TenantsPage() {
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
     // Filter state (unapplied)
-    const [filterCode, setFilterCode] = useState("");
-    const [filterName, setFilterName] = useState("");
-    const [filterStatus, setFilterStatus] = useState("");
-
-    // Applied filters
-    const [appliedFilters, setAppliedFilters] = useState({
+    const [filterState, setFilterState] = useState<TenantFiltersState>({
         code: "",
         name: "",
         status: "",
+        withDeposit: false,
+    });
+
+    // Applied filters
+    const [appliedFilters, setAppliedFilters] = useState<TenantFiltersState>({
+        code: "",
+        name: "",
+        status: "",
+        withDeposit: false,
     });
 
     const [search, setSearch] = useState("");
@@ -49,6 +78,7 @@ export default function TenantsPage() {
         sortBy,
         sortOrder,
         status: appliedFilters.status || undefined,
+        withDeposit: appliedFilters.withDeposit,
     });
 
     const handlePaginationChange = useCallback((newPagination: { page: number; limit: number }) => {
@@ -68,23 +98,18 @@ export default function TenantsPage() {
     }, []);
 
     const handleApplyFilters = useCallback(() => {
-        setAppliedFilters({
-            code: filterCode,
-            name: filterName,
-            status: filterStatus,
-        });
+        setAppliedFilters(filterState);
         setPage(1);
-    }, [filterCode, filterName, filterStatus]);
+    }, [filterState]);
 
     const handleResetFilters = useCallback(() => {
-        setFilterCode("");
-        setFilterName("");
-        setFilterStatus("");
-        setAppliedFilters({ code: "", name: "", status: "" });
+        const resetState = { code: "", name: "", status: "", withDeposit: false };
+        setFilterState(resetState);
+        setAppliedFilters(resetState);
         setPage(1);
     }, []);
 
-    const hasActiveFilters = filterCode || filterName || filterStatus;
+    const hasActiveFilters = filterState.code || filterState.name || filterState.status || filterState.withDeposit;
 
     if (isLoading && !tenants.length) {
         return <div>Loading tenants...</div>;
@@ -257,47 +282,13 @@ export default function TenantsPage() {
             </div>
 
             {/* Filters */}
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 backdrop-blur-sm p-4">
-                <div className="flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label className="text-sm font-medium text-slate-700 mb-1.5 block">Code</label>
-                        <Input
-                            placeholder="Filter by code..."
-                            value={filterCode}
-                            onChange={(e) => setFilterCode(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label className="text-sm font-medium text-slate-700 mb-1.5 block">Name</label>
-                        <Input
-                            placeholder="Filter by name..."
-                            value={filterName}
-                            onChange={(e) => setFilterName(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label className="text-sm font-medium text-slate-700 mb-1.5 block">Status</label>
-                        <Select
-                            options={statusOptions}
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                            placeholder="All statuses"
-                        />
-                    </div>
-                    <div className="flex gap-2">
-                        <Button onClick={handleApplyFilters}>
-                            <Search className="mr-2 h-4 w-4" /> Search
-                        </Button>
-                        {hasActiveFilters && (
-                            <Button variant="outline" onClick={handleResetFilters}>
-                                <X className="mr-2 h-4 w-4" /> Reset
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <TenantFilters
+                filters={filterState}
+                onFiltersChange={setFilterState}
+                onReset={handleResetFilters}
+            />
 
-            <TenantsTable
+            <ExpandableTable
                 data={tenants.map(tenant => ({
                     id: tenant.id,
                     tenantId: tenant.id,

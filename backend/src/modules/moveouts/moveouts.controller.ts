@@ -10,20 +10,20 @@ import {
   Request,
   Query,
 } from '@nestjs/common';
-import { TenantsService, PaginationParams, TenantFilters } from './tenants.service';
+import { MoveoutsService, PaginationParams, MoveOutFilters } from './moveouts.service';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 
 @UseGuards(JwtAuthGuard)
-@Controller('tenants')
-export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+@Controller('moveouts')
+export class MoveoutsController {
+  constructor(private readonly moveoutsService: MoveoutsService) {}
 
   @Post()
-  create(@Body() createTenantDto: Prisma.TenantCreateInput, @Request() req) {
+  create(@Body() createMoveOutDto: Prisma.MoveOutRequestCreateInput, @Request() req) {
     const tenantId = getTenantId(req);
-    return this.tenantsService.create(createTenantDto, tenantId);
+    return this.moveoutsService.create(createMoveOutDto, tenantId);
   }
 
   @Get()
@@ -34,11 +34,7 @@ export class TenantsController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    @Query('agreementType') agreementType?: string,
     @Query('status') status?: string,
-    @Query('gender') gender?: string,
-    @Query('propertyId') propertyId?: string,
-    @Query('withDeposit') withDeposit?: string,
   ) {
     const tenantId = getTenantId(req);
     const params: PaginationParams = {
@@ -48,35 +44,31 @@ export class TenantsController {
       sortBy,
       sortOrder,
     };
-    const filters: TenantFilters = {
-      agreementType,
+    const filters: MoveOutFilters = {
       status,
-      gender,
-      propertyId,
-      withDeposit: withDeposit === 'true' ? true : withDeposit === 'false' ? false : undefined,
     };
-    return this.tenantsService.findAll(tenantId, params, filters);
+    return this.moveoutsService.findAll(tenantId, params, filters);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
-    return this.tenantsService.findOne(id, tenantId);
+    return this.moveoutsService.findOne(id, tenantId);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() updateTenantDto: Prisma.TenantUpdateInput,
+    @Body() updateMoveOutDto: Prisma.MoveOutRequestUpdateInput,
     @Request() req,
   ) {
     const tenantId = getTenantId(req);
-    return this.tenantsService.update(id, updateTenantDto, tenantId);
+    return this.moveoutsService.update(id, updateMoveOutDto, tenantId);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
-    return this.tenantsService.remove(id, tenantId);
+    return this.moveoutsService.remove(id, tenantId);
   }
 }

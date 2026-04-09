@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AxiosError } from "axios";
-import { tenantsApi } from "@/lib/api";
+import { moveoutsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
-import { Tenant } from "@/types";
+import { MoveOutRequest } from "@/types";
 
 export interface PaginationMeta {
     total: number;
@@ -11,21 +11,18 @@ export interface PaginationMeta {
     totalPages: number;
 }
 
-export interface UseTenantsParams {
+export interface UseMoveoutsParams {
     page?: number;
     limit?: number;
     search?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     status?: string;
-    agreementType?: string;
-    propertyId?: string;
-    withDeposit?: boolean;
 }
 
-export function useTenants(params?: UseTenantsParams) {
+export function useMoveouts(params?: UseMoveoutsParams) {
     const { token } = useAuth();
-    const [tenants, setTenants] = useState<Tenant[]>([]);
+    const [moveouts, setMoveouts] = useState<MoveOutRequest[]>([]);
     const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -39,28 +36,25 @@ export function useTenants(params?: UseTenantsParams) {
         params?.sortBy,
         params?.sortOrder,
         params?.status,
-        params?.agreementType,
-        params?.propertyId,
-        params?.withDeposit,
     ]);
 
-    const fetchTenants = useCallback(async () => {
+    const fetchMoveouts = useCallback(async () => {
         if (!token) return;
         setIsLoading(true);
         try {
-            const response = await tenantsApi.findAll(paramsRef.current);
-            setTenants(response.data.data);
+            const response = await moveoutsApi.findAll(paramsRef.current);
+            setMoveouts(response.data.data);
             setPaginationMeta(response.data.meta);
             setError(null);
         } catch (err: unknown) {
             if (err instanceof AxiosError) {
                 if (err.response?.data?.data) {
-                    setTenants(err.response.data.data);
+                    setMoveouts(err.response.data.data);
                     setPaginationMeta(err.response.data.meta);
                     setError(null);
                     return;
                 }
-                setError(err.response?.data?.message || err.message || "Failed to fetch tenants");
+                setError(err.response?.data?.message || err.message || "Failed to fetch move-outs");
             } else if (err instanceof Error) {
                 setError(err.message);
             } else {
@@ -73,8 +67,8 @@ export function useTenants(params?: UseTenantsParams) {
 
     useEffect(() => {
         paramsRef.current = stableParams;
-        fetchTenants();
-    }, [stableParams, fetchTenants]);
+        fetchMoveouts();
+    }, [stableParams, fetchMoveouts]);
 
-    return { tenants, paginationMeta, isLoading, error, refetch: fetchTenants };
+    return { moveouts, paginationMeta, isLoading, error, refetch: fetchMoveouts };
 }
