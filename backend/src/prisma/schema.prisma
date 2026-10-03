@@ -48,19 +48,22 @@ model Organization {
   timezone String @default("Africa/Nairobi")
 
   // Relationships
-  users           User[]
-  properties      Property[]
-  tenants         Tenant[]
-  landlords       Landlord[]
-  leases          RentalAgreement[]
-  moveOutRequests MoveOutRequest[]
-  invoices        Invoice[]
-  payments        Payment[]
-  receipts        Receipt[]
-  auditLogs       AuditLog[]
-  branches        Branch[]
-  roles           Role[]
-  documents       Document[]
+  users             User[]
+  properties        Property[]
+  tenants           Tenant[]
+  landlords         Landlord[]
+  leases            RentalAgreement[]
+  moveOutRequests   MoveOutRequest[]
+  invoices          Invoice[]
+  payments          Payment[]
+  receipts          Receipt[]
+  auditLogs         AuditLog[]
+  branches          Branch[]
+  roles             Role[]
+  documents         Document[]
+  leads             Lead[]
+  contacts          Contact[]
+  communicationLogs CommunicationLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,10 +108,12 @@ model User {
   mfaSecret  String?
   mfaEnabled Boolean @default(false)
 
-  auditLogs         AuditLog[]
-  sessions          Session[]
-  roleAssignments   RoleAssignment[]
-  uploadedDocuments Document[]
+  auditLogs            AuditLog[]
+  sessions             Session[]
+  roleAssignments      RoleAssignment[]
+  uploadedDocuments    Document[]
+  assignedLeads        Lead[]             @relation("UserAssignedLeads")
+  loggedCommunications CommunicationLog[] @relation("UserLoggedCommunications")
 
   @@index([email])
   @@index([role])
@@ -205,6 +210,7 @@ model Branch {
   isActive Boolean @default(true)
 
   properties Property[]
+  leads      Lead[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -383,6 +389,9 @@ model Property {
   // properties created before branches existed keep working.
   branchId String?
   branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  // Leads that asked about this property (Module 3 CRM).
+  leads Lead[] @relation("PropertyLeads")
 
   // Accounting & Billing Configuration
   accountLedgerType     String? // e.g., "Property Control Ledger in GL"
@@ -689,6 +698,13 @@ model Tenant {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
+  // CRM link (Module 3). A Tenant stays its own table — it is the lease party
+  // with an account number, tax PIN and rent history — and is linked to the
+  // shared people directory so contact history is visible from the tenant and
+  // vice versa. One contact maps to at most one tenant.
+  contactId String?  @unique
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
   // Relationships
   rentalAgreements  RentalAgreement[]
   emergencyContacts TenantEmergencyContact[]
@@ -833,6 +849,173 @@ enum MoveOutStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// ============================================
+// CRM (LEADS, CONTACTS, COMMUNICATIONS)
+// ============================================
+
+// Where a lead came from. WEBSITE/FACEBOOK are the two automated sources the
+// public webhook feeds; WHATSAPP is manual until a Business API integration
+// exists.
+enum LeadSource {
+  WEBSITE
+  FACEBOOK
+  WHATSAPP
+  WALK_IN
+  REFERRAL
+  OTHER
+}
+
+// Pipeline stage. WON/LOST are terminal: a lead in either state cannot be
+// moved again without reopening it (see leads.service).
+enum LeadStage {
+  NEW
+  CONTACTED
+  VIEWING_SCHEDULED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Who is asking. The CRM target sketch only carried `source`/`status`; a lead
+  // without contact details cannot be worked, so the enquiry details live on
+  // the lead until it is converted to a Contact.
+  firstName String
+  lastName  String?
+  email     String?
+  phone     String?
+  message   String? @db.Text
+
+  source       LeadSource @default(OTHER)
+  sourceDetail String? // e.g. website form name, Facebook page, referrer
+
+  stage      LeadStage @default(NEW)
+  lostReason String?
+
+  // What they are interested in, and who owns the follow-up.
+  interestedPropertyId String?
+  interestedProperty   Property? @relation("PropertyLeads", fields: [interestedPropertyId], references: [id], onDelete: SetNull)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  assignedAgentId String?
+  assignedAgent   User?   @relation("UserAssignedLeads", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+
+  // Set once the lead is converted: the contact it became, and when.
+  contactId   String?
+  contact     Contact?  @relation("LeadContact", fields: [contactId], references: [id], onDelete: SetNull)
+  convertedAt DateTime?
+
+  communications CommunicationLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  @@index([organizationId])
+  @@index([stage])
+  @@index([source])
+  @@index([assignedAgentId])
+  @@index([interestedPropertyId])
+  @@index([email])
+  @@map("leads")
+}
+
+enum ContactType {
+  BUYER
+  TENANT
+  LANDLORD
+  INVESTOR
+  AGENT
+  LAWYER
+}
+
+// The shared people directory used across leasing and sales. Deliberately
+// separate from `Tenant`: a tenant is a lease party with its own account
+// number, tax PIN and rent history, whereas a contact is just a person we
+// talk to. They are linked via `Tenant.contactId`.
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type      ContactType @default(BUYER)
+  firstName String
+  lastName  String
+
+  email   String?
+  phone   String?
+  company String?
+  notes   String? @db.Text
+
+  isActive Boolean @default(true)
+
+  leads          Lead[]             @relation("LeadContact")
+  communications CommunicationLog[]
+  tenant         Tenant?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([email])
+  @@map("contacts")
+}
+
+enum CommChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  CALL
+  NOTE
+  MEETING
+}
+
+enum CommDirection {
+  INBOUND
+  OUTBOUND
+}
+
+// Every conversation artefact against a contact (or a lead that has not been
+// converted yet). Nothing is sent anywhere yet — Modules 18 (Notifications)
+// and the WhatsApp/e-mail integrations are the senders; this is the record.
+model CommunicationLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  channel   CommChannel
+  direction CommDirection @default(OUTBOUND)
+  subject   String?
+  content   String?       @db.Text
+  outcome   String? // for calls: "answered", "no answer", "rescheduled…"
+
+  occurredAt DateTime @default(now())
+
+  loggedById String?
+  loggedBy   User?   @relation("UserLoggedCommunications", fields: [loggedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([leadId])
+  @@index([occurredAt])
+  @@map("communication_logs")
 }
 
 // ============================================

@@ -691,6 +691,18 @@ export async function generateDemoData(
   );
   console.log('Demo data generation completed!');
 
+  // ========== CRM: leads, contacts, communication history (Module 3) ==========
+  console.log('Generating CRM leads and contacts...');
+  const crmCounts = await generateCrmData(
+    prisma,
+    organizationId,
+    properties,
+    tenants,
+  );
+  console.log(
+    `Generated ${crmCounts.leads} leads, ${crmCounts.contacts} contacts, ${crmCounts.communications} log entries`,
+  );
+
   return {
     landlords: landlords.length,
     properties: properties.length,
@@ -700,7 +712,244 @@ export async function generateDemoData(
     invoices: invoiceCount,
     payments: paymentCount,
     receipts: receiptCount,
+    leads: crmCounts.leads,
+    contacts: crmCounts.contacts,
+    communications: crmCounts.communications,
   };
+}
+
+/**
+ * Small, realistic CRM data set (Module 3).
+ *
+ * Deliberately hand-written rather than randomised: the pipeline board is the
+ * screen a reviewer looks at first, so it needs leads spread across the stages
+ * — including one won lead (with its converted contact), one lost lead with a
+ * reason, and a communication history worth reading.
+ */
+async function generateCrmData(
+  prisma: PrismaClient,
+  organizationId: string,
+  properties: Property[],
+  tenants: Tenant[],
+) {
+  const people: Array<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    source: 'WEBSITE' | 'FACEBOOK' | 'WHATSAPP' | 'WALK_IN' | 'REFERRAL';
+    sourceDetail: string;
+    message: string;
+    stage:
+      | 'NEW'
+      | 'CONTACTED'
+      | 'VIEWING_SCHEDULED'
+      | 'NEGOTIATION'
+      | 'WON'
+      | 'LOST';
+    lostReason?: string;
+  }> = [
+    {
+      firstName: 'Amina',
+      lastName: 'Wanjiru',
+      email: 'amina.wanjiru@example.com',
+      phone: '+254712000001',
+      source: 'WEBSITE',
+      sourceDetail: 'Kileleshi listings page',
+      message:
+        'Looking for a 2-bedroom in Kileleshi or Lavington, budget 60–70k, moving next month.',
+      stage: 'CONTACTED',
+    },
+    {
+      firstName: 'Brian',
+      lastName: 'Otieno',
+      email: 'brian.otieno@example.com',
+      phone: '+254712000002',
+      source: 'FACEBOOK',
+      sourceDetail: 'Facebook Lead Ad — apartments',
+      message:
+        'Interested in serviced apartments near Westlands for two months.',
+      stage: 'VIEWING_SCHEDULED',
+    },
+    {
+      firstName: 'Caroline',
+      lastName: 'Mwangi',
+      email: 'caroline.mwangi@example.com',
+      phone: '+254712000003',
+      source: 'WALK_IN',
+      sourceDetail: '',
+      message: 'Walked in asking about a 3-bedroom for sale in Ruiru.',
+      stage: 'NEGOTIATION',
+    },
+    {
+      firstName: 'David',
+      lastName: 'Kimani',
+      email: 'david.kimani@example.com',
+      phone: '+254712000004',
+      source: 'REFERRAL',
+      sourceDetail: 'Referred by Mr. Otieno (unit B4)',
+      message: 'Referred by an existing tenant, wants a smaller one-bed.',
+      stage: 'WON',
+    },
+    {
+      firstName: 'Esther',
+      lastName: 'Njeri',
+      email: 'esther.njeri@example.com',
+      phone: '+254712000005',
+      source: 'WHATSAPP',
+      sourceDetail: 'WhatsApp Business number',
+      message: 'Asked for a 1-bedroom with parking, anywhere in Nairobi.',
+      stage: 'LOST',
+      lostReason: 'Went with a competitor with a cheaper service charge.',
+    },
+    {
+      firstName: 'Frank',
+      lastName: 'Odhiambo',
+      email: 'frank.odhiambo@example.com',
+      phone: '+254712000006',
+      source: 'WEBSITE',
+      sourceDetail: 'Homepage enquiry form',
+      message: 'General enquiry about a warehouse in Industrial Area.',
+      stage: 'NEW',
+    },
+  ];
+
+  let leads = 0;
+  let contacts = 0;
+  let communications = 0;
+
+  for (const [index, person] of people.entries()) {
+    const property = properties[index % Math.max(properties.length, 1)];
+
+    const lead = await prisma.lead.create({
+      data: {
+        firstName: person.firstName,
+        lastName: person.lastName,
+        email: person.email,
+        phone: person.phone,
+        message: person.message,
+        source: person.source,
+        sourceDetail: person.sourceDetail || null,
+        stage: person.stage,
+        lostReason: person.lostReason ?? null,
+        organizationId,
+        interestedPropertyId: property?.id ?? null,
+        communications: {
+          create: {
+            channel: 'NOTE',
+            direction: 'INBOUND',
+            subject: 'Lead captured',
+            content: person.message,
+            organizationId,
+          },
+        },
+      },
+    });
+    leads += 1;
+
+    // The won lead becomes a contact (the conversion the module is judged on).
+    if (person.stage === 'WON') {
+      const contact = await prisma.contact.create({
+        data: {
+          firstName: person.firstName,
+          lastName: person.lastName,
+          email: person.email,
+          phone: person.phone,
+          type: 'TENANT',
+          notes: 'Referred by an existing tenant; moving in next month.',
+          organizationId,
+          communications: {
+            create: {
+              channel: 'NOTE',
+              direction: 'INBOUND',
+              subject: `Converted from lead (${person.source})`,
+              content: person.message,
+              organizationId,
+            },
+          },
+        },
+      });
+      contacts += 1;
+
+      await prisma.communicationLog.create({
+        data: {
+          channel: 'CALL',
+          direction: 'OUTBOUND',
+          subject: 'Confirmed unit and move-in date',
+          content:
+            'Agreed on unit B7, move-in on the 1st. Asked for the deposit terms in writing.',
+          outcome: 'answered',
+          occurredAt: daysFromNow(-3),
+          contactId: contact.id,
+          leadId: lead.id,
+          organizationId,
+        },
+      });
+      communications += 1;
+
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { contactId: contact.id, convertedAt: daysFromNow(-4) },
+      });
+    }
+
+    // A couple of extra history entries so the contact timeline is not empty.
+    if (person.stage === 'NEGOTIATION' || person.stage === 'LOST') {
+      const contact = await prisma.contact.create({
+        data: {
+          firstName: person.firstName,
+          lastName: person.lastName,
+          email: person.email,
+          phone: person.phone,
+          type: 'BUYER',
+          organizationId,
+        },
+      });
+      contacts += 1;
+
+      await prisma.communicationLog.create({
+        data: {
+          channel: 'EMAIL',
+          direction: 'OUTBOUND',
+          subject: 'Sent the shortlist',
+          content:
+            'Shared four matching units with photos and service charges.',
+          occurredAt: daysFromNow(-6),
+          contactId: contact.id,
+          organizationId,
+        },
+      });
+      communications += 1;
+    }
+  }
+
+  // Link a couple of existing tenants to the directory so the contact detail
+  // screen shows the Tenant relationship.
+  for (const tenant of tenants.slice(0, 3)) {
+    const existing = await prisma.contact.findFirst({
+      where: {
+        organizationId,
+        email: tenant.email ?? undefined,
+        firstName: tenant.otherNames ?? '',
+        lastName: tenant.surname,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: { contactId: existing.id },
+      });
+    }
+  }
+
+  return { leads, contacts, communications };
+}
+
+function daysFromNow(days: number): Date {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
 }
 
 // Main function to run demo data generation standalone
@@ -727,6 +976,11 @@ export async function seedDemoData() {
     await prisma.invoice.deleteMany();
     await prisma.rentalAgreement.deleteMany();
     await prisma.tenantEmergencyContact.deleteMany();
+    // CRM first: `Lead`/`Contact` reference properties, branches, users and
+    // (optionally) tenants, and `CommunicationLog` references both.
+    await prisma.communicationLog.deleteMany();
+    await prisma.lead.deleteMany();
+    await prisma.contact.deleteMany();
     await prisma.tenant.deleteMany();
     await prisma.unitFeature.deleteMany();
     await prisma.unitMeterNumber.deleteMany();

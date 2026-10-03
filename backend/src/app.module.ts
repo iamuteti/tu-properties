@@ -25,6 +25,8 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { CrmLeadsModule } from './modules/crm/leads/leads.module';
+import { CrmContactsModule } from './modules/crm/contacts/contacts.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { SecurityModule } from './security/security.module';
 
@@ -49,6 +51,8 @@ import { SecurityModule } from './security/security.module';
     DashboardModule,
     BranchesModule,
     DocumentsModule,
+    CrmLeadsModule,
+    CrmContactsModule,
   ],
   controllers: [AppController],
   providers: [

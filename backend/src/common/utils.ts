@@ -54,6 +54,31 @@ export function isSuperAdmin(user: any): boolean {
 }
 
 /**
+ * Extract the authenticated user's id from the request, for records that need
+ * an actor (who logged this call, who converted this lead).
+ * Returns `undefined` for super admins operating without a user context.
+ */
+export function getUserId(request: any): string | undefined {
+  return request?.user?.id;
+}
+
+/**
+ * Like `getTenantId`, but for endpoints that *cannot* operate without a tenant
+ * (creating a record, or anything that must be written to exactly one
+ * organization). Super admins have no `organizationId`, so they get a 403 with
+ * an explanation instead of silently writing unscoped data.
+ */
+export function requireTenantId(request: any): string {
+  const tenantId = getTenantId(request);
+  if (!tenantId) {
+    throw new ForbiddenException(
+      'This action requires an organization. Switch to an organization-scoped user or pass the organization explicitly.',
+    );
+  }
+  return tenantId;
+}
+
+/**
  * Assert that the record matching `where` exists, throwing 404 otherwise.
  *
  * Prisma `update`/`delete` require a *unique* where clause, so tenant-scoped

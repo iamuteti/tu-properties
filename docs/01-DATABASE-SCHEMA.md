@@ -356,7 +356,7 @@ enum MoveOutStatus {
 
 ---
 
-## Domain: CRM (Module: CRM) — 🆕 Not started
+## Domain: CRM (Module: CRM) — ✅ Resolved 2026-10-03 (see `04-MODULE-crm.md`)
 
 ```prisma
 model Lead {
@@ -427,6 +427,84 @@ enum CommChannel {
   CALL
   NOTE
   MEETING
+}
+```
+
+**Target vs. shipped.** The sketch above was the intent; Module 3 shipped it with the gaps below closed. The
+full Prisma source is `backend/src/prisma/schema.prisma` (migration `20261003145000_module3_crm`).
+
+| Target | Shipped | Why |
+| --- | --- | --- |
+| `Lead { source, contactId, status, interestedPropertyId, assignedAgentId }` | plus `firstName`/`lastName`/`email`/`phone`/`message`, `sourceDetail`, `lostReason`, `branchId`, `convertedAt` | The sketch had no way to know **who** enquired, so a lead could not be worked at all. `status` became `stage` (`LeadStage`); `contactId` is set on conversion. |
+| `Lead` had no lifecycle | `LeadStage { NEW, CONTACTED, VIEWING_SCHEDULED, NEGOTIATION, WON, LOST }` enforced by `lead-pipeline.ts` | WON/LOST are terminal and WON requires a converted contact — the API refuses the move otherwise. `LOST` requires a reason. |
+| `LeadSource` | same + `WHATSAPP` | WhatsApp is a real enquiry channel even before the Business API exists (manual logging). |
+| `Contact` | same fields + `company`, `notes`, `isActive` | A shared directory across leasing and sales needs a note field and a way to retire someone without deleting history. |
+| `CommunicationLog { contactId, channel, content, occurredAt }` | `contactId` **or** `leadId`, plus `direction`, `subject`, `outcome`, `loggedById` | History has to exist before conversion, so a log row may hang off a lead. `outcome` is what makes a call log useful. |
+| `Contact.id` only | `Tenant.contactId String? @unique` → `Contact` | **Decided: Tenant stays its own table, the two are linked** (see `04-MODULE-crm.md` for the reasoning). One contact maps to at most one tenant; deleting either side nulls the link rather than cascading into leases or invoices. |
+| `organizationId String` everywhere | kept, and every CRM query filters on it | Plus indexes on `stage`, `source`, `type`, `contactId`, `occurredAt`. |
+
+```prisma
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  firstName      String
+  lastName       String?
+  email          String?
+  phone          String?
+  message        String?      @db.Text
+  source         LeadSource   @default(OTHER)
+  sourceDetail   String?
+  stage          LeadStage    @default(NEW)
+  lostReason     String?
+  interestedPropertyId String?
+  branchId       String?
+  assignedAgentId String?
+  contactId      String?
+  convertedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  @@index([organizationId])
+  @@index([stage])
+  @@index([source])
+  @@map("leads")
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           ContactType  @default(BUYER)
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  company        String?
+  notes          String?      @db.Text
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  @@index([organizationId])
+  @@index([type])
+  @@map("contacts")
+}
+
+model CommunicationLog {
+  id             String        @id @default(cuid())
+  organizationId String
+  contactId      String?
+  leadId         String?
+  channel        CommChannel
+  direction      CommDirection @default(OUTBOUND)
+  subject        String?
+  content        String?       @db.Text
+  outcome        String?
+  occurredAt     DateTime      @default(now())
+  loggedById     String?
+  createdAt      DateTime      @default(now())
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([leadId])
+  @@map("communication_logs")
 }
 ```
 

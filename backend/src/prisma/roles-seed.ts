@@ -28,6 +28,8 @@ export const PERMISSION_MODULES = [
   'organizations',
   'branches',
   'documents',
+  'crm_leads',
+  'crm_contacts',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -102,6 +104,8 @@ export const SYSTEM_ROLES: {
       settings: { view: true, update: true },
       branches: full(),
       documents: full(),
+      crm_leads: full(),
+      crm_contacts: full(),
     }),
   },
   {
@@ -116,6 +120,9 @@ export const SYSTEM_ROLES: {
       leases: full(),
       moveouts: full(),
       documents: viewWrite(),
+      // Module 3 CRM: the pipeline is part of day-to-day property work.
+      crm_leads: full(),
+      crm_contacts: full(),
     }),
   },
   {
@@ -128,16 +135,21 @@ export const SYSTEM_ROLES: {
       leases: viewWrite(),
       moveouts: viewWrite(),
       documents: viewWrite(),
+      // Enquiries and viewings are how a leasing officer's day starts.
+      crm_leads: full(),
+      crm_contacts: full(),
     }),
   },
   {
     name: 'Sales Agent',
     description:
-      'Read-only access to properties, units and tenants for sales activity.',
+      'Read-only access to properties, units and tenants for sales activity, plus lead capture.',
     permissions: set({
       properties: view(),
       units: view(),
       tenants: view(),
+      crm_leads: full(),
+      crm_contacts: viewWrite(),
     }),
   },
   {

@@ -757,3 +757,160 @@ export interface MoveOutRequest {
     tenant?: Tenant;
     rentalAgreement?: RentalAgreement;
 }
+// ============================================
+// CRM (Module 3)
+// ============================================
+
+/** Where a lead came from. WEBSITE/FACEBOOK are the automated sources. */
+export type LeadSource =
+    | 'WEBSITE'
+    | 'FACEBOOK'
+    | 'WHATSAPP'
+    | 'WALK_IN'
+    | 'REFERRAL'
+    | 'OTHER';
+
+/** Pipeline stage. WON/LOST are terminal until the lead is reopened. */
+export type LeadStage =
+    | 'NEW'
+    | 'CONTACTED'
+    | 'VIEWING_SCHEDULED'
+    | 'NEGOTIATION'
+    | 'WON'
+    | 'LOST';
+
+export type ContactType =
+    | 'BUYER'
+    | 'TENANT'
+    | 'LANDLORD'
+    | 'INVESTOR'
+    | 'AGENT'
+    | 'LAWYER';
+
+export type CommChannel = 'EMAIL' | 'SMS' | 'WHATSAPP' | 'CALL' | 'NOTE' | 'MEETING';
+export type CommDirection = 'INBOUND' | 'OUTBOUND';
+
+export interface Lead {
+    id: string;
+    organizationId?: string;
+    firstName: string;
+    lastName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    message?: string | null;
+    source: LeadSource;
+    sourceDetail?: string | null;
+    stage: LeadStage;
+    lostReason?: string | null;
+    interestedPropertyId?: string | null;
+    interestedProperty?: { id: string; name: string; code: string } | null;
+    branchId?: string | null;
+    branch?: { id: string; name: string; code: string } | null;
+    assignedAgentId?: string | null;
+    assignedAgent?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+    } | null;
+    /** Set once the lead is converted — the contact it became. */
+    contactId?: string | null;
+    contact?: { id: string; firstName: string; lastName: string; type: ContactType } | null;
+    convertedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+
+    communications?: Communication[];
+    /** Only on the detail endpoint: the stages this lead may move to now. */
+    pipeline?: { availableStages: LeadStage[] };
+}
+
+export interface Contact {
+    id: string;
+    organizationId?: string;
+    type: ContactType;
+    firstName: string;
+    lastName: string;
+    email?: string | null;
+    phone?: string | null;
+    company?: string | null;
+    notes?: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+    tenant?: {
+        id: string;
+        code: string;
+        surname: string;
+        otherNames: string | null;
+    } | null;
+    _count?: { leads: number; communications: number };
+    leads?: Array<{
+        id: string;
+        firstName: string;
+        lastName: string | null;
+        stage: LeadStage;
+        source: LeadSource;
+        createdAt: string;
+    }>;
+    /** Only on the detail endpoint: merged communication history. */
+    timeline?: Communication[];
+}
+
+export interface Communication {
+    id: string;
+    organizationId?: string;
+    contactId?: string | null;
+    leadId?: string | null;
+    channel: CommChannel;
+    direction: CommDirection;
+    subject?: string | null;
+    content?: string | null;
+    outcome?: string | null;
+    occurredAt: string;
+    createdAt?: string;
+    loggedById?: string | null;
+    loggedBy?: { id: string; firstName: string; lastName: string } | null;
+    contact?: { id: string; firstName: string; lastName: string } | null;
+    lead?: {
+        id: string;
+        firstName: string;
+        lastName: string | null;
+        stage: LeadStage;
+    } | null;
+}
+
+export interface CreateLeadData {
+    firstName: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    message?: string;
+    source?: LeadSource;
+    sourceDetail?: string;
+    interestedPropertyId?: string | null;
+    branchId?: string | null;
+    assignedAgentId?: string | null;
+}
+
+export interface ConvertLeadData {
+    contactId?: string;
+    type?: ContactType;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    createTenant?: boolean;
+}
+
+export interface LogCommunicationData {
+    channel: CommChannel;
+    direction?: CommDirection;
+    subject?: string;
+    content?: string;
+    outcome?: string;
+    occurredAt?: string;
+    contactId?: string;
+    leadId?: string;
+}

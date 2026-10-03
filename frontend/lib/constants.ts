@@ -148,3 +148,63 @@ export const PERIODS = [
   { value: "financialYearToLastMonth", label: "Financial Year To Last Month" },
   { value: "lastYear", label: "Last Year" },
 ];
+
+// ============================================
+// CRM (Module 3)
+// ============================================
+
+/** Pipeline columns on the board, in order. Terminal stages last. */
+export const LEAD_STAGES: Array<{
+    value: 'NEW' | 'CONTACTED' | 'VIEWING_SCHEDULED' | 'NEGOTIATION' | 'WON' | 'LOST';
+    label: string;
+    description: string;
+}> = [
+    { value: 'NEW', label: 'New', description: 'Freshly captured, nobody has called yet' },
+    { value: 'CONTACTED', label: 'Contacted', description: 'We reached them and had a first conversation' },
+    { value: 'VIEWING_SCHEDULED', label: 'Viewing scheduled', description: 'A property or unit viewing is booked' },
+    { value: 'NEGOTIATION', label: 'Negotiation', description: 'Talking terms — price, rent, move-in date' },
+    { value: 'WON', label: 'Won', description: 'Converted to a contact (and usually a tenant or buyer)' },
+    { value: 'LOST', label: 'Lost', description: 'Closed without a deal; the reason is recorded' },
+] as const;
+
+export const LEAD_SOURCES: Array<{ value: string; label: string }> = [
+    { value: 'WEBSITE', label: 'Website' },
+    { value: 'FACEBOOK', label: 'Facebook' },
+    { value: 'WHATSAPP', label: 'WhatsApp' },
+    { value: 'WALK_IN', label: 'Walk-in' },
+    { value: 'REFERRAL', label: 'Referral' },
+    { value: 'OTHER', label: 'Other' },
+];
+
+export const CONTACT_TYPES: Array<{ value: string; label: string }> = [
+    { value: 'BUYER', label: 'Buyer' },
+    { value: 'TENANT', label: 'Tenant' },
+    { value: 'LANDLORD', label: 'Landlord' },
+    { value: 'INVESTOR', label: 'Investor' },
+    { value: 'AGENT', label: 'Agent' },
+    { value: 'LAWYER', label: 'Lawyer' },
+];
+
+export const COMM_CHANNELS: Array<{ value: string; label: string }> = [
+    { value: 'CALL', label: 'Call' },
+    { value: 'EMAIL', label: 'Email' },
+    { value: 'SMS', label: 'SMS' },
+    { value: 'WHATSAPP', label: 'WhatsApp' },
+    { value: 'MEETING', label: 'Meeting' },
+    { value: 'NOTE', label: 'Note' },
+];
+
+export const COMM_DIRECTIONS: Array<{ value: string; label: string }> = [
+    { value: 'INBOUND', label: 'Inbound' },
+    { value: 'OUTBOUND', label: 'Outbound' },
+];
+
+/** Column accent colours for the pipeline board. */
+export const LEAD_STAGE_COLORS: Record<string, string> = {
+    NEW: 'bg-slate-100 border-slate-300',
+    CONTACTED: 'bg-sky-50 border-sky-300',
+    VIEWING_SCHEDULED: 'bg-indigo-50 border-indigo-300',
+    NEGOTIATION: 'bg-amber-50 border-amber-300',
+    WON: 'bg-green-50 border-green-300',
+    LOST: 'bg-red-50 border-red-300',
+};

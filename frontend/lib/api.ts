@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -514,4 +514,122 @@ export const moveoutsApi = {
 
     remove: (id: string) =>
         api.delete(`/moveouts/${id}`),
+};
+// ============================================
+// CRM API (Module 3)
+// ============================================
+
+export const crmApi = {
+    // ------------------------------------------------------------------ leads
+    createLead: (data: CreateLeadData) =>
+        api.post<Lead>('/crm/leads', data),
+
+    findLeads: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        stage?: string;
+        source?: string;
+        propertyId?: string;
+        branchId?: string;
+        assignedAgentId?: string;
+        unassigned?: boolean;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            query.append(key, String(value));
+        });
+        const qs = query.toString();
+        return api.get<PaginatedResponse<Lead>>(`/crm/leads${qs ? `?${qs}` : ''}`);
+    },
+
+    findLead: (id: string) => api.get<Lead>(`/crm/leads/${id}`),
+
+    /** Pipeline board feed: open leads only. */
+    pipeline: (params?: { propertyId?: string; agentId?: string }) =>
+        api.get<Lead[]>('/crm/leads/pipeline', { params }),
+
+    updateLead: (id: string, data: Partial<CreateLeadData>) =>
+        api.patch<Lead>(`/crm/leads/${id}`, data),
+
+    /** Move through the pipeline; the API validates the transition. */
+    setLeadStage: (id: string, stage: LeadStage, reason?: string) =>
+        api.patch<Lead>(`/crm/leads/${id}/stage`, { stage, reason }),
+
+    convertLead: (id: string, data: ConvertLeadData) =>
+        api.post<{ lead: Lead; contactId: string; tenantId?: string }>(
+            `/crm/leads/${id}/convert`,
+            data,
+        ),
+
+    removeLead: (id: string) => api.delete(`/crm/leads/${id}`),
+
+    leadsExportUrl: (params?: {
+        search?: string;
+        stage?: string;
+        source?: string;
+        propertyId?: string;
+        branchId?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/crm/leads/export${qs ? `?${qs}` : ''}`;
+    },
+
+    // --------------------------------------------------------------- contacts
+    createContact: (data: Partial<Contact>) =>
+        api.post<Contact>('/crm/contacts', data),
+
+    findContacts: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        type?: string;
+        engaged?: boolean;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            query.append(key, String(value));
+        });
+        const qs = query.toString();
+        return api.get<PaginatedResponse<Contact>>(`/crm/contacts${qs ? `?${qs}` : ''}`);
+    },
+
+    findContact: (id: string) => api.get<Contact>(`/crm/contacts/${id}`),
+
+    updateContact: (id: string, data: Partial<Contact>) =>
+        api.patch<Contact>(`/crm/contacts/${id}`, data),
+
+    removeContact: (id: string) => api.delete(`/crm/contacts/${id}`),
+
+    contactTimeline: (id: string) =>
+        api.get<Communication[]>(`/crm/contacts/${id}/timeline`),
+
+    contactsExportUrl: (params?: { search?: string; type?: string }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/crm/contacts/export${qs ? `?${qs}` : ''}`;
+    },
+
+    // --------------------------------------------------------- communications
+    logCommunication: (data: LogCommunicationData) =>
+        api.post<Communication>('/crm/contacts/communications', data),
+
+    listCommunications: (params?: { leadId?: string; limit?: number }) =>
+        api.get<Communication[]>('/crm/contacts/communications', { params }),
+
+    removeCommunication: (id: string) =>
+        api.delete(`/crm/contacts/communications/${id}`),
 };

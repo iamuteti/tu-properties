@@ -18,6 +18,9 @@ import {
     Landmark,
     Building,
     LogOut,
+    Handshake,
+    Kanban,
+    UserRound,
 } from "lucide-react";
 
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
@@ -41,6 +44,15 @@ const navItems: NavItem[] = [
         children: [
             { href: "/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
             { href: "/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+        ]
+    },
+    {
+        label: "CRM",
+        icon: Handshake,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        children: [
+            { href: "/crm/leads", label: "Leads & pipeline", icon: Kanban, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/crm/contacts", label: "Contacts", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
         ]
     },
     {
