@@ -1,12 +1,13 @@
 "use client";
 
-import { Building2, Save, Shield, MonitorSmartphone, Trash2, Loader2 } from "lucide-react";
+import { Save, Shield, MonitorSmartphone, Trash2, Loader2, History } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { authApi } from "@/lib/api";
+import { authApi, organizationsApi } from "@/lib/api";
+import { LoginEvent } from "@/types";
 import { useEffect, useState } from "react";
 
 type ActiveSession = {
@@ -18,8 +19,45 @@ type ActiveSession = {
     isCurrent: boolean;
 };
 
+const CURRENCIES = ["KES", "USD", "GBP", "EUR", "NGN", "ZAR", "INR", "AED"];
+const TIMEZONES = [
+    "Africa/Nairobi",
+    "Africa/Lagos",
+    "Africa/Johannesburg",
+    "UTC",
+    "Europe/London",
+    "Asia/Dubai",
+    "Asia/Karachi",
+    "Asia/Kolkata",
+    "Asia/Singapore",
+    "Australia/Sydney",
+];
+
+const ACTION_LABELS: Record<string, string> = {
+    LOGIN: "Signed in",
+    MFA_ENABLED: "Enabled 2FA",
+    MFA_DISABLED: "Disabled 2FA",
+    SESSIONS_REVOKED: "Revoked other sessions",
+    PASSWORD_RESET: "Reset password",
+};
+
 export default function SettingsPage() {
-    const { user, organization } = useAuth();
+    const { user, organization, refreshProfile } = useAuth();
+    const canSaveOrg = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+
+    // Org profile / system settings (local form state, saved via PATCH /organizations/me)
+    const [profile, setProfile] = useState({
+        name: "",
+        contactEmail: "",
+        contactPhone: "",
+        legalName: "",
+        taxId: "",
+        currency: "KES",
+        timezone: "Africa/Nairobi",
+    });
+    const [profileLoaded, setProfileLoaded] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveMsg, setSaveMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
     // MFA enrollment
     const [mfaBusy, setMfaBusy] = useState(false);
@@ -33,6 +71,25 @@ export default function SettingsPage() {
     const [sessionsLoaded, setSessionsLoaded] = useState(false);
     const [revokeBusy, setRevokeBusy] = useState(false);
 
+    // Login history (self-scoped)
+    const [loginHistory, setLoginHistory] = useState<LoginEvent[]>([]);
+    const [historyLoaded, setHistoryLoaded] = useState(false);
+
+    useEffect(() => {
+        if (organization) {
+            setProfile({
+                name: organization.name || "",
+                contactEmail: organization.contactEmail || "",
+                contactPhone: organization.contactPhone || "",
+                legalName: organization.legalName || "",
+                taxId: organization.taxId || "",
+                currency: organization.currency || "KES",
+                timezone: organization.timezone || "Africa/Nairobi",
+            });
+            setProfileLoaded(true);
+        }
+    }, [organization]);
+
     const refreshSessions = async () => {
         try {
             const res = await authApi.listSessions();
@@ -45,8 +102,40 @@ export default function SettingsPage() {
 
     useEffect(() => {
         refreshSessions();
+        authApi
+            .loginHistory()
+            .then((res) => {
+                setLoginHistory(res.data);
+                setHistoryLoaded(true);
+            })
+            .catch(() => setHistoryLoaded(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const saveProfile = async () => {
+        setSaving(true);
+        setSaveMsg(null);
+        try {
+            await organizationsApi.updateMe({
+                name: profile.name,
+                contactEmail: profile.contactEmail || null,
+                contactPhone: profile.contactPhone || null,
+                legalName: profile.legalName || null,
+                taxId: profile.taxId || null,
+                currency: profile.currency,
+                timezone: profile.timezone,
+            });
+            await refreshProfile();
+            setSaveMsg({ kind: "success", text: "Settings saved." });
+        } catch (err: any) {
+            setSaveMsg({
+                kind: "error",
+                text: err.response?.data?.message || "Failed to save settings.",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const startMfaSetup = async () => {
         setMfaBusy(true);
@@ -110,13 +199,16 @@ export default function SettingsPage() {
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground">
-                    Manage your organization profile and preferences
+                    Manage your organization profile, system settings and security
                 </p>
             </div>
 
             <Card>
                 <CardHeader>
                     <CardTitle>Organization</CardTitle>
+                    <CardDescription>
+                        Company profile and regional defaults used across the app
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -124,8 +216,10 @@ export default function SettingsPage() {
                             <Label htmlFor="orgName">Organization Name</Label>
                             <Input
                                 id="orgName"
-                                defaultValue={organization?.name || ""}
+                                value={profile.name}
+                                onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
                                 placeholder="Organization name"
+                                disabled={!profileLoaded}
                             />
                         </div>
                         <div className="space-y-2">
@@ -141,12 +235,37 @@ export default function SettingsPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
+                            <Label htmlFor="legalName">Legal Name</Label>
+                            <Input
+                                id="legalName"
+                                value={profile.legalName}
+                                onChange={(e) => setProfile((p) => ({ ...p, legalName: e.target.value }))}
+                                placeholder="Registered company name"
+                                disabled={!profileLoaded}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="taxId">Tax ID / PIN</Label>
+                            <Input
+                                id="taxId"
+                                value={profile.taxId}
+                                onChange={(e) => setProfile((p) => ({ ...p, taxId: e.target.value }))}
+                                placeholder="e.g. P051234567X"
+                                disabled={!profileLoaded}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                             <Label htmlFor="contactEmail">Contact Email</Label>
                             <Input
                                 id="contactEmail"
                                 type="email"
-                                defaultValue={organization?.contactEmail || ""}
+                                value={profile.contactEmail}
+                                onChange={(e) => setProfile((p) => ({ ...p, contactEmail: e.target.value }))}
                                 placeholder="billing@example.com"
+                                disabled={!profileLoaded}
                             />
                         </div>
                         <div className="space-y-2">
@@ -154,9 +273,42 @@ export default function SettingsPage() {
                             <Input
                                 id="contactPhone"
                                 type="tel"
-                                defaultValue={organization?.contactPhone || ""}
+                                value={profile.contactPhone}
+                                onChange={(e) => setProfile((p) => ({ ...p, contactPhone: e.target.value }))}
                                 placeholder="+254 700 000 000"
+                                disabled={!profileLoaded}
                             />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="currency">Default Currency</Label>
+                            <select
+                                id="currency"
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                                value={profile.currency}
+                                onChange={(e) => setProfile((p) => ({ ...p, currency: e.target.value }))}
+                                disabled={!profileLoaded}
+                            >
+                                {CURRENCIES.map((c) => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="timezone">Time Zone</Label>
+                            <select
+                                id="timezone"
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                                value={profile.timezone}
+                                onChange={(e) => setProfile((p) => ({ ...p, timezone: e.target.value }))}
+                                disabled={!profileLoaded}
+                            >
+                                {TIMEZONES.map((tz) => (
+                                    <option key={tz} value={tz}>{tz}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
@@ -183,6 +335,41 @@ export default function SettingsPage() {
                             />
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Recent Sign-Ins
+                    </CardTitle>
+                    <CardDescription>
+                        Your most recent login and security events
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {historyLoaded && loginHistory.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No sign-in events recorded yet.</p>
+                    )}
+                    {historyLoaded && loginHistory.length > 0 && (
+                        <div className="divide-y rounded-md border text-sm">
+                            {loginHistory.map((ev, i) => (
+                                <div key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                                    <div className="min-w-0">
+                                        <p className="font-medium">{ACTION_LABELS[ev.action] || ev.action}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {ev.ipAddress || "unknown IP"}
+                                            {ev.userAgent ? ` · ${ev.userAgent.slice(0, 80)}` : ""}
+                                        </p>
+                                    </div>
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                        {new Date(ev.at).toLocaleString()}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -352,9 +539,14 @@ export default function SettingsPage() {
                 </CardContent>
             </Card>
 
-            <div className="flex justify-end">
-                <Button disabled>
-                    <Save className="mr-2 h-4 w-4" />
+            <div className="flex items-center justify-end gap-3">
+                {saveMsg && (
+                    <p className={`text-sm ${saveMsg.kind === "error" ? "text-destructive" : "text-green-700"}`}>
+                        {saveMsg.text}
+                    </p>
+                )}
+                <Button onClick={saveProfile} disabled={!canSaveOrg || !profileLoaded || saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     Save Changes
                 </Button>
             </div>

@@ -54,7 +54,10 @@ export class PaymentsService {
 
   async delete(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.payment, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.payment, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.payment.delete({
       where: { id },

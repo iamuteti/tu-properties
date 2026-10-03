@@ -10,11 +10,16 @@ import {
   Request,
   Query,
 } from '@nestjs/common';
-import { MoveoutsService, PaginationParams, MoveOutFilters } from './moveouts.service';
+import {
+  MoveoutsService,
+  PaginationParams,
+  MoveOutFilters,
+} from './moveouts.service';
 import { Prisma, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('moveouts')
@@ -23,7 +28,11 @@ export class MoveoutsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
-  create(@Body() createMoveOutDto: Prisma.MoveOutRequestCreateInput, @Request() req) {
+  @Permissions('moveouts.create')
+  create(
+    @Body() createMoveOutDto: Prisma.MoveOutRequestCreateInput,
+    @Request() req,
+  ) {
     const tenantId = getTenantId(req);
     return this.moveoutsService.create(createMoveOutDto, tenantId);
   }
@@ -60,6 +69,7 @@ export class MoveoutsController {
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('moveouts.update')
   update(
     @Param('id') id: string,
     @Body() updateMoveOutDto: Prisma.MoveOutRequestUpdateInput,
@@ -71,6 +81,7 @@ export class MoveoutsController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('moveouts.delete')
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.moveoutsService.remove(id, tenantId);

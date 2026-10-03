@@ -23,7 +23,11 @@ export function resolveAllowlist(nodeEnv: string) {
 
   if (isLocal) {
     // Allow any localhost port during local development.
-    allowlist.push('http://localhost:3002', 'http://localhost:3000', 'http://localhost:3001');
+    allowlist.push(
+      'http://localhost:3002',
+      'http://localhost:3000',
+      'http://localhost:3001',
+    );
   }
 
   for (const origin of configured) {

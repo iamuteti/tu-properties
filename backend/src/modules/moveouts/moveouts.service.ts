@@ -42,11 +42,11 @@ export class MoveoutsService {
           include: {
             unit: {
               include: {
-                property: true
-              }
-            }
-          }
-        }
+                property: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -56,21 +56,29 @@ export class MoveoutsService {
     params?: PaginationParams,
     filters?: MoveOutFilters,
   ): Promise<PaginatedResult<any>> {
-    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = params || {};
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params || {};
     const skip = (page - 1) * limit;
 
     const where: any = tenantId ? { organizationId: tenantId } : {};
 
     if (search) {
       where.OR = [
-        { tenant: {
-          OR: [
-            { surname: { contains: search, mode: 'insensitive' } },
-            { otherNames: { contains: search, mode: 'insensitive' } },
-            { accountNumber: { contains: search, mode: 'insensitive' } },
-            { code: { contains: search, mode: 'insensitive' } },
-          ]
-        }},
+        {
+          tenant: {
+            OR: [
+              { surname: { contains: search, mode: 'insensitive' } },
+              { otherNames: { contains: search, mode: 'insensitive' } },
+              { accountNumber: { contains: search, mode: 'insensitive' } },
+              { code: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
       ];
     }
 
@@ -91,11 +99,11 @@ export class MoveoutsService {
               include: {
                 unit: {
                   include: {
-                    property: true
-                  }
-                }
-              }
-            }
+                    property: true,
+                  },
+                },
+              },
+            },
           },
         }),
         tx.moveOutRequest.count({ where }),
@@ -124,20 +132,27 @@ export class MoveoutsService {
             include: {
               unit: {
                 include: {
-                  property: true
-                }
-              }
-            }
-          }
+                  property: true,
+                },
+              },
+            },
+          },
         },
       }),
       'Move-out request',
     );
   }
 
-  async update(id: string, data: Prisma.MoveOutRequestUpdateInput, tenantId?: string) {
+  async update(
+    id: string,
+    data: Prisma.MoveOutRequestUpdateInput,
+    tenantId?: string,
+  ) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.moveOutRequest, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.moveOutRequest, {
+        id,
+        organizationId: tenantId,
+      });
     }
 
     // If approving, handle the move-out logic (ownership verified above)
@@ -150,19 +165,19 @@ export class MoveoutsService {
             include: {
               unit: {
                 include: {
-                  property: true
-                }
-              }
-            }
-          }
-        }
+                  property: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       if (request) {
         // Update tenant status to INACTIVE
         await this.prisma.tenant.update({
           where: { id: request.tenantId },
-          data: { status: 'INACTIVE' }
+          data: { status: 'INACTIVE' },
         });
 
         // Update rental agreement status to TERMINATED and set terminatedAt to moveout date
@@ -172,12 +187,15 @@ export class MoveoutsService {
           where: { id: request.rentalAgreementId },
           data: {
             status: 'TERMINATED',
-            terminatedAt
-          }
+            terminatedAt,
+          },
         });
 
         // If deposit was required and refunded, create a receipt
-        if (request.rentalAgreement.securityDeposit && request.depositRefunded) {
+        if (
+          request.rentalAgreement.securityDeposit &&
+          request.depositRefunded
+        ) {
           // Create receipt for deposit refund
           await this.prisma.receipt.create({
             data: {
@@ -186,20 +204,22 @@ export class MoveoutsService {
               receiptCategory: 'Refund',
               receivedFrom: `${request.tenant.surname} ${request.tenant.otherNames || ''}`,
               paymentMethod: 'BANK_TRANSFER', // or whatever method
-              amountReceived: request.depositRefundAmount || request.rentalAgreement.securityDeposit,
+              amountReceived:
+                request.depositRefundAmount ||
+                request.rentalAgreement.securityDeposit,
               notes: `Security deposit refund for move-out request ${request.id}`,
               tenantId: request.tenantId,
               landlordId: request.rentalAgreement.unit.property.landlordId,
               organizationId: tenantId,
               amountVatInclusive: true,
-              currency: 'KES'
-            }
+              currency: 'KES',
+            },
           });
 
           // Update agreement depositRefunded
           await this.prisma.rentalAgreement.update({
             where: { id: request.rentalAgreementId },
-            data: { depositRefunded: true }
+            data: { depositRefunded: true },
           });
         }
       }
@@ -214,18 +234,21 @@ export class MoveoutsService {
           include: {
             unit: {
               include: {
-                property: true
-              }
-            }
-          }
-        }
+                property: true,
+              },
+            },
+          },
+        },
       },
     });
   }
 
   async remove(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.moveOutRequest, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.moveOutRequest, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.moveOutRequest.delete({ where: { id } });
   }

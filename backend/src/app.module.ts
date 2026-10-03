@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { PublicGuard } from './security/guards/public.guard';
 import { RolesGuard } from './security/guards/roles.guard';
+import { PermissionsGuard } from './security/guards/permissions.guard';
 import { RateLimitGuard } from './security/guards/rate-limit.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -22,6 +23,9 @@ import { LandlordsModule } from './modules/landlords/landlords.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -31,6 +35,7 @@ import { SecurityModule } from './security/security.module';
     }),
     PrismaModule,
     SecurityModule,
+    PermissionsModule,
     PropertiesModule,
     UsersModule,
     UnitsModule,
@@ -42,6 +47,8 @@ import { SecurityModule } from './security/security.module';
     AuthModule,
     OrganizationsModule,
     DashboardModule,
+    BranchesModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -55,6 +62,12 @@ import { SecurityModule } from './security/security.module';
       // providers matters; keep auth first.
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      // Structured (JSON) role permissions; only active on routes with
+      // @Permissions(). Runs after RolesGuard (name-based fallback).
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
     {
       // Only active on routes decorated with @RateLimit() — auth endpoints.

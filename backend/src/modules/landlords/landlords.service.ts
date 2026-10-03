@@ -49,7 +49,13 @@ export class LandlordsService {
     params?: PaginationParams,
     filters?: LandlordFilters,
   ): Promise<PaginatedResult<any>> {
-    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = params || {};
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params || {};
     const skip = (page - 1) * limit;
 
     const where: any = tenantId ? { organizationId: tenantId } : {};
@@ -103,9 +109,16 @@ export class LandlordsService {
     return requireRecord(this.prisma.landlord.findFirst({ where }), 'Landlord');
   }
 
-  async update(id: string, data: Prisma.LandlordUpdateInput, tenantId?: string) {
+  async update(
+    id: string,
+    data: Prisma.LandlordUpdateInput,
+    tenantId?: string,
+  ) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.landlord, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.landlord, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.landlord.update({
       where: { id },
@@ -115,7 +128,10 @@ export class LandlordsService {
 
   async remove(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.landlord, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.landlord, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.landlord.delete({ where: { id } });
   }

@@ -33,7 +33,11 @@ export class AuditInterceptor implements NestInterceptor {
     }
 
     const method = request.method;
-    const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+    const isMutation =
+      method === 'POST' ||
+      method === 'PUT' ||
+      method === 'PATCH' ||
+      method === 'DELETE';
     if (!isMutation) {
       return next.handle();
     }
@@ -47,18 +51,22 @@ export class AuditInterceptor implements NestInterceptor {
         next: (result) => {
           const id = paramId || this.extractId(result);
           if (!id) return;
-           this.auditService
+          this.auditService
             .logAction({
-               user: { connect: { id: user.userId } },
-               ...(user.organizationId
-                 ? { organization: { connect: { id: user.organizationId } } }
-                 : {}),
-               action: this.actionFromMethod(method),
-               entity,
-               entityId: id,
-               details: `${method} ${route}`,
-             })
-            .catch((err) => this.logger.warn('Audit write failed', err as Error));
+              user: { connect: { id: user.userId } },
+              ...(user.organizationId
+                ? { organization: { connect: { id: user.organizationId } } }
+                : {}),
+              action: this.actionFromMethod(method),
+              entity,
+              entityId: id,
+              details: `${method} ${route}`,
+              ipAddress: request.ip,
+              userAgent: request.headers['user-agent'],
+            })
+            .catch((err) =>
+              this.logger.warn('Audit write failed', err as Error),
+            );
         },
       }),
     );
@@ -84,6 +92,11 @@ export class AuditInterceptor implements NestInterceptor {
     let last = parts[parts.length - 1];
     if (!last || last === 'bulk-delete') {
       last = parts[parts.length - 2] || parts[parts.length - 1];
+    }
+    // Sub-resource routes: the audited entity is the collection, not the
+    // sub-resource (/users/:id/roles → User, /organizations/me → Organization).
+    if (last === 'roles' || last === 'me') {
+      last = parts[parts.length - 3] || parts[parts.length - 2] || last;
     }
     return this.pascalize(last);
   }

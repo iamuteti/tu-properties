@@ -13,15 +13,18 @@ import { InvoicesService } from './invoices.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 import { UserRole } from '@prisma/client';
 
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
+@Permissions('invoices.view')
 @Controller('finance/invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
   @Post()
+  @Permissions('invoices.create')
   create(
     @Body()
     createInvoiceDto: {
@@ -77,6 +80,7 @@ export class InvoicesController {
   }
 
   @Patch(':id')
+  @Permissions('invoices.update')
   update(
     @Param('id') id: string,
     @Body()
@@ -109,12 +113,14 @@ export class InvoicesController {
   }
 
   @Delete(':id')
+  @Permissions('invoices.delete')
   delete(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.invoicesService.delete(id, tenantId);
   }
 
   @Post('bulk-delete')
+  @Permissions('invoices.delete')
   deleteMany(@Body() body: { ids: string[] }, @Request() req) {
     const tenantId = getTenantId(req);
     return this.invoicesService.deleteMany(body.ids, tenantId);

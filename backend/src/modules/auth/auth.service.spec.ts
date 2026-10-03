@@ -103,7 +103,7 @@ describe('AuthService', () => {
       );
 
       // JWT payload carries sub + jti (session linkage)
-      const signCall = jwtService.sign.mock.calls[0][0] as any;
+      const signCall = jwtService.sign.mock.calls[0][0];
       expect(signCall.sub).toBe('user-1');
       expect(signCall.role).toBe('ADMIN');
       expect(typeof signCall.jti).toBe('string');
@@ -157,7 +157,11 @@ describe('AuthService', () => {
     const secret = 'ABCDEFGHIJKLMNOPQRSTUVWX';
 
     function freshCode(secretValue: string): string {
-      return new TOTP({ secret: Secret.fromBase32(secretValue), period: 30, digits: 6 }).generate();
+      return new TOTP({
+        secret: Secret.fromBase32(secretValue),
+        period: 30,
+        digits: 6,
+      }).generate();
     }
 
     it('accepts a valid TOTP code and issues the session', async () => {
@@ -165,7 +169,11 @@ describe('AuthService', () => {
       usersService.findOne.mockResolvedValue({ ...mfaUser, mfaSecret: secret });
       const res = mockRes();
 
-      const result = await service.verifyMfa('challenge-token', freshCode(secret), res as any);
+      const result = await service.verifyMfa(
+        'challenge-token',
+        freshCode(secret),
+        res as any,
+      );
 
       expect(result.sessionId).toEqual(expect.any(String));
       expect(prisma.session.create).toHaveBeenCalledTimes(1);
@@ -194,7 +202,11 @@ describe('AuthService', () => {
 
     it('rejects when the account no longer has MFA enabled', async () => {
       jwtService.verify.mockReturnValue({ sub: 'user-1', mfa: 'verify' });
-      usersService.findOne.mockResolvedValue({ ...mfaUser, mfaEnabled: false, mfaSecret: null });
+      usersService.findOne.mockResolvedValue({
+        ...mfaUser,
+        mfaEnabled: false,
+        mfaSecret: null,
+      });
 
       await expect(
         service.verifyMfa('challenge-token', '123456', mockRes() as any),
@@ -211,7 +223,9 @@ describe('AuthService', () => {
       expect(setup.otpauthUrl).toContain(setup.secret);
 
       usersService.findOne.mockResolvedValue(mfaUser);
-      await expect(service.mfaSetup('user-1')).rejects.toThrow('already enabled');
+      await expect(service.mfaSetup('user-1')).rejects.toThrow(
+        'already enabled',
+      );
     });
 
     it('mfaEnable persists the secret only after a valid code', async () => {
@@ -223,9 +237,9 @@ describe('AuthService', () => {
         digits: 6,
       }).generate();
 
-      await expect(service.mfaEnable('user-1', setup.secret, '000000')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.mfaEnable('user-1', setup.secret, '000000'),
+      ).rejects.toThrow(UnauthorizedException);
       expect(usersService.update).not.toHaveBeenCalled();
 
       await service.mfaEnable('user-1', setup.secret, code);
@@ -239,7 +253,9 @@ describe('AuthService', () => {
       usersService.findOne.mockResolvedValue(mfaUser);
       const code = freshCode(mfaUser.mfaSecret);
 
-      await expect(service.mfaDisable('user-1', '000000')).rejects.toThrow(UnauthorizedException);
+      await expect(service.mfaDisable('user-1', '000000')).rejects.toThrow(
+        UnauthorizedException,
+      );
       await service.mfaDisable('user-1', code);
       expect(usersService.update).toHaveBeenCalledWith('user-1', {
         mfaSecret: null,
@@ -249,7 +265,11 @@ describe('AuthService', () => {
   });
 
   function freshCode(secretValue: string): string {
-    return new TOTP({ secret: Secret.fromBase32(secretValue), period: 30, digits: 6 }).generate();
+    return new TOTP({
+      secret: Secret.fromBase32(secretValue),
+      period: 30,
+      digits: 6,
+    }).generate();
   }
 
   describe('session revocation', () => {
@@ -272,7 +292,11 @@ describe('AuthService', () => {
       const result = await service.revokeOtherSessions('user-1', 'current-jti');
 
       expect(prisma.session.updateMany).toHaveBeenCalledWith({
-        where: { userId: 'user-1', jti: { not: 'current-jti' }, revokedAt: null },
+        where: {
+          userId: 'user-1',
+          jti: { not: 'current-jti' },
+          revokedAt: null,
+        },
         data: expect.objectContaining({ revokedAt: expect.any(Date) }),
       });
       expect(result.revoked).toBe(3);
@@ -283,14 +307,32 @@ describe('AuthService', () => {
 
     it('listSessions returns only active sessions and flags the current one', async () => {
       prisma.session.findMany.mockResolvedValue([
-        { id: 's2', jti: 'j2', createdAt: new Date(), expiresAt: new Date(), ipAddress: '1.2.3.4', userAgent: 'ua' },
-        { id: 's1', jti: 'j1', createdAt: new Date(), expiresAt: new Date(), ipAddress: '1.2.3.4', userAgent: 'ua' },
+        {
+          id: 's2',
+          jti: 'j2',
+          createdAt: new Date(),
+          expiresAt: new Date(),
+          ipAddress: '1.2.3.4',
+          userAgent: 'ua',
+        },
+        {
+          id: 's1',
+          jti: 'j1',
+          createdAt: new Date(),
+          expiresAt: new Date(),
+          ipAddress: '1.2.3.4',
+          userAgent: 'ua',
+        },
       ]);
       const sessions = await service.listSessions('user-1', 'j2');
 
       expect(prisma.session.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: 'user-1', revokedAt: null, expiresAt: { gt: expect.any(Date) } },
+          where: {
+            userId: 'user-1',
+            revokedAt: null,
+            expiresAt: { gt: expect.any(Date) },
+          },
         }),
       );
       expect(sessions).toHaveLength(2);
@@ -306,7 +348,10 @@ describe('AuthService', () => {
         resetPasswordExpires: new Date(Date.now() + 60_000),
       });
 
-      const result = await service.resetPassword('token-value', 'NewPassword123!');
+      const result = await service.resetPassword(
+        'token-value',
+        'NewPassword123!',
+      );
 
       expect(result.message).toBe('Password has been reset');
       expect(usersService.update).toHaveBeenCalledWith(
@@ -332,9 +377,9 @@ describe('AuthService', () => {
         ...mfaUser,
         resetPasswordExpires: new Date(Date.now() - 60_000),
       });
-      await expect(service.resetPassword('token-value', 'NewPassword123!')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.resetPassword('token-value', 'NewPassword123!'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

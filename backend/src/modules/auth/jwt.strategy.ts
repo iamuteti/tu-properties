@@ -40,7 +40,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     try {
       const user = await this.usersService.findOne(payload.sub);
       if (!user || !user.isActive) {
-        this.logger.error('User not found (or inactive) for id: ' + payload.sub);
+        this.logger.error(
+          'User not found (or inactive) for id: ' + payload.sub,
+        );
         throw new UnauthorizedException();
       }
 
@@ -52,14 +54,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // rejected too (fail closed → re-login required after a deploy).
       const jti = payload.jti as string | undefined;
       if (!jti) {
-        throw new UnauthorizedException('Session missing — please log in again');
+        throw new UnauthorizedException(
+          'Session missing — please log in again',
+        );
       }
       const session = await this.prisma.session.findUnique({
         where: { jti },
         select: { revokedAt: true, expiresAt: true },
       });
       if (!session || session.revokedAt || session.expiresAt < new Date()) {
-        throw new UnauthorizedException('Session has been revoked or expired — please log in again');
+        throw new UnauthorizedException(
+          'Session has been revoked or expired — please log in again',
+        );
       }
 
       return {

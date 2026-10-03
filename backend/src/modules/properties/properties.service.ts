@@ -44,7 +44,13 @@ export class PropertiesService {
     params?: PaginationParams,
     filters?: PropertyFilters,
   ): Promise<PaginatedResult<any>> {
-    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = params || {};
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params || {};
     const skip = (page - 1) * limit;
 
     const where: any = tenantId ? { organizationId: tenantId } : {};
@@ -107,9 +113,16 @@ export class PropertiesService {
     );
   }
 
-  async update(id: string, data: Prisma.PropertyUpdateInput, tenantId?: string) {
+  async update(
+    id: string,
+    data: Prisma.PropertyUpdateInput,
+    tenantId?: string,
+  ) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.property, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.property, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.property.update({
       where: { id },
@@ -119,7 +132,10 @@ export class PropertiesService {
 
   async remove(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.property, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.property, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.property.delete({ where: { id } });
   }

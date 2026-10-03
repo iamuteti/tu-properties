@@ -72,7 +72,13 @@ export class TenantsService {
     params?: PaginationParams,
     filters?: TenantFilters,
   ): Promise<PaginatedResult<any>> {
-    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = params || {};
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params || {};
     const skip = (page - 1) * limit;
 
     const where: any = tenantId ? { organizationId: tenantId } : {};
@@ -92,8 +98,8 @@ export class TenantsService {
 
     where.rentalAgreements = {
       some: {
-        agreementType: agreementType
-      }
+        agreementType: agreementType,
+      },
     };
 
     if (filters) {
@@ -105,9 +111,9 @@ export class TenantsService {
           some: {
             ...where.rentalAgreements.some,
             unit: {
-              propertyId: filters.propertyId
-            }
-          }
+              propertyId: filters.propertyId,
+            },
+          },
         };
       }
       if (filters.withDeposit !== undefined) {
@@ -115,8 +121,10 @@ export class TenantsService {
           ...where.rentalAgreements,
           some: {
             ...where.rentalAgreements.some,
-            securityDeposit: filters.withDeposit ? { not: null } : { equals: null }
-          }
+            securityDeposit: filters.withDeposit
+              ? { not: null }
+              : { equals: null },
+          },
         };
       }
     }
@@ -133,28 +141,37 @@ export class TenantsService {
               include: {
                 unit: {
                   include: {
-                    property: true
-                  }
+                    property: true,
+                  },
                 },
-                invoices: true
-              }
-            }
+                invoices: true,
+              },
+            },
           },
         }),
         tx.tenant.count({ where }),
       ]);
 
       // Format data to include rentalAgreement as single object instead of array
-      const formattedData = data.map(tenant => {
-        const rentalAgreement = tenant.rentalAgreements?.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0] || null;
-        const lastPaidInvoice = rentalAgreement?.invoices
-          ?.filter(inv => inv.status === 'PAID')
-          ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+      const formattedData = data.map((tenant) => {
+        const rentalAgreement =
+          tenant.rentalAgreements?.sort(
+            (a, b) =>
+              new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+          )[0] || null;
+        const lastPaidInvoice =
+          rentalAgreement?.invoices
+            ?.filter((inv) => inv.status === 'PAID')
+            ?.sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime(),
+            )[0] || null;
 
         return {
           ...tenant,
           rentalAgreement,
-          lastPaidInvoice
+          lastPaidInvoice,
         };
       });
 
@@ -186,7 +203,10 @@ export class TenantsService {
 
   async update(id: string, data: Prisma.TenantUpdateInput, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.tenant, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.tenant, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.tenant.update({
       where: { id },
@@ -196,7 +216,10 @@ export class TenantsService {
 
   async remove(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.tenant, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.tenant, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.tenant.delete({ where: { id } });
   }

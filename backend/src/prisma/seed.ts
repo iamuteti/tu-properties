@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
 import { seedDemoData } from './demo-data';
+import { seedRoles } from './roles-seed';
 
 dotenv.config();
 
@@ -33,7 +34,13 @@ async function main() {
   await prisma.propertyStandingCharge.deleteMany();
   await prisma.property.deleteMany();
   await prisma.landlord.deleteMany();
+  await prisma.roleAssignment.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.branch.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.auditLog.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.role.deleteMany();
   await prisma.organization.deleteMany();
 
   // 2. Create only Super Admin
@@ -51,7 +58,10 @@ async function main() {
     },
   });
 
-  // 3. Seed demo organizations, users, and business data (Westhill + Rohi)
+  // 3. Seed the 12 system roles with structured permissions (Module 1)
+  await seedRoles(prisma);
+
+  // 4. Seed demo organizations, users, and business data (Westhill + Rohi)
   await seedDemoData();
 
   console.log('Database seeded successfully!');

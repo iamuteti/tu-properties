@@ -47,9 +47,16 @@ export class RentalAgreementsService {
     );
   }
 
-  async update(id: string, data: Prisma.RentalAgreementUpdateInput, tenantId?: string) {
+  async update(
+    id: string,
+    data: Prisma.RentalAgreementUpdateInput,
+    tenantId?: string,
+  ) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.rentalAgreement, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.rentalAgreement, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.rentalAgreement.update({
       where: { id },
@@ -59,7 +66,10 @@ export class RentalAgreementsService {
 
   async remove(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.rentalAgreement, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.rentalAgreement, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.rentalAgreement.delete({ where: { id } });
   }

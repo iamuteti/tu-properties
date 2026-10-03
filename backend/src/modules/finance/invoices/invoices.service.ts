@@ -139,7 +139,10 @@ export class InvoicesService {
     tenantId?: string,
   ) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.invoice, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.invoice, {
+        id,
+        organizationId: tenantId,
+      });
     }
 
     const updateData: Prisma.InvoiceUpdateInput = {};
@@ -153,23 +156,31 @@ export class InvoicesService {
         ? { connect: { id: data.rentalAgreementId } }
         : { disconnect: true };
     }
-    if (data.transactionClass !== undefined) updateData.transactionClass = data.transactionClass;
-    if (data.acReceivable !== undefined) updateData.acReceivable = data.acReceivable;
+    if (data.transactionClass !== undefined)
+      updateData.transactionClass = data.transactionClass;
+    if (data.acReceivable !== undefined)
+      updateData.acReceivable = data.acReceivable;
     if (data.billTo !== undefined) updateData.billTo = data.billTo;
-    if (data.issueDate !== undefined) updateData.issueDate = new Date(data.issueDate);
+    if (data.issueDate !== undefined)
+      updateData.issueDate = new Date(data.issueDate);
     if (data.dueDate !== undefined) updateData.dueDate = new Date(data.dueDate);
     if (data.currency !== undefined) updateData.currency = data.currency;
     if (data.spotRate !== undefined) updateData.spotRate = data.spotRate;
     if (data.lpoNumber !== undefined) updateData.lpoNumber = data.lpoNumber;
-    if (data.signOnEfims !== undefined) updateData.signOnEfims = data.signOnEfims;
-    if (data.paymentInfo !== undefined) updateData.paymentInfo = data.paymentInfo;
-    if (data.termsConditions !== undefined) updateData.termsConditions = data.termsConditions;
+    if (data.signOnEfims !== undefined)
+      updateData.signOnEfims = data.signOnEfims;
+    if (data.paymentInfo !== undefined)
+      updateData.paymentInfo = data.paymentInfo;
+    if (data.termsConditions !== undefined)
+      updateData.termsConditions = data.termsConditions;
     if (data.memo !== undefined) updateData.memo = data.memo;
     if (data.amount !== undefined) updateData.amount = data.amount;
     if (data.vatAmount !== undefined) updateData.vatAmount = data.vatAmount;
-    if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount;
+    if (data.totalAmount !== undefined)
+      updateData.totalAmount = data.totalAmount;
     if (data.paidAmount !== undefined) updateData.paidAmount = data.paidAmount;
-    if (data.balanceAmount !== undefined) updateData.balanceAmount = data.balanceAmount;
+    if (data.balanceAmount !== undefined)
+      updateData.balanceAmount = data.balanceAmount;
     if (data.status !== undefined) updateData.status = data.status as any;
 
     return this.prisma.invoice.update({
@@ -229,7 +240,10 @@ export class InvoicesService {
 
   async delete(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.invoice, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.invoice, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.invoice.delete({
       where: { id },

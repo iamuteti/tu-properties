@@ -11,6 +11,8 @@ interface AuthContextType {
   login: (user: User) => void;
   logout: () => void;
   isLoading: boolean;
+  /** Re-fetch the profile (e.g. after saving organization settings). */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +22,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const res = await api.get('/auth/profile');
+      const profile = res.data;
+      setUser(profile);
+      if (profile.organization) {
+        setOrganization(profile.organization);
+      }
+    } catch {
+      // No valid session — treat as logged out.
+      setUser(null);
+      setOrganization(null);
+    }
+  }, []);
 
   useEffect(() => {
     // No token in localStorage anymore — the JWT lives in an httpOnly cookie
@@ -79,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ user, organization, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, organization, login, logout, isLoading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

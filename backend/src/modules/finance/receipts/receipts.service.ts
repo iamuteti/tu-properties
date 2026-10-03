@@ -244,7 +244,9 @@ export class ReceiptsService {
           },
         });
         if (!invoice) {
-          throw new NotFoundException('Invoice not found for payment allocation');
+          throw new NotFoundException(
+            'Invoice not found for payment allocation',
+          );
         }
         if (invoice.status === 'CANCELLED' || invoice.status === 'PAID') {
           throw new BadRequestException(
@@ -255,9 +257,13 @@ export class ReceiptsService {
         const round2 = (n: number) => Math.round(n * 100) / 100;
         // paid so far = total - outstanding balance
         const newPaid = round2(
-          Number(invoice.totalAmount) - Number(invoice.balanceAmount) + Number(payment.amount),
+          Number(invoice.totalAmount) -
+            Number(invoice.balanceAmount) +
+            Number(payment.amount),
         );
-        const newBalance = round2(Number(invoice.balanceAmount) - Number(payment.amount));
+        const newBalance = round2(
+          Number(invoice.balanceAmount) - Number(payment.amount),
+        );
 
         await tx.invoice.update({
           where: { id: invoice.id },
@@ -318,7 +324,10 @@ export class ReceiptsService {
 
   async delete(id: string, tenantId?: string) {
     if (tenantId) {
-      await assertTenantRecord(this.prisma.receipt, { id, organizationId: tenantId });
+      await assertTenantRecord(this.prisma.receipt, {
+        id,
+        organizationId: tenantId,
+      });
     }
     return this.prisma.receipt.delete({
       where: { id },

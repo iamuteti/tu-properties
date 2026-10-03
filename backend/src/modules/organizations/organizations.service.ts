@@ -65,6 +65,38 @@ export class OrganizationsService {
     });
   }
 
+  /**
+   * Self-service profile update for the caller's own organization (System
+   * Settings). Whitelists the fields a tenant admin may change — plan,
+   * limits, subdomain and custom domain stay platform-managed.
+   */
+  async updateProfile(
+    id: string,
+    data: {
+      name?: string;
+      contactEmail?: string | null;
+      contactPhone?: string | null;
+      legalName?: string | null;
+      taxId?: string | null;
+      currency?: string;
+      timezone?: string;
+    },
+  ) {
+    await this.findOne(id); // Verify exists
+    const clean: Prisma.OrganizationUpdateInput = {};
+    if (data.name !== undefined) clean.name = data.name;
+    if (data.contactEmail !== undefined) clean.contactEmail = data.contactEmail;
+    if (data.contactPhone !== undefined) clean.contactPhone = data.contactPhone;
+    if (data.legalName !== undefined) clean.legalName = data.legalName;
+    if (data.taxId !== undefined) clean.taxId = data.taxId;
+    if (data.currency !== undefined) clean.currency = data.currency;
+    if (data.timezone !== undefined) clean.timezone = data.timezone;
+    return this.prisma.organization.update({
+      where: { id },
+      data: clean,
+    });
+  }
+
   async remove(id: string) {
     await this.findOne(id); // Verify exists
     return this.prisma.organization.delete({

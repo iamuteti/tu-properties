@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -57,6 +57,47 @@ export const authApi = {
         api.get<{ id: string; createdAt: string; expiresAt: string; ipAddress: string | null; userAgent: string | null; isCurrent: boolean }[]>('/auth/sessions'),
     revokeOtherSessions: () =>
         api.post<{ revoked: number }>('/auth/sessions/revoke-others'),
+
+    // Login / security history (self-scoped; org-wide history is on /audit)
+    loginHistory: () =>
+        api.get<LoginEvent[]>('/auth/login-history'),
+};
+
+// Users API (user management, Module 1: Core Platform)
+export const usersApi = {
+    findAll: (params?: { search?: string }) => {
+        const query = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+        return api.get<User[]>(`/users${query}`);
+    },
+
+    findOne: (id: string) =>
+        api.get<User>(`/users/${id}`),
+
+    create: (data: {
+        email: string;
+        firstName: string;
+        lastName: string;
+        phone?: string;
+        role?: User['role'];
+        passwordHash?: string;
+    }) =>
+        api.post<{ user: User; temporaryPassword?: string }>('/users', data),
+
+    update: (id: string, data: Partial<{ firstName: string; lastName: string; phone: string; email: string; role: User['role']; isActive: boolean }>) =>
+        api.patch<User>(`/users/${id}`, data),
+
+    remove: (id: string) =>
+        api.delete(`/users/${id}`),
+
+    // Structured roles (Module 1 RBAC)
+    listRoles: () =>
+        api.get<Role[]>('/users/roles'),
+
+    getUserRoles: (id: string) =>
+        api.get<RoleAssignment[]>(`/users/${id}/roles`),
+
+    setUserRoles: (id: string, roleIds: string[]) =>
+        api.patch<RoleAssignment[]>(`/users/${id}/roles`, { roleIds }),
 };
 
 // Organizations API
@@ -81,6 +122,57 @@ export const organizationsApi = {
 
     checkSubdomain: (subdomain: string) =>
         api.get<boolean>(`/organizations/check/subdomain/${subdomain}`),
+
+    // Self-service org profile / system settings (any org member reads;
+    // ADMIN+ writes via `settings.update` permission).
+    getMe: () =>
+        api.get<Organization>('/organizations/me'),
+
+    updateMe: (data: OrganizationProfileInput) =>
+        api.patch<Organization>('/organizations/me', data),
+};
+
+// Branches API (Module 1: Core Platform)
+export const branchesApi = {
+    findAll: (params?: { search?: string; isActive?: boolean }) =>
+        api.get<Branch[]>('/branches', { params }),
+
+    findOne: (id: string) =>
+        api.get<Branch>(`/branches/${id}`),
+
+    create: (data: { name: string; code?: string; address?: string; city?: string; phone?: string; email?: string }) =>
+        api.post<Branch>('/branches', data),
+
+    update: (id: string, data: Partial<{ name: string; code: string; address: string; city: string; phone: string; email: string; isActive: boolean }>) =>
+        api.patch<Branch>(`/branches/${id}`, data),
+
+    remove: (id: string) =>
+        api.delete(`/branches/${id}`),
+};
+
+// Document Center API (Module 1: Core Platform)
+export const documentsApi = {
+    upload: (file: File, entityType: string, entityId: string) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('entityType', entityType);
+        formData.append('entityId', entityId);
+        return api.post<Document>('/documents', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
+
+    findAll: (params?: { entityType?: string; entityId?: string; page?: number; limit?: number }) =>
+        api.get<{ data: Document[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/documents', { params }),
+
+    findOne: (id: string) =>
+        api.get<Document>(`/documents/${id}`),
+
+    /** Browser-navigable download URL (the httpOnly cookie is sent automatically). */
+    downloadUrl: (id: string) => `${API_BASE_URL}/documents/${id}/download`,
+
+    remove: (id: string) =>
+        api.delete(`/documents/${id}`),
 };
 
 // Properties API

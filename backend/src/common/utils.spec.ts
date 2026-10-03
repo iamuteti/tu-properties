@@ -1,5 +1,10 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { getTenantId, isSuperAdmin, requireRecord, assertTenantRecord } from './utils';
+import {
+  getTenantId,
+  isSuperAdmin,
+  requireRecord,
+  assertTenantRecord,
+} from './utils';
 
 /**
  * Tenant-isolation primitives — the guard rails every service relies on.
@@ -9,17 +14,21 @@ import { getTenantId, isSuperAdmin, requireRecord, assertTenantRecord } from './
 describe('tenant-scoping utils', () => {
   describe('getTenantId', () => {
     it('returns the organization id for a regular user', () => {
-      expect(getTenantId({ user: { role: 'ADMIN', organizationId: 'org-1' } })).toBe('org-1');
+      expect(
+        getTenantId({ user: { role: 'ADMIN', organizationId: 'org-1' } }),
+      ).toBe('org-1');
     });
 
     it('returns undefined for SUPER_ADMIN (platform-wide access)', () => {
-      expect(getTenantId({ user: { role: 'SUPER_ADMIN', organizationId: 'org-x' } })).toBeUndefined();
+      expect(
+        getTenantId({ user: { role: 'SUPER_ADMIN', organizationId: 'org-x' } }),
+      ).toBeUndefined();
     });
 
     it('fails closed for a non-super-admin without an organization', () => {
-      expect(() => getTenantId({ user: { role: 'ADMIN', organizationId: null } })).toThrow(
-        ForbiddenException,
-      );
+      expect(() =>
+        getTenantId({ user: { role: 'ADMIN', organizationId: null } }),
+      ).toThrow(ForbiddenException);
     });
 
     it('fails closed when there is no user at all', () => {
@@ -37,21 +46,23 @@ describe('tenant-scoping utils', () => {
 
   describe('requireRecord', () => {
     it('returns the record when found', async () => {
-      await expect(requireRecord(Promise.resolve({ id: '1' }), 'Property')).resolves.toEqual({
+      await expect(
+        requireRecord(Promise.resolve({ id: '1' }), 'Property'),
+      ).resolves.toEqual({
         id: '1',
       });
     });
 
     it('throws a labeled 404 when the lookup is null', async () => {
-      await expect(requireRecord(Promise.resolve(null), 'Property')).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        requireRecord(Promise.resolve(null), 'Property'),
+      ).rejects.toThrow('Property not found');
     });
 
     it('throws a 404 when the lookup is undefined', async () => {
-      await expect(requireRecord(Promise.resolve(undefined as any), 'Invoice')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        requireRecord(Promise.resolve(undefined as any), 'Invoice'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

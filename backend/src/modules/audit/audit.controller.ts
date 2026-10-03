@@ -11,6 +11,7 @@ import { AuditService } from './audit.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 import { UserRole } from '@prisma/client';
 
 /**
@@ -21,6 +22,7 @@ import { UserRole } from '@prisma/client';
  */
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+@Permissions('audit.view')
 @Controller('audit')
 export class AuditController {
   constructor(
@@ -46,7 +48,11 @@ export class AuditController {
   }
 
   @Get('entity/:entity/:entityId')
-  async getLogsForEntity(@Request() req, @Param('entity') entity: string, @Param('entityId') entityId: string) {
+  async getLogsForEntity(
+    @Request() req,
+    @Param('entity') entity: string,
+    @Param('entityId') entityId: string,
+  ) {
     return this.auditService.getLogsForEntity(
       entity,
       entityId,
@@ -72,6 +78,8 @@ export class AuditController {
    * scope), or undefined for SUPER_ADMIN (platform scope, sees all).
    */
   private adminScope(req: any): string | undefined {
-    return req.user?.role === UserRole.ADMIN ? req.user.organizationId : undefined;
+    return req.user?.role === UserRole.ADMIN
+      ? req.user.organizationId
+      : undefined;
   }
 }

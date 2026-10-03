@@ -28,6 +28,7 @@ import {
   PROPERTY_TYPES,
   UNIT_TYPES,
 } from '@/common/contants';
+import { seedRoles } from './roles-seed';
 
 dotenv.config();
 
@@ -466,7 +467,8 @@ export async function generateDemoData(
 
   // ========== Rental Agreements (all occupied units get agreements) ==========
   console.log('Generating rental agreements...');
-  const rentalAgreements: (RentalAgreement & { tenant: Tenant; unit: Unit })[] = [];
+  const rentalAgreements: (RentalAgreement & { tenant: Tenant; unit: Unit })[] =
+    [];
   let agreementIndex = 0;
 
   for (let i = 0; i < occupiedUnits.length; i++) {
@@ -475,7 +477,9 @@ export async function generateDemoData(
 
     // Determine agreement type based on property category
     const isResidential = property.category === 'residential';
-    const agreementType = isResidential ? AgreementType.RENTAL : AgreementType.LEASE;
+    const agreementType = isResidential
+      ? AgreementType.RENTAL
+      : AgreementType.LEASE;
 
     const tenant = tenants[i];
     const startDate = new Date();
@@ -503,7 +507,9 @@ export async function generateDemoData(
       if (Math.random() < 0.2) {
         // 20% are previous tenants (agreement has ended)
         endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + Math.floor(Math.random() * 12) + 1);
+        endDate.setMonth(
+          endDate.getMonth() + Math.floor(Math.random() * 12) + 1,
+        );
       }
       // 30% have security deposits for rentals
       if (Math.random() < 0.3) {
@@ -524,13 +530,17 @@ export async function generateDemoData(
         currency: 'KES',
         paymentDay: 1,
         securityDeposit,
-        status: endDate && endDate < new Date() ? AgreementStatus.EXPIRED : AgreementStatus.ACTIVE,
+        status:
+          endDate && endDate < new Date()
+            ? AgreementStatus.EXPIRED
+            : AgreementStatus.ACTIVE,
         organizationId,
       },
     });
 
     // Update unit status based on rental agreement status
-    const unitStatus = endDate && endDate < new Date() ? UnitStatus.VACANT : UnitStatus.OCCUPIED;
+    const unitStatus =
+      endDate && endDate < new Date() ? UnitStatus.VACANT : UnitStatus.OCCUPIED;
     await prisma.unit.update({
       where: { id: unit.id },
       data: { status: unitStatus },
@@ -558,7 +568,9 @@ export async function generateDemoData(
     const tenant = tenants[i]; // Each occupied unit has a corresponding tenant
 
     // Find the rental agreement for this unit
-    const rentalAgreement = rentalAgreements.find((ra) => ra.unit.id === unit.id);
+    const rentalAgreement = rentalAgreements.find(
+      (ra) => ra.unit.id === unit.id,
+    );
     const rentalAgreementId = rentalAgreement ? rentalAgreement.id : null;
 
     for (let month = 0; month < months; month++) {
@@ -724,6 +736,12 @@ export async function seedDemoData() {
     await prisma.propertyStandingCharge.deleteMany();
     await prisma.property.deleteMany();
     await prisma.landlord.deleteMany();
+    await prisma.roleAssignment.deleteMany();
+    await prisma.document.deleteMany();
+    await prisma.branch.deleteMany();
+    await prisma.role.deleteMany({ where: { organizationId: { not: null } } });
+    await prisma.session.deleteMany();
+    await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany({
       where: {
         role: {
@@ -758,6 +776,10 @@ export async function seedDemoData() {
         isActive: true,
       },
     });
+
+    // Seed the 12 system roles (idempotent; organization-scoped roles were
+    // cleaned above)
+    await seedRoles(prisma);
 
     // Create users
     console.log('Creating users...');

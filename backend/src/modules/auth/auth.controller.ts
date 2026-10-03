@@ -29,7 +29,11 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  @RateLimit({ limit: 10, ttl: 5 * 60 * 1000, message: 'Too many login attempts. Try again in a few minutes.' })
+  @RateLimit({
+    limit: 10,
+    ttl: 5 * 60 * 1000,
+    message: 'Too many login attempts. Try again in a few minutes.',
+  })
   async login(@Body() req, @Request() request) {
     const validUser = await this.authService.validateUser(
       req.email,
@@ -46,24 +50,33 @@ export class AuthController {
 
   @Post('register')
   @Public()
-  @RateLimit({ limit: 5, ttl: 60 * 60 * 1000, message: 'Too many registrations from this address.' })
+  @RateLimit({
+    limit: 5,
+    ttl: 60 * 60 * 1000,
+    message: 'Too many registrations from this address.',
+  })
   async register(@Body() userData: Prisma.UserCreateInput, @Request() request) {
-    return this.authService.register(
-      userData,
-      request.res as Response,
-    );
+    return this.authService.register(userData, request.res as Response);
   }
 
   @Post('forgot-password')
   @Public()
-  @RateLimit({ limit: 5, ttl: 15 * 60 * 1000, message: 'Too many password reset requests. Try again later.' })
+  @RateLimit({
+    limit: 5,
+    ttl: 15 * 60 * 1000,
+    message: 'Too many password reset requests. Try again later.',
+  })
   async forgotPassword(@Body() body: { email: string }) {
     return this.authService.forgotPassword(body.email);
   }
 
   @Post('reset-password')
   @Public()
-  @RateLimit({ limit: 5, ttl: 15 * 60 * 1000, message: 'Too many password reset attempts. Try again later.' })
+  @RateLimit({
+    limit: 5,
+    ttl: 15 * 60 * 1000,
+    message: 'Too many password reset attempts. Try again later.',
+  })
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     return this.authService.resetPassword(body.token, body.newPassword);
   }
@@ -79,15 +92,20 @@ export class AuthController {
   logout(@Request() request) {
     // Revoke the session row so the cookie stops working immediately,
     // then clear it from the browser.
-    return this.authService.logout(
-      request.user?.jti,
-      request.res as Response,
-    );
+    return this.authService.logout(request.user?.jti, request.res as Response);
   }
 
   // ---------------------------------------------------------------------------
   // Sessions (revocation)
   // ---------------------------------------------------------------------------
+
+  @UseGuards(JwtAuthGuard)
+  @Get('login-history')
+  loginHistory(@Request() req) {
+    // Self-scoped: any authenticated user may see their own login/security
+    // history. Org-wide history remains on /audit (ADMIN+).
+    return this.authService.getLoginHistory(req.user.userId);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('sessions')
@@ -125,17 +143,28 @@ export class AuthController {
 
   @Post('mfa/verify')
   @Public()
-  @RateLimit({ limit: 10, ttl: 5 * 60 * 1000, message: 'Too many MFA attempts. Try again in a few minutes.' })
+  @RateLimit({
+    limit: 10,
+    ttl: 5 * 60 * 1000,
+    message: 'Too many MFA attempts. Try again in a few minutes.',
+  })
   mfaVerify(
     @Body() body: { mfaToken: string; code: string },
     @Request() request,
   ) {
     if (!body.mfaToken || !body.code) {
-      throw new UnauthorizedException('MFA challenge token and code are required');
+      throw new UnauthorizedException(
+        'MFA challenge token and code are required',
+      );
     }
-    return this.authService.verifyMfa(body.mfaToken, body.code, request.res as Response, {
-      ip: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
+    return this.authService.verifyMfa(
+      body.mfaToken,
+      body.code,
+      request.res as Response,
+      {
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
+      },
+    );
   }
 }

@@ -57,8 +57,24 @@ export interface Organization {
     primaryColor?: string;
     contactEmail?: string;
     contactPhone?: string;
+    /** Legal & tax profile (System Settings). */
+    legalName?: string;
+    taxId?: string;
+    /** Org-level defaults (System Settings). */
+    currency?: string;
+    timezone?: string;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface OrganizationProfileInput {
+    name?: string;
+    contactEmail?: string | null;
+    contactPhone?: string | null;
+    legalName?: string | null;
+    taxId?: string | null;
+    currency?: string;
+    timezone?: string;
 }
 
 export interface User {
@@ -71,6 +87,73 @@ export interface User {
     organization?: Organization;
     /** Whether TOTP two-factor auth is enabled on this account. */
     mfaEnabled?: boolean;
+    /** Account status (user management). */
+    isActive?: boolean;
+    phone?: string;
+}
+
+/** Structured RBAC role (Module 1: Core Platform). */
+export interface RolePermissions {
+    all?: boolean;
+    modules: Record<string, { view?: boolean; create?: boolean; update?: boolean; delete?: boolean }>;
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    description?: string;
+    isSystem: boolean;
+    organizationId?: string | null;
+    permissions: RolePermissions;
+}
+
+export interface RoleAssignment {
+    id: string;
+    roleId: string;
+    role: Omit<Role, 'permissions'>;
+}
+
+export interface Branch {
+    id: string;
+    organizationId?: string;
+    name: string;
+    code?: string;
+    address?: string;
+    city?: string;
+    phone?: string;
+    email?: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Document {
+    id: string;
+    organizationId?: string;
+    entityType: string;
+    entityId: string;
+    fileName: string;
+    fileUrl: string;
+    mimeType: string;
+    sizeBytes: number;
+    version: number;
+    uploadedById: string;
+    uploadedBy?: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface LoginEvent {
+    action: string;
+    details?: string;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    at: string;
 }
 
 export interface AuthResponse {

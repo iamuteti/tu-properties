@@ -10,11 +10,16 @@ import {
   Request,
   Query,
 } from '@nestjs/common';
-import { TenantsService, PaginationParams, TenantFilters } from './tenants.service';
+import {
+  TenantsService,
+  PaginationParams,
+  TenantFilters,
+} from './tenants.service';
 import { Prisma, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('tenants')
@@ -23,6 +28,7 @@ export class TenantsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('tenants.create')
   create(@Body() createTenantDto: Prisma.TenantCreateInput, @Request() req) {
     const tenantId = getTenantId(req);
     return this.tenantsService.create(createTenantDto, tenantId);
@@ -55,7 +61,12 @@ export class TenantsController {
       status,
       gender,
       propertyId,
-      withDeposit: withDeposit === 'true' ? true : withDeposit === 'false' ? false : undefined,
+      withDeposit:
+        withDeposit === 'true'
+          ? true
+          : withDeposit === 'false'
+            ? false
+            : undefined,
     };
     return this.tenantsService.findAll(tenantId, params, filters);
   }
@@ -68,6 +79,7 @@ export class TenantsController {
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('tenants.update')
   update(
     @Param('id') id: string,
     @Body() updateTenantDto: Prisma.TenantUpdateInput,
@@ -79,6 +91,7 @@ export class TenantsController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('tenants.delete')
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.tenantsService.remove(id, tenantId);

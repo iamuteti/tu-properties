@@ -7,7 +7,10 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RATE_LIMIT_KEY, RateLimitOptions } from '@/common/decorators/rate-limit.decorator';
+import {
+  RATE_LIMIT_KEY,
+  RateLimitOptions,
+} from '@/common/decorators/rate-limit.decorator';
 
 interface Bucket {
   count: number;
@@ -74,8 +77,7 @@ export class RateLimitGuard implements CanActivate {
       {
         statusCode: HttpStatus.TOO_MANY_REQUESTS,
         message:
-          options.message ||
-          'Too many requests. Please try again later.',
+          options.message || 'Too many requests. Please try again later.',
         retryAfter: retryAfterSec,
       },
       HttpStatus.TOO_MANY_REQUESTS,

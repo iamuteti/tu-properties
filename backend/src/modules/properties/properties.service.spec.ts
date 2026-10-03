@@ -50,7 +50,10 @@ describe('PropertiesService (tenant-scoped CRUD pattern)', () => {
   beforeEach(async () => {
     prisma = mockPrisma();
     const moduleRef: TestingModule = await Test.createTestingModule({
-      providers: [PropertiesService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        PropertiesService,
+        { provide: PrismaService, useValue: prisma },
+      ],
     }).compile();
     service = moduleRef.get(PropertiesService);
   });
@@ -117,12 +120,12 @@ describe('PropertiesService (tenant-scoped CRUD pattern)', () => {
     it('404s when the record belongs to another tenant (no 200 + empty body)', async () => {
       // Cross-tenant lookup: scoped where finds nothing.
       prisma.property.findFirst.mockResolvedValue(null);
-      await expect(service.findOne('prop-other-tenant', 'org-1')).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.findOne('prop-other-tenant', 'org-1')).rejects.toThrow(
-        'Property not found',
-      );
+      await expect(
+        service.findOne('prop-other-tenant', 'org-1'),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.findOne('prop-other-tenant', 'org-1'),
+      ).rejects.toThrow('Property not found');
     });
   });
 
@@ -146,14 +149,18 @@ describe('PropertiesService (tenant-scoped CRUD pattern)', () => {
 
     it('remove refuses a cross-tenant record before deleting it', async () => {
       prisma.property.findFirst.mockResolvedValue(null);
-      await expect(service.remove('prop-1', 'org-2')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('prop-1', 'org-2')).rejects.toThrow(
+        NotFoundException,
+      );
       expect(prisma.property.delete).not.toHaveBeenCalled();
     });
 
     it('remove deletes once ownership is confirmed', async () => {
       prisma.property.findFirst.mockResolvedValue({ id: 'prop-1' });
       await service.remove('prop-1', 'org-1');
-      expect(prisma.property.delete).toHaveBeenCalledWith({ where: { id: 'prop-1' } });
+      expect(prisma.property.delete).toHaveBeenCalledWith({
+        where: { id: 'prop-1' },
+      });
     });
   });
 });

@@ -10,11 +10,16 @@ import {
   Request,
   Query,
 } from '@nestjs/common';
-import { LandlordsService, PaginationParams, LandlordFilters } from './landlords.service';
+import {
+  LandlordsService,
+  PaginationParams,
+  LandlordFilters,
+} from './landlords.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { Prisma, UserRole } from '@prisma/client';
 import { getTenantId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 
 @Controller('landlords')
 @UseGuards(JwtAuthGuard)
@@ -23,6 +28,7 @@ export class LandlordsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('landlords.create')
   create(
     @Body() createLandlordDto: Prisma.LandlordCreateInput,
     @Request() req,
@@ -63,6 +69,7 @@ export class LandlordsController {
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('landlords.update')
   update(
     @Param('id') id: string,
     @Body() updateLandlordDto: Prisma.LandlordUpdateInput,
@@ -74,6 +81,7 @@ export class LandlordsController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('landlords.delete')
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.landlordsService.remove(id, tenantId);

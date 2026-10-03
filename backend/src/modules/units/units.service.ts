@@ -57,10 +57,18 @@ export class UnitsService {
     params?: PaginationParams,
     filters?: UnitFilters,
   ): Promise<PaginatedResult<any>> {
-    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = params || {};
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params || {};
     const skip = (page - 1) * limit;
 
-    const where: any = tenantId ? { property: { organizationId: tenantId } } : {};
+    const where: any = tenantId
+      ? { property: { organizationId: tenantId } }
+      : {};
 
     if (search) {
       where.OR = [

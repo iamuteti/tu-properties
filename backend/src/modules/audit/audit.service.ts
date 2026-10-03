@@ -27,7 +27,9 @@ export class AuditService {
     const page = params.page ?? 1;
     const limit = Math.min(params.limit ?? 50, 200);
     const where: Prisma.AuditLogWhereInput = {
-      ...(params.organizationId ? { organizationId: params.organizationId } : {}),
+      ...(params.organizationId
+        ? { organizationId: params.organizationId }
+        : {}),
       ...(params.entity ? { entity: params.entity } : {}),
       ...(params.action ? { action: params.action } : {}),
     };
@@ -36,7 +38,16 @@ export class AuditService {
       Promise.all([
         tx.auditLog.findMany({
           where,
-          include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
           orderBy: { createdAt: 'desc' },
           skip: (page - 1) * limit,
           take: limit,

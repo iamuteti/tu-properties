@@ -14,9 +14,11 @@ import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 import { UsersService } from '@/modules/users/users.service';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
+@Permissions('payments.view')
 @Controller('finance/payments')
 export class PaymentsController {
   constructor(
@@ -25,6 +27,7 @@ export class PaymentsController {
   ) {}
 
   @Post()
+  @Permissions('payments.create')
   async create(
     @Body() createPaymentDto: Prisma.PaymentCreateInput,
     @Request() req,
@@ -56,12 +59,14 @@ export class PaymentsController {
   }
 
   @Delete(':id')
+  @Permissions('payments.delete')
   delete(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.paymentsService.delete(id, tenantId);
   }
 
   @Post('bulk-delete')
+  @Permissions('payments.delete')
   deleteMany(@Body() body: { ids: string[] }, @Request() req) {
     const tenantId = getTenantId(req);
     return this.paymentsService.deleteMany(body.ids, tenantId);

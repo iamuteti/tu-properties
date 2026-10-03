@@ -32,7 +32,11 @@ export class AuthService {
 
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.usersService.findOneByEmail(email);
-    if (user && user.isActive && (await bcrypt.compare(pass, user.passwordHash))) {
+    if (
+      user &&
+      user.isActive &&
+      (await bcrypt.compare(pass, user.passwordHash))
+    ) {
       const { passwordHash, mfaSecret, ...result } = user;
       return result;
     }
@@ -46,7 +50,11 @@ export class AuthService {
    *   call /auth/mfa/verify with a TOTP code. No session cookie is set
    *   until the code is verified.
    */
-  async login(user: any, res: Response, meta?: { ip?: string; userAgent?: string }) {
+  async login(
+    user: any,
+    res: Response,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
     if (user.mfaEnabled) {
       const mfaToken = this.jwtService.sign(
         { sub: user.id, email: user.email, mfa: 'verify' },
@@ -54,7 +62,10 @@ export class AuthService {
       );
       return { user: this.sanitizeUser(user), mfaRequired: true, mfaToken };
     }
-    return { user: this.sanitizeUser(user), ...(await this.issueSession(user, res, meta)) };
+    return {
+      user: this.sanitizeUser(user),
+      ...(await this.issueSession(user, res, meta)),
+    };
   }
 
   /**
@@ -62,7 +73,11 @@ export class AuthService {
    * that backs it. The `jti` claim ties the token to exactly one session,
    * so revoking the session row invalidates the token.
    */
-  private async issueSession(user: any, res: Response, meta?: { ip?: string; userAgent?: string }) {
+  private async issueSession(
+    user: any,
+    res: Response,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
     const jti = crypto.randomUUID();
     const payload = {
       email: user.email,
@@ -97,6 +112,8 @@ export class AuthService {
         entity: 'User',
         entityId: user.id,
         details: 'User logged in',
+        ipAddress: meta?.ip,
+        userAgent: meta?.userAgent,
       });
     } catch (err) {
       this.logger.warn('Failed to write login audit log', err as Error);
@@ -127,6 +144,36 @@ export class AuthService {
     return result;
   }
 
+  /**
+   * The caller's own recent security events (login history UI). Always
+   * self-scoped — no admin involvement, so it's safe for any role.
+   */
+  async getLoginHistory(userId: string, limit = 20) {
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        userId,
+        action: {
+          in: [
+            'LOGIN',
+            'MFA_ENABLED',
+            'MFA_DISABLED',
+            'SESSIONS_REVOKED',
+            'PASSWORD_RESET',
+          ],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 100),
+    });
+    return rows.map((row) => ({
+      action: row.action,
+      details: row.details,
+      ipAddress: row.ipAddress,
+      userAgent: row.userAgent,
+      at: row.createdAt,
+    }));
+  }
+
   /** Clear the auth cookie (used on logout). */
   clearAuthCookie(res: Response) {
     res.clearCookie(COOKIE_NAME, {
@@ -148,7 +195,9 @@ export class AuthService {
           where: { jti, revokedAt: null },
           data: { revokedAt: new Date() },
         })
-        .catch((err) => this.logger.warn('Failed to revoke session on logout', err as Error));
+        .catch((err) =>
+          this.logger.warn('Failed to revoke session on logout', err as Error),
+        );
     }
     this.clearAuthCookie(res);
     return { message: 'Logged out' };
@@ -189,7 +238,10 @@ export class AuthService {
         details: `User revoked ${result.count} other active session(s)`,
       });
     } catch (err) {
-      this.logger.warn('Failed to write sessions-revoked audit log', err as Error);
+      this.logger.warn(
+        'Failed to write sessions-revoked audit log',
+        err as Error,
+      );
     }
     return { revoked: result.count };
   }
@@ -205,7 +257,12 @@ export class AuthService {
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       })
-      .catch((err) => this.logger.warn('Failed to revoke sessions after password reset', err as Error));
+      .catch((err) =>
+        this.logger.warn(
+          'Failed to revoke sessions after password reset',
+          err as Error,
+        ),
+      );
   }
 
   private setAuthCookie(res: Response, token: string) {
@@ -317,7 +374,12 @@ export class AuthService {
    * Complete an MFA-protected login: verify the challenge token + TOTP
    * code, then issue the session exactly like a normal login.
    */
-  async verifyMfa(mfaToken: string, code: string, res: Response, meta?: { ip?: string; userAgent?: string }) {
+  async verifyMfa(
+    mfaToken: string,
+    code: string,
+    res: Response,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
     let payload: any;
     try {
       payload = this.jwtService.verify(mfaToken);
@@ -424,7 +486,10 @@ export class AuthService {
         details: 'User reset their password; all sessions revoked',
       });
     } catch (err) {
-      this.logger.warn('Failed to write password-reset audit log', err as Error);
+      this.logger.warn(
+        'Failed to write password-reset audit log',
+        err as Error,
+      );
     }
 
     return { message: 'Password has been reset' };

@@ -15,6 +15,7 @@ import { Prisma, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('units')
@@ -23,6 +24,7 @@ export class UnitsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('units.create')
   create(@Body() createUnitDto: any, @Request() req) {
     const tenantId = getTenantId(req);
     return this.unitsService.create(createUnitDto, tenantId);
@@ -64,6 +66,7 @@ export class UnitsController {
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('units.update')
   update(
     @Param('id') id: string,
     @Body() updateUnitDto: Prisma.UnitUpdateInput,
@@ -75,6 +78,7 @@ export class UnitsController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('units.delete')
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.unitsService.remove(id, tenantId);

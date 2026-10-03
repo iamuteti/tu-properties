@@ -38,6 +38,15 @@ model Organization {
   contactEmail String?
   contactPhone String?
 
+  // Legal & tax profile
+  legalName String?
+  taxId     String?
+
+  // Regional defaults (System Settings) — money amounts still carry their
+  // own currency per record; these are the org-level defaults.
+  currency String @default("KES")
+  timezone String @default("Africa/Nairobi")
+
   // Relationships
   users      User[]
   properties Property[]
@@ -49,6 +58,9 @@ model Organization {
   payments   Payment[]
   receipts   Receipt[]
   auditLogs  AuditLog[]
+  branches   Branch[]
+  roles      Role[]
+  documents  Document[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -93,8 +105,10 @@ model User {
   mfaSecret  String?
   mfaEnabled Boolean @default(false)
 
-  auditLogs AuditLog[]
-  sessions  Session[]
+  auditLogs          AuditLog[]
+  sessions           Session[]
+  roleAssignments    RoleAssignment[]
+  uploadedDocuments  Document[]
 
   @@index([email])
   @@index([role])
@@ -114,8 +128,11 @@ enum UserRole {
 model AuditLog {
   id String @id @default(cuid())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // The acting user. Nullable so that deleting a user does not fail on
+  // audit rows (an accountant cleaning up a departing colleague, for
+  // example). The actor's identity remains preserved in `details`.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Tenant scoping: the organization the acting user belonged to at the
   // time of the action. NULL for platform-level actions (SUPER_ADMIN).
@@ -170,6 +187,103 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+// Organization branch/office (Module 1: Core Platform). Tenant-scoped.
+model Branch {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name    String
+  code    String?
+  address String?
+  city    String?
+  phone   String?
+  email   String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("branches")
+}
+
+// Structured RBAC role. `organizationId = null` marks a system role
+// (available to every organization); non-null marks an org-specific role.
+// `permissions` is a JSON document of the shape:
+//   { "all": boolean?, "modules": { "<module>": { "view": b, "create": b, "update": b, "delete": b } } }
+// where <module> is one of: properties, units, landlords, tenants, leases,
+// moveouts, invoices, payments, receipts, users, audit, settings,
+// organizations, branches, documents.
+model Role {
+  id             String   @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  permissions Json
+
+  assignments RoleAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([name])
+  @@map("roles")
+}
+
+// User ↔ Role link (table `user_roles`). The model is not named `UserRole`
+// because that name is already taken by the legacy `UserRole` enum.
+model RoleAssignment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// Document center (Module 1: Core Platform). Polymorphic: entityType/entityId
+// point at any tenant entity (Property, Unit, Tenant, Invoice, ...).
+// `fileUrl` is the storage key/URL resolved by the configured storage driver
+// (local disk by default, S3/MinIO when STORAGE_DRIVER=s3).
+model Document {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  entityType String
+  entityId   String
+  fileName   String
+  fileUrl    String
+  mimeType   String
+  sizeBytes  Int      @default(0)
+
+  // Re-uploading the same file for the same (entityType, entityId, fileName)
+  // creates a new row with version = max + 1 instead of overwriting.
+  version Int @default(1)
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+  @@map("documents")
 }
 
 // ============================================
