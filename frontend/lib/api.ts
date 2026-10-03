@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, Receipt, PaginatedResponse, MoveOutRequest } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -38,6 +38,25 @@ export const authApi = {
 
     getProfile: () =>
         api.get('/auth/profile'),
+
+    logout: () =>
+        api.post<{ message: string }>('/auth/logout'),
+
+    // MFA (TOTP)
+    mfaSetup: () =>
+        api.post<{ secret: string; otpauthUrl: string; issuer: string }>('/auth/mfa/setup'),
+    mfaEnable: (secret: string, code: string) =>
+        api.post<{ message: string }>('/auth/mfa/enable', { secret, code }),
+    mfaDisable: (code: string) =>
+        api.post<{ message: string }>('/auth/mfa/disable', { code }),
+    verifyMfa: (mfaToken: string, code: string) =>
+        api.post<{ user: User; sessionId: string }>('/auth/mfa/verify', { mfaToken, code }),
+
+    // Sessions (revocation)
+    listSessions: () =>
+        api.get<{ id: string; createdAt: string; expiresAt: string; ipAddress: string | null; userAgent: string | null; isCurrent: boolean }[]>('/auth/sessions'),
+    revokeOtherSessions: () =>
+        api.post<{ revoked: number }>('/auth/sessions/revoke-others'),
 };
 
 // Organizations API
@@ -235,6 +254,23 @@ export const financeApi = {
     findOneInvoice: (id: string) =>
         api.get<Invoice>(`/finance/invoices/${id}`),
 
+    updateInvoice: (id: string, data: {
+        landlordId?: string;
+        rentalAgreementId?: string;
+        issueDate?: string;
+        dueDate?: string;
+        currency?: string;
+        memo?: string;
+        billTo?: string;
+        amount?: number;
+        vatAmount?: number;
+        totalAmount?: number;
+        paidAmount?: number;
+        balanceAmount?: number;
+        status?: Invoice['status'];
+    }) =>
+        api.patch<Invoice>(`/finance/invoices/${id}`, data),
+
     deleteInvoice: (id: string) =>
         api.delete(`/finance/invoices/${id}`),
 
@@ -258,7 +294,7 @@ export const financeApi = {
         api.post('/finance/payments/bulk-delete', { ids }),
 
     // Receipts
-    createReceipt: (data: Record<string, unknown>) =>
+    createReceipt: (data: CreateReceiptData) =>
         api.post<Receipt>('/finance/receipts', data),
 
     findAllReceipts: () =>
@@ -272,6 +308,12 @@ export const financeApi = {
 
     deleteReceipts: (ids: string[]) =>
         api.post('/finance/receipts/bulk-delete', { ids }),
+};
+
+// Dashboard API
+export const dashboardApi = {
+    getStats: () =>
+        api.get<DashboardStats>('/dashboard/stats'),
 };
 
 // Moveouts API

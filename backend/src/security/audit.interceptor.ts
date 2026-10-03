@@ -47,14 +47,17 @@ export class AuditInterceptor implements NestInterceptor {
         next: (result) => {
           const id = paramId || this.extractId(result);
           if (!id) return;
-          this.auditService
+           this.auditService
             .logAction({
-              user: { connect: { id: user.userId } },
-              action: this.actionFromMethod(method),
-              entity,
-              entityId: id,
-              details: `${method} ${route}`,
-            })
+               user: { connect: { id: user.userId } },
+               ...(user.organizationId
+                 ? { organization: { connect: { id: user.organizationId } } }
+                 : {}),
+               action: this.actionFromMethod(method),
+               entity,
+               entityId: id,
+               details: `${method} ${route}`,
+             })
             .catch((err) => this.logger.warn('Audit write failed', err as Error));
         },
       }),

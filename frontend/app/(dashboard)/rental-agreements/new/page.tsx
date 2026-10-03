@@ -77,11 +77,11 @@ export default function NewRentalAgreementPage() {
                 ...data,
                 status: "ACTIVE",
                 startDate: new Date(data.startDate).toISOString(),
-                endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
+                endDate: data.endDate ? new Date(data.endDate).toISOString() : undefined,
             };
 
             await rentalAgreementsApi.create(payload);
-            router.push("/dashboard/rental-agreements");
+            router.push("/rental-agreements");
             router.refresh();
         } catch (err: any) {
             setError(

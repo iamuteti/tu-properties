@@ -178,7 +178,7 @@ export default function PropertiesPage() {
                         Manage your real estate assets
                     </p>
                 </div>
-                <Link href="/dashboard/properties/new">
+                <Link href="/properties/new">
                     <Button>
                         <Building2 className="mr-2 h-4 w-4" /> Add Property
                     </Button>

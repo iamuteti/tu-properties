@@ -46,6 +46,36 @@ export default function NewReceiptPage() {
   const [receiptLines, setReceiptLines] = useState<ReceiptLine[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showInvoicePicker, setShowInvoicePicker] = useState(false);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
+
+  // Invoices that can receive a payment: not settled, not cancelled, and
+  // not already applied to this receipt.
+  const eligibleInvoices = (allInvoices || [])
+    .filter((invoice) =>
+      ["PENDING", "PARTIALLY_PAID", "OVERDUE"].includes(invoice.status) &&
+      Number(invoice.balanceAmount) > 0 &&
+      !receiptLines.some((line) => line.invNo === invoice.invoiceNumber)
+    )
+    .filter((invoice) => {
+      if (!invoiceSearch) return true;
+      const q = invoiceSearch.toLowerCase();
+      return (
+        invoice.invoiceNumber.toLowerCase().includes(q) ||
+        (invoice.rentalAgreement?.tenant?.surname || "").toLowerCase().includes(q)
+      );
+    });
+
+  const handleLinePaymentChange = (lineId: string, value: string) => {
+    const payment = Math.max(0, parseFloat(value) || 0);
+    setReceiptLines((prev) =>
+      prev.map((line) =>
+        line.id === lineId
+          ? { ...line, payment, newBalance: Math.max(0, Math.round((line.amtDue - payment) * 100) / 100) }
+          : line
+      )
+    );
+  };
 
   const handleRemoveLine = (id: string) => {
     setReceiptLines(prev => prev.filter(line => line.id !== id));
@@ -100,9 +130,13 @@ export default function NewReceiptPage() {
         throw new Error(`Total payment ($${totalPayment.toFixed(2)}) must match amount received ($${enteredAmount.toFixed(2)})`);
       }
 
-      // Prepare and send data to API
+      // Prepare and send data to API (general receipt — rent receipts are
+      // created from the rent-receipts page and carry receiptCategory Rent)
       const receiptData = {
         ...formData,
+        paymentMethod: formData.paymentMethod as "CASH" | "BANK_TRANSFER" | "CHEQUE" | "MPESA" | "CARD" | "OTHER",
+        receiptType: formData.receiptType as "ApplyToInvoice" | "CashReceipt",
+        receiptCategory: "General" as const,
         amountReceived: parseFloat(formData.amountReceived),
         receiptLines,
       };
@@ -130,7 +164,7 @@ export default function NewReceiptPage() {
           </p>
         </div>
         <div className="flex gap-2">
-<Link href="/dashboard/finance/receipts">
+<Link href="/finance/receipts">
             <Button variant="outline">
               Cancel
             </Button>
@@ -339,11 +373,52 @@ export default function NewReceiptPage() {
       <div className="bg-white border rounded-lg p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Receipt Lines</h2>
-          <Button onClick={() => {/* Implement invoice search/selection */}}>
+          <Button onClick={() => setShowInvoicePicker((prev) => !prev)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Invoice
           </Button>
         </div>
+
+        {showInvoicePicker && (
+          <div className="mb-4 border rounded-lg">
+            <div className="p-2 border-b bg-muted/40">
+              <Input
+                value={invoiceSearch}
+                onChange={(e) => setInvoiceSearch(e.target.value)}
+                placeholder="Search invoices by number or tenant…"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {eligibleInvoices.length > 0 ? (
+                eligibleInvoices.map((invoice) => (
+                  <button
+                    key={invoice.id}
+                    type="button"
+                    onClick={() => {
+                      handleAddInvoice(invoice);
+                      setShowInvoicePicker(false);
+                      setInvoiceSearch("");
+                    }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted/60 transition-colors"
+                  >
+                    <span className="font-medium">{invoice.invoiceNumber}</span>
+                    <span className="text-muted-foreground">
+                      {invoice.rentalAgreement?.tenant?.surname || "—"}
+                    </span>
+                    <span className="text-right">
+                      {invoice.currency} {Number(invoice.balanceAmount).toFixed(2)} due
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-4 text-sm text-muted-foreground">
+                  No eligible invoices found.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {receiptLines.length > 0 ? (
           <Table>
@@ -369,7 +444,17 @@ export default function NewReceiptPage() {
                   <TableCell className="text-right">{line.invoiceTotal.toFixed(2)}</TableCell>
                   <TableCell className="text-right">{line.prevReceipts.toFixed(2)}</TableCell>
                   <TableCell className="text-right">{line.amtDue.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-medium">{line.payment.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={line.amtDue}
+                      value={line.payment}
+                      onChange={(e) => handleLinePaymentChange(line.id || "", e.target.value)}
+                      className="ml-auto h-8 w-28 text-right"
+                    />
+                  </TableCell>
                   <TableCell className="text-right">{line.newBalance.toFixed(2)}</TableCell>
                   <TableCell>
                     <Button
@@ -394,7 +479,7 @@ export default function NewReceiptPage() {
 
       {/* Footer */}
       <div className="flex justify-end gap-2">
-        <Link href="/dashboard/finance/receipts">
+        <Link href="/finance/receipts">
           <Button variant="outline">
             Cancel
           </Button>

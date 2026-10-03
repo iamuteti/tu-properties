@@ -18,7 +18,7 @@ const columns: ColumnDef<Invoice>[] = [
     accessorKey: "invoiceNumber",
     header: "Invoice #",
     cell: ({ row }) => (
-      <Link href={`/dashboard/finance/invoices/${row.original.id}`} className="font-medium text-blue-600 hover:text-blue-800">
+      <Link href={`/finance/invoices/${row.original.id}`} className="font-medium text-blue-600 hover:text-blue-800">
         {row.original.invoiceNumber}
       </Link>
     ),
@@ -36,7 +36,7 @@ const columns: ColumnDef<Invoice>[] = [
   {
     accessorKey: "customer",
     header: "Customer",
-    cell: ({ row }) => row.original.lease?.tenant?.surname || "Unknown",
+      cell: ({ row }) => row.original.rentalAgreement?.tenant?.surname || "Unknown",
   },
   {
     accessorKey: "memo",
@@ -156,7 +156,7 @@ export default function InvoicesPage() {
 
       // Customer filter
       if (filters.customer) {
-        const customerName = (invoice.lease?.tenant?.surname || '') + ' ' + (invoice.lease?.tenant?.otherNames || '');
+        const customerName = (invoice.rentalAgreement?.tenant?.surname || '') + ' ' + (invoice.rentalAgreement?.tenant?.otherNames || '');
         if (!customerName.toLowerCase().includes(filters.customer.toLowerCase())) return false;
       }
 
@@ -172,9 +172,9 @@ export default function InvoicesPage() {
   // Get unique customers and transaction classes for filters
   const uniqueCustomers = Array.from(new Set(
     allInvoices
-      .map(inv => inv.lease?.tenant?.surname && inv.lease?.tenant?.otherNames 
-        ? `${inv.lease.tenant.surname} ${inv.lease.tenant.otherNames}` 
-        : inv.lease?.tenant?.surname || '')
+      .map(inv => inv.rentalAgreement?.tenant?.surname && inv.rentalAgreement?.tenant?.otherNames 
+        ? `${inv.rentalAgreement.tenant.surname} ${inv.rentalAgreement.tenant.otherNames}` 
+        : inv.rentalAgreement?.tenant?.surname || '')
       .filter(Boolean)
   )).sort()
 
@@ -244,7 +244,7 @@ export default function InvoicesPage() {
               </Button>
             </>
           )}
-          <Link href="/dashboard/invoices/new">
+          <Link href="/finance/invoices/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" /> Create Invoice
             </Button>
@@ -267,7 +267,7 @@ export default function InvoicesPage() {
         searchPlaceholder="Search invoices..."
         searchColumns={[
           { id: "invoiceNumber", label: "Invoice Number" },
-          { id: "customer", label: "Customer", accessor: (row) => row.lease?.tenant?.surname || "" },
+          { id: "customer", label: "Customer", accessor: (row: Invoice) => row.rentalAgreement?.tenant?.surname || "" },
           { id: "status", label: "Status" },
         ]}
         emptyMessage="No invoices found. Create your first invoice to get started."

@@ -275,7 +275,7 @@ export default function TenantsPage() {
                         Manage your tenants directory
                     </p>
                 </div>
-                <Link href="/dashboard/tenants/new">
+                <Link href="/tenants/new">
                     <Button>
                         <Plus className="mr-2 h-4 w-4" /> Add Tenant
                     </Button>

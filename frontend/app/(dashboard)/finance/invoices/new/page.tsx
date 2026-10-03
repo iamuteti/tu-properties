@@ -190,7 +190,7 @@ export default function NewInvoicePage() {
 
       await financeApi.createInvoice(invoiceData);
       refetch();
-      router.push("/dashboard/invoices");
+      router.push("/finance/invoices");
     } catch (err: any) {
       setError(
         err.response?.data?.message || "Failed to create invoice. Please try again."

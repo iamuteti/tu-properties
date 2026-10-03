@@ -107,7 +107,7 @@ export default function NewPaymentPage() {
 
       await financeApi.createPayment(paymentData);
       refetch();
-      router.push("/dashboard/payments");
+      router.push("/finance/payments");
     } catch (err: any) {
       setError(
         err.response?.data?.message || "Failed to record payment. Please try again."
@@ -126,8 +126,8 @@ export default function NewPaymentPage() {
         // Auto-fill amount with balance due
         setValue("amount", Number(invoice.balanceAmount));
         // Auto-fill payee from lease tenant
-        if (invoice.lease?.tenant) {
-          const tenant = invoice.lease.tenant;
+        if (invoice.rentalAgreement?.tenant) {
+          const tenant = invoice.rentalAgreement.tenant;
           setValue("payee", `${tenant.surname} ${tenant.otherNames || ''}`.trim());
         }
       }

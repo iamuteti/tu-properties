@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
+import { PrismaService } from '@/prisma/prisma.service';
 
 const AUTH_COOKIE_NAME = 'auth_token';
 
@@ -14,6 +15,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
+    private prisma: PrismaService,
   ) {
     const secret = configService.get<string>('JWT_SECRET') || 'superSecretKey';
     super({
@@ -37,15 +39,35 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     try {
       const user = await this.usersService.findOne(payload.sub);
-      if (!user) {
-        this.logger.error('User not found for id: ' + payload.sub);
+      if (!user || !user.isActive) {
+        this.logger.error('User not found (or inactive) for id: ' + payload.sub);
         throw new UnauthorizedException();
       }
+
+      // Session check: every issued token carries a jti that maps to a
+      // server-side session row. A token whose session has been revoked
+      // (logout / revoke-others / password reset) or expired is rejected
+      // here — this is what makes session revocation real.
+      // Tokens issued before the Session table existed have no jti and are
+      // rejected too (fail closed → re-login required after a deploy).
+      const jti = payload.jti as string | undefined;
+      if (!jti) {
+        throw new UnauthorizedException('Session missing — please log in again');
+      }
+      const session = await this.prisma.session.findUnique({
+        where: { jti },
+        select: { revokedAt: true, expiresAt: true },
+      });
+      if (!session || session.revokedAt || session.expiresAt < new Date()) {
+        throw new UnauthorizedException('Session has been revoked or expired — please log in again');
+      }
+
       return {
         userId: payload.sub,
         email: payload.email,
         role: payload.role,
         organizationId: payload.organizationId || user.organizationId,
+        jti,
       };
     } catch (error: any) {
       this.logger.error(

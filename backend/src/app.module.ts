@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { PublicGuard } from './security/guards/public.guard';
 import { RolesGuard } from './security/guards/roles.guard';
+import { RateLimitGuard } from './security/guards/rate-limit.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -54,6 +55,11 @@ import { SecurityModule } from './security/security.module';
       // providers matters; keep auth first.
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      // Only active on routes decorated with @RateLimit() — auth endpoints.
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
     },
     AppService,
   ],

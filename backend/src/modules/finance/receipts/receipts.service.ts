@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
@@ -18,7 +22,7 @@ export class ReceiptsService {
     return `REC-${year}${month}-${random}`;
   }
 
-  create(
+  async create(
     data: {
       receiptId?: string;
       receiptType?: 'ApplyToInvoice' | 'CashReceipt';
@@ -119,6 +123,22 @@ export class ReceiptsService {
       recordedBy: data.recordedBy,
     };
 
+    // Verify tenant/landlord relations belong to this tenant before
+    // connecting them — otherwise a receipt could be attached to
+    // another organization's records.
+    if (data.tenantId && tenantId) {
+      await assertTenantRecord(this.prisma.tenant, {
+        id: data.tenantId,
+        organizationId: tenantId,
+      });
+    }
+    if (data.landlordId && tenantId) {
+      await assertTenantRecord(this.prisma.landlord, {
+        id: data.landlordId,
+        organizationId: tenantId,
+      });
+    }
+
     // Add tenant organization if provided
     if (tenantId) {
       receiptData.organization = { connect: { id: tenantId } };
@@ -151,44 +171,107 @@ export class ReceiptsService {
       };
     }
 
-    // Add payments if provided
-    if (data.payments && data.payments.length > 0) {
-      receiptData.payments = {
-        create: data.payments.map((payment) => ({
-          paymentDate: new Date(payment.paymentDate),
-          amount: payment.amount,
-          currency: payment.currency || 'KES',
-          spotRate: payment.spotRate || 1,
-          paymentMethod: payment.paymentMethod as any,
-          paymentReference: payment.paymentReference,
-          payee: payment.payee,
-          paidFrom: payment.paidFrom,
-          paidTo: payment.paidTo,
-          paymentType: (payment.paymentType as any) || 'ApplyToBill',
-          chequeNumber: payment.chequeNumber,
-          chequeDate: payment.chequeDate
-            ? new Date(payment.chequeDate)
-            : undefined,
-          mpesaReceiptNumber: payment.mpesaReceiptNumber,
-          mpesaPhoneNumber: payment.mpesaPhoneNumber,
-          notes: payment.notes,
-          attachments: payment.attachments,
-          recordedBy: data.recordedBy,
-          // Add tenant organization if provided
-          ...(tenantId && { organization: { connect: { id: tenantId } } }),
-          // Add invoice relation if provided
-          ...(payment.invoiceId && {
-            invoice: { connect: { id: payment.invoiceId } },
-          }),
-          // Add rental agreement relation if provided
-          ...(payment.rentalAgreementId && {
-            rentalAgreement: { connect: { id: payment.rentalAgreementId } },
-          }),
-        })),
-      };
+    // Normalize payments (also used to apply money to invoices below)
+    const paymentsCreate =
+      data.payments && data.payments.length > 0
+        ? data.payments.map((payment) => ({
+            paymentDate: new Date(payment.paymentDate),
+            amount: payment.amount,
+            currency: payment.currency || 'KES',
+            spotRate: payment.spotRate || 1,
+            paymentMethod: payment.paymentMethod as any,
+            paymentReference: payment.paymentReference,
+            payee: payment.payee,
+            paidFrom: payment.paidFrom,
+            paidTo: payment.paidTo,
+            paymentType: (payment.paymentType as any) || 'ApplyToBill',
+            chequeNumber: payment.chequeNumber,
+            chequeDate: payment.chequeDate
+              ? new Date(payment.chequeDate)
+              : undefined,
+            mpesaReceiptNumber: payment.mpesaReceiptNumber,
+            mpesaPhoneNumber: payment.mpesaPhoneNumber,
+            notes: payment.notes,
+            attachments: payment.attachments,
+            recordedBy: data.recordedBy,
+            // Add tenant organization if provided
+            ...(tenantId && { organization: { connect: { id: tenantId } } }),
+            // Add invoice relation if provided
+            ...(payment.invoiceId && {
+              invoice: { connect: { id: payment.invoiceId } },
+            }),
+            // Add rental agreement relation if provided
+            ...(payment.rentalAgreementId && {
+              rentalAgreement: { connect: { id: payment.rentalAgreementId } },
+            }),
+          }))
+        : [];
+
+    if (paymentsCreate.length > 0) {
+      receiptData.payments = { create: paymentsCreate };
+      // The receipt total must equal what was actually applied
+      const totalApplied = paymentsCreate.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
+      if (Math.abs(totalApplied - Number(data.amountReceived)) > 0.01) {
+        throw new BadRequestException(
+          `Sum of payments (${totalApplied.toFixed(2)}) must equal amount received (${Number(data.amountReceived).toFixed(2)})`,
+        );
+      }
     }
 
-    return this.prisma.receipt.create({ data: receiptData });
+    // Receipt creation moves money, so run it (and the invoice balance
+    // updates) in a single transaction: either everything lands or nothing
+    // does. Invoice balances are only updated for invoices we own — a
+    // receipt can never apply money to another tenant's invoice.
+    return this.prisma.$transaction(async (tx) => {
+      const receipt = await tx.receipt.create({ data: receiptData });
+
+      for (const payment of paymentsCreate) {
+        const invoiceId = payment.invoice?.connect?.id;
+        if (!invoiceId) continue;
+
+        const invoiceWhere: Prisma.InvoiceWhereInput = { id: invoiceId };
+        if (tenantId) invoiceWhere.organizationId = tenantId;
+        const invoice = await tx.invoice.findFirst({
+          where: invoiceWhere,
+          select: {
+            id: true,
+            totalAmount: true,
+            status: true,
+            balanceAmount: true,
+          },
+        });
+        if (!invoice) {
+          throw new NotFoundException('Invoice not found for payment allocation');
+        }
+        if (invoice.status === 'CANCELLED' || invoice.status === 'PAID') {
+          throw new BadRequestException(
+            `Invoice ${invoice.id} is ${invoice.status} and cannot receive payments`,
+          );
+        }
+
+        const round2 = (n: number) => Math.round(n * 100) / 100;
+        // paid so far = total - outstanding balance
+        const newPaid = round2(
+          Number(invoice.totalAmount) - Number(invoice.balanceAmount) + Number(payment.amount),
+        );
+        const newBalance = round2(Number(invoice.balanceAmount) - Number(payment.amount));
+
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            paidAmount: newPaid,
+            balanceAmount: round2(Math.max(0, newBalance)),
+            // We just accepted a payment, so anything left over is partial.
+            status: newBalance <= 0 ? 'PAID' : 'PARTIALLY_PAID',
+          },
+        });
+      }
+
+      return receipt;
+    });
   }
 
   findAll(tenantId?: string, category?: string) {

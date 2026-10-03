@@ -73,7 +73,7 @@ export default function NewTenantPage() {
         setError(null);
         try {
             await tenantsApi.create(data);
-            router.push("/dashboard/tenants");
+            router.push("/tenants");
             router.refresh();
         } catch (err: any) {
             setError(

@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { PAYMENT_METHODS, CURRENCIES } from "@/lib/constants";
+import { financeApi } from "@/lib/api";
 
 // Zod schema for rent receipt validation
 const rentReceiptSchema = z.object({
@@ -34,7 +35,7 @@ type RentReceiptFormValues = z.infer<typeof rentReceiptSchema>;
 
 export default function NewRentReceiptPage() {
   const { user } = useAuth();
-  const { tenants } = useTenants();
+  const { tenants } = useTenants({ limit: 1000 });
   const { rentalAgreements } = useRentalAgreements();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +65,12 @@ export default function NewRentReceiptPage() {
     watch,
   } = form;
 
+  // Get invoices associated with the selected rental agreement
+  const selectedRentalAgreement = rentalAgreements.find((agreement) => agreement.id === watch("rentalAgreementId"));
+  const associatedInvoices: any[] = selectedRentalAgreement?.invoices || [];
+
+  const invoiceBalance = (invoice: any) => Number(invoice?.balanceAmount ?? 0);
+
   const handleRentalAgreementChange = (e: { target: { value: string } }) => {
     const rentalAgreementId = e.target.value;
     setValue("rentalAgreementId", rentalAgreementId);
@@ -71,6 +78,9 @@ export default function NewRentReceiptPage() {
     if (selectedRentalAgreement && selectedRentalAgreement.tenant) {
       setValue("tenantId", selectedRentalAgreement.tenantId);
     }
+    // Switching lease invalidates previously applied invoices
+    setAppliedInvoices([]);
+    setValue("amount", 0);
   };
 
   const handleTenantChange = (e: { target: { value: string } }) => {
@@ -83,38 +93,83 @@ export default function NewRentReceiptPage() {
     } else {
       setValue("rentalAgreementId", "");
     }
+    // Switching tenant invalidates previously applied invoices
+    setAppliedInvoices([]);
+    setValue("amount", 0);
   };
 
   const toggleInvoice = (invoiceId: string) => {
-    if (appliedInvoices.includes(invoiceId)) {
-      setAppliedInvoices(appliedInvoices.filter(id => id !== invoiceId));
-    } else {
-      setAppliedInvoices([...appliedInvoices, invoiceId]);
-    }
+    const next = appliedInvoices.includes(invoiceId)
+      ? appliedInvoices.filter(id => id !== invoiceId)
+      : [...appliedInvoices, invoiceId];
+    setAppliedInvoices(next);
+    // Amount received = sum of the outstanding balances of applied invoices
+    setValue(
+      "amount",
+      Math.round(next.reduce((sum, id) => {
+        const inv = associatedInvoices.find((i) => i.id === id);
+        return sum + invoiceBalance(inv);
+      }, 0) * 100) / 100
+    );
   };
 
   const onSubmit = async (data: RentReceiptFormValues) => {
     setError(null);
     try {
+      const selectedTenant = tenants.find((t) => t.id === data.tenantId);
+      const receivedFrom = selectedTenant
+        ? `${selectedTenant.surname} ${selectedTenant.otherNames || ""}`.trim()
+        : "";
+      if (!receivedFrom) throw new Error("Please select a valid tenant before saving the receipt.");
+
+      const receiptLines = appliedInvoices.map((id) => {
+        const inv = associatedInvoices.find((i) => i.id === id);
+        return {
+          date: data.paymentDate,
+          invNo: inv?.invoiceNumber,
+          particular: "Rent payment",
+          invoiceTotal: Number(inv?.totalAmount ?? 0),
+          prevReceipts: Number(inv?.paidAmount ?? 0),
+          amtDue: invoiceBalance(inv),
+          payment: invoiceBalance(inv),
+          newBalance: 0,
+        };
+      });
+
       const payload = {
-        ...data,
-        invoiceIds: appliedInvoices,
+        receiptId: data.receiptNumber,
+        receiptType: "ApplyToInvoice" as const,
+        receiptCategory: "Rent" as const,
+        receivedFrom,
+        tenantId: data.tenantId,
+        paymentMethod: data.paymentMethod as "CASH" | "BANK_TRANSFER" | "CHEQUE" | "MPESA" | "CARD" | "OTHER",
+        paymentRefNo: data.paymentReference || undefined,
+        recordingDate: data.paymentDate,
+        amountReceived: data.amount,
+        currency: data.currency,
+        notes: data.notes || undefined,
+        recordedBy: user ? `${user.firstName} ${user.lastName}` : undefined,
+        receiptLines,
+        payments: appliedInvoices.map((id) => ({
+          invoiceId: id,
+          rentalAgreementId: data.rentalAgreementId,
+          paymentDate: data.paymentDate,
+          amount: invoiceBalance(associatedInvoices.find((i) => i.id === id)),
+          currency: data.currency,
+          paymentMethod: data.paymentMethod as "CASH" | "BANK_TRANSFER" | "CHEQUE" | "MPESA" | "CARD" | "OTHER",
+          paymentReference: data.paymentReference || undefined,
+          notes: data.notes || undefined,
+        })),
       };
-      
-      // For now, just log the data since we're focusing on UI
-      console.log("Rent receipt data:", payload);
-      
-      router.push("/dashboard/finance/rent-receipts");
+
+      await financeApi.createReceipt(payload);
+      router.push("/finance/rent-receipts");
     } catch (err: any) {
       setError(
-        err.response?.data?.message || "Failed to create rent receipt. Please try again."
+        err.response?.data?.message || err.message || "Failed to create rent receipt. Please try again."
       );
     }
   };
-
-  // Get invoices associated with the selected rental agreement
-  const selectedRentalAgreement = rentalAgreements.find((agreement) => agreement.id === watch("rentalAgreementId"));
-  const associatedInvoices = selectedRentalAgreement?.invoices || [];
 
   // Filter rental agreements to match selected tenant
   const filteredRentalAgreements = watch("tenantId") 

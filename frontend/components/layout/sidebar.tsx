@@ -39,8 +39,8 @@ const navItems: NavItem[] = [
         icon: Building2,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         children: [
-            { href: "/dashboard/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/dashboard/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
         ]
     },
     {
@@ -48,9 +48,9 @@ const navItems: NavItem[] = [
         icon: Users,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         children: [
-            { href: "/dashboard/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/dashboard/rental-agreements", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/dashboard/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
+            { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/rental-agreements", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
         ]
     },
     {
@@ -58,14 +58,14 @@ const navItems: NavItem[] = [
         icon: CreditCard,
         roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
         children: [
-            { href: "/dashboard/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/dashboard/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/dashboard/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/dashboard/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] }
+            { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] }
         ]
     },
 
-    { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -98,13 +98,14 @@ export function Sidebar() {
         const isActive = item.href
             ? (pathname === item.href || pathname.startsWith(item.href + '/'))
             : false;
-        const hasChildren = item.children && item.children.length > 0;
+        const children = item.children;
+        const hasChildren = children && children.length > 0;
         const isExpanded = expandedItems.includes(item.label);
 
         if (hasChildren) {
             // A parent group is "active" if any child route matches, so the
             // group stays expanded when the user is on one of its pages.
-            const childActive = item.children.some(
+            const childActive = children.some(
                 (child) => child.href && (pathname === child.href || pathname.startsWith(child.href + '/'))
             );
             const groupActive = isActive || childActive;

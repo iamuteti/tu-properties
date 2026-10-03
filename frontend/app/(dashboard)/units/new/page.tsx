@@ -94,7 +94,7 @@ export default function NewUnitPage() {
         setError(null);
         try {
             await unitsApi.create(data);
-            router.push("/dashboard/units");
+            router.push("/units");
             router.refresh();
         } catch (err: any) {
             setError(
@@ -314,8 +314,8 @@ export default function NewUnitPage() {
                                     <Select id="unitTypeId" {...register("unitTypeId")} disabled={isSubmitting}>
                                         <option value="">Select unit type</option>
                                         {UNIT_TYPES.map((unitType) => (
-                                            <option key={unitType.id} value={unitType.id}>
-                                                {unitType.name}
+                                            <option key={unitType.value} value={unitType.value}>
+                                                {unitType.label}
                                             </option>
                                         ))}
                                     </Select>

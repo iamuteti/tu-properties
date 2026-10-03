@@ -70,7 +70,7 @@ const columns: ColumnDef<Payment>[] = [
       // Try to get meaningful particulars from invoice or rental agreement
       if (payment.invoice) {
         return (
-          <Link href={`/dashboard/invoices/${payment.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800">
+          <Link href={`/finance/invoices/${payment.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800">
             {payment.invoice.invoiceNumber}
           </Link>
         );
@@ -282,7 +282,7 @@ export default function PaymentsPage() {
               </Button>
             </>
           )}
-          <Link href="/dashboard/payments/new">
+          <Link href="/finance/payments/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" /> Record Payment
             </Button>

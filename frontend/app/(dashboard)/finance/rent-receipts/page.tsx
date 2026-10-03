@@ -295,7 +295,7 @@ export default function RentReceiptsPage() {
               </Button>
             </>
           )}
-          <Link href="/dashboard/finance/rent-receipts/new">
+          <Link href="/finance/rent-receipts/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" /> Create Rent Receipt
             </Button>

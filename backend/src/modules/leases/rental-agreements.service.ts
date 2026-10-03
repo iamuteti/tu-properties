@@ -25,6 +25,7 @@ export class RentalAgreementsService {
           },
         },
         tenant: true,
+        invoices: true,
       },
       orderBy: { createdAt: 'desc' },
     });

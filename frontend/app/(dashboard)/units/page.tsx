@@ -204,7 +204,7 @@ export default function UnitsPage() {
                         Manage your rental units
                     </p>
                 </div>
-                <Link href="/dashboard/units/new">
+                <Link href="/units/new">
                     <Button>
                         <DoorOpen className="mr-2 h-4 w-4" /> Add Unit
                     </Button>

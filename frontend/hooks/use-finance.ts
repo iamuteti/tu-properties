@@ -12,6 +12,7 @@ export interface UseFinanceOptions {
 
 export function useFinance(options: UseFinanceOptions = {}) {
     const { user, isLoading: authIsLoading } = useAuth();
+    const { invoices: fetchInvoices, payments: fetchPayments, receipts: fetchReceipts } = options;
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [receipts, setReceipts] = useState<Receipt[]>([]);

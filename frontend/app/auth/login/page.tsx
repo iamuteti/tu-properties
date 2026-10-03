@@ -23,6 +23,9 @@ export default function LoginPage() {
     const { login } = useAuth();
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
+    const [mfa, setMfa] = useState<{ mfaToken: string; email: string } | null>(null);
+    const [mfaCode, setMfaCode] = useState("");
+    const [mfaBusy, setMfaBusy] = useState(false);
     const {
         register,
         handleSubmit,
@@ -35,7 +38,12 @@ export default function LoginPage() {
         setError(null);
         try {
             const response = await authApi.login(data.email, data.password);
-            const { user } = response.data;
+            const { user, mfaRequired, mfaToken } = response.data;
+            if (mfaRequired && mfaToken) {
+                setMfa({ mfaToken, email: data.email });
+                setMfaCode("");
+                return;
+            }
             if (!user) {
                 setError("Login failed: invalid server response.");
                 return;
@@ -47,6 +55,89 @@ export default function LoginPage() {
             );
         }
     };
+
+    const onVerifyMfa = async () => {
+        if (!mfa) return;
+        setError(null);
+        setMfaBusy(true);
+        try {
+            const response = await authApi.verifyMfa(mfa.mfaToken, mfaCode);
+            login(response.data.user);
+        } catch (err: any) {
+            setError(
+                err.response?.data?.message || "Invalid verification code. Please try again."
+            );
+        } finally {
+            setMfaBusy(false);
+        }
+    };
+
+    if (mfa) {
+        return (
+            <div className="space-y-6">
+                <div className="space-y-2 text-center">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        Two-step verification
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Enter the 6-digit code from your authenticator app for{" "}
+                        <span className="font-medium text-foreground">{mfa.email}</span>
+                    </p>
+                </div>
+
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        onVerifyMfa();
+                    }}
+                    className="space-y-4"
+                >
+                    <div className="space-y-2">
+                        <label
+                            htmlFor="mfa-code"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                            Verification code
+                        </label>
+                        <Input
+                            id="mfa-code"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
+                            placeholder="000000"
+                            value={mfaCode}
+                            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                            disabled={mfaBusy}
+                            autoFocus
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                            {error}
+                        </div>
+                    )}
+
+                    <Button type="submit" className="w-full" disabled={mfaBusy || mfaCode.length !== 6}>
+                        {mfaBusy ? "Verifying..." : "Verify"}
+                    </Button>
+                </form>
+
+                <div className="text-center text-sm text-muted-foreground">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setMfa(null);
+                            setError(null);
+                        }}
+                        className="font-medium text-primary hover:underline"
+                    >
+                        Back to sign in
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

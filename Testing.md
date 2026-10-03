@@ -111,7 +111,46 @@ payments, and receipts). Use it to verify list/filter/pagination behavior.
 
 ---
 
-## 6. Troubleshooting
+## 6. Automated Tests & CI
+
+- **Backend unit tests** (no database needed — all Prisma collaborators are mocked):
+  ```bash
+  cd backend && npx jest --runInBand
+  ```
+  36 tests across:
+  - `auth.service.spec.ts` — session issuance (`jti` linkage), MFA-disabled/enabled login
+    paths, `verifyMfa` (valid/invalid code, expired challenge), MFA enrollment
+    (setup/enable/disable), logout + revoke-others, password reset revokes all sessions.
+  - `properties.service.spec.ts` — the tenant-scoped CRUD pattern (create connects the
+    caller's org, list filters by `organizationId`, read-by-id 404s cross-tenant,
+    update/delete pre-verify ownership).
+  - `common/utils.spec.ts` — `getTenantId` fail-closed, `requireRecord`, `assertTenantRecord`.
+- **CI** (`.github/workflows/ci.yml`, runs on push to `main` + PRs):
+  backend: `npm ci` → `prisma generate` → `tsc --noEmit` → `jest`;
+  frontend: `npm ci --legacy-peer-deps` → `tsc --noEmit` → `next build`.
+
+## 7. Auth Hardening Behaviors (2026-10-03)
+
+- **Sessions:** every login creates a `Session` row tied to the JWT's `jti`.
+  `POST /auth/logout` revokes the current session immediately (the cookie stops
+  working, not just at expiry); `POST /auth/sessions/revoke-others` kills all
+  other devices; a password reset kills every session. Verified behavior:
+  request with a revoked cookie → 401.
+- **MFA (TOTP):** Settings → Security → "Enable 2FA" gives a one-time secret +
+  `otpauth://` URL; confirm with a 6-digit code. Once enabled, `/auth/login`
+  returns `{ mfaRequired, mfaToken }` with no session cookie; the login page
+  then asks for the authenticator code (`POST /auth/mfa/verify`). Wrong code →
+  401. The challenge token expires after 5 minutes.
+- **Rate limiting (per client IP):** login 10/5 min, register 5/hour,
+  forgot/reset password 5/15 min, MFA verify 10/5 min → then HTTP 429 with
+  `retryAfter`. Note: in-memory, per-process — a multi-instance deploy needs a
+  shared store behind the same guard.
+- **Audit trail:** all mutating requests + login/MFA/session/password-reset
+  events are written to `AuditLog` with the actor's `organizationId`.
+  `GET /audit` (ADMIN = own organization only, SUPER_ADMIN = all; cross-tenant
+  reads 404).
+
+## 8. Troubleshooting
 
 1. **Database Connection**: Verify `DATABASE_URL` in `backend/.env`.
 2. **Re-seed**: If data gets messy, run `npx prisma migrate reset` and then `npx prisma db seed`.

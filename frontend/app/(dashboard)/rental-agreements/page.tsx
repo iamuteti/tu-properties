@@ -34,7 +34,7 @@ export default function RentalAgreementsPage() {
                         Manage rental agreements and leases
                     </p>
                 </div>
-                <Link href="/dashboard/rental-agreements/new">
+                <Link href="/rental-agreements/new">
                     <Button>
                         <Plus className="mr-2 h-4 w-4" /> Add Rental Agreement
                     </Button>

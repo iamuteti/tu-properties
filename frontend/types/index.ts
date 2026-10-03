@@ -69,10 +69,17 @@ export interface User {
     role: 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
     organizationId?: string;
     organization?: Organization;
+    /** Whether TOTP two-factor auth is enabled on this account. */
+    mfaEnabled?: boolean;
 }
 
 export interface AuthResponse {
     user: User;
+    sessionId?: string;
+    /** Set when the account has MFA enabled and the TOTP step is pending. */
+    mfaRequired?: boolean;
+    /** Short-lived challenge token for the MFA verify step. */
+    mfaToken?: string;
 }
 
 export interface ApiResponse<T> {
@@ -430,6 +437,62 @@ export interface ReceiptLine {
     whtTax?: number;
     createdAt?: string;
     updatedAt?: string;
+}
+
+export interface DashboardStats {
+    totals: {
+        properties: number;
+        landlords: number;
+        units: number;
+        activeTenants: number;
+    };
+    unitsByStatus: { status: string; count: number }[];
+    monthlyCharges: { label: string; charged: number; collected: number }[];
+    unitsByProperty: { property: string; units: number }[];
+}
+
+export interface CreateReceiptData {
+    receiptId?: string;
+    receiptType?: 'ApplyToInvoice' | 'CashReceipt';
+    receiptCategory?: 'Rent' | 'General';
+    receivedFrom: string;
+    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+    depositIntoAc?: string;
+    refNo?: string;
+    chequeNo?: string;
+    chequeDate?: string;
+    recordingDate?: string;
+    amountReceived: number;
+    notes?: string;
+    tenantId?: string;
+    landlordId?: string;
+    recordDate?: string;
+    bankingDate?: string;
+    paymentRefNo?: string;
+    amountVatInclusive?: boolean;
+    receiptTo?: 'Landlord' | 'GeneralLedger';
+    drtOrDrf?: 'DirectReceipt' | 'DepositRefund';
+    memo?: string;
+    paymentBank?: string;
+    currency?: string;
+    spotRate?: number;
+    recordedBy?: string;
+    receiptLines?: Omit<ReceiptLine, 'id'>[];
+    payments?: {
+        invoiceId?: string;
+        rentalAgreementId?: string;
+        paymentDate: string;
+        amount: number;
+        currency?: string;
+        spotRate?: number;
+        paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+        paymentReference?: string;
+        payee?: string;
+        paidFrom?: string;
+        paidTo?: string;
+        paymentType?: 'ApplyToBill' | 'CashPayment';
+        notes?: string;
+    }[];
 }
 
 export interface DataTableProps<T> {

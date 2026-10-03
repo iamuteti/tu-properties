@@ -48,6 +48,7 @@ model Organization {
   invoices   Invoice[]
   payments   Payment[]
   receipts   Receipt[]
+  auditLogs  AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -87,7 +88,13 @@ model User {
   resetPasswordToken   String? // hashed token for password reset
   resetPasswordExpires DateTime?
 
+  // TOTP multi-factor auth (mfaSecret holds the base32 TOTP seed; only
+  // populated while mfaEnabled is true)
+  mfaSecret  String?
+  mfaEnabled Boolean @default(false)
+
   auditLogs AuditLog[]
+  sessions  Session[]
 
   @@index([email])
   @@index([role])
@@ -110,6 +117,13 @@ model AuditLog {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  // Tenant scoping: the organization the acting user belonged to at the
+  // time of the action. NULL for platform-level actions (SUPER_ADMIN).
+  // Denormalized on purpose so audit queries can filter by tenant without
+  // a join through the entity being audited.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   action   String // CREATE, UPDATE, DELETE, LOGIN, etc.
   entity   String // Property, Unit, Lease, Invoice, etc.
   entityId String // The ID of the affected record
@@ -124,8 +138,38 @@ model AuditLog {
   @@index([userId])
   @@index([entity])
   @@index([entityId])
+  @@index([organizationId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// Server-side session record backing the httpOnly auth cookie.
+// Revoking a session (logout / revoke-others / password reset) sets
+// revokedAt; the JWT strategy rejects any token whose jti maps to a
+// revoked or expired session, which makes "kill this device" and
+// "kill all other devices" real rather than cosmetic.
+model Session {
+  id      String @id @default(cuid())
+  jti     String @unique // JWT "id" claim; one row per issued token
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Denormalized for cheap audit/session reporting; sourced from the user
+  // at login time.
+  organizationId String?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }
 
 // ============================================

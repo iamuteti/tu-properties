@@ -3,15 +3,15 @@ import { AxiosError } from "axios";
 import { tenantsApi, rentalAgreementsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Tenant, RentalAgreement, Unit, Property } from "@/types";
-import { TenantTableData } from "@/components/ui/expandable-table";
+import { TableData } from "@/components/ui/expandable-table";
 
 interface RentalAgreementWithRelations extends RentalAgreement {
     unit?: Unit & { property?: Property };
 }
 
-export function useTenantTableData() {
+export function useTableData() {
     const { user, isLoading: authIsLoading } = useAuth();
-    const [data, setData] = useState<TenantTableData[]>([]);
+    const [data, setData] = useState<TableData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +24,7 @@ export function useTenantTableData() {
                 rentalAgreementsApi.findAll()
             ]);
 
-            const tenants: Tenant[] = tenantsResponse.data;
+            const tenants: Tenant[] = tenantsResponse.data.data;
             const agreements: RentalAgreementWithRelations[] = agreementsResponse.data;
 
             const agreementMap = new Map<string, RentalAgreementWithRelations>();
@@ -34,7 +34,7 @@ export function useTenantTableData() {
                 }
             });
 
-            const tableData: TenantTableData[] = tenants.map(tenant => {
+            const tableData: TableData[] = tenants.map(tenant => {
                 const agreement = agreementMap.get(tenant.id);
                 const unit = agreement?.unit;
                 const property = unit?.property;

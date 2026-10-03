@@ -10,7 +10,7 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status Hint
-CRUD exists and is real (11 backend modules cover org/user/role basics); RBAC enforcement, audit logging, MFA, password reset, session revocation, and the document center are missing or weak — audit-verified.
+CRUD exists and is real (11 backend modules cover org/user/role basics). Auth/security hardening is now done in Module 0 (CORS allowlist, httpOnly JWT cookie, password reset, TOTP MFA, session revocation, auth rate limiting, tenant-scoped `AuditLog`). Settings page now exists (org profile + Security: 2FA + active sessions). **Still missing:** structured `Role.permissions` model (name-based only), document center, system settings UI/backend, login-history UI.
 
 ## Module Goal
 Foundation every other module depends on: organizations, branches, users, roles/permissions, audit logs, system settings, document center — and, critically, making the security/auth side of this actually production-grade.
@@ -32,14 +32,14 @@ Foundation every other module depends on: organizations, branches, users, roles/
 See `01-DATABASE-SCHEMA.md`, domain(s): Identity & Organization
 
 ## Tasks Checklist
-- [ ] Most auth/security hardening (CORS, JWT storage, password reset, MFA, rate limiting, AuditLog wiring) is covered in Module 0 Stabilization — do that first; this module's remaining tasks assume it's done
+- [x] Most auth/security hardening (CORS, JWT storage, password reset, MFA, rate limiting, AuditLog wiring) is covered in Module 0 Stabilization — done 2026-10-03, Module 0 is complete (see `01-MODULE-stabilization.md`); this module's remaining tasks assume it's done
 - [ ] Audit existing Organization/User/Role models against `01-DATABASE-SCHEMA.md`; reconcile gaps
 - [ ] Confirm Branch/department support exists or add it
 - [ ] Build a real, structured permissions model (`Role.permissions Json` with granular per-module CRUD flags) — current roles appear to be name-based only, not enforced per-action
-- [ ] Add login history tracking (can reuse AuditLog with a dedicated action type once that's wired up in Stabilization)
+- [~] Add login history tracking (can reuse AuditLog with a dedicated action type once that's wired in Stabilization) — **partially done 2026-10-03:** every login now writes an audited `LOGIN` row (entity `User`, entityId = userId) and MFA/SESSIONS_REVOKED/PASSWORD_RESET events are audited too. Remaining: capture `ipAddress`/`userAgent` on audit rows (interceptor doesn't populate them yet) and build a login-history UI view
 - [ ] Build System Settings UI + backend (currency, timezone, tax settings per org) — this feeds Finance module's multi-tax-jurisdiction handling
 - [ ] Build the Document Center from scratch: upload endpoint, MinIO storage (S3-compatible), versioning, polymorphic list-by-entity, and evaluate e-signature (defer to a third-party embed like DocuSign/SignRequest rather than building signing infrastructure in-house)
-- [ ] Build a real Settings page in the frontend (currently a dead sidebar link with no page)
+- [~] Build a real Settings page in the frontend — **partially done 2026-10-03:** `frontend/app/(dashboard)/settings/page.tsx` is now a live page (organization profile read from `useAuth().organization`, plus a Security card: TOTP enable/disable, active-sessions list, "revoke other sessions"). Remaining: the Save button is still disabled (no backend update endpoint wired for org contact fields yet) and currency/timezone/tax settings aren't persisted
 
 ## Backend: NestJS Notes
 - Module likely at `backend/src/organizations/`, `backend/src/users/`, `backend/src/roles/`, `backend/src/auth/` — check actual folder names before creating new ones.
@@ -47,7 +47,7 @@ See `01-DATABASE-SCHEMA.md`, domain(s): Identity & Organization
 - Document storage: MinIO (S3-compatible) — already decided. Build upload endpoints on this foundation so every later module's document needs use the same storage.
 
 ## Frontend: Next.js Notes
-- Settings page is a known gap — sidebar links to it but no page exists.
+- Settings page now exists (`/settings` — org profile + Security: 2FA + sessions); the Save button is still disabled pending a backend update endpoint.
 - User management UI (invite, deactivate, assign roles) — verify exists and bring up to `00-UX-CROSS-CUTTING-STANDARDS.md` (detail view per user, row actions, etc.).
 
 ## Acceptance Criteria

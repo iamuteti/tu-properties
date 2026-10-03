@@ -102,8 +102,8 @@ export default function NewPropertyPage() {
     useEffect(() => {
         const fetchLandlords = async () => {
             try {
-                const response = await landlordsApi.findAll();
-                setLandlords(response.data);
+                const response = await landlordsApi.findAll({ limit: 1000 });
+                setLandlords(response.data.data);
             } catch (err) {
                 console.error('Failed to fetch landlords:', err);
             } finally {
@@ -142,7 +142,7 @@ export default function NewPropertyPage() {
         setError(null);
         try {
             await propertiesApi.create(data);
-            router.push("/dashboard/properties");
+            router.push("/properties");
             router.refresh();
         } catch (err: any) {
             setError(
@@ -221,8 +221,8 @@ export default function NewPropertyPage() {
                                     >
                                         <option value="">Select category</option>
                                         {PROPERTY_CATEGORIES.map((category) => (
-                                            <option key={category.id} value={category.id}>
-                                                {category.name}
+                                            <option key={category.value} value={category.value}>
+                                                {category.label}
                                             </option>
                                         ))}
                                     </Select>
@@ -242,8 +242,8 @@ export default function NewPropertyPage() {
                                     >
                                         <option value="">Select type</option>
                                         {PROPERTY_TYPES.map((type) => (
-                                            <option key={type.id} value={type.id}>
-                                                {type.name}
+                                            <option key={type.value} value={type.value}>
+                                                {type.label}
                                             </option>
                                         ))}
                                     </Select>
