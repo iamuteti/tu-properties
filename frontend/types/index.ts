@@ -181,12 +181,61 @@ export interface PaginatedResponse<T> {
     };
 }
 
+/** Lifecycle status of a property record (Module 2). */
+export type PropertyStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+
+/** Occupancy status of a unit (Module 2). Always consistent with its leases. */
+export type UnitStatus = 'VACANT' | 'OCCUPIED' | 'MAINTENANCE' | 'RESERVED';
+
+/** Structured amenity row attached to a property. */
+export interface PropertyAmenity {
+    id: string;
+    propertyId: string;
+    name: string;
+    category?: string | null;
+    notes?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+/** Feature/amenity row attached to a unit. */
+export interface UnitFeature {
+    id?: string;
+    unitId?: string;
+    name: string;
+    featureType?: string | null;
+}
+
+/** Per-row report returned by the CSV bulk import endpoints. */
+export interface ImportReport {
+    total: number;
+    created: number;
+    skipped: number;
+    failed: number;
+    dryRun: boolean;
+    results: Array<{
+        row: number;
+        code?: string;
+        name?: string;
+        status: 'created' | 'skipped' | 'failed';
+        id?: string;
+        message?: string;
+    }>;
+}
+
 export interface Property {
     id: string;
     code: string;
     name: string;
     dateAcquired?: string;
     lrNumber?: string;
+    /** Lifecycle status; archived properties are hidden from default lists. */
+    status?: PropertyStatus;
+    branchId?: string;
+    branch?: Branch | null;
+    amenities?: PropertyAmenity[];
+    /** Occupancy rollup returned by the property detail endpoint. */
+    occupancy?: Record<string, number> & { total: number };
     
     // Location & Address
     country?: string;
@@ -210,12 +259,16 @@ export interface Property {
     // Relationships
     landlordId?: string;
     landlord?: any;
-    
-    categoryId?: string;
-    category?: PropertyCategory;
-    
-    propertyTypeId?: string;
-    propertyType?: PropertyType;
+
+    /**
+     * Classification columns on the `properties` table. Both are free-form
+     * strings seeded from `PROPERTY_TYPES` / `PROPERTY_CATEGORIES` in
+     * `lib/constants.ts` — the database has no property-type/category lookup
+     * tables, so the `categoryId` / `propertyTypeId` fields that used to sit
+     * here never had a column to write to.
+     */
+    category?: string;
+    type?: string;
     
     // Organization/Tenant association
     organizationId?: string;
@@ -275,6 +328,7 @@ export interface Property {
     
     _count?: {
         units: number;
+        amenities?: number;
     };
 }
 
@@ -329,7 +383,14 @@ export interface Unit {
     rentalAgreements?: RentalAgreement[];
     serviceCharges?: any[];
     meterNumbers?: any[];
-    features?: any[];
+    features?: UnitFeature[];
+
+    /** Derived occupancy view returned by the unit detail endpoint. */
+    occupancy?: {
+        status: UnitStatus;
+        derivedStatus: UnitStatus;
+        availableActions: UnitStatus[];
+    };
 
     // Audit fields
     createdAt: string;

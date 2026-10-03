@@ -22,15 +22,17 @@ export interface DocumentListItem {
   mimeType: string;
   sizeBytes: number;
   version: number;
-  uploadedById: string;
+  /** Nullable: deleting a user nulls the uploader link, keeping the document. */
+  uploadedById: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Null once the uploading user is deleted; the document itself is kept. */
   uploadedBy: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
-  };
+  } | null;
 }
 
 const ALLOWED_MIME_PREFIXES = [

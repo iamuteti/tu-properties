@@ -46,8 +46,17 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Enable global validation pipes
-  app.useGlobalPipes(new ValidationPipe());
+  // Validate every DTO-backed request at the controller boundary. `whitelist`
+  // strips properties that have no validation decorator, which stops clients
+  // from smuggling in columns (e.g. `organizationId`) that a DTO does not
+  // declare. Bodies whose type is not a DTO class are left untouched.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: false,
+    }),
+  );
 
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);

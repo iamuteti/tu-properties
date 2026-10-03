@@ -151,7 +151,20 @@ model Document {
 
 ---
 
-## Domain: Property (Module: Property Management) — ✅ Believed existing, verify & extend
+## Domain: Property (Module: Property Management) — ✅ Resolved 2026-10-03 (see `03-MODULE-property-management.md`)
+
+**Target vs. shipped.** The block below is the original target sketch. What Module 2 actually shipped keeps the
+same intent but differs where the existing schema forced it to:
+
+| Target | Shipped | Why |
+| --- | --- | --- |
+| `status PropertyStatus` | ✅ `PropertyStatus { ACTIVE, INACTIVE, ARCHIVED }` on `Property.status` | Adds the operational middle state competitors have. `INACTIVE` is "managed but not listed"; `ARCHIVED` is hidden from default lists. |
+| `branchId String?` | ✅ `Property.branchId` → `Branch` (`onDelete: SetNull`) | The relationship was missing entirely. Nullable so pre-Module-2 rows keep working. |
+| — | ✅ `PropertyAmenity` (unique `(propertyId, name)`, cascade delete, `category`, `notes`) | Amenities were never stored. Structured rows so they can be filtered and grouped in reports. |
+| `addressLine1/2`, `city` | `roadStreet`, `estateArea`, `areaRegion`, `country` | The `properties` table already had granular location columns; the demo layout ("Area / Region, Estate / Area, Country, Road / Street") matches the product screenshots, so no rename was warranted. |
+| `gpsLat/gpsLng Decimal(9,6)` | `latitude`/`longitude` as `Float` with `@db.Decimal(9,6)` | Column names already existed as `latitude`/`longitude`. |
+| `type PropertyType` (enum) | `type String?` + `category String?` | An enum would require a migration over 100 seeded properties and blocks the free-form types the demo shows. Values are seeded from `PROPERTY_TYPES`/`PROPERTY_CATEGORIES` in `frontend/lib/constants.ts`. |
+| — | Occupancy is derived, not stored free-form | `Unit.status` stays a column (for queries/indexes) but can only change through `PATCH /units/:id/status`, which validates it against the unit's `RentalAgreement` records; the leases module re-derives it on every agreement change. |
 
 ```prisma
 model Property {
@@ -187,7 +200,23 @@ enum PropertyType {
 
 enum PropertyStatus {
   ACTIVE
+  INACTIVE
   ARCHIVED
+}
+
+model PropertyAmenity {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name       String
+  category   String?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([propertyId, name])
+  @@index([propertyId])
 }
 
 model Unit {
@@ -213,6 +242,45 @@ enum UnitOccupancyStatus {
   RESERVED
   UNDER_MAINTENANCE
   SOLD
+}
+```
+
+**`Unit` as shipped** (`backend/src/prisma/schema.prisma`). The target sketch above stays the intent, but the
+existing table carries far more (pricing, meter numbers, service charges, `UnitFeature`, standing charges,
+security deposits), and three deliberate differences matter to later modules:
+
+| Target | Shipped | Why |
+| --- | --- | --- |
+| `unitNumber` | `code` (generated, `UNIT-001`) + `name` (the human label, e.g. "Flat 12") | Competitor listings show both. Codes stay unique and stable; names are what people type. |
+| `areaSqM` | `areaSqFt` | Every seed and screenshot in this project is sq ft; conversion would silently change every price. |
+| `occupancyStatus UnitOccupancyStatus` | `status UnitStatus { VACANT, OCCUPIED, MAINTENANCE, RESERVED }` | `SOLD` is a *property*-level state and belongs on `Property.status` once Module 4 (Sales) lands; `UNDER_MAINTENANCE` renamed to `MAINTENANCE`. |
+| — | Occupancy is **derived from `RentalAgreement`**, not user-set | `Unit.status` is kept as a column for indexing and fast lists, but the only way to change it is `PATCH /units/:id/status`, which refuses a transition that contradicts the unit's agreements (e.g. OCCUPIED with no active lease → 409). The leases module re-derives it on agreement create/update/delete. Do not write `Unit.status` directly from another module — call `UnitsService.syncOccupancyStatus()`. |
+
+```prisma
+model Unit {
+  id             String   @id @default(uuid())
+  organizationId String
+  propertyId     String
+  property       Property @relation(fields: [propertyId], references: [id])
+  code           String   @unique
+  name           String
+  floor          String?
+  bedrooms       Int?
+  bathrooms      Int?
+  areaSqFt       Decimal? @db.Decimal(10,2)
+  status         UnitStatus @default(VACANT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+enum UnitStatus {
+  VACANT
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
 }
 ```
 

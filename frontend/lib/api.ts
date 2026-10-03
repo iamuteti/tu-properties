@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -175,7 +175,7 @@ export const documentsApi = {
         api.delete(`/documents/${id}`),
 };
 
-// Properties API
+// Properties API (Module 2: Property Management)
 export const propertiesApi = {
     create: (data: Partial<Property>) =>
         api.post<Property>('/properties', data),
@@ -189,6 +189,9 @@ export const propertiesApi = {
         type?: string;
         category?: string;
         landlordId?: string;
+        branchId?: string;
+        status?: string;
+        includeArchived?: boolean;
     }) => {
         const queryParams = new URLSearchParams();
         if (params?.page) queryParams.append('page', params.page.toString());
@@ -199,6 +202,9 @@ export const propertiesApi = {
         if (params?.type) queryParams.append('type', params.type);
         if (params?.category) queryParams.append('category', params.category);
         if (params?.landlordId) queryParams.append('landlordId', params.landlordId);
+        if (params?.branchId) queryParams.append('branchId', params.branchId);
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.includeArchived) queryParams.append('includeArchived', 'true');
         const query = queryParams.toString();
         return api.get<PaginatedResponse<Property>>(`/properties${query ? `?${query}` : ''}`);
     },
@@ -206,11 +212,48 @@ export const propertiesApi = {
     findOne: (id: string) =>
         api.get<Property>(`/properties/${id}`),
 
-    update: (id: string, data: Partial<{ name: string; address: string; type: string }>) =>
+    update: (id: string, data: Partial<Property>) =>
         api.patch<Property>(`/properties/${id}`, data),
 
     remove: (id: string) =>
         api.delete(`/properties/${id}`),
+
+    // Availability calendar feed (vacant/reserved units + upcoming lease ends)
+    availability: (params?: { propertyId?: string; from?: string; to?: string }) =>
+        api.get<Unit[]>('/properties/availability', { params }),
+
+    /** Tenant-wide occupancy rollup. */
+    occupancy: () =>
+        api.get<Array<{ status: string; count: number }>>('/properties/occupancy'),
+
+    // Amenities (structured rows, not free text)
+    listAmenities: (id: string) =>
+        api.get<PropertyAmenity[]>(`/properties/${id}/amenities`),
+
+    addAmenity: (id: string, data: { name: string; category?: string; notes?: string }) =>
+        api.post<PropertyAmenity>(`/properties/${id}/amenities`, data),
+
+    replaceAmenities: (id: string, amenities: Array<{ name: string; category?: string; notes?: string }>) =>
+        api.put<PropertyAmenity[]>(`/properties/${id}/amenities`, { amenities }),
+
+    removeAmenity: (id: string, amenityId: string) =>
+        api.delete(`/properties/${id}/amenities/${amenityId}`),
+
+    // Bulk import / export
+    /** Browser-navigable CSV download (the httpOnly cookie is sent automatically). */
+    exportUrl: (params?: { search?: string; type?: string; category?: string; landlordId?: string; branchId?: string; status?: string }) => {
+        const queryParams = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) queryParams.append(key, value);
+        });
+        const query = queryParams.toString();
+        return `${API_BASE_URL}/properties/export${query ? `?${query}` : ''}`;
+    },
+
+    importTemplateUrl: () => `${API_BASE_URL}/properties/import-template`,
+
+    importCsv: (csv: string, dryRun?: boolean) =>
+        api.post<ImportReport>('/properties/import', { csv, dryRun }),
 };
 
 // Landlords API
@@ -238,7 +281,7 @@ export const landlordsApi = {
         api.delete(`/landlords/${id}`),
 };
 
-// Units API
+// Units API (Module 2: Property Management)
 export const unitsApi = {
     create: (data: Partial<Unit>) =>
         api.post<Unit>('/units', data),
@@ -252,6 +295,9 @@ export const unitsApi = {
         propertyId?: string;
         status?: string;
         type?: string;
+        branchId?: string;
+        floor?: string;
+        bedrooms?: string;
     }) => {
         const queryParams = new URLSearchParams();
         if (params?.page) queryParams.append('page', params.page.toString());
@@ -262,6 +308,9 @@ export const unitsApi = {
         if (params?.propertyId) queryParams.append('propertyId', params.propertyId);
         if (params?.status) queryParams.append('status', params.status);
         if (params?.type) queryParams.append('type', params.type);
+        if (params?.branchId) queryParams.append('branchId', params.branchId);
+        if (params?.floor) queryParams.append('floor', params.floor);
+        if (params?.bedrooms) queryParams.append('bedrooms', params.bedrooms);
         const query = queryParams.toString();
         return api.get<PaginatedResponse<Unit>>(`/units${query ? `?${query}` : ''}`);
     },
@@ -272,8 +321,33 @@ export const unitsApi = {
     update: (id: string, data: Partial<Unit>) =>
         api.patch<Unit>(`/units/${id}`, data),
 
+    /**
+     * Occupancy transition. Validated server-side against the unit's rental
+     * agreements — a unit cannot be marked occupied without an active lease.
+     */
+    setStatus: (id: string, status: UnitStatus, reason?: string) =>
+        api.patch<Unit>(`/units/${id}/status`, { status, reason }),
+
+    /** Re-derive occupancy from the unit's rental agreements. */
+    syncStatus: (id: string) =>
+        api.post<{ id: string; status: UnitStatus; changed: boolean }>(`/units/${id}/sync-status`),
+
     remove: (id: string) =>
         api.delete(`/units/${id}`),
+
+    exportUrl: (params?: { search?: string; propertyId?: string; status?: string; type?: string; branchId?: string }) => {
+        const queryParams = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) queryParams.append(key, value);
+        });
+        const query = queryParams.toString();
+        return `${API_BASE_URL}/units/export${query ? `?${query}` : ''}`;
+    },
+
+    importTemplateUrl: () => `${API_BASE_URL}/units/import-template`,
+
+    importCsv: (csv: string, dryRun?: boolean, createMissingProperties?: boolean) =>
+        api.post<ImportReport>('/units/import', { csv, dryRun, createMissingProperties }),
 };
 
 // Tenants API

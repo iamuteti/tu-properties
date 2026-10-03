@@ -20,6 +20,9 @@ export interface UsePropertiesParams {
     type?: string;
     category?: string;
     landlordId?: string;
+    branchId?: string;
+    status?: string;
+    includeArchived?: boolean;
 }
 
 export function useProperties(params?: UsePropertiesParams) {
@@ -40,6 +43,9 @@ export function useProperties(params?: UsePropertiesParams) {
         params?.type,
         params?.category,
         params?.landlordId,
+        params?.branchId,
+        params?.status,
+        params?.includeArchived,
     ]);
 
     const fetchProperties = useCallback(async () => {

@@ -48,19 +48,19 @@ model Organization {
   timezone String @default("Africa/Nairobi")
 
   // Relationships
-  users      User[]
-  properties Property[]
-  tenants    Tenant[]
-  landlords  Landlord[]
-  leases     RentalAgreement[]
+  users           User[]
+  properties      Property[]
+  tenants         Tenant[]
+  landlords       Landlord[]
+  leases          RentalAgreement[]
   moveOutRequests MoveOutRequest[]
-  invoices   Invoice[]
-  payments   Payment[]
-  receipts   Receipt[]
-  auditLogs  AuditLog[]
-  branches   Branch[]
-  roles      Role[]
-  documents  Document[]
+  invoices        Invoice[]
+  payments        Payment[]
+  receipts        Receipt[]
+  auditLogs       AuditLog[]
+  branches        Branch[]
+  roles           Role[]
+  documents       Document[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,10 +105,10 @@ model User {
   mfaSecret  String?
   mfaEnabled Boolean @default(false)
 
-  auditLogs          AuditLog[]
-  sessions           Session[]
-  roleAssignments    RoleAssignment[]
-  uploadedDocuments  Document[]
+  auditLogs         AuditLog[]
+  sessions          Session[]
+  roleAssignments   RoleAssignment[]
+  uploadedDocuments Document[]
 
   @@index([email])
   @@index([role])
@@ -166,10 +166,10 @@ model AuditLog {
 // revoked or expired session, which makes "kill this device" and
 // "kill all other devices" real rather than cosmetic.
 model Session {
-  id      String @id @default(cuid())
-  jti     String @unique // JWT "id" claim; one row per issued token
-  userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  jti    String @unique // JWT "id" claim; one row per issued token
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Denormalized for cheap audit/session reporting; sourced from the user
   // at login time.
@@ -191,7 +191,7 @@ model Session {
 
 // Organization branch/office (Module 1: Core Platform). Tenant-scoped.
 model Branch {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -203,6 +203,8 @@ model Branch {
   email   String?
 
   isActive Boolean @default(true)
+
+  properties Property[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -219,13 +221,13 @@ model Branch {
 // moveouts, invoices, payments, receipts, users, audit, settings,
 // organizations, branches, documents.
 model Role {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
-  isSystem    Boolean  @default(false)
+  isSystem    Boolean @default(false)
   permissions Json
 
   assignments RoleAssignment[]
@@ -260,7 +262,7 @@ model RoleAssignment {
 // `fileUrl` is the storage key/URL resolved by the configured storage driver
 // (local disk by default, S3/MinIO when STORAGE_DRIVER=s3).
 model Document {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -269,7 +271,7 @@ model Document {
   fileName   String
   fileUrl    String
   mimeType   String
-  sizeBytes  Int      @default(0)
+  sizeBytes  Int    @default(0)
 
   // Re-uploading the same file for the same (entityType, entityId, fileName)
   // creates a new row with version = max + 1 instead of overwriting.
@@ -291,8 +293,8 @@ model Document {
 // ============================================
 
 model Landlord {
-  id               String  @id @default(cuid())
-  code             String  @unique
+  id               String       @id @default(cuid())
+  code             String       @unique
   name             String
   status           TenantStatus @default(ACTIVE)
   email            String?
@@ -342,16 +344,20 @@ model Property {
   dateAcquired DateTime? // Date Acquired
   lrNumber     String? // LR Number (Land Registry Number)
 
+  // Lifecycle status (Module 2). Distinct from `type`/`category`, which
+  // classify the asset. ARCHIVED hides the property from default listings.
+  status PropertyStatus @default(ACTIVE)
+
   agencyRole    String? // Managing | Letting | Both
   category      String?
   type          String?
   specification String? // Multi-unit/Multi-Space
 
   // Location & Address
-  country       String?
-  estateArea    String? // Estate/Area
-  areaRegion    String? // Area/Region
-  roadStreet    String? // Road/Street
+  country    String?
+  estateArea String? // Estate/Area
+  areaRegion String? // Area/Region
+  roadStreet String? // Road/Street
 
   // Property Classification
   multiStoryType String? // Multi Story Type
@@ -372,6 +378,11 @@ model Property {
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Owning branch/office (Module 1 Branch → Module 2 Property). Nullable so
+  // properties created before branches existed keep working.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   // Accounting & Billing Configuration
   accountLedgerType     String? // e.g., "Property Control Ledger in GL"
@@ -420,6 +431,7 @@ model Property {
   units            Unit[]
   standingCharges  PropertyStandingCharge[]
   securityDeposits PropertySecurityDeposit[]
+  amenities        PropertyAmenity[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -429,7 +441,16 @@ model Property {
   @@index([landlordId])
   @@index([code])
   @@index([organizationId])
+  @@index([branchId])
+  @@index([status])
   @@map("properties")
+}
+
+// Lifecycle status of a property record (Module 2: Property Management).
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
 }
 
 // ============================================
@@ -437,8 +458,8 @@ model Property {
 // ============================================
 
 model Unit {
-  id       String @id @default(cuid())
-  code     String @unique // Unit/Space No.
+  id       String  @id @default(cuid())
+  code     String  @unique // Unit/Space No.
   name     String // Unit Name/Number
   sequence Int? // Unit Sequence
   type     String?
@@ -486,9 +507,9 @@ model Unit {
 
   // Relationships
   rentalAgreements RentalAgreement[]
-  serviceCharges UnitServiceCharge[]
-  meterNumbers   UnitMeterNumber[]
-  features       UnitFeature[]
+  serviceCharges   UnitServiceCharge[]
+  meterNumbers     UnitMeterNumber[]
+  features         UnitFeature[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -560,6 +581,27 @@ model UnitFeature {
 
   @@index([unitId])
   @@map("unit_features")
+}
+
+// Structured amenities (Module 2). Replaces free-text amenity blobs so the
+// list UI can filter/search on them; `category` groups them (e.g. "Security",
+// "Parking", "Utilities") for report grouping.
+model PropertyAmenity {
+  id String @id @default(cuid())
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  name     String
+  category String?
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([propertyId, name])
+  @@index([propertyId])
+  @@map("property_amenities")
 }
 
 // ============================================
@@ -648,10 +690,10 @@ model Tenant {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  rentalAgreements RentalAgreement[]
+  rentalAgreements  RentalAgreement[]
   emergencyContacts TenantEmergencyContact[]
   receipts          Receipt[]
-  moveOutRequests MoveOutRequest[]
+  moveOutRequests   MoveOutRequest[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -714,9 +756,9 @@ model RentalAgreement {
   securityDeposit Decimal? @db.Decimal(10, 2)
 
   // Lease-specific fields (commercial)
-  escalationRate     Decimal? @db.Decimal(5, 2)  // % increase per year
-  escalationMonth   Int?                      // Month when rent escalates
-  noticePeriodDays  Int?                      // Notice period for termination
+  escalationRate   Decimal? @db.Decimal(5, 2) // % increase per year
+  escalationMonth  Int? // Month when rent escalates
+  noticePeriodDays Int? // Notice period for termination
 
   // Status
   status AgreementStatus @default(DRAFT)
@@ -726,16 +768,16 @@ model RentalAgreement {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  invoices Invoice[]
-  payments Payment[]
+  invoices        Invoice[]
+  payments        Payment[]
   moveOutRequests MoveOutRequest[]
 
   // Audit fields
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  terminatedAt DateTime?
-  depositRefunded Boolean @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+  terminatedAt    DateTime?
+  depositRefunded Boolean   @default(false)
 
   @@index([unitId])
   @@index([tenantId])
@@ -747,18 +789,18 @@ model RentalAgreement {
 }
 
 model MoveOutRequest {
-  id                String @id @default(cuid())
-  tenantId          String
-  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  rentalAgreementId String
-  rentalAgreement   RentalAgreement @relation(fields: [rentalAgreementId], references: [id], onDelete: Cascade)
-  moveoutDate       DateTime
-  approvalDate      DateTime?
-  approvedBy        String? // User ID who approved
-  status            MoveOutStatus @default(PENDING)
-  depositRefunded   Boolean @default(false)
-  depositRefundAmount Decimal? @db.Decimal(10, 2)
-  notes             String? @db.Text
+  id                  String          @id @default(cuid())
+  tenantId            String
+  tenant              Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rentalAgreementId   String
+  rentalAgreement     RentalAgreement @relation(fields: [rentalAgreementId], references: [id], onDelete: Cascade)
+  moveoutDate         DateTime
+  approvalDate        DateTime?
+  approvedBy          String? // User ID who approved
+  status              MoveOutStatus   @default(PENDING)
+  depositRefunded     Boolean         @default(false)
+  depositRefundAmount Decimal?        @db.Decimal(10, 2)
+  notes               String?         @db.Text
 
   // Organization/Tenant association
   organizationId String?
@@ -775,8 +817,8 @@ model MoveOutRequest {
 }
 
 enum AgreementType {
-  LEASE    // Commercial - long term
-  RENTAL   // Residential - monthly
+  LEASE // Commercial - long term
+  RENTAL // Residential - monthly
 }
 
 enum AgreementStatus {
@@ -807,7 +849,7 @@ model Invoice {
 
   // Keep rental agreement reference for backward compatibility and property tracking
   rentalAgreementId String?
-  rentalAgreement   RentalAgreement?  @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
 
   // Invoice Details
   issueDate   DateTime @default(now())
@@ -886,14 +928,14 @@ model InvoiceItem {
   incomeAccount String? // Income Account - for general ledger integration
 
   // Quantity and pricing
-  quantity  Decimal  @default(1) @db.Decimal(10, 2) // Qty - quantity of items
-  unitPrice Decimal  @db.Decimal(10, 2) // Unit Cost - price per unit
+  quantity  Decimal @default(1) @db.Decimal(10, 2) // Qty - quantity of items
+  unitPrice Decimal @db.Decimal(10, 2) // Unit Cost - price per unit
 
   // Line total
   amount Decimal @db.Decimal(10, 2) // Line Total - total amount for this line
 
   // Tax information
-  vatRate   Decimal? @db.Decimal(5, 2)  // Tax Rate - VAT percentage
+  vatRate   Decimal? @db.Decimal(5, 2) // Tax Rate - VAT percentage
   vatAmount Decimal? @db.Decimal(10, 2) // Tax Amount - calculated VAT amount
 
   // Additional classification
@@ -916,51 +958,51 @@ enum InvoiceStatus {
 }
 
 model Receipt {
-  id String @id @default(cuid())
-  receiptId String @unique // Receipt ID
-  receiptType ReceiptType @default(ApplyToInvoice)
+  id              String          @id @default(cuid())
+  receiptId       String          @unique // Receipt ID
+  receiptType     ReceiptType     @default(ApplyToInvoice)
   receiptCategory ReceiptCategory @default(Rent)
-  
+
   // Common fields
-  receivedFrom String
-  paymentMethod PaymentMethod
-  depositIntoAc String?
-  refNo String?
-  chequeNo String?
-  chequeDate DateTime?
-  recordingDate DateTime @default(now())
-  amountReceived Decimal @db.Decimal(10, 2)
-  notes String? @db.Text
-  
+  receivedFrom   String
+  paymentMethod  PaymentMethod
+  depositIntoAc  String?
+  refNo          String?
+  chequeNo       String?
+  chequeDate     DateTime?
+  recordingDate  DateTime      @default(now())
+  amountReceived Decimal       @db.Decimal(10, 2)
+  notes          String?       @db.Text
+
   // Rent receipt specific fields
-  tenantId String?
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  landlordId String?
-  landlord Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
-  recordDate DateTime?
-  bankingDate DateTime?
-  paymentRefNo String?
-  amountVatInclusive Boolean @default(true)
-  receiptTo ReceiptTo @default(Landlord)
-  drtOrDrf DRTOrDRF @default(DepositRefund)
-  memo String? @db.Text
-  paymentBank String?
-  currency String @default("KES")
-  spotRate Decimal? @db.Decimal(10, 4)
-  
+  tenantId           String?
+  tenant             Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  landlordId         String?
+  landlord           Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
+  recordDate         DateTime?
+  bankingDate        DateTime?
+  paymentRefNo       String?
+  amountVatInclusive Boolean   @default(true)
+  receiptTo          ReceiptTo @default(Landlord)
+  drtOrDrf           DRTOrDRF  @default(DepositRefund)
+  memo               String?   @db.Text
+  paymentBank        String?
+  currency           String    @default("KES")
+  spotRate           Decimal?  @db.Decimal(10, 4)
+
   // Relationships
-  payments Payment[]
+  payments     Payment[]
   receiptLines ReceiptLine[]
-  
+
   // Organization/Tenant association
   organizationId String?
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Audit fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   recordedBy String?
-  
+
   @@index([tenantId])
   @@index([landlordId])
   @@index([receiptType])
@@ -978,13 +1020,13 @@ enum ReceiptCategory {
 }
 
 model Payment {
-  id            String @id @default(cuid())
-  invoiceId     String?
-  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  
+  id        String   @id @default(cuid())
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
   rentalAgreementId String?
   rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
-  
+
   receiptId String?
   receipt   Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
 
@@ -999,9 +1041,9 @@ model Payment {
   paymentReference String? // Ref No. (Bank ref, M-Pesa code, etc.)
 
   // Payment Parties
-  payee        String?
-  paidFrom     String?
-  paidTo       String?
+  payee    String?
+  paidFrom String?
+  paidTo   String?
 
   // Payment Type
   paymentType PaymentType @default(ApplyToBill)
@@ -1015,18 +1057,18 @@ model Payment {
   mpesaPhoneNumber   String?
 
   // Notes and Attachments
-  notes        String? @db.Text
-  attachments  String? // JSON or comma-separated file paths
+  notes       String? @db.Text
+  attachments String? // JSON or comma-separated file paths
 
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Audit fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   recordedBy String?
-  
+
   @@index([rentalAgreementId])
   @@index([invoiceId])
   @@index([receiptId])
@@ -1066,23 +1108,23 @@ enum DRTOrDRF {
 }
 
 model ReceiptLine {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
   receiptId String
-  receipt Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  
-  date DateTime
-  invNo String?
-  particular String
-  invoiceTotal Decimal @db.Decimal(10, 2)
-  prevReceipts Decimal @db.Decimal(10, 2) @default(0)
-  amtDue Decimal @db.Decimal(10, 2)
-  payment Decimal @db.Decimal(10, 2)
-  newBalance Decimal @db.Decimal(10, 2)
-  whtTax Decimal @db.Decimal(10, 2) @default(0)
-  
+  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  date         DateTime
+  invNo        String?
+  particular   String
+  invoiceTotal Decimal  @db.Decimal(10, 2)
+  prevReceipts Decimal  @default(0) @db.Decimal(10, 2)
+  amtDue       Decimal  @db.Decimal(10, 2)
+  payment      Decimal  @db.Decimal(10, 2)
+  newBalance   Decimal  @db.Decimal(10, 2)
+  whtTax       Decimal  @default(0) @db.Decimal(10, 2)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([receiptId])
   @@map("receipt_lines")
 }

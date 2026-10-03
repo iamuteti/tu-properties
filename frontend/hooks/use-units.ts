@@ -20,6 +20,9 @@ export interface UseUnitsParams {
     propertyId?: string;
     status?: string;
     type?: string;
+    branchId?: string;
+    floor?: string;
+    bedrooms?: string;
 }
 
 export function useUnits(params?: UseUnitsParams) {
@@ -39,6 +42,9 @@ export function useUnits(params?: UseUnitsParams) {
         params?.propertyId,
         params?.status,
         params?.type,
+        params?.branchId,
+        params?.floor,
+        params?.bedrooms,
     ]);
 
     const fetchUnits = useCallback(async () => {
