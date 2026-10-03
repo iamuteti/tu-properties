@@ -139,12 +139,15 @@ model Document {
   fileUrl        String
   mimeType       String
   version        Int      @default(1)
-  uploadedById   String
+  uploadedById   String?
+  uploadedBy     User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
   @@index([organizationId])
   @@index([entityType, entityId])
 }
 ```
+
+> **Drift watch (2026-10-03, Core Platform bug-fix):** `AuditLog.userId` and `Document.uploadedById` are **nullable** with `onDelete: SetNull` (matching `AuditLog.userId String?` above). A non-nullable `Restrict` FK meant `DELETE /users/:id` returned HTTP 500 whenever a user had audit rows or had uploaded documents; both are now nullable so audit history is retained while user deletion succeeds (the actor reference is nulled, not the row). Treat `schema.prisma` as the source of truth for FK actions; this doc is the target shape only.
 
 ---
 
