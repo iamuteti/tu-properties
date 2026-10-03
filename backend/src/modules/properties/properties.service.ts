@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { assertTenantRecord } from '@/common/utils';
 
 export interface PaginationParams {
   page?: number;
@@ -94,7 +95,7 @@ export class PropertiesService {
 
   findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.property.findUnique({
+    return this.prisma.property.findFirst({
       where,
       include: {
         landlord: true,
@@ -103,16 +104,20 @@ export class PropertiesService {
     });
   }
 
-  update(id: string, data: Prisma.PropertyUpdateInput, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
+  async update(id: string, data: Prisma.PropertyUpdateInput, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.property, { id, organizationId: tenantId });
+    }
     return this.prisma.property.update({
-      where,
+      where: { id },
       data,
     });
   }
 
-  remove(id: string, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.property.delete({ where });
+  async remove(id: string, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.property, { id, organizationId: tenantId });
+    }
+    return this.prisma.property.delete({ where: { id } });
   }
 }

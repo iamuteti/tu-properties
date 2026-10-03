@@ -1,7 +1,13 @@
-import { Injectable, NestInterceptor, ExecutionContext, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  Logger,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../modules/audit/audit.service';
 
 /**
  * AuditInterceptor records every successful mutating request (POST/PUT/PATCH/DELETE)
@@ -16,7 +22,7 @@ export class AuditInterceptor implements NestInterceptor {
 
   constructor(private readonly auditService: AuditService) {}
 
-  intercept(context: ExecutionContext, next: Observable<any>): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const http = context.switchToHttp();
     const request = http.getRequest();
     const user = request.user;

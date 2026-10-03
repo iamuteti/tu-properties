@@ -692,7 +692,7 @@ export async function generateDemoData(
 }
 
 // Main function to run demo data generation standalone
-async function main() {
+export async function seedDemoData() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     console.error('DATABASE_URL environment variable is not set');
@@ -827,5 +827,5 @@ async function main() {
 }
 
 if (require.main === module) {
-  main();
+  seedDemoData();
 }

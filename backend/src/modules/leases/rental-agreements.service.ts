@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { assertTenantRecord } from '@/common/utils';
 
 @Injectable()
 export class RentalAgreementsService {
@@ -31,7 +32,7 @@ export class RentalAgreementsService {
 
   findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.rentalAgreement.findUnique({
+    return this.prisma.rentalAgreement.findFirst({
       where,
       include: {
         unit: true,
@@ -42,16 +43,20 @@ export class RentalAgreementsService {
     });
   }
 
-  update(id: string, data: Prisma.RentalAgreementUpdateInput, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
+  async update(id: string, data: Prisma.RentalAgreementUpdateInput, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.rentalAgreement, { id, organizationId: tenantId });
+    }
     return this.prisma.rentalAgreement.update({
-      where,
+      where: { id },
       data,
     });
   }
 
-  remove(id: string, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.rentalAgreement.delete({ where });
+  async remove(id: string, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.rentalAgreement, { id, organizationId: tenantId });
+    }
+    return this.prisma.rentalAgreement.delete({ where: { id } });
   }
 }

@@ -90,31 +90,40 @@ Do not treat the module roadmap in Section 4 as "mostly built, just polish it." 
 
 Treat these as **Module 0 — Stabilization** work. Fix before/alongside new module work where they'd otherwise block it (e.g. don't build new Finance features on top of the `/billing/` vs `/finance/` confusion without resolving it first).
 
+Status markers: ✅ = resolved (date), ⚠️ = partially resolved, ❌ = still open. Items 1–9 were re-verified against the live repo on 2026-10-03.
+
 **Navigation / broken links:**
-1. Sidebar links (`frontend/components/layout/sidebar.tsx:33-73`) omit the `/dashboard` prefix for several routes; the Settings link has no page.
-2. Invoice row links to a non-existent detail page: `frontend/app/(dashboard)/finance/invoices/page.tsx:21` (`Link href="/dashboard/invoices/${row.original.id}"`).
-3. Receipts-new page links to `/dashboard/receipts` instead of the correct `/dashboard/finance/receipts`: `frontend/app/(dashboard)/finance/receipts/new/page.tsx:133,397`.
-4. Leases-new link is broken: `frontend/app/(dashboard)/leases/page.tsx:268`.
-5. Accountant role is hidden from the Properties parent nav item while its child route is still reachable/visible: `frontend/components/layout/sidebar.tsx:33-73` — inconsistent role-based nav.
+1. ❌ (partial) Sidebar links: Settings link now resolves to a real page; most children carry the `/dashboard` prefix; **still open:** `/organizations` and `/landlords` sidebar links still lack the `/dashboard` prefix (`sidebar.tsx:35-36`).
+2. ⚠️ Invoice row now links to `/dashboard/finance/invoices/${id}` — but that `[id]` detail page does not exist yet (and `invoices/new` links back to `/dashboard/invoices/new` + `router.push("/dashboard/invoices")`, both wrong prefixes — `page.tsx:247`, `new/page.tsx:193`).
+3. ✅ (2026-10-03, verified) Receipts-new links fixed to `/dashboard/finance/receipts`.
+4. ✅ (2026-10-03, verified) Leases-new link now points to `/dashboard/rental-agreements/new` (`leases/page.tsx:268`).
+5. ✅ (2026-10-03, verified) Properties parent + children now consistently exclude ACCOUNTANT.
 
 **Dead / incomplete code:**
-6. Dashboard stats/charts are hardcoded: `frontend/app/(dashboard)/dashboard/page.tsx:19-52,69-105` — not API-driven.
-7. Rent-receipt creation form only logs the payload to console, never persists: `frontend/app/(dashboard)/finance/rent-receipts/new/page.tsx:96-107`.
-8. Receipt invoice selection is an unfinished TODO stub: `frontend/app/(dashboard)/finance/receipts/new/page.tsx:342`.
-9. Legacy `billingApi` targets nonexistent `/billing/*` endpoints; working API is under `/finance/*`: `frontend/lib/api.ts:232-310`.
+6. ❌ Dashboard stats/charts still hardcoded (`dashboard/page.tsx`) — not API-driven.
+7. ❌ Rent-receipt form still logs to console only (`rent-receipts/new/page.tsx:105`); no backend create path for rent receipts yet (Receipt model supports `receiptCategory: Rent` + `ReceiptLine[]`).
+8. ❌ Receipt "Add Invoice" button still a no-op stub (`receipts/new/page.tsx:342`), though the invoice list is already loaded via `useFinance`.
+9. ✅ (2026-10-03, verified) `billingApi` removed from `frontend/lib/api.ts`; no `/billing` references remain.
 
 **Security (treat as P0, not polish):**
-10. CORS is wildcard/unrestricted: `backend/src/main.ts:27-33`.
-11. JWT is stored in `localStorage` on the frontend — vulnerable to XSS token theft; move to httpOnly cookies or an equivalent safer pattern.
-12. No password reset flow, no MFA, no session revocation, no rate limiting on auth endpoints.
-13. RBAC is not enforced granularly at controller/DTO level — role checks are inconsistent (see Accountant nav bug above as a symptom of the same underlying gap).
-14. `AuditLog` exists but is never actually written to — there is currently no real audit trail despite the model.
+10. ✅ (2026-10-03) CORS restricted to env-driven allowlist (`security/cors.service.ts` + `resolveAllowlist`), wired in `main.ts`.
+11. ✅ (2026-10-03) JWT now in httpOnly `auth_token` cookie (SameSite=strict, 1h); `cookie-parser` enabled; axios uses `withCredentials`; no token in response bodies or localStorage. Note: the migration was previously stranded in a dead `src/auth/` tree (never compiled, never booted) — it was merged into `modules/auth` this session.
+12. ⚠️ Password reset flow now exists (`/auth/forgot-password`, `/auth/reset-password`, hashed 30-min tokens; schema columns added by migration `20261003082158_add_password_reset_fields`). Still missing: MFA, session revocation, auth rate limiting.
+13. ⚠️ All controllers sit behind `JwtAuthGuard`, and tenant filtering now fails closed (`getTenantId` throws 403 for org-less non-super-admins; invalid compound-where Prisma queries fixed in **all 10 services**, verified live on 2026-10-03: Rohi sees its 100 properties, Westhill sees 0, cross-org create lands in the correct org). Still missing: granular `@Roles`/`RolesGuard` enforcement (any authenticated role can still call any endpoint).
+14. ✅ (2026-10-03) `AuditLog` is now written: global `AuditInterceptor` records all mutating requests + LOGIN events. Was previously unwired — broken import, wrong `CallHandler` typing, and `SecurityModule` missing its `AuditModule` import (boot crash); all fixed. Still open: `AuditLog` has no `organizationId`, so audit queries aren't tenant-scoped.
 
 **Process / hygiene:**
-15. `Testing.md:9-18` documents `npx prisma db seed`, but the actual seed path is `db:seed:demo` against `backend/src/prisma/demo-data.ts:738-818` — docs and reality don't match.
-16. The working tree shows ~188 modified paths, but only `backend/package-lock.json` has substantive drift — the rest is CRLF normalization noise. **Add a `.gitattributes` file to fix line-ending handling** so future diffs are meaningful.
-17. Only 3 test specs exist in the entire project (`backend/src/app.controller.spec.ts`, `backend/src/prisma/prisma.service.spec.ts`, `backend/test/app.e2e-spec.ts:19-23`). No frontend tests, no workflow/integration tests, no CI/CD pipeline, no Docker setup, no OpenAPI/API docs.
-18. A prior implementation plan/roadmap doc was deleted in commit `6e4892b`, leaving no other product roadmap in the repo before this doc set — treat this doc set as the current roadmap of record.
+15. ✅ (2026-10-03) `seed.ts` now runs the full demo seed (`seedDemoData()` from `demo-data.ts`), so `npx prisma db seed` produces the state described in the rewritten `Testing.md`; `npm run db:seed:demo` still works standalone.
+16. ❌ No `.gitattributes` yet; CRLF noise + lockfile drift still present.
+17. ❌ Still only 3 backend test specs; no frontend tests, no CI/CD, no Docker, no OpenAPI docs.
+18. ✅ N/A — this doc set remains the roadmap of record.
+
+**New issues found 2026-10-03 (backend/DB pass):**
+19. Prisma schema had drifted ahead of migrations — `users` table was missing `resetPasswordToken`/`resetPasswordExpires`; fixed by migration `20261003082158_add_password_reset_fields`. Run `npx prisma migrate dev` before seeding a fresh DB.
+20. ✅ (2026-10-03) Tenant-scoped `findUnique`/`update`/`delete` used invalid compound where-clauses (`{ id, organizationId }`) in every module service — every tenant-user read-by-id/update/delete 500'd. Fixed in **all 10 services** (properties, units, landlords, tenants, rental-agreements, invoices, payments, receipts, moveouts, users) via the `assertTenantRecord()` helper in `common/utils.ts`.
+21. `invoices` has no PATCH endpoint (frontend `invoicesApi.update` targets a 404); no CSV export or dashboard-stats endpoints yet.
+22. `AuditInterceptor` derives the entity name from the URL path with a trailing `s` stripped, so `/properties` logs entity `"Propertie"` — cosmetic, but audit queries must account for it until the interceptor maps route → model name.
+23. `main.ts` previously passed a **sync** allowlist function to `enableCors({ origin })` — the cors package treats a function `origin` as async and waits for a callback, so **every request to the API hung** (app booted normally, no route responded). Fixed 2026-10-03 with the callback form. Lesson: any function passed to `origin` must call its callback.
 
 ### 3.4 Benchmark gaps (what a real PMS/ERP has that TU Properties doesn't yet)
 

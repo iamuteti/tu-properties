@@ -1,7 +1,7 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { JwtAuthGuard } from '../../modules/auth/guards/jwt-auth.guard';
+import { IS_PUBLIC_KEY } from '@/common/decorators/public.decorator';
+import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 
 /**
  * PublicGuard is the app-wide guard registered in AppModule.

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { assertTenantRecord } from '@/common/utils';
 
 @Injectable()
 export class UsersService {
@@ -34,15 +35,19 @@ export class UsersService {
   }
 
   async update(id: string, data: Prisma.UserUpdateInput, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.user, { id, organizationId: tenantId });
+    }
     return this.prisma.user.update({
-      where,
+      where: { id },
       data,
     });
   }
 
   async remove(id: string, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.user.delete({ where });
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.user, { id, organizationId: tenantId });
+    }
+    return this.prisma.user.delete({ where: { id } });
   }
 }

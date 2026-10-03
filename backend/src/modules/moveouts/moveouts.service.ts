@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { assertTenantRecord } from '@/common/utils';
 
 export interface PaginationParams {
   page?: number;
@@ -33,7 +34,6 @@ export class MoveoutsService {
       data.organizationId = tenantId;
     }
 
-    console.log('Data: ', data);
     return this.prisma.moveOutRequest.create({
       data: data as Prisma.MoveOutRequestCreateInput,
       include: {
@@ -115,7 +115,7 @@ export class MoveoutsService {
 
   findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.moveOutRequest.findUnique({
+    return this.prisma.moveOutRequest.findFirst({
       where,
       include: {
         tenant: true,
@@ -133,9 +133,11 @@ export class MoveoutsService {
   }
 
   async update(id: string, data: Prisma.MoveOutRequestUpdateInput, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.moveOutRequest, { id, organizationId: tenantId });
+    }
 
-    // If approving, handle the move-out logic
+    // If approving, handle the move-out logic (ownership verified above)
     if (data.status === 'APPROVED') {
       const request = await this.prisma.moveOutRequest.findUnique({
         where: { id },
@@ -201,7 +203,7 @@ export class MoveoutsService {
     }
 
     return this.prisma.moveOutRequest.update({
-      where,
+      where: { id },
       data,
       include: {
         tenant: true,
@@ -218,8 +220,10 @@ export class MoveoutsService {
     });
   }
 
-  remove(id: string, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.moveOutRequest.delete({ where });
+  async remove(id: string, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.moveOutRequest, { id, organizationId: tenantId });
+    }
+    return this.prisma.moveOutRequest.delete({ where: { id } });
   }
 }

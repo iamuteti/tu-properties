@@ -12,6 +12,8 @@
 > **Do not add duplicate fields for any of the above** — extend/wire the existing ones. Also verified: `AuditLog` model exists and a `logAction()` service exists (`backend/src/modules/audit/audit.service.ts`), but `logAction` is **never called anywhere in the codebase** — it needs to be wired into every create/update/delete on tenant data, not rebuilt.
 >
 > Tables below marked "✅ Believed existing" should be reconciled field-by-field against the live file — treat this doc as the *target* shape, not a guaranteed-accurate mirror of today's schema.
+>
+> **Drift watch (2026-10-03):** the live `schema.prisma` was verified against the live DB via `migrate deploy` — the DB was behind the schema (users table lacked the password-reset columns), and catch-up migration `20261003082158_add_password_reset_fields` was created and applied. After any schema edit, run `npx prisma migrate dev` so the migrations directory stays the source of truth for the DB; a fresh DB is built with `npx prisma migrate deploy` + `npx prisma db seed` (seed now includes the full demo dataset — see `Testing.md`).
 
 ---
 
@@ -73,6 +75,9 @@ model User {
   status         UserStatus @default(ACTIVE)
   twoFactorEnabled Boolean @default(false)
   lastLoginAt    DateTime?
+  // Live in the real schema (added by migration 20261003082158_add_password_reset_fields):
+  resetPasswordToken   String? // SHA-256 hashed token for /auth/reset-password
+  resetPasswordExpires DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

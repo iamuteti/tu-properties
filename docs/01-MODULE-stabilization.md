@@ -11,6 +11,7 @@
 
 ## Status Hint
 18 verified issues from a full codebase audit — highest priority, several are security-critical, do first.
+**Session 2026-10-03 (backend/DB pass):** auth cookie flow fully wired and smoke-tested; dead `src/auth` duplicate removed; backend build broken-state fixed (see Change Log below); catch-up migration `add_password_reset_fields` created + applied; seed now produces the full demo dataset; `Testing.md` reconciled; tenant-isolation hardening in progress (see checklist marks).
 
 ## Module Goal
 Resolve the verified inconsistencies, dead code, broken navigation, and security gaps between the current implementation and a safe, coherent baseline, before layering new modules on top.
@@ -36,20 +37,32 @@ Resolve the verified inconsistencies, dead code, broken navigation, and security
 See `01-DATABASE-SCHEMA.md`, domain(s): Core Platform, Finance & Accounting
 
 ## Tasks Checklist
-- [ ] Fix Testing.md to document the real `db:seed:demo` command and actual demo data behavior
-- [ ] Fix all sidebar route prefixes and the three specific broken links (invoices detail, receipts-new, leases-new); add a real Settings page or remove the link until Core Platform's settings UI exists
-- [ ] Fix Accountant role nav visibility so parent/child items are consistent
-- [ ] Remove `billingApi` from `frontend/lib/api.ts`; confirm no remaining references; confirm `/finance/*` covers the same functionality
+- [x] Fix Testing.md to document the real `db:seed:demo` command and actual demo data behavior — done 2026-10-03: `seed.ts` now calls `seedDemoData()` (exported from `demo-data.ts`), so `npx prisma db seed` produces super admin + Westhill/Rohi orgs + full Rohi demo dataset; Testing.md rewritten to match (Rohi holds the data, Westhill is the empty sandbox org)
+- [~] Fix all sidebar route prefixes and the three specific broken links (invoices detail, receipts-new, leases-new); add a real Settings page or remove the link until Core Platform's settings UI exists — invoices detail link now points to `/dashboard/finance/invoices/[id]` (the `[id]` detail page itself is still missing — frontend task); receipts-new + leases-new links fixed; Settings page now exists; **remaining:** sidebar `/organizations` and `/landlords` links still lack the `/dashboard` prefix
+- [x] Fix Accountant role nav visibility so parent/child items are consistent — Properties parent and its children now consistently exclude ACCOUNTANT (verified in `sidebar.tsx`)
+- [x] Remove `billingApi` from `frontend/lib/api.ts`; confirm no remaining references; confirm `/finance/*` covers the same functionality — verified gone, no `/billing` references remain
 - [ ] Replace hardcoded dashboard stats with real API calls (reuse existing invoice/payment/unit endpoints even before the full Reports module exists)
-- [ ] Fix rent-receipt form to call a real create-receipt mutation with loading/error states and visible success confirmation
-- [ ] Finish the receipt invoice-selection TODO stub
-- [ ] Restrict CORS in `backend/src/main.ts` to an explicit, environment-driven allowlist
-- [ ] Move JWT off `localStorage` to httpOnly cookies (or another XSS-resistant pattern); update the Axios client accordingly
-- [ ] Add password reset flow, basic MFA (TOTP recommended), session revocation, and rate limiting on auth endpoints
-- [ ] Audit every controller for missing `@UseGuards` / role checks / DTO validation; fix systematically, not just the ones already flagged
-- [ ] Wire `logAction()` into every create/update/delete on tenant data, starting with money-related actions (invoices, payments, receipts) and auth events (login, role change)
+- [ ] Fix rent-receipt form to call a real create-receipt mutation with loading/error states and visible success confirmation — blocked on backend endpoint work (Receipt with `receiptCategory: Rent` + `ReceiptLine[]` already exists in schema; rent-receipts list derives from receipts client-side)
+- [ ] Finish the receipt invoice-selection TODO stub — "Add Invoice" button in `receipts/new` still does nothing; invoice list is already loaded via `useFinance`
+- [x] Restrict CORS in `backend/src/main.ts` to an explicit, environment-driven allowlist — `CorsAllowlistService` + `resolveAllowlist()` in place
+- [x] Move JWT off `localStorage` to httpOnly cookies (or another XSS-resistant pattern); update the Axios client accordingly — done 2026-10-03: cookie set server-side on login (`auth_token`, httpOnly, SameSite=strict), `cookie-parser` enabled in `main.ts`, axios `withCredentials: true`, no `access_token` in responses, `frontend/types` `AuthResponse` updated, dead `src/auth` duplicate deleted
+- [~] Add password reset flow, basic MFA (TOTP recommended), session revocation, and rate limiting on auth endpoints — **password reset done** (`/auth/forgot-password` + `/auth/reset-password`, hashed 30-min tokens, `users.resetPasswordToken/Expires` columns added via migration `20261003082158_add_password_reset_fields`); MFA, session revocation, and rate limiting still missing
+- [~] Audit every controller for missing `@UseGuards` / role checks / DTO validation; fix systematically, not just the ones already flagged — all controllers have `JwtAuthGuard` (via global `PublicGuard` + per-route guards); **granular role checks (`@Roles`/`RolesGuard`) not yet implemented** — any authenticated role can still mutate any resource; also `users.service.update/remove` and several others had invalid Prisma compound-where clauses (see Change Log)
+- [x] Wire `logAction()` into every create/update/delete on tenant data, starting with money-related actions (invoices, payments, receipts) and auth events (login, role change) — global `AuditInterceptor` (`security/audit.interceptor.ts`) records all POST/PUT/PATCH/DELETE + LOGIN events; interceptor import/type bugs fixed and `SecurityModule` now imports `AuditModule` (was crashing boot). **Remaining:** `AuditLog` has no `organizationId` column, so audit queries can't be tenant-scoped
 - [ ] Add `.gitattributes` to normalize line endings and stop the CRLF diff noise
 - [ ] Stand up a minimal CI pipeline (lint + existing tests) and add test coverage for at least the auth flow and one full CRUD module as a pattern for future modules to follow
+
+## Change Log (maintained per session — add an entry after every code/schema change)
+
+### 2026-10-03 — backend/DB stabilization pass
+- **Auth (P0):** merged the half-finished cookie-auth work (previously stranded in a dead `src/auth/` tree that didn't compile) into the live `modules/auth`: `login` now sets the `auth_token` httpOnly cookie and returns only `{ user }`; added `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`; `GET /auth/profile` now returns the full user + organization (frontend `User` contract) instead of the raw JWT payload; deleted `src/auth/`.
+- **Backend build:** fixed broken imports in `security/audit.interceptor.ts` (wrong audit path, `CallHandler` typing) and `security/guards/public.guard.ts` (decorator path); `SecurityModule` now imports `AuditModule` (boot crash); installed `cookie-parser`; backend `tsc --noEmit` clean.
+- **Schema/DB:** created + applied migration `20261003082158_add_password_reset_fields` (users: `resetPasswordToken`, `resetPasswordExpires` + index) — schema had drifted ahead of migrations.
+- **Seed:** `seed.ts` now calls `seedDemoData()` so `npx prisma db seed` = super admin + demo orgs/users + full Rohi dataset (previously super admin only, with a dead `generateDemoData` import); `demo-data.ts` `main` exported as `seedDemoData`.
+- **Tenant isolation:** `getTenantId` now throws 403 for non-super-admins without an organization (fail-closed, was silent no-filter); fixed invalid Prisma compound-where usage (`findUnique`/`update`/`delete` with `{ id, organizationId }`) in **all 10 module services** (properties, units, landlords, tenants, rental-agreements, invoices, payments, receipts, moveouts, users) via new shared helper `assertTenantRecord()` in `common/utils.ts`. Verified live: Rohi admin sees 100 properties, Westhill admin sees 0; Westhill property create lands in the Westhill org. Follow-up still open: `organizationId` columns are nullable on all tenant models (NOT NULL migration deferred — it changes the super-admin create contract, which currently relies on the client omitting the org).
+- **CORS hang (critical latent bug):** `main.ts` passed the sync allowlist function directly to `enableCors({ origin })`; the cors package treats a function `origin` as async and waits for a callback that never fires — **every HTTP request to the API hung forever** (booted fine, but no route ever responded). Fixed with the callback form: `origin: (origin, cb) => cb(null, cors.isAllowed(origin))`.
+- **Smoke-tested end-to-end (2026-10-03):** login sets httpOnly `auth_token` cookie, no token in body; `/auth/profile` returns full user + organization; tenant-scoped list/create verified for two tenants; `/auth/logout` clears the cookie; audit trail shows `LOGIN` + `CREATE | Propertie | <id>` entries.
+- **Docs:** `Testing.md` rewritten to match actual seed behavior; master-doc Known Issues + schema doc updated below.
 
 ## Backend: NestJS Notes
 - CORS config in `backend/src/main.ts` — use an env var for allowed origins, default to strict list, never `*` in non-local envs.

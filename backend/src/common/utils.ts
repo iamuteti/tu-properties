@@ -1,3 +1,5 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+
 // Generate invoice number
 export function generateInvoiceNumber(): string {
   const date = new Date();
@@ -22,18 +24,26 @@ export function generateReceiptNumber(): string {
 
 /**
  * Extract tenant ID from the request user object.
- * Returns undefined for SUPER_ADMIN users (they can access all data).
- * Returns the organizationId for regular users.
+ * Returns undefined only for SUPER_ADMIN users (they can access all data).
+ * Throws for any other user without an organization — failing closed keeps a
+ * user with a broken/missing org from reading unfiltered tenant data.
  *
  * @param request - The request object containing the user
- * @returns The tenant ID (organizationId) or undefined
+ * @returns The tenant ID (organizationId), or undefined for super admins
  */
 export function getTenantId(request: any): string | undefined {
   const user = request?.user;
-  if (!user) return undefined;
+  if (!user) {
+    throw new ForbiddenException('No authenticated user on request');
+  }
   // Super admins can access all data
   if (user.role === 'SUPER_ADMIN') return undefined;
-  return user.organizationId || undefined;
+  if (!user.organizationId) {
+    throw new ForbiddenException(
+      'User has no organization assigned; cannot access tenant data',
+    );
+  }
+  return user.organizationId;
 }
 
 /**
@@ -41,4 +51,22 @@ export function getTenantId(request: any): string | undefined {
  */
 export function isSuperAdmin(user: any): boolean {
   return user?.role === 'SUPER_ADMIN';
+}
+
+/**
+ * Assert that the record matching `where` exists, throwing 404 otherwise.
+ *
+ * Prisma `update`/`delete` require a *unique* where clause, so tenant-scoped
+ * mutations cannot pass `{ id, organizationId }` directly. Instead, verify
+ * ownership with a `findFirst` using the tenant-scoped where, then act on
+ * the (now verified) `id` alone.
+ */
+export async function assertTenantRecord(
+  model: { findFirst: (args: { where: any; select?: any }) => Promise<any> },
+  where: any,
+): Promise<void> {
+  const record = await model.findFirst({ where, select: { id: true } });
+  if (!record) {
+    throw new NotFoundException('Record not found');
+  }
 }

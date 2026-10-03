@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { CorsAllowlistService } from './security/cors.service';
 
 dotenv.config();
@@ -27,11 +28,19 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // Parse request cookies so the JWT strategy can read the httpOnly auth cookie.
+  app.use(cookieParser());
+
   // Restrict CORS to an explicit, environment-driven allowlist.
   // Never use a wildcard '*' outside of local development.
+  // Note: the cors package treats a function `origin` as async and expects it
+  // to call a callback. Passing the sync allowlist function directly would
+  // hang every request, so wrap it in the callback form.
   const cors = app.get(CorsAllowlistService);
   app.enableCors({
-    origin: cors.getAllowlist(),
+    origin: (origin, callback) => {
+      callback(null, cors.isAllowed(origin));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

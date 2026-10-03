@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { assertTenantRecord } from '@/common/utils';
 
 export interface PaginationParams {
   page?: number;
@@ -110,7 +111,7 @@ export class UnitsService {
     const where = tenantId
       ? { id, property: { organizationId: tenantId } }
       : { id };
-    return this.prisma.unit.findUnique({
+    return this.prisma.unit.findFirst({
       where,
       include: {
         property: true,
@@ -119,20 +120,26 @@ export class UnitsService {
     });
   }
 
-  update(id: string, data: Prisma.UnitUpdateInput, tenantId?: string) {
-    const where = tenantId
-      ? { id, property: { organizationId: tenantId } }
-      : { id };
+  async update(id: string, data: Prisma.UnitUpdateInput, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.unit, {
+        id,
+        property: { organizationId: tenantId },
+      });
+    }
     return this.prisma.unit.update({
-      where,
+      where: { id },
       data,
     });
   }
 
-  remove(id: string, tenantId?: string) {
-    const where = tenantId
-      ? { id, property: { organizationId: tenantId } }
-      : { id };
-    return this.prisma.unit.delete({ where });
+  async remove(id: string, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.unit, {
+        id,
+        property: { organizationId: tenantId },
+      });
+    }
+    return this.prisma.unit.delete({ where: { id } });
   }
 }

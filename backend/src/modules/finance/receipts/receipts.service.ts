@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { assertTenantRecord } from '@/common/utils';
 
 @Injectable()
 export class ReceiptsService {
@@ -209,7 +210,7 @@ export class ReceiptsService {
 
   findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.receipt.findUnique({
+    return this.prisma.receipt.findFirst({
       where,
       include: {
         tenant: true,
@@ -224,10 +225,12 @@ export class ReceiptsService {
     });
   }
 
-  delete(id: string, tenantId?: string) {
-    const where = tenantId ? { id, organizationId: tenantId } : { id };
+  async delete(id: string, tenantId?: string) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.receipt, { id, organizationId: tenantId });
+    }
     return this.prisma.receipt.delete({
-      where,
+      where: { id },
     });
   }
 

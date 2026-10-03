@@ -3,7 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
-import { generateDemoData } from './demo-data';
+import { seedDemoData } from './demo-data';
 
 dotenv.config();
 
@@ -50,6 +50,9 @@ async function main() {
       role: UserRole.SUPER_ADMIN,
     },
   });
+
+  // 3. Seed demo organizations, users, and business data (Westhill + Rohi)
+  await seedDemoData();
 
   console.log('Database seeded successfully!');
 }
