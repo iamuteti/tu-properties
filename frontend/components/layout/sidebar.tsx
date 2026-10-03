@@ -22,9 +22,16 @@ import {
     Kanban,
     UserRound,
     HandCoins,
+    MessageSquare,
 } from "lucide-react";
 
-type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
+type UserRole =
+    | 'SUPER_ADMIN'
+    | 'ADMIN'
+    | 'PROPERTY_MANAGER'
+    | 'LEASING_OFFICER'
+    | 'ACCOUNTANT'
+    | 'USER';
 
 interface NavItem {
     href?: string;
@@ -72,6 +79,7 @@ const navItems: NavItem[] = [
         children: [
             { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
             { href: "/rental-agreements", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/tenant-requests", label: "Tenant requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
             { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
         ]
     },
@@ -98,6 +106,7 @@ const roleLabels: Record<UserRole, string> = {
     SUPER_ADMIN: 'Super Admin',
     ADMIN: 'Admin',
     PROPERTY_MANAGER: 'Property Manager',
+    LEASING_OFFICER: 'Leasing Officer',
     ACCOUNTANT: 'Accountant',
     USER: 'User',
 };

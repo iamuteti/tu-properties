@@ -502,17 +502,16 @@ export async function generateDemoData(
         securityDeposit = Number(unit.baseRent) * 2;
       }
     } else {
-      // Residential rental: no fixed end date (monthly), but we can set a past end date for history
-      // For demo purposes, make some have ended (previous tenants) and some active
-      if (Math.random() < 0.2) {
-        // 20% are previous tenants (agreement has ended)
+      // Residential rental: monthly by default, but half get a 6-12 month term.
+      // A fixed term keeps the renewal path (and the expiry-reminder list)
+      // demonstrable, while rolling monthlies stay represented.
+      if (Math.random() < 0.5) {
+        const months = Math.floor(Math.random() * 7) + 6;
         endDate = new Date(startDate);
-        endDate.setMonth(
-          endDate.getMonth() + Math.floor(Math.random() * 12) + 1,
-        );
-      }
-      // 30% have security deposits for rentals
-      if (Math.random() < 0.3) {
+        endDate.setMonth(endDate.getMonth() + months);
+        termMonths = months;
+        securityDeposit = Number(unit.baseRent);
+      } else if (Math.random() < 0.3) {
         securityDeposit = Number(unit.baseRent);
       }
     }
@@ -530,6 +529,9 @@ export async function generateDemoData(
         currency: 'KES',
         paymentDay: 1,
         securityDeposit,
+        // A standard notice period on every tenancy, so the portal's
+        // early-notice flag on a move-out request has something to compare to.
+        noticePeriodDays: 30,
         status:
           endDate && endDate < new Date()
             ? AgreementStatus.EXPIRED
@@ -1345,8 +1347,46 @@ export async function seedDemoData() {
       },
     });
 
-    // Generate demo data for Rohi Estate Management
+// Generate demo data for Rohi Estate Management
     await generateDemoData(prisma, rohiOrg.id);
+
+    // Tenant portal logins (Module 5 checklist, auth in Module 1).
+    //
+    // Created *after* the demo data so a tenant actually exists to bind to:
+    // one resident per organization, linked to that tenant's record, so
+    // `/portal` can be demonstrated — sign in as `tenant@rohi.co.ke` with the
+    // demo password to see only that household's lease, invoices and receipts.
+    for (const [org, email] of [
+      [rohiOrg, 'tenant@rohi.co.ke'],
+      [defaultOrg, 'tenant@westhill.co.ke'],
+    ] as const) {
+      const tenant = await prisma.tenant.findFirst({
+        where: { organizationId: org.id },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, surname: true, otherNames: true },
+      });
+      if (!tenant) {
+        // The other demo org has no tenancy data seeded, so there is nothing to
+        // bind a portal login to.
+        continue;
+      }
+
+      await prisma.user.create({
+        data: {
+          email,
+          // Some seeded tenants carry no other names, so fall back to a placeholder
+          // rather than an empty first name.
+          firstName: (tenant.otherNames ?? '').trim() || 'Tenant',
+          lastName: tenant.surname,
+          passwordHash,
+          // A portal login is a resident: never a staff role.
+          role: UserRole.USER,
+          organizationId: org.id,
+          portalTenantId: tenant.id,
+        },
+      });
+      console.log(`  Portal login: ${email} (password: Password123!)`);
+    }
 
     console.log('Demo data generation completed successfully!');
   } catch (error) {

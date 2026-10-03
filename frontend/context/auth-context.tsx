@@ -75,7 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (newUser.organization) {
       setOrganization(newUser.organization);
     }
-    router.push("/dashboard");
+    // A tenant portal login belongs in the portal, not the dashboard: every
+    // dashboard endpoint is organization-scoped and would deny them.
+    router.push(newUser.portalTenantId ? "/portal" : "/dashboard");
   };
 
   const logout = useCallback(async () => {

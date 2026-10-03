@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { DoorOpen, Search, X } from "lucide-react";
 import { DataTable, type PaginationMeta } from "@/components/ui/data-table";
 import { MoveOutRequestModal } from "@/components/ui/modals/move-out-request-modal";
@@ -178,6 +179,24 @@ export default function MovingOutPage() {
             header: 'Approval Date',
             cell: ({ row }) => row.original.approvalDate ? new Date(row.original.approvalDate).toLocaleDateString('en-GB') : '-',
             size: 120,
+        },
+        {
+            id: 'settlement',
+            header: 'Deposit',
+            size: 160,
+            cell: ({ row }) => (
+                <div className="flex items-center justify-end gap-2">
+                    <span className="text-xs text-muted-foreground">
+                        {row.original.depositRefunded
+                            ? `Refunded ${row.original.depositRefundAmount?.toLocaleString() ?? ''}`
+                            : 'Not settled'}
+                    </span>
+                    {/* The settlement screen (deductions + derived refund) lives here. */}
+                    <Link href={`/moving-out/${row.original.id}`}>
+                        <Button size="sm" variant="ghost">Open</Button>
+                    </Link>
+                </div>
+            ),
         },
     ];
 

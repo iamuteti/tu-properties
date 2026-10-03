@@ -82,9 +82,14 @@ export interface User {
     email: string;
     firstName: string;
     lastName: string;
-    role: 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
+    role: 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'LEASING_OFFICER' | 'ACCOUNTANT' | 'USER';
     organizationId?: string;
     organization?: Organization;
+    /**
+     * Set only for tenant portal logins: this user is a resident of exactly one
+     * tenant record, and the `/portal` API is scoped by it. Staff have it null.
+     */
+    portalTenantId?: string | null;
     /** Whether TOTP two-factor auth is enabled on this account. */
     mfaEnabled?: boolean;
     /** Account status (user management). */
@@ -418,6 +423,10 @@ export interface Tenant {
     email?: string;
     phone: string;
     town?: string;
+    county?: string;
+    occupation?: string;
+    /** CRM link (Module 3): the shared people directory entry. */
+    contactId?: string;
     sendMobileNumber?: boolean;
     idNoRegNo?: string;
     taxPin?: string;
@@ -756,6 +765,10 @@ export interface MoveOutRequest {
     updatedAt: string;
     tenant?: Tenant;
     rentalAgreement?: RentalAgreement;
+    /** Itemised deductions behind the refund (Module 5). */
+    deductions?: MoveOutDeduction[];
+    /** Detail endpoint only: the derived deposit position. */
+    deposit?: DepositBreakdown;
 }
 // ============================================
 // CRM (Module 3)
@@ -1054,4 +1067,416 @@ export interface CommissionReportRow {
 export interface CommissionReport {
     rows: Commission[];
     byAgent: CommissionReportRow[];
+}
+
+// ============================================
+// LEASE & TENANCY (Module 5)
+// ============================================
+
+export type AgreementStatus =
+    | 'DRAFT'
+    | 'ACTIVE'
+    | 'EXPIRED'
+    | 'TERMINATED'
+    | 'RENEWED';
+
+export type AgreementType = 'RENTAL' | 'LEASE';
+
+export type LeaseAction =
+    | 'ACTIVATE'
+    | 'RENEW'
+    | 'EXTEND'
+    | 'TERMINATE'
+    | 'EXPIRE'
+    | 'REACTIVATE';
+
+export interface Lease {
+    id: string;
+    code?: string;
+    organizationId?: string | null;
+    unitId: string;
+    tenantId: string;
+    status: AgreementStatus;
+    agreementType: AgreementType;
+    rentAmount: number | string;
+    currency: string;
+    startDate: string;
+    endDate?: string | null;
+    paymentDay?: number | null;
+    termMonths?: number | null;
+    securityDeposit?: number | string | null;
+    noticePeriodDays?: number | null;
+    escalationRate?: number | string | null;
+    escalationMonth?: number | null;
+    activatedAt?: string | null;
+    terminatedAt?: string | null;
+    terminatedReason?: string | null;
+    expiredAt?: string | null;
+    depositRefunded?: boolean;
+    renewedToId?: string | null;
+    renewedTo?: { id: string; code: string; status: AgreementStatus; endDate?: string | null } | null;
+    renewedFrom?: { id: string; code: string; status: AgreementStatus; endDate?: string | null } | null;
+    createdAt: string;
+
+    unit?: { id: string; name: string; code: string; propertyId: string; property?: { id: string; name: string; code: string } } | null;
+    tenant?: {
+        id: string;
+        code: string;
+        surname: string;
+        otherNames?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        accountNumber?: string | null;
+    } | null;
+    moveOutRequests?: MoveOutRequest[];
+    inspections?: InspectionReport[];
+    invoices?: Array<{
+        id: string;
+        invoiceNumber: string;
+        status: string;
+        dueDate: string;
+        amount: number | string;
+        paidAmount: number | string;
+        balanceAmount: number | string;
+    }>;
+
+    /** Detail endpoint only. */
+    money?: {
+        invoiced: number;
+        paid: number;
+        outstanding: number;
+        arrears: number;
+    };
+    timeline?: {
+        daysRemaining: number | null;
+        availableActions: LeaseAction[];
+        notices: string[];
+    };
+}
+
+export interface LeaseLedger {
+    money: { invoiced: number; paid: number; outstanding: number; arrears: number };
+    invoices: Array<{
+        id: string;
+        invoiceNumber: string;
+        dueDate: string;
+        amount: number;
+        paid: number;
+        status: string;
+    }>;
+}
+
+export type MoveOutStatus = 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
+export type DeductionCategory =
+    | 'DAMAGE'
+    | 'CLEANING'
+    | 'UNPAID_RENT'
+    | 'LATE_FEE'
+    | 'UTILITY'
+    | 'REPAIRS'
+    | 'OTHER';
+
+export interface MoveOutDeduction {
+    id: string;
+    category: DeductionCategory;
+    description: string;
+    amount: number | string;
+    notes?: string | null;
+    approvedBy?: { firstName: string; lastName: string } | null;
+    createdAt: string;
+}
+
+export interface DepositBreakdown {
+    depositHeld: number;
+    deductions: Array<{
+        category: DeductionCategory;
+        description: string;
+        amount: number;
+        notes?: string | null;
+        approvedBy?: string | null;
+        createdAt: string;
+    }>;
+    deductionsByCategory: Array<{ category: DeductionCategory; total: number }>;
+    deductionsTotal: number;
+    unpaidRent: number;
+    /** Never negative — what goes back to the tenant. */
+    refund: number;
+    /** Set when deductions and arrears exceed the deposit. */
+    carriedForward: number;
+    refundPaid: boolean;
+    refundPaidAt?: string | null;
+    refundRecordedAmount?: number | string | null;
+    currency: string;
+    status: MoveOutStatus;
+    moveOutRequestId: string;
+}
+
+
+export type InspectionType = 'MOVE_IN' | 'PERIODIC' | 'MOVE_OUT' | 'ANNUAL';
+export type InspectionStatus = 'DRAFT' | 'COMPLETED' | 'VOID';
+export type ConditionRating = 'GOOD' | 'FAIR' | 'POOR' | 'DAMAGED';
+
+export interface InspectionItem {
+    id: string;
+    area: string;
+    item: string;
+    condition: ConditionRating;
+    notes?: string | null;
+    estimatedCost?: number | string | null;
+    requiresAction?: boolean;
+}
+
+export interface InspectionReport {
+    id: string;
+    unitId: string;
+    rentalAgreementId?: string | null;
+    type: InspectionType;
+    status: InspectionStatus;
+    scheduledDate: string;
+    completedAt?: string | null;
+    completedBy?: { id: string; firstName: string; lastName: string } | null;
+    notes?: string | null;
+    items?: InspectionItem[];
+    unit?: { id: string; name: string; property?: { id: string; name: string } } | null;
+    rentalAgreement?: {
+        id: string;
+        code: string;
+        status: AgreementStatus;
+        tenant?: { id: string; surname: string; otherNames?: string | null } | null;
+    } | null;
+    previous?: InspectionReport | null;
+    /** Items that got worse than the last report of the opposite type. */
+    comparison?: Array<{
+        area: string;
+        item: string;
+        from: ConditionRating | null;
+        to: ConditionRating;
+        worse: boolean;
+        estimatedCost: number;
+    }>;
+}
+
+export interface LeaseTemplate {
+    id: string;
+    name: string;
+    agreementType: AgreementType;
+    rentAmount?: number | string | null;
+    currency: string;
+    securityDeposit?: number | string | null;
+    termMonths?: number | null;
+    noticePeriodDays?: number;
+    escalationRate?: number | string | null;
+    paymentDay?: number;
+    termsBody?: string | null;
+    isActive: boolean;
+}
+
+export interface OccupancyHistory {
+    unit: { id: string; name: string; property: { id: string; name: string; code: string } };
+    status: string;
+    periods: Array<
+        | {
+              kind: 'tenancy';
+              agreementId: string;
+              agreementCode: string;
+              agreementStatus: AgreementStatus;
+              tenant: { id: string; surname: string; otherNames?: string | null; code: string };
+              start: string;
+              end?: string | null;
+              occupiedDays: number | null;
+          }
+        | {
+              kind: 'vacancy';
+              start: string;
+              end: string;
+              vacantDays: number;
+          }
+    >;
+    summary: {
+        tenancies: number;
+        totalOccupiedDays: number;
+        totalVacantDays: number;
+        currentTenant: { id: string; surname: string; otherNames?: string | null; code: string } | null;
+    };
+}
+
+export interface CreateLeaseData {
+    unitId: string;
+    tenantId: string;
+    rentAmount: number;
+    agreementType?: AgreementType;
+    currency?: string;
+    startDate?: string;
+    endDate?: string;
+    termMonths?: number;
+    securityDeposit?: number;
+    noticePeriodDays?: number;
+    escalationRate?: number;
+    paymentDay?: number;
+}
+
+// ============================================
+// TENANT PORTAL (Module 5 / auth in Module 1)
+// ============================================
+
+export interface PortalTenant {
+    code: string;
+    accountNumber: string;
+    surname: string;
+    otherNames?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    status?: string;
+}
+
+export interface PortalMoney {
+    invoiced: number;
+    paid: number;
+    outstanding: number;
+    arrears: number;
+}
+
+export interface PortalSummary {
+    hasLease: boolean;
+    tenant: PortalTenant;
+    money: PortalMoney;
+    lease?: {
+        code: string;
+        rentAmount: number;
+        currency: string;
+        startDate: string;
+        endDate?: string | null;
+        unit?: {
+            name: string;
+            property?: { name: string; roadStreet?: string | null; estateArea?: string | null };
+        } | null;
+    };
+    nextDue?: {
+        invoiceId: string;
+        invoiceNumber: string;
+        dueDate: string;
+        balance: number;
+        isOverdue: boolean;
+    } | null;
+    daysRemaining: number | null;
+}
+
+export interface PortalLease {
+    lease: {
+        code: string;
+        status: AgreementStatus;
+        agreementType: AgreementType;
+        rentAmount: number;
+        currency: string;
+        startDate: string;
+        endDate?: string | null;
+        termMonths?: number | null;
+        paymentDay?: number | null;
+        securityDeposit?: number | null;
+        noticePeriodDays?: number | null;
+        unit?: {
+            id: string;
+            name: string;
+            bedrooms?: number | null;
+            bathrooms?: number | null;
+            areaSqFt?: number | string | null;
+            property?: { id: string; name: string; code: string; roadStreet?: string | null; estateArea?: string | null };
+        } | null;
+    };
+    money: PortalMoney;
+    invoices: Array<{
+        id: string;
+        invoiceNumber: string;
+        issueDate: string;
+        dueDate: string;
+        status: string;
+        amount: number;
+        paid: number;
+    }>;
+}
+
+export interface PortalInvoice {
+    id: string;
+    invoiceNumber: string;
+    issueDate: string;
+    dueDate: string;
+    status: string;
+    amount: number | string;
+    paidAmount: number | string;
+    balanceAmount: number | string;
+    currency?: string;
+}
+
+export interface PortalReceipt {
+    id: string;
+    receiptId: string;
+    receiptType: string;
+    receiptCategory: string;
+    receivedFrom: string;
+    paymentMethod: string;
+    refNo?: string | null;
+    recordingDate: string;
+    amountReceived: number | string;
+    notes?: string | null;
+    memo?: string | null;
+    currency: string;
+    receiptLines?: Array<{ id: string; particular: string; invNo?: string | null; amtDue: number | string; payment: number | string }>;
+}
+
+export interface PortalDocument {
+    id: string;
+    fileName: string;
+    mimeType?: string | null;
+    sizeBytes?: number | null;
+    version?: number;
+    createdAt: string;
+}
+
+
+// ============================================
+// TENANT REQUESTS (resident-initiated, staff-approved)
+// ============================================
+
+export type TenantRequestType =
+    | 'RENEWAL'
+    | 'MOVE_OUT'
+    | 'PAYMENT_PLAN'
+    | 'MAINTENANT'
+    | 'LEASE_AMENDMENT';
+
+export type TenantRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+
+export interface TenantRequest {
+    id: string;
+    type: TenantRequestType;
+    status: TenantRequestStatus;
+    payload?: Record<string, unknown> | null;
+    preferredDate?: string | null;
+    /** Set when a move-out date falls inside the lease's notice period. */
+    earlyNotice?: boolean;
+    note?: string | null;
+    decidedAt?: string | null;
+    decisionNote?: string | null;
+    /** What the approval actually did (e.g. created the successor lease). */
+    result?: Record<string, unknown> | null;
+    createdAt: string;
+    rentalAgreementId?: string | null;
+    rentalAgreement?: {
+        id: string;
+        code: string;
+        status: string;
+        endDate?: string | null;
+        noticePeriodDays?: number | null;
+        unit?: { id: string; name: string } | null;
+    } | null;
+    tenant?: {
+        id: string;
+        code: string;
+        surname: string;
+        otherNames?: string | null;
+        accountNumber?: string;
+        phone?: string | null;
+        email?: string | null;
+    } | null;
+    decidedBy?: { id: string; firstName: string; lastName: string } | null;
 }

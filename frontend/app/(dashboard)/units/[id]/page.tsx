@@ -4,14 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronLeft, FileText, Pencil, RefreshCw, Trash2, Zap } from "lucide-react";
+import { ChevronLeft, FileText, History, Pencil, RefreshCw, Trash2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/ui/entity-states";
 import { UnitStatusActions } from "@/components/units/unit-status-actions";
-import { unitsApi } from "@/lib/api";
-import type { Unit } from "@/types";
+import { leasesApi, unitsApi } from "@/lib/api";
+import type { OccupancyHistory, Unit } from "@/types";
 
 export default function UnitDetailPage() {
     const params = useParams<{ id: string }>();
@@ -22,6 +22,8 @@ export default function UnitDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isBusy, setIsBusy] = useState(false);
+    const [history, setHistory] = useState<OccupancyHistory | null>(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
 
     const loadUnit = useCallback(async () => {
         if (!id) return;
@@ -30,6 +32,18 @@ export default function UnitDetailPage() {
         try {
             const response = await unitsApi.findOne(id);
             setUnit(response.data);
+
+            // Occupancy history (Module 5) — every tenancy plus the vacant gaps.
+            try {
+                const occupancy = await leasesApi.occupancyHistory(id);
+                setHistory(occupancy.data);
+                setHistoryError(null);
+            } catch (historyErr: any) {
+                setHistory(null);
+                setHistoryError(
+                    historyErr.response?.data?.message || "Could not load occupancy history.",
+                );
+            }
         } catch (err: any) {
             setError(
                 err.response?.status === 404
@@ -209,6 +223,91 @@ export default function UnitDetailPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <History className="h-4 w-4" aria-hidden="true" />
+                        Occupancy history
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {historyError ? (
+                        <ErrorState message={historyError} onRetry={loadUnit} />
+                    ) : !history || history.periods.length === 0 ? (
+                        <EmptyState
+                            title="No tenancies recorded yet"
+                            description="Every tenancy on this unit will appear here, with the vacant gaps between them."
+                        />
+                    ) : (
+                        <>
+                            <p className="text-sm text-muted-foreground">
+                                {history.summary.tenancies} tenancy
+                                {history.summary.tenancies === 1 ? "" : "ies"} ·{" "}
+                                {history.summary.totalVacantDays.toLocaleString()} days vacant
+                                {history.summary.currentTenant && (
+                                    <>
+                                        {" · currently "}
+                                        {`${history.summary.currentTenant.surname} ${history.summary.currentTenant.otherNames ?? ""}`.trim()}
+                                    </>
+                                )}
+                            </p>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Period</TableHead>
+                                        <TableHead>Tenant</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Days</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {history.periods.map((period, index) =>
+                                        period.kind === "tenancy" ? (
+                                            <TableRow key={`t-${period.agreementId}-${index}`}>
+                                                <TableCell className="text-xs">
+                                                    {new Date(period.start).toLocaleDateString()}
+                                                    {period.end
+                                                        ? ` – ${new Date(period.end).toLocaleDateString()}`
+                                                        : " – present"}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Link
+                                                        href={`/rental-agreements/${period.agreementId}`}
+                                                        className="hover:underline"
+                                                    >
+                                                        {`${period.tenant.surname} ${period.tenant.otherNames ?? ""}`.trim()}
+                                                    </Link>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <StatusBadge status={period.agreementStatus} />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {period.occupiedDays ?? "—"}
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            <TableRow key={`v-${period.start}-${index}`}>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {new Date(period.start).toLocaleDateString()} –{" "}
+                                                    {new Date(period.end).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    Vacant
+                                                </TableCell>
+                                                <TableCell>—</TableCell>
+                                                <TableCell className="text-right text-muted-foreground">
+                                                    {period.vacantDays}
+                                                </TableCell>
+                                            </TableRow>
+                                        ),
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

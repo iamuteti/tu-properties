@@ -28,6 +28,9 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { CrmLeadsModule } from './modules/crm/leads/leads.module';
 import { CrmContactsModule } from './modules/crm/contacts/contacts.module';
 import { SalesModule } from './modules/sales/sales.module';
+import { InspectionsModule } from './modules/inspections/inspections.module';
+import { PortalModule } from './modules/portal/portal.module';
+import { TenantRequestsModule } from './modules/tenant-requests/tenant-requests.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { SecurityModule } from './security/security.module';
 
@@ -55,6 +58,9 @@ import { SecurityModule } from './security/security.module';
     CrmLeadsModule,
     CrmContactsModule,
     SalesModule,
+    InspectionsModule,
+    PortalModule,
+    TenantRequestsModule,
   ],
   controllers: [AppController],
   providers: [

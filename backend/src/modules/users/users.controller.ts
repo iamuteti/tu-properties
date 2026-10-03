@@ -56,10 +56,16 @@ export class UsersController {
       // Org admins can only create users inside their own organization —
       // never trust the client-supplied organization (id or relation).
       const { organization, organizationId, ...rest } = data;
-      user = await this.usersService.create({
-        ...rest,
-        organization: { connect: { id: tenantId } },
-      } as Prisma.UserCreateInput);
+      // `portalTenantId` (a self-service resident login) is passed through as a
+      // scalar; the service validates the tenant is in this organization and
+      // forces a non-staff role.
+      user = await this.usersService.create(
+        {
+          ...rest,
+          organization: { connect: { id: tenantId } },
+        } as Prisma.UserCreateInput,
+        tenantId,
+      );
     } else {
       user = await this.usersService.create(data as Prisma.UserCreateInput);
     }

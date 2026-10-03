@@ -54,12 +54,38 @@ export function isSuperAdmin(user: any): boolean {
 }
 
 /**
+ * The tenant this session is allowed to act as in the self-service portal.
+ *
+ * This is the security boundary for `/portal`: the scope comes from the
+ * authenticated user's `portalTenantId` link and nothing else. A client that
+ * sends `?tenantId=…` or `tenantId` in a body is ignored by construction, so a
+ * resident cannot read another resident's lease by editing a request.
+ *
+ * Staff users are rejected rather than silently scoped to some tenant: the
+ * portal is a resident view, and staff use the dashboard endpoints.
+ */
+export function getPortalTenantId(request: any): string {
+  const user = request?.user;
+  const tenantId = user?.portalTenantId;
+  if (!tenantId) {
+    throw new ForbiddenException(
+      'This account is not a tenant portal account. Staff should use the dashboard.',
+    );
+  }
+  return tenantId as string;
+}
+
+/**
  * Extract the authenticated user's id from the request, for records that need
- * an actor (who logged this call, who converted this lead).
- * Returns `undefined` for super admins operating without a user context.
+ * an actor (who approved a tenant request, who refunded a deposit, who
+ * completed an inspection).
+ *
+ * `JwtStrategy` puts the id on `request.user.userId`; some guards/tests attach
+ * a user object with `id` instead, so both are accepted. Returns `undefined`
+ * for super admins operating without a user context.
  */
 export function getUserId(request: any): string | undefined {
-  return request?.user?.id;
+  return request?.user?.userId ?? request?.user?.id;
 }
 
 /**

@@ -84,6 +84,10 @@ export class AuthService {
       sub: user.id,
       role: user.role,
       organizationId: user.organizationId,
+      // Tenant portal identity (Module 5, auth work here in Module 1): present
+      // only for a self-service login, and the *only* thing /portal endpoints
+      // scope by. Staff sessions carry no `portalTenantId`.
+      portalTenantId: user.portalTenantId ?? null,
       jti,
     };
     const token = this.jwtService.sign(payload);

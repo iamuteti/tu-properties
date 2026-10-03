@@ -286,7 +286,95 @@ enum UnitStatus {
 
 ---
 
-## Domain: Leasing (Module: Lease & Tenancy) — ✅ Believed existing, verify & extend
+## Domain: Leasing (Module: Lease & Tenancy) — ✅ Resolved 2026-10-03 (see `06-MODULE-lease-tenancy.md`)
+
+**Target vs. shipped.** The sketch below is the intent. Module 5 shipped it with these changes, all in
+`backend/src/prisma/schema.prisma`:
+
+| Target | Shipped | Why |
+| --- | --- | --- |
+| `Tenant { firstName, lastName, emergencyContactName/Phone }` | `surname`/`otherNames`; emergency contacts are their own `TenantEmergencyContact` rows | One contact per tenant is not a list. `Tenant.contactId` links the CRM directory entry (Module 3). |
+| `RentalAgreement.billingCycle BillingCycle` | `paymentDay` + `termMonths` + `escalationRate`/`escalationMonth` | Rent is raised monthly by the finance module (a `BillingCycle` enum with no scheduler behind it is decorative). The escalation fields are what make a renewal compute the new rent. |
+| `LeaseStatus { DRAFT ACTIVE RENEWED EXPIRED TERMINATED }` | identical, as `AgreementStatus` | Kept exactly as sketched — the gap was enforcement, not values: `status` is no longer settable from the update DTO, only through validated lifecycle actions. |
+| — | `renewedToId @unique` / `renewedFromId` (self-relation) | A renewal creates a successor agreement, so the unit's tenancy history is one query instead of a date-range reconstruction. |
+| — | `activatedAt`, `terminatedAt`, `terminatedReason`, `expiredAt` | The audit trail the lifecycle actions write; a termination without a recorded reason is how disputes start. |
+| — | `LeaseTemplate` | Reusable default terms (checklist item). A template prefills the create form and never becomes the lease, so editing one cannot rewrite a signed agreement. |
+| `MoveOutRequest.depositRefundAmount Decimal?` (typed in) | kept as a record of what was paid, **plus** `MoveOutDeduction` rows and `refundedAt`/`refundedById` | The refund is now *derived* — `deposit − Σ(deductions) − unpaid rent` — so the figure on screen can be explained line by line. |
+| — | `InspectionReport` + `InspectionItem`, `MoveOutStatus += COMPLETED`, `UserRole += LEASING_OFFICER` | The condition record that settles damage disputes, a real end state for a settled move-out, and an enum value for a role that already existed in the seed. |
+
+```prisma
+model RentalAgreement {
+  id             String       @id @default(cuid())
+  organizationId String
+  code           String       @unique // RA-000001
+  unitId         String
+  tenantId       String
+  status         AgreementStatus @default(DRAFT)
+  agreementType  AgreementType
+  rentAmount     Decimal      @db.Decimal(14, 2)
+  securityDeposit Decimal?    @db.Decimal(14, 2)
+  currency       String       @default("KES")
+  startDate      DateTime
+  endDate        DateTime?    // null = rolling monthly
+  termMonths     Int?
+  paymentDay     Int?
+  escalationRate Decimal?     @db.Decimal(5, 2)
+  escalationMonth Int?
+  noticePeriodDays Int        @default(30)
+  renewedToId    String?      @unique
+  renewedFromId  String?
+  activatedAt    DateTime?
+  terminatedAt   DateTime?
+  terminatedReason String?
+  expiredAt      DateTime?
+  depositRefunded Boolean     @default(false)
+  @@index([unitId]) @@index([tenantId]) @@index([status])
+  @@map("rental_agreements")
+}
+
+model MoveOutDeduction {
+  id              String         @id @default(cuid())
+  moveOutRequestId String
+  category        DeductionCategory
+  description     String
+  amount          Decimal        @db.Decimal(10, 2)
+  approvedById    String?
+  @@index([moveOutRequestId])
+  @@map("move_out_deductions")
+}
+
+model InspectionReport {
+  id                String           @id @default(cuid())
+  unitId            String
+  rentalAgreementId String?
+  type              InspectionType
+  status            InspectionStatus @default(DRAFT)
+  scheduledDate     DateTime
+  completedAt       DateTime?
+  notes             String?          @db.Text
+  items             InspectionItem[]
+  @@index([unitId]) @@index([rentalAgreementId])
+  @@map("inspection_reports")
+}
+
+model LeaseTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  agreementType  AgreementType
+  rentAmount     Decimal?     @db.Decimal(10, 2)
+  securityDeposit Decimal?    @db.Decimal(10, 2)
+  termMonths     Int?
+  noticePeriodDays Int        @default(30)
+  termsBody      String?      @db.Text
+  isActive       Boolean      @default(true)
+  @@index([organizationId])
+  @@map("lease_templates")
+}
+```
+
+<details>
+<summary>Original target sketch (superseded)</summary>
 
 ```prisma
 model Tenant {
@@ -333,6 +421,8 @@ enum LeaseStatus {
   EXPIRED
   TERMINATED
 }
+```
+</details>
 
 model MoveOutRequest {
   id               String   @id @default(uuid())

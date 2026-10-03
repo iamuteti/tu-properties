@@ -259,3 +259,117 @@ export const COMMISSION_STATUS_OPTIONS: Array<{ value: string; label: string }> 
     { value: 'PAID', label: 'Paid' },
     { value: 'REJECTED', label: 'Rejected' },
 ];
+
+// ============================================
+// LEASE & TENANCY (Module 5)
+// ============================================
+
+export const AGREEMENT_STATUSES: Array<{ value: string; label: string }> = [
+    { value: 'DRAFT', label: 'Draft' },
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'EXPIRED', label: 'Expired' },
+    { value: 'RENEWED', label: 'Renewed' },
+    { value: 'TERMINATED', label: 'Terminated' },
+];
+
+export const AGREEMENT_TYPES: Array<{ value: string; label: string }> = [
+    { value: 'RENTAL', label: 'Rental (monthly)' },
+    { value: 'LEASE', label: 'Lease (fixed term)' },
+];
+
+export const MOVE_OUT_STATUSES: Array<{ value: string; label: string }> = [
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'COMPLETED', label: 'Completed' },
+    { value: 'REJECTED', label: 'Rejected' },
+];
+
+export const DEDUCTION_CATEGORIES: Array<{ value: string; label: string }> = [
+    { value: 'DAMAGE', label: 'Damage' },
+    { value: 'CLEANING', label: 'Cleaning' },
+    { value: 'UNPAID_RENT', label: 'Unpaid rent' },
+    { value: 'LATE_FEE', label: 'Late fee' },
+    { value: 'UTILITY', label: 'Utility' },
+    { value: 'REPAIRS', label: 'Repairs' },
+    { value: 'OTHER', label: 'Other' },
+];
+
+export const CONDITION_RATINGS: Array<{ value: string; label: string }> = [
+    { value: 'GOOD', label: 'Good' },
+    { value: 'FAIR', label: 'Fair' },
+    { value: 'POOR', label: 'Poor' },
+    { value: 'DAMAGED', label: 'Damaged' },
+];
+
+export const INSPECTION_TYPES: Array<{ value: string; label: string }> = [
+    { value: 'MOVE_IN', label: 'Move-in' },
+    { value: 'PERIODIC', label: 'Periodic' },
+    { value: 'MOVE_OUT', label: 'Move-out' },
+    { value: 'ANNUAL', label: 'Annual' },
+];
+
+/** Colours for agreement status pills, shared by list and detail. */
+export const AGREEMENT_STATUS_STYLES: Record<string, string> = {
+    DRAFT: 'bg-slate-100 text-slate-700',
+    ACTIVE: 'bg-green-100 text-green-800',
+    EXPIRED: 'bg-amber-100 text-amber-800',
+    RENEWED: 'bg-violet-100 text-violet-800',
+    TERMINATED: 'bg-red-100 text-red-800',
+};
+
+export const CONDITION_STYLES: Record<string, string> = {
+    GOOD: 'bg-green-100 text-green-800',
+    FAIR: 'bg-yellow-100 text-yellow-800',
+    POOR: 'bg-orange-100 text-orange-800',
+    DAMAGED: 'bg-red-100 text-red-800',
+};
+
+// ============================================
+// TENANT REQUESTS (Module 5)
+// ============================================
+
+export const TENANT_REQUEST_TYPES: Array<{
+    value: string;
+    label: string;
+    description: string;
+}> = [
+    {
+        value: 'RENEWAL',
+        label: 'Renew my lease',
+        description: 'Stay on after the current term, optionally with a new rent.',
+    },
+    {
+        value: 'MOVE_OUT',
+        label: 'Give notice to move out',
+        description: 'Tell us when you plan to leave. Your notice period still applies.',
+    },
+    {
+        value: 'PAYMENT_PLAN',
+        label: 'Ask for a payment plan',
+        description: 'If you are behind on rent, ask to agree instalments.',
+    },
+    {
+        value: 'MAINTENANT',
+        label: 'Report a repair',
+        description: 'Something in the unit needs fixing.',
+    },
+    {
+        value: 'LEASE_AMENDMENT',
+        label: 'Change something on my lease',
+        description: 'Anything else you would like agreed in writing.',
+    },
+];
+
+export const TENANT_REQUEST_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'REJECTED', label: 'Rejected' },
+    { value: 'WITHDRAWN', label: 'Withdrawn' },
+];
+
+export const REQUEST_STATUS_STYLES: Record<string, string> = {
+    PENDING: 'bg-amber-100 text-amber-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    REJECTED: 'bg-red-100 text-red-800',
+    WITHDRAWN: 'bg-slate-100 text-slate-700',
+};

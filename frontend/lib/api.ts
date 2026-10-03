@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -731,4 +731,215 @@ export const salesApi = {
         const qs = query.toString();
         return `${API_BASE_URL}/sales/export${qs ? `?${qs}` : ''}`;
     },
+};
+
+// ============================================
+// LEASES API (Module 5)
+// ============================================
+
+export const leasesApi = {
+    createLease: (data: CreateLeaseData) => api.post<Lease>('/leases', data),
+
+    findLeases: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        status?: string;
+        agreementType?: string;
+        unitId?: string;
+        tenantId?: string;
+        propertyId?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            query.append(key, String(value));
+        });
+        const qs = query.toString();
+        return api.get<PaginatedResponse<Lease>>(`/leases${qs ? `?${qs}` : ''}`);
+    },
+
+    findLease: (id: string) => api.get<Lease>(`/leases/${id}`),
+
+    updateLease: (id: string, data: Partial<CreateLeaseData>) =>
+        api.patch<Lease>(`/leases/${id}`, data),
+
+    // Lifecycle actions. `status` is only settable through these.
+    activate: (id: string) => api.post<Lease>(`/leases/${id}/activate`),
+
+    /** Creates the successor agreement and links the renewal chain. */
+    renew: (
+        id: string,
+        data: {
+            newStartDate?: string;
+            newEndDate?: string;
+            rentAmount?: number;
+            securityDeposit?: number;
+            termMonths?: number;
+            currency?: string;
+        },
+    ) => api.post<{ previous: { id: string; code: string }; lease: Lease }>(`/leases/${id}/renew`, data),
+
+    extend: (id: string, newEndDate: string) =>
+        api.post<Lease>(`/leases/${id}/extend`, { newEndDate }),
+
+    terminate: (id: string, reason: string) =>
+        api.post<{ lease: Lease; outstanding: number; arrears: number; unitVacated: boolean }>(
+            `/leases/${id}/terminate`,
+            { reason },
+        ),
+
+    expire: (id: string) => api.post<Lease>(`/leases/${id}/expire`),
+
+    reactivate: (id: string) => api.post<Lease>(`/leases/${id}/reactivate`),
+
+    removeLease: (id: string) => api.delete(`/leases/${id}`),
+
+    /** Everything billed and collected against this lease. */
+    ledger: (id: string) => api.get<LeaseLedger>(`/leases/${id}/ledger`),
+
+    /** Expiry reminders (stub until Notifications exists). */
+    expiring: (days = 60) => api.get<Lease[]>('/leases/expiring', { params: { days } }),
+
+    /** Occupancy history for a unit: tenancies plus the vacant gaps. */
+    occupancyHistory: (unitId: string) =>
+        api.get<OccupancyHistory>(`/leases/units/${unitId}/occupancy-history`),
+
+    exportUrl: (params?: { search?: string; status?: string; agreementType?: string }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/leases/export${qs ? `?${qs}` : ''}`;
+    },
+};
+
+export const moveOutsApi = {
+    create: (data: { rentalAgreementId: string; moveoutDate: string; notes?: string }) =>
+        api.post<MoveOutRequest>('/move-outs', data),
+
+    findAll: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
+        api.get<PaginatedResponse<MoveOutRequest>>('/move-outs', { params }),
+
+    findOne: (id: string) => api.get<MoveOutRequest>(`/move-outs/${id}`),
+
+    /** The auditable deposit position — always derived, never typed in. */
+    deposit: (id: string) => api.get<DepositBreakdown>(`/move-outs/${id}/deposit`),
+
+    addDeduction: (
+        id: string,
+        data: { category: DeductionCategory; description: string; amount: number; notes?: string },
+    ) => api.post<MoveOutDeduction>(`/move-outs/${id}/deductions`, data),
+
+    removeDeduction: (id: string, deductionId: string) =>
+        api.delete(`/move-outs/${id}/deductions/${deductionId}`),
+
+    approve: (id: string, notes?: string) =>
+        api.post<MoveOutRequest & { unitVacated: boolean }>(`/move-outs/${id}/approve`, { notes }),
+
+    reject: (id: string, notes: string) =>
+        api.post<MoveOutRequest>(`/move-outs/${id}/reject`, { notes }),
+
+    /** Pays out the derived refund and stamps the lease. */
+    refund: (id: string, paidRef: string, paymentMethod?: string) =>
+        api.post<MoveOutRequest & { refund: number; reference: string }>(
+            `/move-outs/${id}/refund`,
+            { paidRef, paymentMethod },
+        ),
+};
+
+export const inspectionsApi = {
+    create: (data: {
+        unitId: string;
+        rentalAgreementId?: string;
+        type: InspectionType;
+        scheduledDate: string;
+        notes?: string;
+        items?: Array<{ area: string; item: string; condition?: ConditionRating; notes?: string; estimatedCost?: number }>;
+    }) => api.post<InspectionReport>('/inspections', data),
+
+    list: (params?: { unitId?: string; type?: string }) =>
+        api.get<InspectionReport[]>('/inspections', { params }),
+
+    findOne: (id: string) => api.get<InspectionReport>(`/inspections/${id}`),
+
+    addItem: (
+        id: string,
+        item: { area: string; item: string; condition?: ConditionRating; notes?: string; estimatedCost?: number },
+    ) => api.post<InspectionItem>(`/inspections/${id}/items`, item),
+
+    updateItem: (
+        id: string,
+        itemId: string,
+        data: { condition?: ConditionRating; notes?: string; estimatedCost?: number; requiresAction?: boolean },
+    ) => api.patch<InspectionItem>(`/inspections/${id}/items/${itemId}`, data),
+
+    complete: (id: string) => api.post<InspectionReport>(`/inspections/${id}/complete`),
+
+    remove: (id: string) => api.delete(`/inspections/${id}`),
+};
+
+export const leaseTemplatesApi = {
+    list: () => api.get<LeaseTemplate[]>('/lease-templates'),
+    create: (data: Partial<LeaseTemplate>) => api.post<LeaseTemplate>('/lease-templates', data),
+    update: (id: string, data: Partial<LeaseTemplate>) =>
+        api.patch<LeaseTemplate>(`/lease-templates/${id}`, data),
+    /** Deactivates rather than deleting — leases created from it are on file. */
+    remove: (id: string) => api.delete(`/lease-templates/${id}`),
+};
+
+/**
+ * Read-only resident API.
+ *
+ * Every call is scoped by the tenant linked to the signed-in user's session —
+ * the client never sends a tenant id, so a resident cannot read another
+ * household's data by editing a request.
+ */
+export const portalApi = {
+    me: () =>
+        api.get<{ user: { id: string; email: string }; tenant: PortalTenant }>('/portal/me'),
+
+    summary: () => api.get<PortalSummary>('/portal/summary'),
+
+    lease: () => api.get<PortalLease>('/portal/lease'),
+
+    invoices: () => api.get<PortalInvoice[]>('/portal/invoices'),
+
+    receipts: () => api.get<PortalReceipt[]>('/portal/receipts'),
+
+    documents: () => api.get<PortalDocument[]>('/portal/documents'),
+
+    /** Browser-navigable download (the httpOnly session cookie is sent along). */
+    downloadUrl: (documentId: string) =>
+        `${API_BASE_URL}/portal/documents/${documentId}/download`,
+};
+
+// ============================================
+// TENANT REQUEST API
+// ============================================
+
+export const tenantRequestsApi = {
+    // Resident side — scoped by the tenant on the session.
+    myRequests: () => api.get<TenantRequest[]>('/portal/requests'),
+    createRequest: (data: {
+        type: TenantRequestType;
+        rentalAgreementId?: string;
+        preferredDate?: string;
+        note?: string;
+        payload?: Record<string, unknown>;
+    }) => api.post<TenantRequest>('/portal/requests', data),
+    withdrawRequest: (id: string) =>
+        api.post<TenantRequest>(`/portal/requests/${id}/withdraw`),
+
+    // Staff queue.
+    findAll: (params?: { status?: string; type?: string; tenantId?: string }) =>
+        api.get<TenantRequest[]>('/tenant-requests', { params }),
+    decide: (id: string, decision: 'APPROVE' | 'REJECT', decisionNote?: string) =>
+        api.post<TenantRequest>(`/tenant-requests/${id}/decide`, {
+            decision,
+            decisionNote,
+        }),
 };

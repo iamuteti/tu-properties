@@ -31,6 +31,8 @@ export const PERMISSION_MODULES = [
   'crm_leads',
   'crm_contacts',
   'sales',
+  'leases',
+  'tenant_requests',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -108,6 +110,7 @@ export const SYSTEM_ROLES: {
       crm_leads: full(),
       crm_contacts: full(),
       sales: full(),
+      tenant_requests: full(),
     }),
   },
   {
@@ -119,7 +122,6 @@ export const SYSTEM_ROLES: {
       units: full(),
       landlords: full(),
       tenants: full(),
-      leases: full(),
       moveouts: full(),
       documents: viewWrite(),
       // Module 3 CRM: the pipeline is part of day-to-day property work.
@@ -127,6 +129,10 @@ export const SYSTEM_ROLES: {
       crm_contacts: full(),
       // Module 4: a property manager can run a sale to handover.
       sales: full(),
+      // Module 5: leases, renewals and move-outs are daily property work.
+      leases: full(),
+      // Resident requests raised from the tenant portal.
+      tenant_requests: full(),
     }),
   },
   {
@@ -144,6 +150,8 @@ export const SYSTEM_ROLES: {
       crm_contacts: full(),
       // A leasing officer may register a sale but not run commissions.
       sales: viewWrite(),
+      // Resident requests are exactly their job: read the queue, decide.
+      tenant_requests: full(),
     }),
   },
   {

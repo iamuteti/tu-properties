@@ -73,6 +73,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         email: payload.email,
         role: payload.role,
         organizationId: payload.organizationId || user.organizationId,
+        // Read from the *user row*, not the token: if a user is unlinked from a
+        // tenant (or their portal access is revoked) the change takes effect on
+        // their next request instead of persisting until the token expires.
+        portalTenantId: user.portalTenantId ?? null,
+        isTenantPortal: Boolean(user.portalTenantId),
         jti,
       };
     } catch (error: any) {

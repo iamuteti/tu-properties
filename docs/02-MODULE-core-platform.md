@@ -12,6 +12,10 @@
 ## Status
 
 > **Completed 2026-10-03 (backend).** Auth/security groundwork was finished in Module 0 (`01-MODULE-stabilization.md`) — CORS allowlist, httpOnly JWT cookie, httpOnly sessions backed by a server-side `Session` table, password reset, TOTP MFA, per-user session revocation, login rate limiting, and audit logging via `AuditInterceptor`. Module 1 delivers the core-platform surface that every other module depends on.
+>
+> **Added 2026-10-03 (tenant-scoped auth, for Module 5's portal).** `User.portalTenantId` links a login to
+> exactly one tenant record, and `TenantPortalGuard` + `getPortalTenantId()` make `/portal` readable only by
+> that resident. Details and verification at the bottom of this doc.
 
 Verified as live on a running server (`backend` on `http://localhost:3003`):
 
@@ -54,7 +58,27 @@ See `01-DATABASE-SCHEMA.md`, domain(s): Identity & Organization
 - [x] Add login history tracking — every login now writes an audited `LOGIN` row (entity `User`, entityId = userId); MFA/SESSIONS_REVOKED/PASSWORD_RESET events audited too. `ipAddress`/`userAgent` captured on audit rows (`AuditInterceptor`); `GET /auth/login-history` and `GET /audit/user/:userId` expose them. (Login-history **UI** remains a frontend task, out of scope for this backend pass.)
 - [x] Build System Settings UI + backend (currency, timezone, tax settings per org) — **backend done:** `GET/PATCH /organizations/me` persists `currency`, `timezone`, `legalName`, `taxId` per org. (Settings **UI** remains a frontend task.)
 - [x] Build the Document Center from scratch: upload endpoint, storage (local filesystem driver by default, S3/MinIO when `STORAGE_DRIVER=s3`), versioning, polymorphic list-by-entity, download streaming, and evaluate e-signature (deferred to a third-party embed like DocuSign/SignRequest rather than building signing infrastructure in-house)
-- [x] Build a real Settings page in the frontend — `frontend/app/(dashboard)/settings/page.tsx` exists (org profile + Security: 2FA + sessions); **backend** update endpoint for org fields now wired (`PATCH /organizations/me`). Currency/timezone/tax persistence and the User-management UI page are frontend follow-ups.
+- [x] Build a real Settings page in the frontend — `frontend/app/(dashboard)/settings/page.tsx` exists and is **fully wired**: the org profile form (name, contact, `legalName`, `taxId`, `currency`, `timezone`) saves through `PATCH /organizations/me`, and the Security area covers 2FA, active sessions and the login-history UI (`GET /auth/login-history`, rendered with action label, IP, user agent and timestamp). The User-management page (`/users`: invite, deactivate, assign roles) is live against `POST /users`, `GET /users/roles`, `PATCH /users/:id/roles`, `DELETE /users/:id`.
+
+### Tenant-scoped auth (added for Module 5's portal, 2026-10-03)
+
+The tenant portal needed a login that resolves to *one household*, not to an organization. That is auth work, so
+it landed here rather than in the leasing module.
+
+- **Schema** — `User.portalTenantId String?` → `Tenant` (`SetNull`, indexed), migration
+  `20261003220000_add_tenant_portal_identity`. Null for staff; set only for a resident login.
+- **Session** — the claim rides in the JWT (`portalTenantId`) *and* is re-read from the user row on every request
+  by `JwtStrategy`, so revoking a resident's portal access takes effect immediately instead of persisting until
+  the token expires.
+- **`TenantPortalGuard`** (`security/guards/`) runs after `JwtAuthGuard` and rejects any session without the
+  link, so staff cannot use `/portal` to look up a tenant of their choosing. `getPortalTenantId(request)` in
+  `common/utils.ts` is the only scope source; a `tenantId` sent by the client is ignored by construction.
+- **User creation** — `POST /users` accepts `portalTenantId`; the tenant must be in the caller's organization and
+  the role is **forced to `USER`**, so a resident login can never become an admin.
+- **Verified live**: `tenant@rohi.co.ke` reads only its own lease/invoices/receipts; the other organization's
+  resident sees a different household; a staff session gets 403; an unauthenticated call 401; a document download
+  for an unknown id 404. Frontend: residents land on `/portal`, the dashboard redirects them away, and staff are
+  bounced back from `/portal`.
 
 ## Backend: NestJS Notes
 - Modules live at `backend/src/modules/{organizations,users,permissions,branches,documents}/` plus shared guards in `backend/src/security/guards/` (`permissions.guard.ts`) and the storage abstraction in `backend/src/modules/documents/storage/`.

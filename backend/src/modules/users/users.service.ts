@@ -96,13 +96,50 @@ export class UsersService {
    * `passwordHash`), and Prisma rejects unknown arguments — so `password` is
    * stripped here. It used to be passed straight through, which made every
    * user creation a 500.
+   *
+   * A **portal user** (`portalTenantId` set) is a resident login for the self-
+   * service portal. Two guards, because this is the one place where a wrong
+   * assignment would hand someone another household's data:
+   *   - the tenant must exist inside the caller's organization, and
+   *   - the role is forced to `USER`, so a portal login can never be an admin
+   *     (staff roles stay organisation-scoped and use the dashboard).
    */
-  async create(data: Prisma.UserCreateInput & { password?: string }) {
+  async create(
+    data: Prisma.UserCreateInput & {
+      password?: string;
+      portalTenantId?: string | null;
+    },
+    tenantId?: string,
+  ) {
     const { ...userData } = data;
     // `password` is not a column — Prisma rejects unknown arguments.
     delete (userData as { password?: string }).password;
+
+    const portalTenantId = data.portalTenantId ?? null;
+
+    if (portalTenantId) {
+      const tenant = await this.prisma.tenant.findFirst({
+        where: {
+          id: portalTenantId,
+          ...(tenantId ? { organizationId: tenantId } : {}),
+        },
+        select: { id: true },
+      });
+      if (!tenant) {
+        throw new BadRequestException(
+          'The tenant for this portal login does not exist in your organization.',
+        );
+      }
+
+      // Portal logins are residents: no staff role, ever.
+      (userData as Record<string, unknown>).role = 'USER';
+      (userData as Record<string, unknown>).portalTenant = {
+        connect: { id: portalTenantId },
+      };
+    }
+
     return this.prisma.user.create({
-      data: userData,
+      data: userData as Prisma.UserCreateInput,
       include: { organization: true },
     });
   }

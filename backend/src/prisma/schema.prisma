@@ -66,6 +66,9 @@ model Organization {
   communicationLogs CommunicationLog[]
   saleTransactions  SaleTransaction[]
   commissions       Commission[]
+  leaseTemplates    LeaseTemplate[]
+  inspectionReports InspectionReport[]
+  tenantRequests    TenantRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -92,9 +95,16 @@ model User {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  // Status
-  isActive      Boolean @default(true)
-  emailVerified Boolean @default(false)
+  // Tenant portal identity (Module 5, auth work in Module 1).
+  //
+  // Set only for self-service portal logins: such a user is a *resident* of
+  // exactly one tenant record, and every /portal endpoint derives its scope
+  // from this link rather than from anything the client sends. Staff users
+  // leave it null and keep organization-scoped access.
+  portalTenantId String?
+  portalTenant   Tenant? @relation("TenantPortalUsers", fields: [portalTenantId], references: [id], onDelete: SetNull)
+  isActive       Boolean @default(true)
+  emailVerified  Boolean @default(false)
 
   // Audit fields
   createdAt   DateTime  @default(now())
@@ -110,16 +120,22 @@ model User {
   mfaSecret  String?
   mfaEnabled Boolean @default(false)
 
-  auditLogs            AuditLog[]
-  sessions             Session[]
-  roleAssignments      RoleAssignment[]
-  uploadedDocuments    Document[]
-  assignedLeads        Lead[]             @relation("UserAssignedLeads")
-  loggedCommunications CommunicationLog[] @relation("UserLoggedCommunications")
-  sales                SaleTransaction[]  @relation("UserSales")
-  commissions          Commission[]       @relation("UserCommissions")
-  approvedCommissions  Commission[]       @relation("UserApprovedCommissions")
+  auditLogs             AuditLog[]
+  sessions              Session[]
+  roleAssignments       RoleAssignment[]
+  uploadedDocuments     Document[]
+  assignedLeads         Lead[]             @relation("UserAssignedLeads")
+  loggedCommunications  CommunicationLog[] @relation("UserLoggedCommunications")
+  sales                 SaleTransaction[]  @relation("UserSales")
+  commissions           Commission[]       @relation("UserCommissions")
+  approvedCommissions   Commission[]       @relation("UserApprovedCommissions")
+  approvedDeductions    MoveOutDeduction[]
+  completedInspections  InspectionReport[]
+  refundedMoveOuts      MoveOutRequest[]
+  decidedTenantRequests TenantRequest[]    @relation("UserDecidedTenantRequests")
 
+  // Status
+  @@index([portalTenantId])
   @@index([email])
   @@index([role])
   @@index([organizationId])
@@ -131,6 +147,9 @@ enum UserRole {
   SUPER_ADMIN
   ADMIN
   PROPERTY_MANAGER
+  // Added in Module 5: the seeded Leasing Officer role had no UserRole counterpart,
+  // so it could be granted permissions but never held. See master doc issue 48.
+  LEASING_OFFICER
   ACCOUNTANT
   USER
 }
@@ -527,6 +546,7 @@ model Unit {
   serviceCharges   UnitServiceCharge[]
   meterNumbers     UnitMeterNumber[]
   features         UnitFeature[]
+  inspections      InspectionReport[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -713,6 +733,12 @@ model Tenant {
   contactId String?  @unique
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
+  // Self-service portal logins that belong to this tenant.
+  portalUsers User[] @relation("TenantPortalUsers")
+
+  // Requests the resident submitted through the portal.
+  requests TenantRequest[]
+
   // Relationships
   rentalAgreements  RentalAgreement[]
   emergencyContacts TenantEmergencyContact[]
@@ -797,12 +823,29 @@ model RentalAgreement {
   commissions     Commission[]
   moveOutRequests MoveOutRequest[]
 
+  // Renewal chain (Module 5): a renewed lease points at its successor and the
+  // successor points back, so the full history of a unit's tenancies is one
+  // query instead of a date-range reconstruction.
+  renewedToId   String?          @unique
+  renewedTo     RentalAgreement? @relation("LeaseRenewals", fields: [renewedToId], references: [id], onDelete: SetNull)
+  renewedFromId String?
+  renewedFrom   RentalAgreement? @relation("LeaseRenewals")
+
+  // Inspections attached to this tenancy (move-in, periodic, move-out)
+  inspections InspectionReport[]
+
+  // Resident requests raised against this tenancy
+  tenantRequests TenantRequest[]
+
   // Audit fields
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
-  terminatedAt    DateTime?
-  depositRefunded Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  activatedAt      DateTime?
+  terminatedAt     DateTime?
+  terminatedReason String?
+  expiredAt        DateTime?
+  depositRefunded  Boolean   @default(false)
 
   @@index([unitId])
   @@index([tenantId])
@@ -811,6 +854,147 @@ model RentalAgreement {
   @@index([endDate])
   @@index([organizationId])
   @@map("rental_agreements")
+}
+
+// Itemised deductions against a tenant's deposit. The refund is derived from
+// these rows rather than typed in, so the number is always auditable: deposit
+// − Σ(deductions) − unpaid rent.
+model MoveOutDeduction {
+  id               String         @id @default(cuid())
+  moveOutRequestId String
+  moveOutRequest   MoveOutRequest @relation(fields: [moveOutRequestId], references: [id], onDelete: Cascade)
+
+  category    DeductionCategory
+  description String
+  amount      Decimal           @db.Decimal(10, 2)
+
+  approvedById String?
+  approvedBy   User?   @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  notes        String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moveOutRequestId])
+  @@index([category])
+  @@map("move_out_deductions")
+}
+
+enum DeductionCategory {
+  DAMAGE
+  CLEANING
+  UNPAID_RENT
+  LATE_FEE
+  UTILITY
+  REPAIRS
+  OTHER
+}
+
+// Move-in / periodic / move-out condition report. Photos attach through the
+// Document Center (entityType = 'InspectionReport'), not a bespoke upload path.
+enum InspectionType {
+  MOVE_IN
+  PERIODIC
+  MOVE_OUT
+  ANNUAL
+}
+
+enum InspectionStatus {
+  DRAFT
+  COMPLETED
+  VOID
+}
+
+enum ConditionRating {
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+}
+
+model InspectionReport {
+  id     String @id @default(cuid())
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+
+  type   InspectionType
+  status InspectionStatus @default(DRAFT)
+
+  scheduledDate DateTime
+  completedAt   DateTime?
+  completedById String?
+  completedBy   User?     @relation(fields: [completedById], references: [id], onDelete: SetNull)
+
+  notes String? @db.Text
+
+  items InspectionItem[]
+
+  // Organization/Tenant association
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([unitId])
+  @@index([rentalAgreementId])
+  @@index([status])
+  @@index([organizationId])
+  @@map("inspection_reports")
+}
+
+model InspectionItem {
+  id       String           @id @default(cuid())
+  reportId String
+  report   InspectionReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  area      String // "Kitchen", "Bathroom", "Walls"…
+  item      String // what was checked
+  condition ConditionRating
+  notes     String?         @db.Text
+
+  // Estimated cost to put right, and whether the tenant is liable for it.
+  estimatedCost  Decimal? @db.Decimal(10, 2)
+  requiresAction Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reportId])
+  @@map("inspection_items")
+}
+
+// Reusable lease terms (Module 5). Applying a template prefills the create
+// form; the saved agreement is always a full row, never a reference back here.
+model LeaseTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name          String
+  agreementType AgreementType @default(RENTAL)
+
+  rentAmount       Decimal? @db.Decimal(10, 2)
+  currency         String   @default("KES")
+  securityDeposit  Decimal? @db.Decimal(10, 2)
+  termMonths       Int?
+  noticePeriodDays Int      @default(30)
+  escalationRate   Decimal? @db.Decimal(5, 2)
+  paymentDay       Int      @default(1)
+
+  termsBody String? @db.Text
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("lease_templates")
 }
 
 model MoveOutRequest {
@@ -826,6 +1010,13 @@ model MoveOutRequest {
   depositRefunded     Boolean         @default(false)
   depositRefundAmount Decimal?        @db.Decimal(10, 2)
   notes               String?         @db.Text
+
+  // Itemised deductions behind the refund (Module 5) — the refund is derived,
+  // never typed in.
+  deductions   MoveOutDeduction[]
+  refundedAt   DateTime?
+  refundedById String?
+  refundedBy   User?              @relation(fields: [refundedById], references: [id], onDelete: SetNull)
 
   // Organization/Tenant association
   organizationId String?
@@ -857,6 +1048,9 @@ enum AgreementStatus {
 enum MoveOutStatus {
   PENDING
   APPROVED
+  // Added in Module 5: the refund is a real settlement step, so a move-out that
+  // has been paid out is COMPLETED rather than merely APPROVED.
+  COMPLETED
   REJECTED
 }
 
@@ -1027,6 +1221,72 @@ model CommunicationLog {
   @@index([leadId])
   @@index([occurredAt])
   @@map("communication_logs")
+}
+
+// ============================================
+// TENANT REQUESTS (self-service, approved by staff)
+// ============================================
+
+// What a resident can *ask* for in the portal. A request never changes a lease
+// by itself: it is decided by staff, and approval delegates to the same
+// services staff would have called by hand.
+enum TenantRequestType {
+  RENEWAL
+  MOVE_OUT
+  PAYMENT_PLAN
+  MAINTENANT
+  LEASE_AMENDMENT
+}
+
+enum TenantRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+model TenantRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+
+  type   TenantRequestType
+  status TenantRequestStatus @default(PENDING)
+
+  // What the resident asked for, snapshotted at submission so a later change
+  // to the lease cannot rewrite their request.
+  payload Json
+
+  preferredDate DateTime?
+
+  // Set when a move-out date falls inside the lease's notice period: a flag for
+  // staff to decide on, not a refusal — the resident is allowed to ask.
+  earlyNotice Boolean @default(false)
+
+  note String? @db.Text
+
+  // Staff decision
+  decidedById  String?
+  decidedBy    User?     @relation("UserDecidedTenantRequests", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt    DateTime?
+  decisionNote String?   @db.Text
+
+  // What the approval actually did, so the queue stays auditable.
+  result Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([tenantId, status])
+  @@index([rentalAgreementId])
+  @@map("tenant_requests")
 }
 
 // ============================================
