@@ -70,3 +70,22 @@ export async function assertTenantRecord(
     throw new NotFoundException('Record not found');
   }
 }
+
+/**
+ * Await a Prisma lookup and turn a null result into a 404.
+ *
+ * Without this, a `findFirst` that matches nothing (genuinely missing record
+ * OR a record belonging to another tenant) resolves to `null`, and NestJS
+ * answers 200 with an empty body — leaking existence and breaking detail
+ * pages. Use for every tenant-scoped read-by-id.
+ */
+export async function requireRecord<T>(
+  lookup: Promise<T | null>,
+  label = 'Record',
+): Promise<T> {
+  const record = await lookup;
+  if (!record) {
+    throw new NotFoundException(`${label} not found`);
+  }
+  return record;
+}

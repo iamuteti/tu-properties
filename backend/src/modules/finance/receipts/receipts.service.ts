@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { assertTenantRecord } from '@/common/utils';
+import { assertTenantRecord, requireRecord } from '@/common/utils';
 
 @Injectable()
 export class ReceiptsService {
@@ -191,8 +191,13 @@ export class ReceiptsService {
     return this.prisma.receipt.create({ data: receiptData });
   }
 
-  findAll(tenantId?: string) {
-    const where = tenantId ? { organizationId: tenantId } : {};
+  findAll(tenantId?: string, category?: string) {
+    const where: Prisma.ReceiptWhereInput = tenantId
+      ? { organizationId: tenantId }
+      : {};
+    if (category && ['Rent', 'General', 'Refund'].includes(category)) {
+      where.receiptCategory = category as any;
+    }
     return this.prisma.receipt.findMany({
       where,
       include: {
@@ -208,21 +213,24 @@ export class ReceiptsService {
     });
   }
 
-  findOne(id: string, tenantId?: string) {
+  async findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.receipt.findFirst({
-      where,
-      include: {
-        tenant: true,
-        payments: {
-          include: {
-            invoice: true,
-            rentalAgreement: true,
+    return requireRecord(
+      this.prisma.receipt.findFirst({
+        where,
+        include: {
+          tenant: true,
+          payments: {
+            include: {
+              invoice: true,
+              rentalAgreement: true,
+            },
           },
+          receiptLines: true,
         },
-        receiptLines: true,
-      },
-    });
+      }),
+      'Receipt',
+    );
   }
 
   async delete(id: string, tenantId?: string) {

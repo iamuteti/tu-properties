@@ -45,11 +45,7 @@ export class AuthService {
       role: user.role,
       organizationId: user.organizationId,
     };
-    this.logger.log('Login payload: ' + JSON.stringify(payload));
     const token = this.jwtService.sign(payload);
-    this.logger.log(
-      'Generated token (first 50 chars): ' + token.substring(0, 50) + '...',
-    );
 
     this.setAuthCookie(res, token);
 
@@ -138,7 +134,9 @@ export class AuthService {
 
     // In a real product this would email the token. For now we return it in
     // the response so the flow can be exercised end-to-end in development.
-    this.logger.log(`Password reset token for ${user.email}: ${token}`);
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log('Password reset token issued for ' + user.email);
+    }
     return {
       message: 'If that email exists, a reset link has been sent.',
       ...(process.env.NODE_ENV !== 'production' && { resetToken: token }),

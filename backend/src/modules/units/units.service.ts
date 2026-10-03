@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { assertTenantRecord } from '@/common/utils';
+import { assertTenantRecord, requireRecord } from '@/common/utils';
 
 export interface PaginationParams {
   page?: number;
@@ -107,17 +107,20 @@ export class UnitsService {
     });
   }
 
-  findOne(id: string, tenantId?: string) {
+  async findOne(id: string, tenantId?: string) {
     const where = tenantId
       ? { id, property: { organizationId: tenantId } }
       : { id };
-    return this.prisma.unit.findFirst({
-      where,
-      include: {
-        property: true,
-        rentalAgreements: true,
-      },
-    });
+    return requireRecord(
+      this.prisma.unit.findFirst({
+        where,
+        include: {
+          property: true,
+          rentalAgreements: true,
+        },
+      }),
+      'Unit',
+    );
   }
 
   async update(id: string, data: Prisma.UnitUpdateInput, tenantId?: string) {

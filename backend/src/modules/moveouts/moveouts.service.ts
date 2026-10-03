@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { assertTenantRecord } from '@/common/utils';
+import { assertTenantRecord, requireRecord } from '@/common/utils';
 
 export interface PaginationParams {
   page?: number;
@@ -113,23 +113,26 @@ export class MoveoutsService {
     });
   }
 
-  findOne(id: string, tenantId?: string) {
+  async findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.moveOutRequest.findFirst({
-      where,
-      include: {
-        tenant: true,
-        rentalAgreement: {
-          include: {
-            unit: {
-              include: {
-                property: true
+    return requireRecord(
+      this.prisma.moveOutRequest.findFirst({
+        where,
+        include: {
+          tenant: true,
+          rentalAgreement: {
+            include: {
+              unit: {
+                include: {
+                  property: true
+                }
               }
             }
           }
-        }
-      },
-    });
+        },
+      }),
+      'Move-out request',
+    );
   }
 
   async update(id: string, data: Prisma.MoveOutRequestUpdateInput, tenantId?: string) {

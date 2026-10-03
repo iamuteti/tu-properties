@@ -10,18 +10,34 @@ import {
   Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
+import { Roles } from '@/common/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body() createUserDto: Prisma.UserCreateInput) {
-    return this.usersService.create(createUserDto);
+  create(
+    @Body() createUserDto: Prisma.UserCreateInput | Prisma.UserUncheckedCreateInput,
+    @Request() req,
+  ) {
+    const tenantId = getTenantId(req);
+    if (tenantId) {
+      // Org admins can only create users inside their own organization —
+      // never trust the client-supplied organization (id or relation).
+      const { organization, organizationId, ...rest } =
+        createUserDto as Prisma.UserUncheckedCreateInput & Record<string, unknown>;
+      return this.usersService.create({
+        ...rest,
+        organization: { connect: { id: tenantId } },
+      } as Prisma.UserCreateInput);
+    }
+    return this.usersService.create(createUserDto as Prisma.UserCreateInput);
   }
 
   @Get()

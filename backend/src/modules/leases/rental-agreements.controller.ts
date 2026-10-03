@@ -10,9 +10,10 @@ import {
   Request,
 } from '@nestjs/common';
 import { RentalAgreementsService } from './rental-agreements.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
+import { Roles } from '@/common/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('rental-agreements')
@@ -20,6 +21,7 @@ export class RentalAgreementsController {
   constructor(private readonly rentalAgreementsService: RentalAgreementsService) {}
 
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
   create(@Body() createRentalAgreementDto: Prisma.RentalAgreementCreateInput, @Request() req) {
     const tenantId = getTenantId(req);
     return this.rentalAgreementsService.create(createRentalAgreementDto, tenantId);
@@ -38,6 +40,7 @@ export class RentalAgreementsController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
   update(
     @Param('id') id: string,
     @Body() updateRentalAgreementDto: Prisma.RentalAgreementUpdateInput,
@@ -48,6 +51,7 @@ export class RentalAgreementsController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.rentalAgreementsService.remove(id, tenantId);

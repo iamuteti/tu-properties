@@ -11,10 +11,12 @@ import {
 } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
-import { Prisma } from '@prisma/client';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { Prisma, UserRole } from '@prisma/client';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard)
+@Roles(UserRole.SUPER_ADMIN)
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 

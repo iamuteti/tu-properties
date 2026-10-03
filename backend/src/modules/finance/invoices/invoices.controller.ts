@@ -6,13 +6,17 @@ import {
   Param,
   UseGuards,
   Delete,
+  Patch,
   Request,
 } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 @UseGuards(JwtAuthGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
 @Controller('finance/invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
@@ -70,6 +74,38 @@ export class InvoicesController {
   findOne(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.invoicesService.findOne(id, tenantId);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body()
+    updateInvoiceDto: {
+      landlordId?: string;
+      rentalAgreementId?: string;
+      transactionClass?: string;
+      acReceivable?: string;
+      billTo?: string;
+      issueDate?: string;
+      dueDate?: string;
+      currency?: string;
+      spotRate?: number;
+      lpoNumber?: string;
+      signOnEfims?: boolean;
+      paymentInfo?: string;
+      termsConditions?: string;
+      memo?: string;
+      amount?: number;
+      vatAmount?: number;
+      totalAmount?: number;
+      paidAmount?: number;
+      balanceAmount?: number;
+      status?: string;
+    },
+    @Request() req,
+  ) {
+    const tenantId = getTenantId(req);
+    return this.invoicesService.update(id, updateInvoiceDto, tenantId);
   }
 
   @Delete(':id')

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { assertTenantRecord } from '@/common/utils';
+import { assertTenantRecord, requireRecord } from '@/common/utils';
 
 @Injectable()
 export class InvoicesService {
@@ -112,6 +112,83 @@ export class InvoicesService {
     return this.prisma.invoice.create({ data: invoiceData });
   }
 
+  async update(
+    id: string,
+    data: {
+      landlordId?: string;
+      rentalAgreementId?: string;
+      transactionClass?: string;
+      acReceivable?: string;
+      billTo?: string;
+      issueDate?: string | Date;
+      dueDate?: string | Date;
+      currency?: string;
+      spotRate?: number;
+      lpoNumber?: string;
+      signOnEfims?: boolean;
+      paymentInfo?: string;
+      termsConditions?: string;
+      memo?: string;
+      amount?: number;
+      vatAmount?: number;
+      totalAmount?: number;
+      paidAmount?: number;
+      balanceAmount?: number;
+      status?: string;
+    },
+    tenantId?: string,
+  ) {
+    if (tenantId) {
+      await assertTenantRecord(this.prisma.invoice, { id, organizationId: tenantId });
+    }
+
+    const updateData: Prisma.InvoiceUpdateInput = {};
+    if (data.landlordId !== undefined) {
+      updateData.landlord = data.landlordId
+        ? { connect: { id: data.landlordId } }
+        : { disconnect: true };
+    }
+    if (data.rentalAgreementId !== undefined) {
+      updateData.rentalAgreement = data.rentalAgreementId
+        ? { connect: { id: data.rentalAgreementId } }
+        : { disconnect: true };
+    }
+    if (data.transactionClass !== undefined) updateData.transactionClass = data.transactionClass;
+    if (data.acReceivable !== undefined) updateData.acReceivable = data.acReceivable;
+    if (data.billTo !== undefined) updateData.billTo = data.billTo;
+    if (data.issueDate !== undefined) updateData.issueDate = new Date(data.issueDate);
+    if (data.dueDate !== undefined) updateData.dueDate = new Date(data.dueDate);
+    if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.spotRate !== undefined) updateData.spotRate = data.spotRate;
+    if (data.lpoNumber !== undefined) updateData.lpoNumber = data.lpoNumber;
+    if (data.signOnEfims !== undefined) updateData.signOnEfims = data.signOnEfims;
+    if (data.paymentInfo !== undefined) updateData.paymentInfo = data.paymentInfo;
+    if (data.termsConditions !== undefined) updateData.termsConditions = data.termsConditions;
+    if (data.memo !== undefined) updateData.memo = data.memo;
+    if (data.amount !== undefined) updateData.amount = data.amount;
+    if (data.vatAmount !== undefined) updateData.vatAmount = data.vatAmount;
+    if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount;
+    if (data.paidAmount !== undefined) updateData.paidAmount = data.paidAmount;
+    if (data.balanceAmount !== undefined) updateData.balanceAmount = data.balanceAmount;
+    if (data.status !== undefined) updateData.status = data.status as any;
+
+    return this.prisma.invoice.update({
+      where: { id },
+      data: updateData,
+      include: {
+        invoiceItems: true,
+        payments: true,
+        landlord: true,
+        rentalAgreement: {
+          include: {
+            tenant: true,
+            unit: true,
+          },
+        },
+      },
+    });
+  }
+
   findAll(tenantId?: string) {
     const where = tenantId ? { organizationId: tenantId } : {};
     return this.prisma.invoice.findMany({
@@ -129,22 +206,25 @@ export class InvoicesService {
     });
   }
 
-  findOne(id: string, tenantId?: string) {
+  async findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
-    return this.prisma.invoice.findFirst({
-      where,
-      include: {
-        invoiceItems: true,
-        payments: true,
-        landlord: true,
-        rentalAgreement: {
-          include: {
-            tenant: true,
-            unit: true,
+    return requireRecord(
+      this.prisma.invoice.findFirst({
+        where,
+        include: {
+          invoiceItems: true,
+          payments: true,
+          landlord: true,
+          rentalAgreement: {
+            include: {
+              tenant: true,
+              unit: true,
+            },
           },
         },
-      },
-    });
+      }),
+      'Invoice',
+    );
   }
 
   async delete(id: string, tenantId?: string) {

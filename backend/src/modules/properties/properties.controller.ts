@@ -12,8 +12,9 @@ import {
 } from '@nestjs/common';
 import { PropertiesService, PaginationParams, PropertyFilters } from './properties.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { getTenantId } from '@/common/utils';
+import { Roles } from '@/common/decorators/roles.decorator';
 
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
@@ -21,6 +22,7 @@ export class PropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
   create(
     @Body() createPropertyDto: Prisma.PropertyCreateInput,
     @Request() req,
@@ -64,6 +66,7 @@ export class PropertiesController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
   update(
     @Param('id') id: string,
     @Body() updatePropertyDto: Prisma.PropertyUpdateInput,
@@ -74,6 +77,7 @@ export class PropertiesController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
   remove(@Param('id') id: string, @Request() req) {
     const tenantId = getTenantId(req);
     return this.propertiesService.remove(id, tenantId);

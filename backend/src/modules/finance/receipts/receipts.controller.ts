@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
   Delete,
   Request,
@@ -11,8 +12,11 @@ import {
 import { ReceiptsService } from './receipts.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 @UseGuards(JwtAuthGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
 @Controller('finance/receipts')
 export class ReceiptsController {
   constructor(private readonly receiptsService: ReceiptsService) {}
@@ -97,9 +101,9 @@ export class ReceiptsController {
   }
 
   @Get()
-  findAll(@Request() req) {
+  findAll(@Request() req, @Query('category') category?: string) {
     const tenantId = getTenantId(req);
-    return this.receiptsService.findAll(tenantId);
+    return this.receiptsService.findAll(tenantId, category);
   }
 
   @Get(':id')

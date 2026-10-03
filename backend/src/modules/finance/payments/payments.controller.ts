@@ -9,12 +9,14 @@ import {
   Request,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { getTenantId } from '@/common/utils';
 import { UsersService } from '@/modules/users/users.service';
+import { Roles } from '@/common/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
 @Controller('finance/payments')
 export class PaymentsController {
   constructor(

@@ -75,7 +75,7 @@ Do not treat the module roadmap in Section 4 as "mostly built, just polish it." 
 
 ### 3.2 What is real vs. what looks real
 
-**Backend (NestJS 11 + Prisma 7 + PostgreSQL, port 3003) — 11 modules, CRUD-only:**
+**Backend (NestJS 11 + Prisma 7 + PostgreSQL, port 3003) — 12 modules, CRUD-only (plus `GET /dashboard/stats` aggregation since 2026-10-03):**
 - Organizations, users, roles, properties, units, landlords, tenants, rental agreements, move-outs, invoices, payments, receipts, audit (model only) — all exist as Prisma models + basic CRUD controllers.
 - Schema has **20 Prisma models** (`backend/src/prisma/schema.prisma` lines 17–905), including a number of fields that look like accounting/legacy carryover and are **not wired to any logic yet**: `acReceivable`, `incomeAccount`, `spotRate` on relevant models; `Property.mpesaPropertyPayNumber`; `Invoice.signOnEfims`; `Receipt.bankingDate`; `exemptAllSms`. **Do not delete these — they signal intended future functionality (GL account mapping, payment gateway config, local tax compliance, SMS opt-out) — but do not assume they mean the feature is built. Wire logic to them or extend them; don't duplicate them with new fields.**
 - `AuditLog` model and `logAction()` service (`backend/src/modules/audit/audit.service.ts:9`) exist but **`logAction` is never called anywhere in the codebase**. Audit logging is effectively non-functional despite the model existing.
@@ -100,7 +100,7 @@ Status markers: ✅ = resolved (date), ⚠️ = partially resolved, ❌ = still 
 5. ✅ (2026-10-03, verified) Properties parent + children now consistently exclude ACCOUNTANT.
 
 **Dead / incomplete code:**
-6. ❌ Dashboard stats/charts still hardcoded (`dashboard/page.tsx`) — not API-driven.
+6. ⚠️ Dashboard stats/charts still hardcoded on the frontend (`dashboard/page.tsx`) — but the backend `GET /dashboard/stats` endpoint now exists (2026-10-03, `modules/dashboard/`, tenant-scoped; returns totals, unitsByStatus, monthlyCharges[6], unitsByProperty top-7). Frontend wiring is the remaining piece.
 7. ❌ Rent-receipt form still logs to console only (`rent-receipts/new/page.tsx:105`); no backend create path for rent receipts yet (Receipt model supports `receiptCategory: Rent` + `ReceiptLine[]`).
 8. ❌ Receipt "Add Invoice" button still a no-op stub (`receipts/new/page.tsx:342`), though the invoice list is already loaded via `useFinance`.
 9. ✅ (2026-10-03, verified) `billingApi` removed from `frontend/lib/api.ts`; no `/billing` references remain.
@@ -109,21 +109,23 @@ Status markers: ✅ = resolved (date), ⚠️ = partially resolved, ❌ = still 
 10. ✅ (2026-10-03) CORS restricted to env-driven allowlist (`security/cors.service.ts` + `resolveAllowlist`), wired in `main.ts`.
 11. ✅ (2026-10-03) JWT now in httpOnly `auth_token` cookie (SameSite=strict, 1h); `cookie-parser` enabled; axios uses `withCredentials`; no token in response bodies or localStorage. Note: the migration was previously stranded in a dead `src/auth/` tree (never compiled, never booted) — it was merged into `modules/auth` this session.
 12. ⚠️ Password reset flow now exists (`/auth/forgot-password`, `/auth/reset-password`, hashed 30-min tokens; schema columns added by migration `20261003082158_add_password_reset_fields`). Still missing: MFA, session revocation, auth rate limiting.
-13. ⚠️ All controllers sit behind `JwtAuthGuard`, and tenant filtering now fails closed (`getTenantId` throws 403 for org-less non-super-admins; invalid compound-where Prisma queries fixed in **all 10 services**, verified live on 2026-10-03: Rohi sees its 100 properties, Westhill sees 0, cross-org create lands in the correct org). Still missing: granular `@Roles`/`RolesGuard` enforcement (any authenticated role can still call any endpoint).
+13. ✅ (2026-10-03) All controllers sit behind `JwtAuthGuard`, tenant filtering fails closed (`getTenantId` throws 403 for org-less non-super-admins; invalid compound-where Prisma queries fixed in **all 10 services**, verified live: Rohi sees its 100 properties, Westhill sees 0, cross-org create lands in the correct org), and granular RBAC is enforced via `@Roles` decorator + global `RolesGuard` on **all 12 controllers** (matrix mirrors the sidebar's role visibility: properties/units/landlords/tenants/leases/moveouts writes = SUPER_ADMIN/ADMIN/PROPERTY_MANAGER; finance = SUPER_ADMIN/ADMIN/ACCOUNTANT; users = ADMIN/SUPER_ADMIN; orgs = SUPER_ADMIN; audit = ADMIN/SUPER_ADMIN). Verified live: Property Manager gets 403 on finance + user endpoints, Accountant gets 403 on property writes. Note: this is name-based on the 5-role `UserRole` enum; the structured `Role.permissions` model is Module 1 (Core Platform) work.
 14. ✅ (2026-10-03) `AuditLog` is now written: global `AuditInterceptor` records all mutating requests + LOGIN events. Was previously unwired — broken import, wrong `CallHandler` typing, and `SecurityModule` missing its `AuditModule` import (boot crash); all fixed. Still open: `AuditLog` has no `organizationId`, so audit queries aren't tenant-scoped.
 
 **Process / hygiene:**
 15. ✅ (2026-10-03) `seed.ts` now runs the full demo seed (`seedDemoData()` from `demo-data.ts`), so `npx prisma db seed` produces the state described in the rewritten `Testing.md`; `npm run db:seed:demo` still works standalone.
 16. ❌ No `.gitattributes` yet; CRLF noise + lockfile drift still present.
-17. ❌ Still only 3 backend test specs; no frontend tests, no CI/CD, no Docker, no OpenAPI docs.
+17. ❌ Still only 2 backend test specs (`app.controller.spec.ts`, `prisma.service.spec.ts` — both trivial, no auth/CRUD coverage); no frontend tests, no CI/CD, no Docker, no OpenAPI docs.
 18. ✅ N/A — this doc set remains the roadmap of record.
 
 **New issues found 2026-10-03 (backend/DB pass):**
 19. Prisma schema had drifted ahead of migrations — `users` table was missing `resetPasswordToken`/`resetPasswordExpires`; fixed by migration `20261003082158_add_password_reset_fields`. Run `npx prisma migrate dev` before seeding a fresh DB.
 20. ✅ (2026-10-03) Tenant-scoped `findUnique`/`update`/`delete` used invalid compound where-clauses (`{ id, organizationId }`) in every module service — every tenant-user read-by-id/update/delete 500'd. Fixed in **all 10 services** (properties, units, landlords, tenants, rental-agreements, invoices, payments, receipts, moveouts, users) via the `assertTenantRecord()` helper in `common/utils.ts`.
-21. `invoices` has no PATCH endpoint (frontend `invoicesApi.update` targets a 404); no CSV export or dashboard-stats endpoints yet.
+21. ✅ (2026-10-03) `PATCH /finance/invoices/:id` now exists (scalar fields + status; relation connect/disconnect for landlord/rentalAgreement; line items not editable via PATCH yet). `GET /finance/receipts?category=Rent|General|Refund` filter added for the rent-receipts list. Still open: CSV export endpoints.
 22. `AuditInterceptor` derives the entity name from the URL path with a trailing `s` stripped, so `/properties` logs entity `"Propertie"` — cosmetic, but audit queries must account for it until the interceptor maps route → model name.
 23. `main.ts` previously passed a **sync** allowlist function to `enableCors({ origin })` — the cors package treats a function `origin` as async and waits for a callback, so **every request to the API hung** (app booted normally, no route responded). Fixed 2026-10-03 with the callback form. Lesson: any function passed to `origin` must call its callback.
+24. ✅ (2026-10-03) Tenant-scoped `GET /:id` reads returned **200 with an empty body** for missing or cross-tenant records (Nest returns null → 200), which would have broken every detail page and leaked record existence across tenants. All 10 tenant services now wrap `findFirst` read-by-id in the `requireRecord()` helper (`common/utils.ts`) which throws 404. Verified live: cross-tenant invoice read → 404, same-tenant read → 200 with data.
+25. **Schema debt (verified 2026-10-03):** `Unit` (and all child/line models — `UnitServiceCharge`, `UnitMeterNumber`, `UnitFeature`, `PropertyStandingCharge`, `PropertySecurityDeposit`, `TenantEmergencyContact`, `InvoiceItem`, `ReceiptLine`) have **no `organizationId` column**; tenant scoping flows through the parent relation (`Unit` → `Property`). Any query against these models MUST filter by relation (`{ property: { organizationId: tenantId } }`) — filtering by `organizationId` throws a Prisma validation error. `AuditLog` also lacks `organizationId` (see item 14).
 
 ### 3.4 Benchmark gaps (what a real PMS/ERP has that TU Properties doesn't yet)
 
