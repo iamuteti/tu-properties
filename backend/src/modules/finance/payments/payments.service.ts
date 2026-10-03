@@ -11,11 +11,37 @@ export class PaymentsService {
     private usersService: UsersService,
   ) {}
 
+  /**
+   * Record a payment.
+   *
+   * The controller receives the flat shape the UI sends (`invoiceId`,
+   * `rentalAgreementId`, `receiptId`) while Prisma needs either all scalar FKs
+   * *or* all nested relation writes — mixing them is rejected. Since we also
+   * connect `organization` as a relation, the parent links are converted to
+   * nested writes here; before this, paying an invoice by `invoiceId` always
+   * failed with "Unknown argument `invoiceId`".
+   */
   async create(
-    data: Prisma.PaymentCreateInput & { recordedBy?: string },
+    data: Prisma.PaymentCreateInput & {
+      recordedBy?: string;
+      invoiceId?: string | null;
+      rentalAgreementId?: string | null;
+      receiptId?: string | null;
+    },
     tenantId?: string,
   ) {
-    const paymentData: Prisma.PaymentCreateInput = { ...data };
+    const { invoiceId, rentalAgreementId, receiptId, ...rest } = data;
+    // `recordedBy` is the UI's display name, not a column.
+    delete (rest as { recordedBy?: string }).recordedBy;
+
+    const paymentData = {
+      ...rest,
+      ...(invoiceId ? { invoice: { connect: { id: invoiceId } } } : {}),
+      ...(rentalAgreementId
+        ? { rentalAgreement: { connect: { id: rentalAgreementId } } }
+        : {}),
+      ...(receiptId ? { receipt: { connect: { id: receiptId } } } : {}),
+    } as Prisma.PaymentCreateInput;
 
     // Add tenant organization if provided
     if (tenantId) {

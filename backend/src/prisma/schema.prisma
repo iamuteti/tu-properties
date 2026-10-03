@@ -64,6 +64,8 @@ model Organization {
   leads             Lead[]
   contacts          Contact[]
   communicationLogs CommunicationLog[]
+  saleTransactions  SaleTransaction[]
+  commissions       Commission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -114,6 +116,9 @@ model User {
   uploadedDocuments    Document[]
   assignedLeads        Lead[]             @relation("UserAssignedLeads")
   loggedCommunications CommunicationLog[] @relation("UserLoggedCommunications")
+  sales                SaleTransaction[]  @relation("UserSales")
+  commissions          Commission[]       @relation("UserCommissions")
+  approvedCommissions  Commission[]       @relation("UserApprovedCommissions")
 
   @@index([email])
   @@index([role])
@@ -392,6 +397,9 @@ model Property {
 
   // Leads that asked about this property (Module 3 CRM).
   leads Lead[] @relation("PropertyLeads")
+
+  // Open sales against this property (Module 4).
+  sales SaleTransaction[] @relation("PropertySales")
 
   // Accounting & Billing Configuration
   accountLedgerType     String? // e.g., "Property Control Ledger in GL"
@@ -786,6 +794,7 @@ model RentalAgreement {
   // Relationships
   invoices        Invoice[]
   payments        Payment[]
+  commissions     Commission[]
   moveOutRequests MoveOutRequest[]
 
   // Audit fields
@@ -914,6 +923,7 @@ model Lead {
   convertedAt DateTime?
 
   communications CommunicationLog[]
+  sales          SaleTransaction[]  @relation("LeadSales")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -958,6 +968,7 @@ model Contact {
   isActive Boolean @default(true)
 
   leads          Lead[]             @relation("LeadContact")
+  sales          SaleTransaction[]  @relation("ContactSales")
   communications CommunicationLog[]
   tenant         Tenant?
 
@@ -1019,6 +1030,179 @@ model CommunicationLog {
 }
 
 // ============================================
+// SALES MANAGEMENT
+// ============================================
+
+// A property sale moves strictly forward through these stages; CANCELLED is
+// reachable from any stage before HANDOVER. The transition rules (which gates
+// each move) live in `modules/sales/sale-stage.ts`.
+enum SaleStage {
+  QUOTATION
+  OFFER
+  RESERVATION
+  AGREEMENT
+  PAYMENT
+  HANDOVER
+  CANCELLED
+}
+
+enum InstallmentStatus {
+  SCHEDULED
+  INVOICED
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+model SaleTransaction {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  code String @unique // Sale reference, e.g. SALE-2026-0001
+
+  // What is being sold. `Restrict`: a property with an open sale cannot be
+  // deleted out from under it.
+  propertyId String
+  property   Property @relation("PropertySales", fields: [propertyId], references: [id], onDelete: Restrict)
+
+  // Snapshot of the property name/title at the time the sale was opened, so a
+  // renamed or archived property does not rewrite history.
+  propertyTitle String?
+
+  // Buyer comes from the CRM contacts directory (Module 3).
+  buyerContactId String?
+  buyerContact   Contact? @relation("ContactSales", fields: [buyerContactId], references: [id], onDelete: SetNull)
+
+  // Lead this sale came from, when it started in the CRM pipeline.
+  leadId String?
+  lead   Lead?   @relation("LeadSales", fields: [leadId], references: [id], onDelete: SetNull)
+
+  // Primary agent. Additional agents are rows in `Commission` (split support).
+  agentUserId String?
+  agent       User?   @relation("UserSales", fields: [agentUserId], references: [id], onDelete: SetNull)
+
+  stage SaleStage @default(QUOTATION)
+
+  // Money
+  askingPrice   Decimal? @db.Decimal(14, 2)
+  agreedPrice   Decimal? @db.Decimal(14, 2)
+  bookingFee    Decimal? @db.Decimal(14, 2)
+  depositAmount Decimal? @db.Decimal(14, 2)
+  currency      String   @default("KES")
+
+  // Commission basis for this sale, as a percentage of the agreed price.
+  // Individual splits are stored on `Commission.splitPercentage`.
+  commissionRate Decimal? @db.Decimal(5, 2)
+
+  // Stage dates, stamped when the sale enters each stage (audit trail)
+  quotationDate      DateTime?
+  offerDate          DateTime?
+  reservationDate    DateTime?
+  agreementDate      DateTime?
+  paymentDate        DateTime?
+  handoverDate       DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  notes String? @db.Text
+
+  installments SaleInstallment[]
+  commissions  Commission[]
+  invoices     Invoice[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  @@index([organizationId])
+  @@index([stage])
+  @@index([propertyId])
+  @@index([buyerContactId])
+  @@map("sale_transactions")
+}
+
+// An agreed payment schedule. `invoiceId` is the Finance invoice raised for
+// the installment — installment billing reuses `InvoicesService` rather than
+// duplicating invoicing logic.
+model SaleInstallment {
+  id                String          @id @default(cuid())
+  saleTransactionId String
+  saleTransaction   SaleTransaction @relation(fields: [saleTransactionId], references: [id], onDelete: Cascade)
+
+  sequence    Int // 1-based position in the schedule
+  description String // e.g. "Deposit", "Second instalment"
+  amount      Decimal           @db.Decimal(14, 2)
+  dueDate     DateTime
+  status      InstallmentStatus @default(SCHEDULED)
+  invoiceId   String?           @unique
+  invoice     Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  paidAt      DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([saleTransactionId, sequence])
+  @@index([saleTransactionId])
+  @@index([status])
+  @@map("sale_installments")
+}
+
+// Commission earned on a sale (or, for the leasing side that the schema also
+// allows, on a rental agreement). `splitPercentage` is the agent's share of
+// the sale's commission; the rows for one sale are expected to add up to 100.
+model Commission {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  saleTransactionId String?
+  saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: SetNull)
+
+  // The leasing side of the same commission concept. Module 5 wires this up.
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+
+  agentUserId String
+  agent       User   @relation("UserCommissions", fields: [agentUserId], references: [id], onDelete: Restrict)
+
+  amount          Decimal  @db.Decimal(14, 2)
+  splitPercentage Decimal? @db.Decimal(5, 2)
+  currency        String   @default("KES")
+
+  // What the commission was earned on: the sale price, the booking fee, a
+  // referral, or an agent's cut of another agent's deal.
+  basis String @default("SALE")
+
+  status CommissionStatus @default(PENDING)
+  notes  String?          @db.Text
+
+  approvedAt   DateTime?
+  approvedById String?
+  approvedBy   User?     @relation("UserApprovedCommissions", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  paidAt  DateTime?
+  paidRef String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([saleTransactionId])
+  @@index([agentUserId])
+  @@index([status])
+  @@map("commissions")
+}
+
+// ============================================
 // BILLING & PAYMENTS
 // ============================================
 
@@ -1033,6 +1217,12 @@ model Invoice {
   // Keep rental agreement reference for backward compatibility and property tracking
   rentalAgreementId String?
   rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+
+  // Sale instalment link (Module 4). Sale invoices are raised by the Sales
+  // module through `InvoicesService` and classified with
+  // `transactionClass = 'SALE'`; they are not rental invoices.
+  saleTransactionId String?
+  saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: SetNull)
 
   // Invoice Details
   issueDate   DateTime @default(now())
@@ -1085,10 +1275,12 @@ model Invoice {
   payments     Payment[]
 
   // Audit fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  saleInstallment SaleInstallment?
 
   @@index([rentalAgreementId])
+  @@index([saleTransactionId])
   @@index([status])
   @@index([dueDate])
   @@index([organizationId])

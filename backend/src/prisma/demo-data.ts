@@ -703,6 +703,18 @@ export async function generateDemoData(
     `Generated ${crmCounts.leads} leads, ${crmCounts.contacts} contacts, ${crmCounts.communications} log entries`,
   );
 
+  // ========== SALES: transactions, instalments, commissions (Module 4) ==========
+  console.log('Generating sales transactions and commissions...');
+  const salesCounts = await generateSalesData(
+    prisma,
+    organizationId,
+    properties,
+    crmCounts.buyerContactId,
+  );
+  console.log(
+    `Generated ${salesCounts.sales} sales, ${salesCounts.installments} instalments, ${salesCounts.commissions} commissions`,
+  );
+
   return {
     landlords: landlords.length,
     properties: properties.length,
@@ -715,7 +727,242 @@ export async function generateDemoData(
     leads: crmCounts.leads,
     contacts: crmCounts.contacts,
     communications: crmCounts.communications,
+    sales: salesCounts.sales,
+    installments: salesCounts.installments,
+    commissions: salesCounts.commissions,
   };
+}
+
+/**
+ * Sales data (Module 4).
+ *
+ * Spreads sales across the pipeline so the board shows a real funnel: two
+ * quotations, an offer, a reservation, a sale in payment collection with a
+ * payment schedule and raised invoices, and one completed handover. The handed
+ * over sale carries a split commission so the report has two agents on it.
+ */
+async function generateSalesData(
+  prisma: PrismaClient,
+  organizationId: string,
+  properties: Property[],
+  buyerContactId: string | null,
+) {
+  // Only properties without an open sale can carry one (enforced by the API).
+  const candidates = properties.filter(
+    (property) => property.type?.toLowerCase() !== 'land',
+  );
+  if (candidates.length < 6 || !buyerContactId) {
+    return { sales: 0, installments: 0, commissions: 0 };
+  }
+
+  const agents = await prisma.user.findMany({
+    where: { organizationId },
+    select: { id: true },
+    take: 2,
+  });
+  const agentId = agents[0]?.id ?? null;
+  const secondAgentId = agents[1]?.id ?? agentId;
+
+  const stages = [
+    'QUOTATION',
+    'QUOTATION',
+    'OFFER',
+    'RESERVATION',
+    'PAYMENT',
+    'HANDOVER',
+  ] as const;
+
+  let sales = 0;
+  let installments = 0;
+  let commissions = 0;
+  let sequence = 1;
+
+  for (const [index, stage] of stages.entries()) {
+    const property = candidates[index];
+    if (!property) break;
+
+    const agreedPrice = 40_000_000 + index * 7_500_000;
+    const isHandover = stage === 'HANDOVER';
+
+    const sale = await prisma.saleTransaction.create({
+      data: {
+        code: `SALE-2026-${String(sequence).padStart(4, '0')}`,
+        organizationId,
+        propertyId: property.id,
+        propertyTitle: property.name,
+        buyerContactId,
+        agentUserId: agentId,
+        stage,
+        askingPrice: agreedPrice + 3_000_000,
+        agreedPrice,
+        bookingFee: 500_000,
+        depositAmount: 5_000_000,
+        commissionRate: 3,
+        quotationDate: daysFromNow(-60 + index * 5),
+        offerDate: stage === 'QUOTATION' ? null : daysFromNow(-55 + index * 5),
+        reservationDate:
+          stage === 'QUOTATION' || stage === 'OFFER'
+            ? null
+            : daysFromNow(-50 + index * 5),
+        agreementDate:
+          stage === 'QUOTATION' || stage === 'OFFER' || stage === 'RESERVATION'
+            ? null
+            : daysFromNow(-45 + index * 5),
+        paymentDate:
+          stage === 'PAYMENT' || isHandover ? daysFromNow(-30) : null,
+        handoverDate: isHandover ? daysFromNow(-5) : null,
+        notes: 'Seeded sale for demonstration.',
+      },
+    });
+    sales += 1;
+
+    // Only the money stages need a schedule; earlier stages have nothing to bill.
+    if (stage === 'RESERVATION' || stage === 'PAYMENT' || isHandover) {
+      const deposit = 5_000_000;
+      const financed = agreedPrice - deposit;
+      const count = 4;
+      const per = Math.round((financed / count) * 100) / 100;
+
+      const rows: Array<{
+        saleTransactionId: string;
+        sequence: number;
+        description: string;
+        amount: number;
+        dueDate: Date;
+        status: 'SCHEDULED' | 'PAID';
+        paidAt?: Date;
+      }> = [
+        {
+          saleTransactionId: sale.id,
+          sequence: 1,
+          description: 'Deposit',
+          amount: deposit,
+          dueDate: daysFromNow(-40),
+          status: isHandover ? 'PAID' : 'SCHEDULED',
+          ...(isHandover ? { paidAt: daysFromNow(-40) } : {}),
+        },
+      ];
+
+      for (let i = 0; i < count; i += 1) {
+        rows.push({
+          saleTransactionId: sale.id,
+          sequence: i + 2,
+          description: `Instalment ${i + 1}`,
+          amount:
+            i === count - 1
+              ? Math.round((financed - per * (count - 1)) * 100) / 100
+              : per,
+          dueDate: daysFromNow(-10 + i * 30),
+          status: isHandover ? 'PAID' : 'SCHEDULED',
+          ...(isHandover ? { paidAt: daysFromNow(-10 + i * 30) } : {}),
+        });
+      }
+
+      await prisma.saleInstallment.createMany({ data: rows });
+      installments += rows.length;
+
+      // Raise finance invoices for the two money stages, as the API would.
+      const created = await prisma.saleInstallment.findMany({
+        where: { saleTransactionId: sale.id },
+        orderBy: { sequence: 'asc' },
+      });
+      for (const row of created) {
+        const invoice = await prisma.invoice.create({
+          data: {
+            invoiceNumber: `INV-SALE-${String(sequence).padStart(4, '0')}-${row.sequence}`,
+            transactionClass: 'SALE',
+            billTo: 'Seeded buyer',
+            issueDate: daysFromNow(-12),
+            dueDate: row.dueDate,
+            amount: row.amount,
+            totalAmount: row.amount,
+            paidAmount: row.status === 'PAID' ? row.amount : 0,
+            balanceAmount: row.status === 'PAID' ? 0 : row.amount,
+            status: row.status === 'PAID' ? 'PAID' : 'PENDING',
+            memo: `Sale ${sale.code} — ${row.description}`,
+            organizationId,
+            saleTransactionId: sale.id,
+            invoiceItems: {
+              create: [
+                {
+                  description: `${row.description} (${sale.code})`,
+                  revenueExpenseItem: 'Property sale',
+                  quantity: 1,
+                  unitPrice: row.amount,
+                  amount: row.amount,
+                },
+              ],
+            },
+          },
+        });
+
+        await prisma.saleInstallment.update({
+          where: { id: row.id },
+          data: {
+            invoiceId: invoice.id,
+            status: isHandover ? 'PAID' : 'INVOICED',
+          },
+        });
+
+        if (isHandover) {
+          await prisma.payment.create({
+            data: {
+              invoiceId: invoice.id,
+              amount: row.amount,
+              paymentMethod: 'MPESA',
+              paymentReference: `SALE-PAY-${row.sequence}`,
+              organizationId,
+            },
+          });
+        }
+      }
+
+      // Commission split: 70/30 when a second agent exists.
+      const total = Math.round(agreedPrice * 0.03 * 100) / 100;
+      const participants =
+        secondAgentId && secondAgentId !== agentId
+          ? [
+              { agentUserId: agentId ?? '', share: 70 },
+              { agentUserId: secondAgentId, share: 30 },
+            ]
+          : [{ agentUserId: agentId ?? '', share: 100 }];
+
+      let allocated = 0;
+      for (const [pIndex, participant] of participants.entries()) {
+        const amount =
+          pIndex === participants.length - 1
+            ? Math.round((total - allocated) * 100) / 100
+            : Math.round(((total * participant.share) / 100) * 100) / 100;
+        allocated += amount;
+
+        await prisma.commission.create({
+          data: {
+            organizationId,
+            saleTransactionId: sale.id,
+            agentUserId: participant.agentUserId,
+            amount,
+            splitPercentage: participant.share,
+            currency: 'KES',
+            basis: 'SALE',
+            status: isHandover
+              ? 'PAID'
+              : stage === 'PAYMENT'
+                ? 'APPROVED'
+                : 'PENDING',
+            approvedAt:
+              isHandover || stage === 'PAYMENT' ? daysFromNow(-30) : null,
+            paidAt: isHandover ? daysFromNow(-5) : null,
+            paidRef: isHandover ? `COMM-PAY-${sequence}` : null,
+          },
+        });
+        commissions += 1;
+      }
+    }
+
+    sequence += 1;
+  }
+
+  return { sales, installments, commissions };
 }
 
 /**
@@ -817,6 +1064,7 @@ async function generateCrmData(
   let leads = 0;
   let contacts = 0;
   let communications = 0;
+  let buyerContactId: string | null = null;
 
   for (const [index, person] of people.entries()) {
     const property = properties[index % Math.max(properties.length, 1)];
@@ -870,6 +1118,8 @@ async function generateCrmData(
         },
       });
       contacts += 1;
+      // Reused as the buyer on the seeded sales (Module 4).
+      buyerContactId = buyerContactId ?? contact.id;
 
       await prisma.communicationLog.create({
         data: {
@@ -943,7 +1193,7 @@ async function generateCrmData(
     }
   }
 
-  return { leads, contacts, communications };
+  return { leads, contacts, communications, buyerContactId };
 }
 
 function daysFromNow(days: number): Date {
@@ -973,6 +1223,11 @@ export async function seedDemoData() {
     await prisma.receiptLine.deleteMany();
     await prisma.receipt.deleteMany();
     await prisma.invoiceItem.deleteMany();
+    // Sales own instalments and commissions, and reference properties/users,
+    // so they are cleared before the tables they point at.
+    await prisma.commission.deleteMany();
+    await prisma.saleInstallment.deleteMany();
+    await prisma.saleTransaction.deleteMany();
     await prisma.invoice.deleteMany();
     await prisma.rentalAgreement.deleteMany();
     await prisma.tenantEmergencyContact.deleteMany();

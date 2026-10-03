@@ -21,6 +21,7 @@ import {
     Handshake,
     Kanban,
     UserRound,
+    HandCoins,
 } from "lucide-react";
 
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'PROPERTY_MANAGER' | 'ACCOUNTANT' | 'USER';
@@ -53,6 +54,15 @@ const navItems: NavItem[] = [
         children: [
             { href: "/crm/leads", label: "Leads & pipeline", icon: Kanban, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
             { href: "/crm/contacts", label: "Contacts", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+        ]
+    },
+    {
+        label: "Sales",
+        icon: Handshake,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        children: [
+            { href: "/sales", label: "Sales pipeline", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/sales/commissions", label: "Commissions", icon: HandCoins, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
         ]
     },
     {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -632,4 +632,103 @@ export const crmApi = {
 
     removeCommunication: (id: string) =>
         api.delete(`/crm/contacts/communications/${id}`),
+};
+
+// ============================================
+// SALES API (Module 4)
+// ============================================
+
+export const salesApi = {
+    createSale: (data: CreateSaleData) => api.post<Sale>('/sales', data),
+
+    findSales: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        stage?: string;
+        propertyId?: string;
+        agentUserId?: string;
+        buyerContactId?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            query.append(key, String(value));
+        });
+        const qs = query.toString();
+        return api.get<PaginatedResponse<Sale>>(`/sales${qs ? `?${qs}` : ''}`);
+    },
+
+    findSale: (id: string) => api.get<Sale>(`/sales/${id}`),
+
+    /** Open sales only — the pipeline board feed. */
+    pipeline: (params?: { agentUserId?: string }) =>
+        api.get<Sale[]>('/sales/pipeline', { params }),
+
+    updateSale: (id: string, data: Partial<CreateSaleData>) =>
+        api.patch<Sale>(`/sales/${id}`, data),
+
+    setStage: (id: string, stage: SaleStage, reason?: string) =>
+        api.patch<Sale>(`/sales/${id}/stage`, { stage, reason }),
+
+    removeSale: (id: string) => api.delete(`/sales/${id}`),
+
+    // ------------------------------------------------------------ instalments
+    createInstallmentPlan: (
+        id: string,
+        data: {
+            installments: number;
+            firstDueDate: string;
+            upfrontAmount?: number;
+            upfrontDescription?: string;
+            intervalDays?: number;
+        },
+    ) => api.post<SaleInstallment[]>(`/sales/${id}/installments/plan`, data),
+
+    /** Raise a finance invoice for one instalment (server-side reuse). */
+    invoiceInstallment: (id: string, installmentId: string, body?: { description?: string; memo?: string }) =>
+        api.post(`/sales/${id}/installments/${installmentId}/invoice`, body ?? {}),
+
+    setInstallmentStatus: (id: string, installmentId: string, status: string) =>
+        api.patch<SaleInstallment>(
+            `/sales/${id}/installments/${installmentId}/status?status=${status}`,
+        ),
+
+    refreshInstallments: (id: string) =>
+        api.post<{ updated: number }>(`/sales/${id}/installments/refresh`),
+
+    // ------------------------------------------------------------- commissions
+    generateCommissions: (
+        id: string,
+        data: {
+            commissionRate?: number;
+            participants?: Array<{ agentUserId: string; splitPercentage: number }>;
+            basis?: string;
+        },
+    ) =>
+        api.post<{ total: number; rate: number; commissions: Commission[] }>(
+            `/sales/${id}/commissions`,
+            data,
+        ),
+
+    commissionReport: (params?: { agentUserId?: string; status?: string; saleTransactionId?: string }) =>
+        api.get<CommissionReport>('/sales/commissions', { params }),
+
+    setCommissionStatus: (
+        id: string,
+        status: CommissionStatus,
+        body?: { paidRef?: string; notes?: string },
+    ) => api.patch<Commission>(`/sales/commissions/${id}/status`, { status, ...(body ?? {}) }),
+
+    // ------------------------------------------------------------------ export
+    exportUrl: (params?: { search?: string; stage?: string; propertyId?: string; agentUserId?: string }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/sales/export${qs ? `?${qs}` : ''}`;
+    },
 };

@@ -89,8 +89,22 @@ export class UsersService {
     return this.getUserRoles(userId, tenantId);
   }
 
-  async create(data: Prisma.UserCreateInput) {
-    return this.prisma.user.create({ data, include: { organization: true } });
+  /**
+   * Create a user.
+   *
+   * The controller accepts the registration shape (plain `password` alongside
+   * `passwordHash`), and Prisma rejects unknown arguments — so `password` is
+   * stripped here. It used to be passed straight through, which made every
+   * user creation a 500.
+   */
+  async create(data: Prisma.UserCreateInput & { password?: string }) {
+    const { ...userData } = data;
+    // `password` is not a column — Prisma rejects unknown arguments.
+    delete (userData as { password?: string }).password;
+    return this.prisma.user.create({
+      data: userData,
+      include: { organization: true },
+    });
   }
 
   async findOneByEmail(email: string) {

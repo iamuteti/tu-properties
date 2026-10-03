@@ -208,3 +208,54 @@ export const LEAD_STAGE_COLORS: Record<string, string> = {
     WON: 'bg-green-50 border-green-300',
     LOST: 'bg-red-50 border-red-300',
 };
+
+// ============================================
+// SALES (Module 4)
+// ============================================
+
+/** Sale pipeline columns, in order. Terminal stages are last and closed. */
+export const SALE_STAGES: Array<{
+    value:
+        | 'QUOTATION'
+        | 'OFFER'
+        | 'RESERVATION'
+        | 'AGREEMENT'
+        | 'PAYMENT'
+        | 'HANDOVER'
+        | 'CANCELLED';
+    label: string;
+    description: string;
+}> = [
+    { value: 'QUOTATION', label: 'Quotation', description: 'Price agreed in principle, nothing committed' },
+    { value: 'OFFER', label: 'Offer', description: 'Formal offer made to the buyer' },
+    { value: 'RESERVATION', label: 'Reservation', description: 'Property held — agreed price on record' },
+    { value: 'AGREEMENT', label: 'Agreement', description: 'Sale agreement signed with a buyer' },
+    { value: 'PAYMENT', label: 'Payment', description: 'Invoices raised and money being collected' },
+    { value: 'HANDOVER', label: 'Handover', description: 'Fully paid and transferred — sale closed' },
+    { value: 'CANCELLED', label: 'Cancelled', description: 'Closed without a deal; reason recorded' },
+] as const;
+
+export const SALE_STAGE_COLORS: Record<string, string> = {
+    QUOTATION: 'bg-slate-100 border-slate-300',
+    OFFER: 'bg-sky-50 border-sky-300',
+    RESERVATION: 'bg-indigo-50 border-indigo-300',
+    AGREEMENT: 'bg-violet-50 border-violet-300',
+    PAYMENT: 'bg-amber-50 border-amber-300',
+    HANDOVER: 'bg-green-50 border-green-300',
+    CANCELLED: 'bg-red-50 border-red-300',
+};
+
+export const INSTALLMENT_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'SCHEDULED', label: 'Scheduled' },
+    { value: 'INVOICED', label: 'Invoiced' },
+    { value: 'PAID', label: 'Paid' },
+    { value: 'OVERDUE', label: 'Overdue' },
+    { value: 'WAIVED', label: 'Waived' },
+];
+
+export const COMMISSION_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'PAID', label: 'Paid' },
+    { value: 'REJECTED', label: 'Rejected' },
+];

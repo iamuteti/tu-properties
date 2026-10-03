@@ -510,19 +510,71 @@ model CommunicationLog {
 
 ---
 
-## Domain: Sales (Module: Sales Management) — 🆕 Not started
+## Domain: Sales (Module: Sales Management) — ✅ Resolved 2026-10-03 (see `05-MODULE-sales.md`)
+
+**Target vs. shipped.** The sketch below was the intent; Module 4 shipped it with these additions. The Prisma
+source is `backend/src/prisma/schema.prisma` (migration `20261003170000_module4_sales`).
+
+| Target | Shipped | Why |
+| --- | --- | --- |
+| `SaleTransaction { propertyId, buyerContactId, status, agreedPrice, bookingFee }` | plus `code`, `propertyTitle` snapshot, `leadId`, `agentUserId`, `askingPrice`, `depositAmount`, `currency`, `commissionRate`, a date per stage, `cancellationReason`, soft delete | The sketch could not answer "which sale is this?" (no code) or "what did the agent earn?" (no rate). Stage dates give the audit trail the workflow implies. |
+| `propertyId` FK | `onDelete: Restrict` | A property with an open sale must not be deleted out from under it; the API also refuses a second open sale on the same property. |
+| `status SaleStage` | `stage SaleStage` | Kept the enum exactly as sketched (QUOTATION → HANDOVER, plus CANCELLED). |
+| `Commission { saleTransactionId, rentalAgreementId, agentUserId, amount, splitPercentage, status }` | plus `currency`, `basis`, `notes`, `approvedAt/approvedById`, `paidAt/paidRef`, `REJECTED` status | Approval needs to record *who* approved; payment needs a reference (the API refuses to mark one paid without it). `REJECTED` exists so a rejected split can be corrected and regenerated. |
+| — | `SaleInstallment` | The sketch had no place for installment plans. Instalment rows carry `sequence`, `dueDate`, `status` and `invoiceId`. |
+| — | `Invoice.saleTransactionId` | Sale invoices are ordinary finance invoices (`transactionClass = 'SALE'`) rather than a parallel billing model, so they reconcile with everything else — hence a nullable link instead of a sales-specific invoice table. |
+| `id @default(uuid())` | `@default(cuid())` | Matches the rest of this schema. |
+| — | `Commission.agentUserId` is `Restrict` | You cannot delete a user who has unearned commission. |
 
 ```prisma
 model SaleTransaction {
-  id             String   @id @default(uuid())
+  id             String       @id @default(cuid())
   organizationId String
+  code           String       @unique
   propertyId     String
-  buyerContactId String
-  status         SaleStage @default(QUOTATION)
-  agreedPrice    Decimal? @db.Decimal(14,2)
-  bookingFee     Decimal? @db.Decimal(14,2)
-  createdAt      DateTime @default(now())
+  property       Property     @relation("PropertySales", fields: [propertyId], references: [id], onDelete: Restrict)
+  propertyTitle  String?
+  buyerContactId String?
+  buyerContact   Contact?     @relation("ContactSales", fields: [buyerContactId], references: [id], onDelete: SetNull)
+  leadId         String?
+  agentUserId    String?
+  stage          SaleStage    @default(QUOTATION)
+  askingPrice    Decimal?     @db.Decimal(14, 2)
+  agreedPrice    Decimal?     @db.Decimal(14, 2)
+  bookingFee     Decimal?     @db.Decimal(14, 2)
+  depositAmount  Decimal?     @db.Decimal(14, 2)
+  currency       String       @default("KES")
+  commissionRate Decimal?     @db.Decimal(5, 2)
+  quotationDate   DateTime?
+  offerDate       DateTime?
+  reservationDate DateTime?
+  agreementDate   DateTime?
+  paymentDate     DateTime?
+  handoverDate    DateTime?
+  cancelledAt     DateTime?
+  cancellationReason String?
+  installments SaleInstallment[]
+  commissions  Commission[]
+  invoices     Invoice[]
   @@index([organizationId])
+  @@index([stage])
+  @@map("sale_transactions")
+}
+
+model SaleInstallment {
+  id                String           @id @default(cuid())
+  saleTransactionId String
+  saleTransaction   SaleTransaction  @relation(fields: [saleTransactionId], references: [id], onDelete: Cascade)
+  sequence          Int
+  description       String
+  amount            Decimal          @db.Decimal(14, 2)
+  dueDate           DateTime
+  status            InstallmentStatus @default(SCHEDULED)
+  invoiceId         String?          @unique
+  invoice           Invoice?         @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  paidAt            DateTime?
+  @@unique([saleTransactionId, sequence])
+  @@map("sale_installments")
 }
 
 enum SaleStage {
@@ -535,22 +587,43 @@ enum SaleStage {
   CANCELLED
 }
 
-model Commission {
-  id             String   @id @default(uuid())
-  organizationId String
-  saleTransactionId String?
-  rentalAgreementId String?
-  agentUserId    String
-  amount         Decimal  @db.Decimal(14,2)
-  splitPercentage Decimal? @db.Decimal(5,2)
-  status         CommissionStatus @default(PENDING)
-  @@index([organizationId])
+enum InstallmentStatus {
+  SCHEDULED
+  INVOICED
+  PAID
+  OVERDUE
+  WAIVED
 }
 
 enum CommissionStatus {
   PENDING
   APPROVED
   PAID
+  REJECTED
+}
+
+model Commission {
+  id             String       @id @default(cuid())
+  organizationId String
+  saleTransactionId String?
+  saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: SetNull)
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agentUserId String
+  agent       User   @relation("UserCommissions", fields: [agentUserId], references: [id], onDelete: Restrict)
+  amount          Decimal  @db.Decimal(14, 2)
+  splitPercentage Decimal? @db.Decimal(5, 2)
+  currency        String   @default("KES")
+  basis           String   @default("SALE")
+  status          CommissionStatus @default(PENDING)
+  approvedAt DateTime?
+  approvedById String?
+  paidAt DateTime?
+  paidRef String?
+  @@index([organizationId])
+  @@index([agentUserId])
+  @@index([status])
+  @@map("commissions")
 }
 ```
 

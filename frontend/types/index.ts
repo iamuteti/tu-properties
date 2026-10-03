@@ -914,3 +914,144 @@ export interface LogCommunicationData {
     contactId?: string;
     leadId?: string;
 }
+
+// ============================================
+// SALES (Module 4)
+// ============================================
+
+/** Property sale pipeline. HANDOVER and CANCELLED are terminal. */
+export type SaleStage =
+    | 'QUOTATION'
+    | 'OFFER'
+    | 'RESERVATION'
+    | 'AGREEMENT'
+    | 'PAYMENT'
+    | 'HANDOVER'
+    | 'CANCELLED';
+
+export type InstallmentStatus =
+    | 'SCHEDULED'
+    | 'INVOICED'
+    | 'PAID'
+    | 'OVERDUE'
+    | 'WAIVED';
+
+export type CommissionStatus = 'PENDING' | 'APPROVED' | 'PAID' | 'REJECTED';
+
+export interface SaleInstallment {
+    id: string;
+    saleTransactionId?: string;
+    sequence: number;
+    description: string;
+    amount: number | string;
+    dueDate: string;
+    status: InstallmentStatus;
+    invoiceId?: string | null;
+    paidAt?: string | null;
+    invoice?: {
+        id: string;
+        invoiceNumber: string;
+        status: string;
+        dueDate: string;
+        amount: number | string;
+        paidAmount: number | string;
+        balanceAmount: number | string;
+        currency?: string;
+    } | null;
+}
+
+export interface Commission {
+    id: string;
+    organizationId?: string;
+    saleTransactionId?: string | null;
+    rentalAgreementId?: string | null;
+    agentUserId: string;
+    amount: number | string;
+    splitPercentage?: number | string | null;
+    currency: string;
+    basis: string;
+    status: CommissionStatus;
+    notes?: string | null;
+    approvedAt?: string | null;
+    paidAt?: string | null;
+    paidRef?: string | null;
+    agent: { id: string; firstName: string; lastName: string; email: string };
+    saleTransaction?: { code: string; stage: SaleStage; propertyTitle?: string | null } | null;
+    approvedBy?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface Sale {
+    id: string;
+    organizationId?: string;
+    code: string;
+    propertyId: string;
+    propertyTitle?: string | null;
+    property?: { id: string; name: string; code: string; status?: string; landlordId?: string | null };
+    buyerContactId?: string | null;
+    buyerContact?: { id: string; firstName: string; lastName: string; type: string } | null;
+    leadId?: string | null;
+    lead?: { id: string; firstName: string; lastName: string; stage: string } | null;
+    agentUserId?: string | null;
+    agent?: { id: string; firstName: string; lastName: string; email: string } | null;
+    stage: SaleStage;
+    askingPrice?: number | string | null;
+    agreedPrice?: number | string | null;
+    bookingFee?: number | string | null;
+    depositAmount?: number | string | null;
+    currency: string;
+    commissionRate?: number | string | null;
+    quotationDate?: string | null;
+    offerDate?: string | null;
+    reservationDate?: string | null;
+    agreementDate?: string | null;
+    paymentDate?: string | null;
+    handoverDate?: string | null;
+    cancelledAt?: string | null;
+    cancellationReason?: string | null;
+    notes?: string | null;
+    installments?: SaleInstallment[];
+    commissions?: Commission[];
+    createdAt: string;
+    updatedAt: string;
+
+    /** Detail endpoint only: the money rollup the UI and the server agree on. */
+    money?: {
+        agreedPrice: number;
+        scheduled: number;
+        outstanding: number;
+        commission: number;
+    };
+    /** Detail endpoint only: the stages this sale may move to right now. */
+    pipeline?: { availableStages: SaleStage[] };
+}
+
+export interface CreateSaleData {
+    propertyId: string;
+    propertyTitle?: string;
+    buyerContactId?: string | null;
+    leadId?: string | null;
+    agentUserId?: string | null;
+    askingPrice?: number;
+    agreedPrice?: number;
+    bookingFee?: number;
+    depositAmount?: number;
+    currency?: string;
+    commissionRate?: number;
+    notes?: string;
+}
+
+export interface CommissionReportRow {
+    agentUserId: string;
+    agentName: string;
+    agentEmail: string;
+    saleCount: number;
+    total: number;
+    pending: number;
+    approved: number;
+    paid: number;
+}
+
+export interface CommissionReport {
+    rows: Commission[];
+    byAgent: CommissionReportRow[];
+}
