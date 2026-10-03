@@ -55,7 +55,7 @@ interface InvoiceLine {
 }
 
 export default function NewInvoicePage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const { landlords, isLoading: isLoadingLandlords, refetch } = useLandlords();
   const [error, setError] = useState<string | null>(null);

@@ -14,6 +14,13 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email }, include: { organization: true } });
   }
 
+  async findOneByResetToken(tokenHash: string) {
+    return this.prisma.user.findFirst({
+      where: { resetPasswordToken: tokenHash },
+      include: { organization: true },
+    });
+  }
+
   async findOne(id: string) {
     return this.prisma.user.findUnique({ where: { id }, include: { organization: true } });
   }

@@ -30,7 +30,7 @@ const rentalAgreementSchema = z.object({
 type RentalAgreementFormValues = z.infer<typeof rentalAgreementSchema>;
 
 export default function NewRentalAgreementPage() {
-    const { token } = useAuth();
+    const { user } = useAuth();
     const { units } = useUnits();
     const { tenants } = useTenants();
     const router = useRouter();

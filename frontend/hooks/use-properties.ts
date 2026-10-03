@@ -23,7 +23,7 @@ export interface UsePropertiesParams {
 }
 
 export function useProperties(params?: UsePropertiesParams) {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [properties, setProperties] = useState<Property[]>([]);
     const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +43,7 @@ export function useProperties(params?: UsePropertiesParams) {
     ]);
 
     const fetchProperties = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const response = await propertiesApi.findAll(paramsRef.current);
@@ -67,7 +67,7 @@ export function useProperties(params?: UsePropertiesParams) {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         paramsRef.current = stableParams;

@@ -5,13 +5,13 @@ import { useAuth } from "./use-auth";
 import { RentalAgreement } from "@/types";
 
 export function useRentalAgreements() {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [rentalAgreements, setRentalAgreements] = useState<RentalAgreement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchRentalAgreements = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const response = await rentalAgreementsApi.findAll();
@@ -28,7 +28,7 @@ export function useRentalAgreements() {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         fetchRentalAgreements();

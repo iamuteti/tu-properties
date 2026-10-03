@@ -68,7 +68,7 @@ const unitSchema = z.object({
 type UnitFormValues = z.infer<typeof unitSchema>;
 
 export default function NewUnitPage() {
-    const { token } = useAuth();
+    const { user } = useAuth();
     const { properties } = useProperties(); // Fetch properties for the dropdown
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);

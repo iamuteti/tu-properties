@@ -21,7 +21,7 @@ export interface UseMoveoutsParams {
 }
 
 export function useMoveouts(params?: UseMoveoutsParams) {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [moveouts, setMoveouts] = useState<MoveOutRequest[]>([]);
     const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +39,7 @@ export function useMoveouts(params?: UseMoveoutsParams) {
     ]);
 
     const fetchMoveouts = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const response = await moveoutsApi.findAll(paramsRef.current);
@@ -63,7 +63,7 @@ export function useMoveouts(params?: UseMoveoutsParams) {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         paramsRef.current = stableParams;

@@ -53,7 +53,7 @@ const tenantSchema = z.object({
 type TenantFormValues = z.infer<typeof tenantSchema>;
 
 export default function NewTenantPage() {
-    const { token } = useAuth();
+    const { user } = useAuth();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
 

@@ -83,11 +83,16 @@ model User {
   updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
 
+  // Password reset flow
+  resetPasswordToken   String? // hashed token for password reset
+  resetPasswordExpires DateTime?
+
   auditLogs AuditLog[]
 
   @@index([email])
   @@index([role])
   @@index([organizationId])
+  @@index([resetPasswordToken])
   @@map("users")
 }
 

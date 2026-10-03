@@ -24,7 +24,7 @@ export interface UseTenantsParams {
 }
 
 export function useTenants(params?: UseTenantsParams) {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +45,7 @@ export function useTenants(params?: UseTenantsParams) {
     ]);
 
     const fetchTenants = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const response = await tenantsApi.findAll(paramsRef.current);
@@ -69,7 +69,7 @@ export function useTenants(params?: UseTenantsParams) {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         paramsRef.current = stableParams;

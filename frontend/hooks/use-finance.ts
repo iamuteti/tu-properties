@@ -11,8 +11,7 @@ export interface UseFinanceOptions {
 }
 
 export function useFinance(options: UseFinanceOptions = {}) {
-    const { invoices: fetchInvoices = false, payments: fetchPayments = false, receipts: fetchReceipts = false } = options;
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -20,7 +19,7 @@ export function useFinance(options: UseFinanceOptions = {}) {
     const [error, setError] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         setError(null);
         try {
@@ -59,16 +58,22 @@ export function useFinance(options: UseFinanceOptions = {}) {
         } finally {
             setIsLoading(false);
         }
-    }, [token, fetchInvoices, fetchPayments, fetchReceipts]);
+    }, [user, fetchInvoices, fetchPayments, fetchReceipts]);
 
 
     useEffect(() => {
+        // Wait for auth to resolve before fetching; the cookie is sent
+        // automatically and there is no token to check.
+        if (authIsLoading) {
+            setIsLoading(true);
+            return;
+        }
         if (fetchInvoices || fetchPayments || fetchReceipts) {
             fetchData();
         } else {
             setIsLoading(false);
         }
-    }, [fetchData, fetchInvoices, fetchPayments, fetchReceipts]);
+    }, [fetchData, fetchInvoices, fetchPayments, fetchReceipts, authIsLoading]);
 
     return { invoices, payments, receipts, isLoading, error, refetch: fetchData };
 }

@@ -33,7 +33,7 @@ const rentReceiptSchema = z.object({
 type RentReceiptFormValues = z.infer<typeof rentReceiptSchema>;
 
 export default function NewRentReceiptPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const { tenants } = useTenants();
   const { rentalAgreements } = useRentalAgreements();
   const router = useRouter();

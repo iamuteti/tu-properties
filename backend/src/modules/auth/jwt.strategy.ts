@@ -4,6 +4,8 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 
+const AUTH_COOKIE_NAME = 'auth_token';
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(JwtStrategy.name);
@@ -15,7 +17,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const secret = configService.get<string>('JWT_SECRET') || 'superSecretKey';
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // JWT now lives in an httpOnly cookie, so extract it from there rather
+      // than from the Authorization header.
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (request) => request?.cookies?.[AUTH_COOKIE_NAME],
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       secretOrKey: secret,
     });

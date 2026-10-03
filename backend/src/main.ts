@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { CorsAllowlistService } from './security/cors.service';
 
 dotenv.config();
 
@@ -26,8 +27,15 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
-  app.enableCors();
+  // Restrict CORS to an explicit, environment-driven allowlist.
+  // Never use a wildcard '*' outside of local development.
+  const cors = app.get(CorsAllowlistService);
+  app.enableCors({
+    origin: cors.getAllowlist(),
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   // Enable global validation pipes
   app.useGlobalPipes(new ValidationPipe());

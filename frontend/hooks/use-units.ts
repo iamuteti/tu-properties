@@ -23,7 +23,7 @@ export interface UseUnitsParams {
 }
 
 export function useUnits(params?: UseUnitsParams) {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [units, setUnits] = useState<Unit[]>([]);
     const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +42,7 @@ export function useUnits(params?: UseUnitsParams) {
     ]);
 
     const fetchUnits = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const response = await unitsApi.findAll(paramsRef.current);
@@ -66,7 +66,7 @@ export function useUnits(params?: UseUnitsParams) {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         paramsRef.current = stableParams;

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 
-import { PublicGuard } from './common/guards/public.guard';
+import { PublicGuard } from './security/guards/public.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,6 +19,7 @@ import { FinanceModule } from './modules/finance/finance.module';
 import { LandlordsModule } from './modules/landlords/landlords.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { SecurityModule } from './security/security.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
       isGlobal: true,
     }),
     PrismaModule,
+    SecurityModule,
     PropertiesModule,
     UsersModule,
     UnitsModule,

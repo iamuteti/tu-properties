@@ -92,7 +92,7 @@ const propertySchema = z.object({
 type PropertyFormValues = z.infer<typeof propertySchema>;
 
 export default function NewPropertyPage() {
-    const { token } = useAuth();
+    const { user } = useAuth();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [landlords, setLandlords] = useState<Landlord[]>([]);

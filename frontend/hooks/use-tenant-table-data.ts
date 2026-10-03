@@ -10,13 +10,13 @@ interface RentalAgreementWithRelations extends RentalAgreement {
 }
 
 export function useTenantTableData() {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [data, setData] = useState<TenantTableData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const [tenantsResponse, agreementsResponse] = await Promise.all([
@@ -96,7 +96,7 @@ export function useTenantTableData() {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         fetchData();

@@ -39,7 +39,7 @@ const paymentSchema = z.object({
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export default function NewPaymentPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const { invoices: allInvoices, isLoading: isLoadingInvoices, refetch } = useFinance({ invoices: true });
   const [error, setError] = useState<string | null>(null);

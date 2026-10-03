@@ -130,7 +130,7 @@ export default function NewReceiptPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/receipts">
+<Link href="/dashboard/finance/receipts">
             <Button variant="outline">
               Cancel
             </Button>
@@ -394,7 +394,7 @@ export default function NewReceiptPage() {
 
       {/* Footer */}
       <div className="flex justify-end gap-2">
-        <Link href="/dashboard/receipts">
+        <Link href="/dashboard/finance/receipts">
           <Button variant="outline">
             Cancel
           </Button>

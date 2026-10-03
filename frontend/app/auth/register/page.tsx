@@ -50,8 +50,12 @@ export default function RegisterPage() {
 
             const response = await authApi.register(payload);
 
-            const { access_token, user } = response.data;
-            login(access_token, user);
+            const { user } = response.data;
+            if (!user) {
+                setError("Registration failed: invalid server response.");
+                return;
+            }
+            login(user);
         } catch (err: any) {
             setError(
                 err.response?.data?.message || "Failed to register. Please try again."

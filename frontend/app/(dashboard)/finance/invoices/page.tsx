@@ -18,7 +18,7 @@ const columns: ColumnDef<Invoice>[] = [
     accessorKey: "invoiceNumber",
     header: "Invoice #",
     cell: ({ row }) => (
-      <Link href={`/dashboard/invoices/${row.original.id}`} className="font-medium text-blue-600 hover:text-blue-800">
+      <Link href={`/dashboard/finance/invoices/${row.original.id}`} className="font-medium text-blue-600 hover:text-blue-800">
         {row.original.invoiceNumber}
       </Link>
     ),

@@ -21,7 +21,7 @@ export interface UseLandlordsParams {
 }
 
 export function useLandlords(params?: UseLandlordsParams) {
-    const { token } = useAuth();
+    const { user, isLoading: authIsLoading } = useAuth();
     const [landlords, setLandlords] = useState<Landlord[]>([]);
     const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +39,7 @@ export function useLandlords(params?: UseLandlordsParams) {
     ]);
 
     const fetchLandlords = useCallback(async () => {
-        if (!token) return;
+        if (!user) return;
         setIsLoading(true);
         try {
             const response = await landlordsApi.findAll(paramsRef.current);
@@ -63,7 +63,7 @@ export function useLandlords(params?: UseLandlordsParams) {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [user, authIsLoading]);
 
     useEffect(() => {
         paramsRef.current = stableParams;

@@ -4,34 +4,28 @@ import { AuthResponse, Property, Unit, Tenant, RentalAgreement, Invoice, Payment
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
 export const api = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true, // auth token now lives in an httpOnly cookie
 });
 
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+// No request interceptor is needed: the httpOnly cookie is sent automatically
+// by the browser on same-origin requests, and there is no token to read out
+// of localStorage. This closes the XSS token-theft vector.
 
 // Response interceptor to handle errors
 api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            // Handle unauthorized access - use Next.js router instead of window.location
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('auth_user');
-            // Dispatch event to trigger logout in auth context
-            window.dispatchEvent(new CustomEvent('unauthorized'));
-            console.warn('Unauthorized access - token cleared');
-        }
-        return Promise.reject(error);
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Dispatch event to trigger logout in auth context
+      window.dispatchEvent(new CustomEvent('unauthorized'));
+      console.warn('Unauthorized access - session expired');
     }
+    return Promise.reject(error);
+  }
 );
 
 // Auth API
@@ -229,36 +223,7 @@ export const rentalAgreementsApi = {
         api.delete(`/rental-agreements/${id}`),
 };
 
-export const billingApi = {
-    // Invoices
-    createInvoice: (data: CreateInvoiceData) =>
-        api.post<Invoice>('/billing/invoices', data),
-
-    findAllInvoices: () =>
-        api.get<Invoice[]>('/billing/invoices'),
-
-    findOneInvoice: (id: string) =>
-        api.get<Invoice>(`/billing/invoices/${id}`),
-
-    deleteInvoice: (id: string) =>
-        api.delete(`/billing/invoices/${id}`),
-
-    deleteInvoices: (ids: string[]) =>
-        api.post('/billing/invoices/bulk-delete', { ids }),
-
-    // Payments
-    recordPayment: (data: { invoiceId: string; amount: number; paymentDate: string; method: string; reference?: string }) =>
-        api.post<Payment>('/billing/payments', data),
-
-    findAllPayments: () =>
-        api.get<Payment[]>('/billing/payments'),
-
-    // Get all rental agreements for customer selection
-    findAllRentalAgreements: () =>
-        api.get<RentalAgreement[]>('/billing/rental-agreements'),
-};
-
-// Finance API (new modular endpoints)
+// Finance API (new modular endpoints — the only billing API in use)
 export const financeApi = {
     // Invoices
     createInvoice: (data: CreateInvoiceData) =>
