@@ -373,3 +373,56 @@ export const REQUEST_STATUS_STYLES: Record<string, string> = {
     REJECTED: 'bg-red-100 text-red-800',
     WITHDRAWN: 'bg-slate-100 text-slate-700',
 };
+
+// ---------------------------------------------------------------------------
+// Module 6: Landlord Management — owner statements, payouts, charges
+// ---------------------------------------------------------------------------
+
+export const MANAGEMENT_FEE_TYPES = [
+    { value: 'PERCENTAGE', label: 'Percentage of rent collected' },
+    { value: 'FIXED', label: 'Flat fee per statement period' },
+];
+
+export const OWNER_STATEMENT_STATUSES: Array<{
+    value: 'DRAFT' | 'ISSUED' | 'SETTLED' | 'VOID';
+    label: string;
+    /** Tailwind classes for the status badge. */
+    className: string;
+}> = [
+    { value: 'DRAFT', label: 'Draft', className: 'bg-slate-100 text-slate-700' },
+    { value: 'ISSUED', label: 'Issued', className: 'bg-blue-100 text-blue-700' },
+    { value: 'SETTLED', label: 'Settled', className: 'bg-emerald-100 text-emerald-700' },
+    { value: 'VOID', label: 'Void', className: 'bg-slate-100 text-slate-500 line-through' },
+];
+
+export const PAYOUT_STATUSES: Array<{
+    value: 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED';
+    label: string;
+    className: string;
+}> = [
+    { value: 'PENDING', label: 'Pending', className: 'bg-amber-100 text-amber-700' },
+    { value: 'PROCESSING', label: 'Processing', className: 'bg-blue-100 text-blue-700' },
+    { value: 'PAID', label: 'Paid', className: 'bg-emerald-100 text-emerald-700' },
+    { value: 'FAILED', label: 'Failed', className: 'bg-red-100 text-red-700' },
+];
+
+export const CHARGE_CATEGORIES: Array<{ value: string; label: string }> = [
+    { value: 'MAINTENANCE', label: 'Maintenance' },
+    { value: 'REPAIR', label: 'Repairs' },
+    { value: 'UTILITIES', label: 'Utilities' },
+    { value: 'INSURANCE', label: 'Insurance' },
+    { value: 'TAX', label: 'Tax / rates' },
+    { value: 'LEGAL', label: 'Legal' },
+    { value: 'OTHER', label: 'Other' },
+];
+
+/** Period presets for the "generate a statement" flow. */
+export const STATEMENT_PERIOD_PRESETS: Array<{
+    value: 'last-month' | 'this-month' | 'last-quarter' | 'custom';
+    label: string;
+}> = [
+    { value: 'last-month', label: 'Last month' },
+    { value: 'this-month', label: 'Month to date' },
+    { value: 'last-quarter', label: 'Last quarter' },
+    { value: 'custom', label: 'Custom dates' },
+];

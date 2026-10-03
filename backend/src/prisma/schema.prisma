@@ -69,6 +69,9 @@ model Organization {
   leaseTemplates    LeaseTemplate[]
   inspectionReports InspectionReport[]
   tenantRequests    TenantRequest[]
+  ownerStatements   OwnerStatement[]
+  landlordPayouts   LandlordPayout[]
+  landlordCharges   LandlordCharge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -347,14 +350,28 @@ model Landlord {
   taxPin        String?
   vatRegistered Boolean @default(false)
 
+  // Management agreement (Module 6). The fee is deducted from the owner
+  // statement: PERCENTAGE applies `managementFeeRate` (a percentage) to the rent
+  // actually collected in the period, FIXED deducts `managementFeeAmount` once
+  // per statement period.
+  managementFeeType   ManagementFeeType @default(PERCENTAGE)
+  managementFeeRate   Decimal           @default(0) @db.Decimal(5, 2)
+  managementFeeAmount Decimal           @default(0) @db.Decimal(14, 2)
+
+  // Free-form owner notes / instructions for whoever runs the account
+  notes String? @db.Text
+
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  properties Property[]
-  invoices   Invoice[]
-  receipts   Receipt[]
+  properties      Property[]
+  invoices        Invoice[]
+  receipts        Receipt[]
+  ownerStatements OwnerStatement[]
+  payouts         LandlordPayout[]
+  charges         LandlordCharge[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -365,6 +382,163 @@ model Landlord {
   @@index([email])
   @@index([organizationId])
   @@map("landlords")
+}
+
+// ---------------------------------------------------------------------------
+// Owner statements and payouts (Module 6: Landlord Management)
+// ---------------------------------------------------------------------------
+
+enum ManagementFeeType {
+  PERCENTAGE
+  FIXED
+}
+
+enum OwnerStatementStatus {
+  DRAFT
+  ISSUED
+  SETTLED
+  VOID
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+enum ChargeCategory {
+  MAINTENANCE
+  REPAIR
+  UTILITIES
+  INSURANCE
+  TAX
+  LEGAL
+  OTHER
+}
+
+/// One period's owner account: what was collected, what it cost to run, what
+/// the management fee was, and what is left to pay the owner.
+///
+/// Every money column is a frozen snapshot taken at generation time, and the
+/// two `*Lines` columns hold the itemised breakdown. That is deliberate: an
+/// ISSUED statement is a document the owner was sent, so it must keep
+/// reconciling to its own lines even after an invoice or charge underneath it
+/// is edited. Re-issuing means generating a new statement, not rewriting this.
+model OwnerStatement {
+  id              String        @id @default(cuid())
+  statementNumber String        @unique
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  landlordId      String
+  landlord        Landlord      @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+  currency    String   @default("KES")
+
+  // Derived money (never typed in by hand).
+  grossIncome    Decimal @db.Decimal(14, 2) // rent actually collected in the period
+  expenses       Decimal @default(0) @db.Decimal(14, 2) // owner charges levied in the period
+  managementFee  Decimal @default(0) @db.Decimal(14, 2)
+  carriedForward Decimal @default(0) @db.Decimal(14, 2) // unpaid balance brought in from earlier statements
+  netPayout      Decimal @db.Decimal(14, 2) // grossIncome - expenses - managementFee - carriedForward
+
+  status   OwnerStatementStatus @default(DRAFT)
+  issuedAt DateTime?
+  notes    String?              @db.Text
+
+  // Itemised snapshots: [{ ref, description, property, amount, ... }]
+  incomeLines  Json
+  expenseLines Json
+
+  payouts LandlordPayout[]
+  charges LandlordCharge[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  generatedBy String?
+
+  @@index([organizationId])
+  @@index([landlordId])
+  @@index([periodStart, periodEnd])
+  @@index([status])
+  @@map("owner_statements")
+}
+
+/// Money leaving the company for an owner. v1 records the intent and its
+/// outcome — the transfer itself is executed in the bank and the reference is
+/// recorded here — because there is no banking integration to call.
+model LandlordPayout {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  landlordId     String
+  landlord       Landlord      @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  // A payout usually settles one statement; a payout without one (arrears
+  // catch-up, goodwill payment) is allowed.
+  ownerStatementId String?
+  ownerStatement   OwnerStatement? @relation(fields: [ownerStatementId], references: [id], onDelete: SetNull)
+
+  amount   Decimal       @db.Decimal(14, 2)
+  currency String        @default("KES")
+  method   PaymentMethod @default(BANK_TRANSFER)
+  status   PayoutStatus  @default(PENDING)
+
+  reference     String? // bank transfer / cheque reference
+  scheduledFor  DateTime?
+  paidAt        DateTime?
+  failureReason String?
+  notes         String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@index([organizationId])
+  @@index([landlordId])
+  @@index([ownerStatementId])
+  @@index([status])
+  @@map("landlord_payouts")
+}
+
+/// A cost charged to an owner: repairs carried out, utilities the company
+/// advanced, insurance, legal fees. Deducted from the next owner statement.
+///
+/// Deliberately not a general `Expense` table — Finance & Accounting (Module 7)
+/// owns the general ledger and will own expenses. This is the owner-facing
+/// slice of that idea: only amounts actually charged to a landlord, so an
+/// owner statement can be built today without pretending the GL exists.
+model LandlordCharge {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  landlordId     String
+  landlord       Landlord      @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  propertyId     String?
+  property       Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  category    ChargeCategory
+  description String
+  amount      Decimal        @db.Decimal(14, 2)
+  chargeDate  DateTime       @default(now())
+
+  // Set once the charge has been rolled into an ISSUED statement; it then
+  // belongs to that statement and must not be edited or deleted.
+  ownerStatementId String?
+  ownerStatement   OwnerStatement? @relation(fields: [ownerStatementId], references: [id], onDelete: SetNull)
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@index([organizationId])
+  @@index([landlordId])
+  @@index([chargeDate])
+  @@index([ownerStatementId])
+  @@map("landlord_charges")
 }
 
 model Property {
@@ -468,6 +642,7 @@ model Property {
   standingCharges  PropertyStandingCharge[]
   securityDeposits PropertySecurityDeposit[]
   amenities        PropertyAmenity[]
+  landlordCharges  LandlordCharge[]
 
   // Audit fields
   createdAt DateTime  @default(now())

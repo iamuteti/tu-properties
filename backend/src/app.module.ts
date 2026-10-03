@@ -49,6 +49,7 @@ import { SecurityModule } from './security/security.module';
     MoveoutsModule,
     RentalAgreementsModule,
     FinanceModule,
+    LandlordsModule,
     AuditModule,
     AuthModule,
     OrganizationsModule,

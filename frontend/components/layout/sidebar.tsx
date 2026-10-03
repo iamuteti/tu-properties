@@ -23,6 +23,7 @@ import {
     UserRound,
     HandCoins,
     MessageSquare,
+    Banknote,
 } from "lucide-react";
 
 type UserRole =
@@ -44,7 +45,16 @@ interface NavItem {
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
     { href: "/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
-    { href: "/landlords", label: "Landlords", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+    {
+        label: "Landlords",
+        icon: Landmark,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
+        children: [
+            { href: "/landlords", label: "Owners", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
+            { href: "/landlords/statements", label: "Owner statements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
+            { href: "/landlords/payouts", label: "Owner payouts", icon: Banknote, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
+        ]
+    },
     {
         label: "Properties",
         icon: Building2,

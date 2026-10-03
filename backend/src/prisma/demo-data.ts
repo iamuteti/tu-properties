@@ -18,6 +18,10 @@ import {
   AgreementType,
   Invoice,
   UserRole,
+  ManagementFeeType,
+  ChargeCategory,
+  OwnerStatementStatus,
+  PayoutStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -717,6 +721,20 @@ export async function generateDemoData(
     `Generated ${salesCounts.sales} sales, ${salesCounts.installments} instalments, ${salesCounts.commissions} commissions`,
   );
 
+  // ========== OWNERS: charges, statements, payouts (Module 6) ==========
+  console.log('Generating owner charges, statements and payouts...');
+  const ownerCounts = await generateOwnerData(
+    prisma,
+    organizationId,
+    landlords,
+    properties,
+    startDate,
+    months,
+  );
+  console.log(
+    `Generated ${ownerCounts.charges} owner charges, ${ownerCounts.statements} statements, ${ownerCounts.payouts} payouts`,
+  );
+
   return {
     landlords: landlords.length,
     properties: properties.length,
@@ -732,6 +750,387 @@ export async function generateDemoData(
     sales: salesCounts.sales,
     installments: salesCounts.installments,
     commissions: salesCounts.commissions,
+    ownerCharges: ownerCounts.charges,
+    ownerStatements: ownerCounts.statements,
+    ownerPayouts: ownerCounts.payouts,
+  };
+}
+
+/**
+ * Owner money data (Module 6).
+ *
+ * A handful of landlords — the ones with the most properties — get real
+ * statements generated from the payments that were just created, so the module
+ * opens with figures that reconcile rather than hand-typed ones.
+ *
+ * The arithmetic is duplicated here on purpose: this script seeds the database
+ * directly, outside Nest, so it cannot reach `OwnerStatementsService`. It calls
+ * the same calculation rules in spirit — income from payments dated in the
+ * period, expenses from unclaimed charges, a percentage fee, net payout — and
+ * writes the frozen line snapshots so the documents still reconcile.
+ */
+async function generateOwnerData(
+  prisma: PrismaClient,
+  organizationId: string,
+  landlords: Landlord[],
+  properties: Property[],
+  /** Window the rent data was generated for, reused to date the charges. */
+  historyStart: Date,
+  historyMonths: number,
+) {
+  // Landlords with the biggest portfolios get the most interesting history.
+  const owners = landlords
+    .map((landlord) => ({
+      landlord,
+      properties: properties.filter(
+        (property) => property.landlordId === landlord.id,
+      ),
+    }))
+    .filter((entry) => entry.properties.length > 0)
+    .sort((a, b) => b.properties.length - a.properties.length)
+    .slice(0, 12);
+
+  // Give every landlord in the demo a plausible management agreement, so the
+  // statement screen shows a fee rather than a column of zeros. The rate is
+  // kept per landlord and reused when their statement is written, so the
+  // profile and the statement never disagree.
+  const feeRates = new Map<string, number>();
+  for (const { landlord } of owners) {
+    const rate = [8, 8.5, 9, 10][Math.floor(Math.random() * 4)];
+    feeRates.set(landlord.id, rate);
+    await prisma.landlord.update({
+      where: { id: landlord.id },
+      data: {
+        managementFeeType: ManagementFeeType.PERCENTAGE,
+        managementFeeRate: rate,
+        notes:
+          Math.random() > 0.5
+            ? 'Prefers quarterly statements. Send the printed copy to the Kileleshwa address.'
+            : null,
+      },
+    });
+  }
+
+  // Statements cover the two full months before the current one: those periods
+  // are finished, so they are the ones an operator would actually run. Defined
+  // before the charges so most charges can be dated inside them and actually
+  // show up as deductions.
+  const periodEnds: Date[] = [];
+  for (let monthOffset = 1; monthOffset <= 2; monthOffset += 1) {
+    const end = new Date();
+    end.setMonth(end.getMonth() - monthOffset, 0);
+    end.setHours(23, 59, 59, 999);
+    periodEnds.push(end);
+  }
+
+  const periods = periodEnds.map((periodEnd) => {
+    const periodStart = new Date(periodEnd);
+    periodStart.setMonth(periodStart.getMonth() - 1, 1);
+    periodStart.setHours(0, 0, 0, 0);
+    return { periodStart, periodEnd };
+  });
+
+  // Costs charged to owners, some already claimed by a statement, some still
+  // waiting to be deducted from the next one.
+  const chargeTemplates = [
+    {
+      category: ChargeCategory.REPAIR,
+      description: 'Burst pipe in unit 4B',
+      amount: 18_500,
+    },
+    {
+      category: ChargeCategory.MAINTENANCE,
+      description: 'Serviced the water pump',
+      amount: 32_000,
+    },
+    {
+      category: ChargeCategory.UTILITIES,
+      description: 'Water bill advanced by the office',
+      amount: 24_750,
+    },
+    {
+      category: ChargeCategory.INSURANCE,
+      description: 'Annual building insurance premium',
+      amount: 45_000,
+    },
+    {
+      category: ChargeCategory.TAX,
+      description: 'Ground rent / rates for the year',
+      amount: 60_000,
+    },
+    {
+      category: ChargeCategory.LEGAL,
+      description: 'Lease renewal legal fees',
+      amount: 15_000,
+    },
+  ];
+
+  const chargeRows: Array<{
+    id: string;
+    landlordId: string;
+    amount: number;
+    chargeDate: Date;
+    category: ChargeCategory;
+    description: string;
+    propertyName: string | null;
+  }> = [];
+
+  for (const { landlord, properties: ownerProperties } of owners) {
+    const count = 1 + Math.floor(Math.random() * 3);
+    for (let index = 0; index < count; index += 1) {
+      const template =
+        chargeTemplates[Math.floor(Math.random() * chargeTemplates.length)];
+
+      // Most charges land inside a statement period so they actually appear as
+      // deductions; the rest sit in the older history and stay unstated.
+      let chargeDate: Date;
+      if (Math.random() > 0.3) {
+        const period = periods[Math.floor(Math.random() * periods.length)];
+        const spanDays = Math.floor(
+          (period.periodEnd.getTime() - period.periodStart.getTime()) / 86_400_000,
+        );
+        chargeDate = new Date(period.periodStart);
+        chargeDate.setDate(
+          chargeDate.getDate() + Math.floor(Math.random() * spanDays),
+        );
+      } else {
+        chargeDate = new Date(historyStart);
+        chargeDate.setDate(
+          chargeDate.getDate() +
+            Math.floor(Math.random() * (historyMonths * 30)),
+        );
+      }
+
+      const property =
+        ownerProperties[Math.floor(Math.random() * ownerProperties.length)];
+
+      const charge = await prisma.landlordCharge.create({
+        data: {
+          organizationId,
+          landlordId: landlord.id,
+          propertyId: property.id,
+          category: template.category,
+          description: template.description,
+          amount: template.amount,
+          chargeDate,
+          createdBy: 'MASHABAZI GIDEON',
+        },
+      });
+
+      chargeRows.push({
+        id: charge.id,
+        landlordId: landlord.id,
+        amount: Number(charge.amount),
+        chargeDate,
+        category: template.category,
+        description: template.description,
+        propertyName: property.name,
+      });
+    }
+  }
+
+  let statementCount = 0;
+  let payoutCount = 0;
+
+  for (const { landlord } of owners) {
+    for (let index = 0; index < periods.length; index += 1) {
+      const { periodStart, periodEnd } = periods[index];
+
+      const payments = await prisma.payment.findMany({
+        where: {
+          organizationId,
+          paymentDate: { gte: periodStart, lte: periodEnd },
+          invoice: {
+            organizationId,
+            saleTransactionId: null,
+            OR: [
+              { landlordId: landlord.id },
+              {
+                landlordId: null,
+                rentalAgreement: {
+                  unit: {
+                    property: { landlordId: landlord.id },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        select: {
+          amount: true,
+          paymentDate: true,
+          invoice: {
+            select: {
+              invoiceNumber: true,
+              rentalAgreement: {
+                select: {
+                  unit: { select: { property: { select: { name: true } } } },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const byInvoice = new Map<
+        string,
+        { amountCents: number; paymentDate: string; property: string | null }
+      >();
+
+      for (const payment of payments) {
+        const invoiceNumber = payment.invoice?.invoiceNumber;
+        if (!invoiceNumber) continue;
+        const existing = byInvoice.get(invoiceNumber) ?? {
+          amountCents: 0,
+          paymentDate: payment.paymentDate.toISOString().slice(0, 10),
+          property:
+            payment.invoice?.rentalAgreement?.unit.property.name ?? null,
+        };
+        existing.amountCents += Math.round(Number(payment.amount) * 100);
+        existing.paymentDate = payment.paymentDate.toISOString().slice(0, 10);
+        byInvoice.set(invoiceNumber, existing);
+      }
+
+      const incomeLines = [...byInvoice.entries()].map(([ref, entry]) => ({
+        ref,
+        description: 'Rent collected',
+        property: entry.property,
+        amount: entry.amountCents / 100,
+        paymentDate: entry.paymentDate,
+      }));
+
+      const claimable = chargeRows.filter(
+        (charge) =>
+          charge.landlordId === landlord.id &&
+          charge.chargeDate >= periodStart &&
+          charge.chargeDate <= periodEnd,
+      );
+
+      const grossIncomeCents = incomeLines.reduce(
+        (sum, line) => sum + Math.round(line.amount * 100),
+        0,
+      );
+      const expensesCents = claimable.reduce(
+        (sum, charge) => sum + Math.round(charge.amount * 100),
+        0,
+      );
+      const feeRate = feeRates.get(landlord.id) ?? 8.5;
+      const managementFeeCents = Math.round((grossIncomeCents * feeRate) / 100);
+      const netCents = grossIncomeCents - expensesCents - managementFeeCents;
+
+      if (netCents <= 0 && index === 0) continue; // nothing worth issuing
+
+      const statementNumber = `OST-${periodEnd.getFullYear()}${String(periodEnd.getMonth() + 1).padStart(2, '0')}-${String(statementCount + 1).padStart(4, '0')}`;
+
+      const statement = await prisma.ownerStatement.create({
+        data: {
+          statementNumber,
+          organizationId,
+          landlordId: landlord.id,
+          periodStart,
+          periodEnd,
+          grossIncome: grossIncomeCents / 100,
+          expenses: expensesCents / 100,
+          managementFee: managementFeeCents / 100,
+          carriedForward: 0,
+          netPayout: netCents / 100,
+          status: OwnerStatementStatus.ISSUED,
+          issuedAt: new Date(periodEnd.getTime() + 2 * 24 * 60 * 60 * 1000),
+          notes:
+            index === 0
+              ? 'Rent collected less repairs and the management fee. Statement printed and emailed.'
+              : null,
+          incomeLines: incomeLines as never,
+          expenseLines: claimable.map((charge) => ({
+            ref: charge.id,
+            category: charge.category,
+            description: charge.description,
+            property: charge.propertyName,
+            amount: charge.amount,
+            chargeDate: charge.chargeDate.toISOString().slice(0, 10),
+          })) as never,
+          generatedBy: 'MASHABAZI GIDEON',
+        },
+      });
+
+      await prisma.landlordCharge.updateMany({
+        where: { id: { in: claimable.map((charge) => charge.id) } },
+        data: { ownerStatementId: statement.id },
+      });
+
+      statementCount += 1;
+
+      // The oldest statement gets paid in full; the recent one is left partly
+      // open so the dashboard has something genuinely outstanding.
+      if (index === periodEnds.length - 1) {
+        const payoutAmount =
+          Math.random() > 0.4
+            ? netCents / 100
+            : Math.round((netCents / 100) * (0.4 + Math.random() * 0.3) * 100) /
+              100;
+
+        if (payoutAmount > 0) {
+          const paidInFull = Math.abs(payoutAmount - netCents / 100) < 0.01;
+          await prisma.landlordPayout.create({
+            data: {
+              organizationId,
+              landlordId: landlord.id,
+              ownerStatementId: statement.id,
+              amount: payoutAmount,
+              currency: 'KES',
+              method: PaymentMethod.BANK_TRANSFER,
+              status: paidInFull ? PayoutStatus.PAID : PayoutStatus.PROCESSING,
+              reference: paidInFull ? `BNK-RTGS-${randomString(6)}` : null,
+              paidAt: paidInFull
+                ? new Date(periodEnd.getTime() + 5 * 24 * 60 * 60 * 1000)
+                : null,
+              scheduledFor: paidInFull
+                ? null
+                : new Date(periodEnd.getTime() + 7 * 24 * 60 * 60 * 1000),
+              notes: paidInFull
+                ? null
+                : 'Awaiting the transfer confirmation from the bank.',
+              createdBy: 'Mary Johnson',
+            },
+          });
+
+          if (paidInFull) {
+            await prisma.ownerStatement.update({
+              where: { id: statement.id },
+              data: { status: OwnerStatementStatus.SETTLED },
+            });
+          }
+
+          payoutCount += 1;
+
+          // A second instalment on some owners, so a statement shows a payout
+          // history rather than a single row.
+          if (paidInFull && Math.random() > 0.6) {
+            await prisma.landlordPayout.create({
+              data: {
+                organizationId,
+                landlordId: landlord.id,
+                amount: Math.round(Math.random() * 20_000 * 100) / 100,
+                currency: 'KES',
+                method: PaymentMethod.MPESA,
+                status: PayoutStatus.FAILED,
+                failureReason:
+                  'Account number rejected by the bank — confirm with the owner.',
+                notes: 'Goodwill payment; retry once the account is corrected.',
+                createdBy: 'Mary Johnson',
+              },
+            });
+            payoutCount += 1;
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    charges: chargeRows.length,
+    statements: statementCount,
+    payouts: payoutCount,
   };
 }
 
@@ -1347,7 +1746,7 @@ export async function seedDemoData() {
       },
     });
 
-// Generate demo data for Rohi Estate Management
+    // Generate demo data for Rohi Estate Management
     await generateDemoData(prisma, rohiOrg.id);
 
     // Tenant portal logins (Module 5 checklist, auth in Module 1).

@@ -36,11 +36,153 @@ export interface Landlord {
     accountNumber?: string;
     taxPin?: string;
     vatRegistered?: boolean;
+    /** Management agreement (Module 6) — what the owner statement deducts. */
+    managementFeeType: 'PERCENTAGE' | 'FIXED';
+    managementFeeRate: number;
+    managementFeeAmount: number;
+    notes?: string;
     organizationId?: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
     properties?: Property[];
+}
+
+/** Landlord detail payload: profile plus the owner's money history. */
+export interface LandlordDetail extends Landlord {
+    /** Properties, each with a unit count so the page need not fetch them. */
+    properties?: Array<Property & { _count?: { units: number } }>;
+    statements: OwnerStatementSummary[];
+    payouts: LandlordPayoutSummary[];
+    charges: LandlordCharge[];
+    totals: {
+        properties: number;
+        units: number;
+        paidOut: number;
+        outstanding: number;
+        unstatedCharges: number;
+    };
+}
+
+export interface StatementIncomeLine {
+    ref: string;
+    description: string;
+    property: string | null;
+    amount: number;
+    paymentDate: string;
+}
+
+export interface StatementExpenseLine {
+    ref: string;
+    category: string;
+    description: string;
+    property: string | null;
+    amount: number;
+    chargeDate: string;
+}
+
+export type OwnerStatementStatus = 'DRAFT' | 'ISSUED' | 'SETTLED' | 'VOID';
+
+export interface OwnerStatementSummary {
+    id: string;
+    statementNumber: string;
+    periodStart: string;
+    periodEnd: string;
+    status: OwnerStatementStatus;
+    grossIncome: number;
+    expenses: number;
+    managementFee: number;
+    carriedForward: number;
+    netPayout: number;
+    issuedAt?: string | null;
+}
+
+export interface OwnerStatement extends OwnerStatementSummary {
+    organizationId?: string;
+    landlordId: string;
+    currency: string;
+    notes?: string | null;
+    incomeLines: StatementIncomeLine[];
+    expenseLines: StatementExpenseLine[];
+    landlord?: { id: string; code: string; name: string };
+    payouts?: LandlordPayoutSummary[];
+    charges?: LandlordCharge[];
+    createdAt: string;
+    updatedAt: string;
+    generatedBy?: string | null;
+    /** Derived: how much of the net payout has been paid out. */
+    settledAmount: number;
+    /** Derived: what is still owed on this statement. */
+    outstandingAmount: number;
+}
+
+export interface StatementPreview {
+    landlordId: string;
+    periodStart: string;
+    periodEnd: string;
+    grossIncome: number;
+    expenses: number;
+    managementFee: number;
+    carriedForward: number;
+    netPayout: number;
+    incomeLines: StatementIncomeLine[];
+    expenseLines: StatementExpenseLine[];
+    priorStatements: OwnerStatementSummary[];
+}
+
+export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED';
+
+export interface LandlordPayoutSummary {
+    id: string;
+    amount: number;
+    status: PayoutStatus;
+    method: string;
+    reference?: string | null;
+    paidAt?: string | null;
+    createdAt: string;
+    ownerStatementId?: string | null;
+    ownerStatement?: {
+        id: string;
+        statementNumber: string;
+        periodEnd?: string;
+        netPayout: number;
+    } | null;
+}
+
+export interface LandlordPayout extends LandlordPayoutSummary {
+    landlordId: string;
+    currency: string;
+    scheduledFor?: string | null;
+    failureReason?: string | null;
+    notes?: string | null;
+    landlord?: { id: string; code: string; name: string };
+}
+
+export type ChargeCategory =
+    | 'MAINTENANCE'
+    | 'REPAIR'
+    | 'UTILITIES'
+    | 'INSURANCE'
+    | 'TAX'
+    | 'LEGAL'
+    | 'OTHER';
+
+export interface LandlordCharge {
+    id: string;
+    landlordId: string;
+    propertyId?: string | null;
+    category: ChargeCategory;
+    description: string;
+    amount: number;
+    chargeDate: string;
+    /** Set once the charge is on an issued statement — then it is frozen. */
+    ownerStatementId?: string | null;
+    ownerStatement?: { id: string; statementNumber: string; status: OwnerStatementStatus } | null;
+    notes?: string | null;
+    property?: { id: string; name: string } | null;
+    landlord?: { id: string; code: string; name: string };
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface Organization {

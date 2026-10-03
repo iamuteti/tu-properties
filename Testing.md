@@ -91,6 +91,10 @@ payments, and receipts). Use it to verify list/filter/pagination behavior.
 - **Rohi Estate Management:** ~120 landlords, ~100 properties, ~2,400 units,
   ~1,800 tenants, plus rental agreements, invoices, payments, and receipts.
   Exact counts may vary slightly between seed runs (names/addresses are randomized).
+  Since Module 6 the seed also produces **owner statements, owner charges and
+  payouts** for the 12 landlords with the largest portfolios (~24 statements,
+  ~20 charges, ~15 payouts) — generated from the payments it just created, so
+  every statement reconciles.
 
 ---
 
@@ -117,7 +121,14 @@ payments, and receipts). Use it to verify list/filter/pagination behavior.
   ```bash
   cd backend && npx jest --runInBand
   ```
-  36 tests across:
+  **384 tests across 24 suites** (`npx jest`, 2026-10-04) — the ones that matter:
+  - `statement-calculator.spec.ts` + `payout-status.spec.ts` (Module 6) — the owner-statement
+    arithmetic in integer cents, the overlapping-period double-pay guard, carry-forward of an
+    unpaid balance, and every payout gate (reference required to be paid, reason required to
+    fail, no overpayment, PAID terminal).
+  - `owner-statements.service.spec.ts`, `landlord-payouts.service.spec.ts`,
+    `landlord-charges.service.spec.ts` (Module 6) — the derivation (including the sale-invoice
+    exclusion), charge freezing, tenant isolation, and the payout lifecycle.
   - `auth.service.spec.ts` — session issuance (`jti` linkage), MFA-disabled/enabled login
     paths, `verifyMfa` (valid/invalid code, expired challenge), MFA enrollment
     (setup/enable/disable), logout + revoke-others, password reset revokes all sessions.

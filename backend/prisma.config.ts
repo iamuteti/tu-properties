@@ -11,5 +11,9 @@ export default defineConfig({
     },
     datasource: {
         url: process.env["DATABASE_URL"],
+        // Only `prisma migrate diff --from-migrations` needs this: it replays the
+        // migration history into a throwaway database to compute the diff, so
+        // never point it at the real one.
+        shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
     },
 });

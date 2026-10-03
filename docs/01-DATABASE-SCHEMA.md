@@ -719,49 +719,101 @@ model Commission {
 
 ---
 
-## Domain: Landlord (Module: Landlord Management) — ⚠️ Partially existing, verify
+## Domain: Landlord (Module: Module 6 — Landlord Management) — ✅ Built, verified 2026-10-04
+
+Landed in migration `20261004000000_module6_landlords`. The `Landlord` profile itself predates this module and is
+already shaped differently from the target below (single `name` rather than `firstName`/`lastName`, `code` per
+organization, and the `status` field borrowed from `TenantStatus`); what this module added is the **management
+agreement** and the three owner-money tables. `PayoutStatus` matches the target. `pdfUrl` was dropped: the
+statement is rendered on demand from its frozen line snapshot (`GET /owner-statements/:id/document`) rather than
+written to storage, so there is no file to point at.
 
 ```prisma
+// Additions to the existing model
 model Landlord {
-  id             String   @id @default(uuid())
-  organizationId String
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  bankAccountName   String?
-  bankAccountNumber String?
-  bankName       String?
-  taxId          String?
-  createdAt      DateTime @default(now())
-  @@index([organizationId])
+  // … existing identity, address and bank fields …
+  notes String? @db.Text
+
+  // Management agreement — what an owner statement deducts
+  managementFeeType   ManagementFeeType @default(PERCENTAGE)
+  managementFeeRate   Decimal           @default(0) @db.Decimal(5, 2)   // %
+  managementFeeAmount Decimal           @default(0) @db.Decimal(14, 2) // flat, per period
 }
 
+enum ManagementFeeType {
+  PERCENTAGE
+  FIXED
+}
+
+/// One period's owner account. Every money column is a frozen snapshot taken at
+/// generation time, and `incomeLines`/`expenseLines` hold the itemised
+/// breakdown — an ISSUED statement is a document the owner was sent, so it must
+/// keep reconciling to its own lines even after an invoice underneath it is
+/// edited. Re-issuing means generating a new statement.
 model OwnerStatement {
-  id             String   @id @default(uuid())
-  organizationId String
-  landlordId     String
-  periodStart    DateTime
-  periodEnd      DateTime
-  rentalIncome   Decimal  @db.Decimal(14,2)
-  expenses       Decimal  @db.Decimal(14,2)
-  managementFee  Decimal  @db.Decimal(14,2)
-  netPayout      Decimal  @db.Decimal(14,2)
-  pdfUrl         String?
-  createdAt      DateTime @default(now())
+  id              String   @id @default(cuid())
+  statementNumber String   @unique               // OST-YYYYMM-NNNN
+  organizationId  String?
+  landlordId      String
+  periodStart     DateTime
+  periodEnd       DateTime
+  currency        String   @default("KES")
+
+  grossIncome    Decimal @db.Decimal(14, 2)  // rent actually collected in the period
+  expenses       Decimal @default(0) @db.Decimal(14, 2)
+  managementFee  Decimal @default(0) @db.Decimal(14, 2)
+  carriedForward Decimal @default(0) @db.Decimal(14, 2)  // unpaid balance from earlier statements
+  netPayout      Decimal @db.Decimal(14, 2)  // gross − expenses − fee − carriedForward
+
+  status   OwnerStatementStatus @default(DRAFT)
+  issuedAt DateTime?
+  notes    String? @db.Text
+
+  incomeLines  Json
+  expenseLines Json
+
+  payouts LandlordPayout[]
+  charges LandlordCharge[]
+  generatedBy String?
+
   @@index([organizationId])
+  @@index([landlordId])
+  @@index([periodStart, periodEnd])
+  @@index([status])
+  @@map("owner_statements")
 }
 
+enum OwnerStatementStatus {
+  DRAFT     // calculated, never sent
+  ISSUED    // sent to the owner — figures are frozen
+  SETTLED   // payouts cover the net amount
+  VOID      // retracted; its charges are released for a corrected statement
+}
+
+/// Money leaving the company for an owner. v1 records the intent and its outcome —
+/// the transfer is made in the bank and the reference is recorded here — because
+/// there is no banking integration to call.
 model LandlordPayout {
-  id             String   @id @default(uuid())
-  organizationId String
+  id             String   @id @default(cuid())
+  organizationId String?
   landlordId     String
-  ownerStatementId String?
-  amount         Decimal  @db.Decimal(14,2)
-  method         PaymentMethod
-  status         PayoutStatus @default(PENDING)
-  paidAt         DateTime?
+  ownerStatementId String?          // usually settles one statement; optional for arrears catch-up
+  amount   Decimal        @db.Decimal(14, 2)
+  currency String         @default("KES")
+  method   PaymentMethod  @default(BANK_TRANSFER)
+  status   PayoutStatus   @default(PENDING)
+  reference String?        // required by the service before a payout can become PAID
+  scheduledFor DateTime?
+  paidAt       DateTime?
+  failureReason String?
+  notes          String? @db.Text
+  createdBy String?
+
   @@index([organizationId])
+  @@index([landlordId])
+  @@index([ownerStatementId])
+  @@index([status])
+  @@map("landlord_payouts")
 }
 
 enum PayoutStatus {
@@ -769,6 +821,43 @@ enum PayoutStatus {
   PROCESSING
   PAID
   FAILED
+}
+
+/// A cost charged to an owner: repairs carried out, utilities the company
+/// advanced, insurance, legal fees — deducted on their next statement.
+/// Deliberately NOT a general expense table: Finance & Accounting (Module 7)
+/// owns the ledger and expenses. This is the owner-facing slice, so a statement
+/// can be built today without pretending the GL exists. `ownerStatementId` is
+/// set when the charge is rolled into a statement; it then belongs to that
+/// document and can no longer be edited or deleted.
+model LandlordCharge {
+  id             String   @id @default(cuid())
+  organizationId String?
+  landlordId     String
+  propertyId     String?              // optional attribution to one of the owner's properties
+  category    ChargeCategory
+  description String
+  amount      Decimal       @db.Decimal(14, 2)
+  chargeDate  DateTime      @default(now())
+  ownerStatementId String?
+  notes          String? @db.Text
+  createdBy String?
+
+  @@index([organizationId])
+  @@index([landlordId])
+  @@index([chargeDate])
+  @@index([ownerStatementId])
+  @@map("landlord_charges")
+}
+
+enum ChargeCategory {
+  MAINTENANCE
+  REPAIR
+  UTILITIES
+  INSURANCE
+  TAX
+  LEGAL
+  OTHER
 }
 ```
 

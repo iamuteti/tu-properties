@@ -1,6 +1,7 @@
 'use client'
 
 import { Dialog, DialogPanel, DialogTitle, Description } from '@headlessui/react'
+import type { ReactNode } from 'react'
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -8,9 +9,25 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   title: string;
   message: string;
+  /** Extra input rendered above the buttons — a reason, a note. */
+  children?: ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  /** Style the confirm button as destructive (default) or neutral. */
+  tone?: 'danger' | 'default';
 }
 
-export default function ConfirmDialog({ isOpen, onClose, onConfirm, title, message }: ConfirmDialogProps) {
+export default function ConfirmDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  children,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  tone = 'danger',
+}: ConfirmDialogProps) {
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       {/* Backdrop */}
@@ -26,18 +43,22 @@ export default function ConfirmDialog({ isOpen, onClose, onConfirm, title, messa
             {message}
           </Description>
 
+          {children}
+
           <div className="mt-6 flex justify-end gap-3">
             <button
               onClick={onClose}
               className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              Cancel
+              {cancelText}
             </button>
             <button
               onClick={() => { onConfirm(); onClose(); }}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
+                tone === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'
+              }`}
             >
-              Confirm
+              {confirmText}
             </button>
           </div>
         </DialogPanel>

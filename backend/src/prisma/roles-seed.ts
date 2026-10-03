@@ -33,6 +33,8 @@ export const PERMISSION_MODULES = [
   'sales',
   'leases',
   'tenant_requests',
+  'owner_statements',
+  'owner_payouts',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -111,6 +113,9 @@ export const SYSTEM_ROLES: {
       crm_contacts: full(),
       sales: full(),
       tenant_requests: full(),
+      // Module 6: owner statements and payouts.
+      owner_statements: full(),
+      owner_payouts: full(),
     }),
   },
   {
@@ -152,6 +157,9 @@ export const SYSTEM_ROLES: {
       sales: viewWrite(),
       // Resident requests are exactly their job: read the queue, decide.
       tenant_requests: full(),
+      // Module 6: owners are their clients — statements get run and paid out.
+      owner_statements: full(),
+      owner_payouts: full(),
     }),
   },
   {
@@ -177,7 +185,11 @@ export const SYSTEM_ROLES: {
       receipts: full(),
       tenants: view(),
       leases: view(),
+      landlords: view(),
       documents: viewWrite(),
+      // Module 6: statements and payouts are finance work.
+      owner_statements: full(),
+      owner_payouts: full(),
     }),
   },
   {
@@ -207,6 +219,9 @@ export const SYSTEM_ROLES: {
       invoices: view(),
       receipts: view(),
       documents: view(),
+      // Module 6: the owner portal (Phase 2) reads exactly these two.
+      owner_statements: view(),
+      owner_payouts: view(),
     }),
   },
   {

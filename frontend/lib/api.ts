@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -256,29 +256,182 @@ export const propertiesApi = {
         api.post<ImportReport>('/properties/import', { csv, dryRun }),
 };
 
-// Landlords API
+/**
+ * Build a GET URL for a CSV export endpoint. Exports are plain links rather
+ * than axios calls: the browser has to download the file, and the auth cookie
+ * travels with a normal navigation.
+ */
+function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
+    const queryParams = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+        }
+    });
+    const query = queryParams.toString();
+    return `${API_BASE_URL}${path}${query ? `?${query}` : ''}`;
+}
+
+// Landlords API (Module 6: Landlord Management)
+export interface LandlordListParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    status?: string;
+    managementFeeType?: string;
+    hasProperties?: boolean;
+}
+
 export const landlordsApi = {
     create: (data: Partial<Landlord>) =>
         api.post<Landlord>('/landlords', data),
 
-    findAll: (params?: {
-        page?: number;
-        limit?: number;
-        search?: string;
-        sortBy?: string;
-        sortOrder?: 'asc' | 'desc';
-        status?: string;
-    }) =>
+    findAll: (params?: LandlordListParams) =>
         api.get<{ data: Landlord[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/landlords', { params }),
 
     findOne: (id: string) =>
-        api.get<Landlord>(`/landlords/${id}`),
+        api.get<LandlordDetail>(`/landlords/${id}`),
+
+    /** What this landlord is still owed, plus charge and payout totals. */
+    outstanding: (id: string) =>
+        api.get<{
+            outstanding: number;
+            paid: number;
+            statements: number;
+            charges: { unstated: number; total: number; count: number };
+            payouts: { paid: number; pending: number; count: number };
+        }>(`/landlords/${id}/outstanding`),
 
     update: (id: string, data: Partial<Landlord>) =>
         api.patch<Landlord>(`/landlords/${id}`, data),
 
     remove: (id: string) =>
         api.delete(`/landlords/${id}`),
+
+    exportUrl: (params?: { status?: string; managementFeeType?: string }) =>
+        buildUrl('/landlords/export', params),
+};
+
+/** Owner charges — costs levied on a landlord, deducted on their statement. */
+export const landlordChargesApi = {
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        landlordId?: string;
+        propertyId?: string;
+        category?: string;
+        unstated?: boolean;
+        from?: string;
+        to?: string;
+    }) =>
+        api.get<{ data: LandlordCharge[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/landlords/charges', { params }),
+
+    findOne: (id: string) =>
+        api.get<LandlordCharge>(`/landlords/charges/${id}`),
+
+    create: (data: {
+        landlordId: string;
+        propertyId?: string;
+        category: string;
+        description: string;
+        amount: number;
+        chargeDate?: string;
+        notes?: string;
+    }) => api.post<LandlordCharge>('/landlords/charges', data),
+
+    update: (id: string, data: Partial<LandlordCharge>) =>
+        api.patch<LandlordCharge>(`/landlords/charges/${id}`, data),
+
+    remove: (id: string) =>
+        api.delete(`/landlords/charges/${id}`),
+
+    exportUrl: (params?: { landlordId?: string; category?: string }) =>
+        buildUrl('/landlords/charges/export', params),
+};
+
+/** Owner statements — a period's account, derived from rent payments. */
+export const ownerStatementsApi = {
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        landlordId?: string;
+        status?: string;
+        periodStart?: string;
+        periodEnd?: string;
+    }) =>
+        api.get<{ data: OwnerStatement[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/owner-statements', { params }),
+
+    findOne: (id: string) =>
+        api.get<OwnerStatement>(`/owner-statements/${id}`),
+
+    /** Dry run: exactly what a period would produce, writing nothing. */
+    preview: (params: { landlordId: string; periodStart: string; periodEnd: string }) =>
+        api.get<StatementPreview>('/owner-statements/preview', { params }),
+
+    generate: (data: {
+        landlordId: string;
+        periodStart: string;
+        periodEnd: string;
+        notes?: string;
+        managementFeeType?: string;
+        managementFeeRate?: number;
+        managementFeeAmount?: number;
+    }) => api.post<OwnerStatement>('/owner-statements', data),
+
+    issue: (id: string) => api.post<OwnerStatement>(`/owner-statements/${id}/issue`),
+
+    void: (id: string, reason?: string) =>
+        api.post<OwnerStatement>(`/owner-statements/${id}/void`, { reason }),
+
+    remove: (id: string) => api.delete(`/owner-statements/${id}`),
+
+    /** Opens the printable statement; `download=true` serves it as a file. */
+    documentUrl: (id: string, download = false) =>
+        `${API_BASE_URL}/owner-statements/${id}/document${download ? '?download=true' : ''}`,
+
+    exportUrl: (params?: { landlordId?: string; status?: string }) =>
+        buildUrl('/owner-statements/export', params),
+};
+
+/** Owner payouts — money leaving the company for a landlord. */
+export const landlordPayoutsApi = {
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        landlordId?: string;
+        ownerStatementId?: string;
+        status?: string;
+        method?: string;
+    }) =>
+        api.get<{ data: LandlordPayout[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/landlord-payouts', { params }),
+
+    findOne: (id: string) => api.get<LandlordPayout>(`/landlord-payouts/${id}`),
+
+    create: (data: {
+        landlordId: string;
+        ownerStatementId?: string;
+        amount: number;
+        method?: string;
+        currency?: string;
+        reference?: string;
+        scheduledFor?: string;
+        notes?: string;
+    }) => api.post<LandlordPayout>('/landlord-payouts', data),
+
+    updateStatus: (
+        id: string,
+        data: { status: string; reference?: string; failureReason?: string; paidAt?: string; notes?: string },
+    ) => api.patch<LandlordPayout>(`/landlord-payouts/${id}/status`, data),
+
+    exportUrl: (params?: { landlordId?: string; status?: string }) =>
+        buildUrl('/landlord-payouts/export', params),
 };
 
 // Units API (Module 2: Property Management)
