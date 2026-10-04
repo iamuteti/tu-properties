@@ -72,6 +72,8 @@ model Organization {
   ownerStatements   OwnerStatement[]
   landlordPayouts   LandlordPayout[]
   landlordCharges   LandlordCharge[]
+  accounts          Account[]
+  journalEntries    JournalEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1870,6 +1872,13 @@ model Payment {
   notes       String? @db.Text
   attachments String? // JSON or comma-separated file paths
 
+  // Reversal bookkeeping (Module 7). A payment applied in error is reversed,
+  // never deleted: the row stays so the history of what was once applied to an
+  // invoice remains auditable, and the GL entry is posted in reverse.
+  isReversed Boolean   @default(false)
+  reversedAt DateTime?
+  reversedBy String?
+
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -1915,6 +1924,147 @@ enum ReceiptTo {
 enum DRTOrDRF {
   DirectReceipt
   DepositRefund
+}
+
+/// Chart of accounts (Module 7 — Finance & Accounting). One row per
+/// organization: accounts are tenant-scoped so two organizations never share
+/// (or can read) each other's ledger structure. `code` is unique per
+/// organization, `type` drives the trial balance grouping.
+model Account {
+  id     String @id @default(cuid())
+  code   String
+  name   String
+  type   AccountType
+  subtype String?
+  description String? @db.Text
+
+  // Normal balance of the account, used when rendering balances and when
+  // validating manual journal entries.
+  normalBalance BalanceSide @default(DEBIT)
+
+  // System accounts (cash on hand, bank, AR, VAT payable, rent revenue, ...)
+  // are seeded per organization and cannot be deleted — they are the target of
+  // auto-posted entries. Custom accounts added by an accountant can be removed.
+  isSystem Boolean @default(false)
+
+  // Postable accounts accept journal lines; header/parent accounts (e.g.
+  // "Current Assets" grouping) do not.
+  isPostable Boolean @default(true)
+
+  isActive Boolean @default(true)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  lines JournalLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([type])
+  @@map("accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum BalanceSide {
+  DEBIT
+  CREDIT
+}
+
+/// A double-entry journal entry. Routine transactions (invoice issued, payment
+/// received) are auto-posted by `AccountingService`; entries created manually
+/// carry `source = MANUAL`.
+model JournalEntry {
+  id String @id @default(cuid())
+  entryNumber String
+
+  entryDate DateTime @default(now())
+
+  memo String? @db.Text
+  reference String?
+
+  source JournalEntrySource @default(MANUAL)
+
+  /// Free-form pointer back to the business record that caused the entry, e.g.
+  /// { "type": "INVOICE", "id": "clx...", "number": "INV-202601-0001" }.
+  /// Stored as JSON so new source types do not need a migration.
+  sourceRef Json?
+
+  status JournalEntryStatus @default(POSTED)
+
+  /// Reversal bookkeeping — a reversed entry keeps its lines and points at the
+  /// reversing entry instead of being deleted, so history stays auditable.
+  reversedByEntryId String?   @unique
+  reversedByEntry   JournalEntry?  @relation("EntryReversal", fields: [reversedByEntryId], references: [id], onDelete: SetNull)
+  reversesEntryId   String?   @unique
+  reversesEntry     JournalEntry?  @relation("EntryReversal")
+
+  postedBy String?
+  postedAt DateTime?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  lines JournalLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, entryNumber])
+  @@index([organizationId])
+  @@index([entryDate])
+  @@index([source])
+  @@map("journal_entries")
+}
+
+enum JournalEntrySource {
+  MANUAL
+  INVOICE
+  PAYMENT
+  RECEIPT
+  LEASE
+  CREDIT_NOTE
+  PAYOUT
+  OPENING_BALANCE
+}
+
+enum JournalEntryStatus {
+  POSTED
+  REVERSED
+}
+
+/// One side of a journal entry. Exactly one of debit/credit is non-zero; the
+/// entry as a whole must balance (see `AccountingService.postEntry`).
+model JournalLine {
+  id String @id @default(cuid())
+  entryId String
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  debit  Decimal @default(0) @db.Decimal(14, 2)
+  credit Decimal @default(0) @db.Decimal(14, 2)
+
+  description String? @db.Text
+
+  // Entity the line belongs to, for per-tenant/landlord/property reporting.
+  memo String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
 }
 
 model ReceiptLine {

@@ -612,6 +612,9 @@ export const financeApi = {
     deletePayments: (ids: string[]) =>
         api.post('/finance/payments/bulk-delete', { ids }),
 
+    reversePayment: (id: string) =>
+        api.post(`/finance/payments/${id}/reverse`),
+
     // Receipts
     createReceipt: (data: CreateReceiptData) =>
         api.post<Receipt>('/finance/receipts', data),
@@ -627,6 +630,107 @@ export const financeApi = {
 
     deleteReceipts: (ids: string[]) =>
         api.post('/finance/receipts/bulk-delete', { ids }),
+};
+
+/**
+ * General ledger (Module 7: Finance & Accounting). Accounts, journal entries,
+ * reversals and the trial balance. Routine transactions are auto-posted by the
+ * backend — these endpoints exist for reading the ledger and for the manual
+ * adjusting entries an accountant occasionally needs.
+ */
+export interface GLAccount {
+    id: string;
+    code: string;
+    name: string;
+    type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+    subtype?: string | null;
+    description?: string | null;
+    normalBalance: 'DEBIT' | 'CREDIT';
+    isSystem: boolean;
+    isPostable: boolean;
+    isActive: boolean;
+}
+
+export interface GLJournalLine {
+    id: string;
+    accountId: string;
+    debit: number | string;
+    credit: number | string;
+    description?: string | null;
+    account: GLAccount;
+}
+
+export interface GLJournalEntry {
+    id: string;
+    entryNumber: string;
+    entryDate: string;
+    memo?: string | null;
+    reference?: string | null;
+    source: string;
+    sourceRef?: { type?: string; id?: string; number?: string } | null;
+    status: 'POSTED' | 'REVERSED';
+    postedBy?: string | null;
+    postedAt?: string | null;
+    lines: GLJournalLine[];
+}
+
+export interface GLTrialBalanceRow {
+    id: string;
+    code: string;
+    name: string;
+    type: GLAccount['type'];
+    debit: number;
+    credit: number;
+    balance: number;
+}
+
+export const accountingApi = {
+    listAccounts: () => api.get<GLAccount[]>('/finance/accounting/accounts'),
+
+    createAccount: (data: {
+        code: string;
+        name: string;
+        type: GLAccount['type'];
+        subtype?: string;
+        description?: string;
+        normalBalance?: 'DEBIT' | 'CREDIT';
+        isPostable?: boolean;
+    }) => api.post<GLAccount>('/finance/accounting/accounts', data),
+
+    updateAccount: (
+        id: string,
+        data: { name?: string; subtype?: string; description?: string; isPostable?: boolean; isActive?: boolean },
+    ) => api.put<GLAccount>(`/finance/accounting/accounts/${id}`, data),
+
+    deleteAccount: (id: string) =>
+        api.delete(`/finance/accounting/accounts/${id}`),
+
+    listEntries: (params?: { from?: string; to?: string; source?: string; limit?: number }) =>
+        api.get<GLJournalEntry[]>('/finance/accounting/entries', { params }),
+
+    findEntry: (id: string) => api.get<GLJournalEntry>(`/finance/accounting/entries/${id}`),
+
+    createEntry: (data: {
+        entryDate?: string;
+        memo?: string;
+        reference?: string;
+        lines: { accountCode: string; debit?: number; credit?: number; description?: string }[];
+    }) => api.post<GLJournalEntry>('/finance/accounting/entries', data),
+
+    reverseEntry: (id: string) =>
+        api.post<GLJournalEntry>(`/finance/accounting/entries/${id}/reverse`),
+
+    trialBalance: (params?: { from?: string; to?: string }) =>
+        api.get<{ rows: GLTrialBalanceRow[]; totalDebit: number; totalCredit: number; balanced: boolean }>(
+            '/finance/accounting/trial-balance',
+            { params },
+        ),
+
+    accountLedger: (id: string, params?: { from?: string; to?: string }) =>
+        api.get<{ account: GLAccount; lines: { entryNumber: string; entryDate: string; description?: string | null; debit: number; credit: number; balance: number }[]; closingBalance: number }>(
+            `/finance/accounting/accounts/${id}/ledger`,
+            { params },
+        ),
 };
 
 // Dashboard API

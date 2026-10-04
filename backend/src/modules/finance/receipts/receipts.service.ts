@@ -6,10 +6,19 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
+import { AccountingService } from '../accounting/accounting.service';
+import { JournalEntrySource } from '@prisma/client';
 
 @Injectable()
 export class ReceiptsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private accountingService: AccountingService,
+  ) {}
+
+  private round2(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
 
   // Generate receipt number
   private generateReceiptNumber(): string {
@@ -222,15 +231,25 @@ export class ReceiptsService {
     }
 
     // Receipt creation moves money, so run it (and the invoice balance
-    // updates) in a single transaction: either everything lands or nothing
-    // does. Invoice balances are only updated for invoices we own — a
-    // receipt can never apply money to another tenant's invoice.
+    // updates, and the GL postings) in a single transaction: either everything
+    // lands or nothing does. Invoice balances are only updated for invoices we
+    // own — a receipt can never apply money to another tenant's invoice.
     return this.prisma.$transaction(async (tx) => {
       const receipt = await tx.receipt.create({ data: receiptData });
 
+      // Money applied to a specific invoice relieves AR; any part of the
+      // receipt that is not allocated is posted on-account so the cash is
+      // still reflected in the ledger.
+      let unallocated = 0;
+
       for (const payment of paymentsCreate) {
+        const amount = this.round2(Number(payment.amount));
         const invoiceId = payment.invoice?.connect?.id;
-        if (!invoiceId) continue;
+
+        if (!invoiceId) {
+          unallocated = this.round2(unallocated + amount);
+          continue;
+        }
 
         const invoiceWhere: Prisma.InvoiceWhereInput = { id: invoiceId };
         if (tenantId) invoiceWhere.organizationId = tenantId;
@@ -254,26 +273,64 @@ export class ReceiptsService {
           );
         }
 
-        const round2 = (n: number) => Math.round(n * 100) / 100;
         // paid so far = total - outstanding balance
-        const newPaid = round2(
-          Number(invoice.totalAmount) -
-            Number(invoice.balanceAmount) +
-            Number(payment.amount),
+        const newPaid = this.round2(
+          Number(invoice.totalAmount) - Number(invoice.balanceAmount) + amount,
         );
-        const newBalance = round2(
-          Number(invoice.balanceAmount) - Number(payment.amount),
-        );
+        const newBalance = this.round2(Number(invoice.balanceAmount) - amount);
 
         await tx.invoice.update({
           where: { id: invoice.id },
           data: {
             paidAmount: newPaid,
-            balanceAmount: round2(Math.max(0, newBalance)),
+            balanceAmount: this.round2(Math.max(0, newBalance)),
             // We just accepted a payment, so anything left over is partial.
             status: newBalance <= 0 ? 'PAID' : 'PARTIALLY_PAID',
           },
         });
+
+        if (tenantId) {
+          await this.accountingService.postPaymentReceived(
+            {
+              amount,
+              paymentDate: payment.paymentDate,
+              paymentMethod: payment.paymentMethod as string,
+              reference: payment.paymentReference,
+              description: `Receipt ${receipt.receiptId} — payment applied`,
+              source: JournalEntrySource.RECEIPT,
+              sourceRef: {
+                type: 'RECEIPT',
+                id: receipt.id,
+                number: receipt.receiptId,
+              },
+            },
+            tenantId,
+            tx,
+          );
+        }
+      }
+
+      if (tenantId && unallocated > 0) {
+        await this.accountingService.postPaymentReceived(
+          {
+            amount: unallocated,
+            paymentDate: receipt.recordingDate,
+            paymentMethod: receipt.paymentMethod as string,
+            reference: receipt.refNo ?? undefined,
+            description: `Receipt ${receipt.receiptId} — on account`,
+            // Money collected for an owner is not income until the owner
+            // statement is paid out, so it sits in a liability account.
+            onBehalfOfLandlord: Boolean(data.landlordId),
+            source: JournalEntrySource.RECEIPT,
+            sourceRef: {
+              type: 'RECEIPT',
+              id: receipt.id,
+              number: receipt.receiptId,
+            },
+          },
+          tenantId,
+          tx,
+        );
       }
 
       return receipt;
@@ -328,6 +385,8 @@ export class ReceiptsService {
         id,
         organizationId: tenantId,
       });
+      // A deleted receipt must not leave its cash movement in the ledger.
+      await this.accountingService.reverseEntriesForSource(id, tenantId);
     }
     return this.prisma.receipt.delete({
       where: { id },

@@ -24,6 +24,8 @@ import {
     HandCoins,
     MessageSquare,
     Banknote,
+    BookOpen,
+    Scale,
 } from "lucide-react";
 
 type UserRole =
@@ -101,7 +103,10 @@ const navItems: NavItem[] = [
             { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] }
+            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/journal-entries", label: "Journal Entries", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/trial-balance", label: "Trial Balance", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] }
         ]
     },
 

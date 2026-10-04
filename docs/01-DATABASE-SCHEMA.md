@@ -863,7 +863,23 @@ enum ChargeCategory {
 
 ---
 
-## Domain: Finance & Accounting (Module: Finance & Accounting) — ⚠️ Partially existing, verify
+## Domain: Finance & Accounting (Module: Finance & Accounting) — ✅ GL landed 2026-10-04, rest still missing
+
+The chart of accounts and general ledger below now exist in `schema.prisma`
+(`Account`, `JournalEntry`, `JournalLine`, with the `AccountType`,
+`BalanceSide`, `JournalEntrySource` and `JournalEntryStatus` enums). The
+Invoice/Payment/Receipt/CreditNote shapes in this section are still the target
+design, not the current tables — the live invoice/payment/receipt models are
+documented above and differ. Differences worth knowing:
+
+- `Account.code` is unique **per organization**, not globally, and is immutable
+  once created: auto-posting resolves accounts by code, so renaming a code would
+  rewrite the meaning of posted entries.
+- `JournalEntry.sourceRef` is JSON (`{ type, id, number }`) rather than typed
+  FKs, so a new source type does not need a migration. It is the hook the
+  reversal path queries.
+- A reversed entry is kept and marked `REVERSED` with `reversedByEntryId` /
+  `reversesEntryId` set; entries are never deleted or edited.
 
 ```prisma
 model Account {

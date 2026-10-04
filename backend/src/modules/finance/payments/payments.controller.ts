@@ -46,6 +46,17 @@ export class PaymentsController {
     );
   }
 
+  @Post(':id/reverse')
+  @Permissions('payments.update')
+  async reverse(@Param('id') id: string, @Request() req) {
+    const tenantId = getTenantId(req);
+    const user = await this.usersService.findOne(req.user.userId);
+    const reversedBy = user
+      ? `${user.firstName} ${user.lastName}`
+      : 'Unknown User';
+    return this.paymentsService.reverse(id, tenantId, reversedBy);
+  }
+
   @Get()
   findAll(@Request() req) {
     const tenantId = getTenantId(req);

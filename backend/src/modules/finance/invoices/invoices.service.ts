@@ -2,10 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
+import { AccountingService } from '../accounting/accounting.service';
+import { ACCOUNT_CODES } from '../accounting/chart-of-accounts';
 
 @Injectable()
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private accountingService: AccountingService,
+  ) {}
 
   // Generate invoice number
   private generateInvoiceNumber(): string {
@@ -109,7 +114,43 @@ export class InvoicesService {
       };
     }
 
-    return this.prisma.invoice.create({ data: invoiceData });
+    // The invoice and its double-entry GL effect must land together: if the
+    // ledger rejects the entry (unbalanced, missing account) the invoice must
+    // not exist without its accounting record.
+    return this.prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.create({ data: invoiceData });
+
+      if (tenantId) {
+        // The invoice amount may be VAT-inclusive (total = net + VAT) or
+        // VAT-exclusive (total = amount + VAT); revenue is always the net.
+        const total = Number(data.totalAmount);
+        const vat = Number(data.vatAmount ?? 0);
+        const amount = Number(data.amount ?? 0);
+        const exclusive = Math.abs(amount + vat - total) < 0.01;
+        const net = exclusive ? amount : Math.round((total - vat) * 100) / 100;
+
+        await this.accountingService.postInvoiceIssued(
+          {
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            issueDate: invoice.issueDate,
+            totalAmount: total,
+            vatAmount: vat,
+            netAmount: net,
+            status: invoice.status,
+            incomeAccountCode:
+              data.transactionClass === 'SALE'
+                ? ACCOUNT_CODES.SALE_OF_PROPERTY_INCOME
+                : undefined,
+            memo: `Invoice ${invoice.invoiceNumber} issued`,
+          },
+          tenantId,
+          tx,
+        );
+      }
+
+      return invoice;
+    });
   }
 
   async update(
@@ -143,6 +184,21 @@ export class InvoicesService {
         id,
         organizationId: tenantId,
       });
+    }
+
+    // Cancelling an invoice reverses its auto-posted GL entry — a cancelled
+    // sale must not leave revenue and AR standing in the ledger.
+    const previous = await this.prisma.invoice.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (
+      tenantId &&
+      data.status === 'CANCELLED' &&
+      previous &&
+      previous.status !== 'CANCELLED'
+    ) {
+      await this.accountingService.reverseEntriesForSource(id, tenantId);
     }
 
     const updateData: Prisma.InvoiceUpdateInput = {};
@@ -244,6 +300,9 @@ export class InvoicesService {
         id,
         organizationId: tenantId,
       });
+      // Reverse the ledger effect first; deleting the invoice must not leave
+      // an orphan revenue/AR posting behind.
+      await this.accountingService.reverseEntriesForSource(id, tenantId);
     }
     return this.prisma.invoice.delete({
       where: { id },
