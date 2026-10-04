@@ -42,6 +42,18 @@ model Organization {
   legalName String?
   taxId     String?
 
+  // ── Tax jurisdiction ────────────────────────────────────────────────────
+  // The rules engine is country-agnostic: nothing in the code assumes Kenya.
+  // An organization declares where it is taxed, and the `TaxRule` rows for that
+  // jurisdiction do the rest. `taxCountryCode` is ISO-3166-1 alpha-2 (KE, GB,
+  // DE, US, ...); `taxRegionCode` is the optional sub-national level that many
+  // countries actually tax by (US state, German Bundesland, Brazilian estado).
+  taxCountryCode String? @db.Char(2)
+  taxRegionCode  String?
+  // VAT/GST/sales-tax registration number, printed on invoices where the law
+  // requires it. Separate from `taxId`, which is the company registration.
+  taxRegistrationNumber String?
+
   // Regional defaults (System Settings) — money amounts still carry their
   // own currency per record; these are the org-level defaults.
   currency String @default("KES")
@@ -77,6 +89,7 @@ model Organization {
   customerCredits   CustomerCredit[]
   paymentRefunds    PaymentRefund[]
   creditNotes       CreditNote[]
+  taxRules          TaxRule[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1710,13 +1723,27 @@ model Invoice {
   paidAmount    Decimal @default(0) @db.Decimal(10, 2)
   balanceAmount Decimal @db.Decimal(10, 2)
 
+  // Tax provenance (Module 7 rules engine). `amount`/`vatAmount`/`totalAmount`
+  // remain the single source of truth for the money; these record what the
+  // engine decided and under whose jurisdiction, so a document issued in one
+  // country is not silently re-read under another's rules.
+  taxJurisdiction String? // e.g. "KE", "US-CA" — snapshotted at issue
+  taxBasis        TaxBasis?
+  /// Per-rule totals, e.g. [{ "code": "VAT", "rate": 16, "amount": 1600,
+  /// "account": "2100" }]. JSON so a jurisdiction with three tax types does not
+  /// need a migration to invoice its fourth.
+  taxSummary      Json?
+  // Withholding tax collected on the invoice is deducted from what we remit,
+  // never added to what the customer owes.
+  taxWithheldAmount Decimal @default(0) @db.Decimal(10, 2)
+
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  invoiceItems     InvoiceItem[]
-  payments         Payment[]
+  invoiceItems InvoiceItem[]
+  payments     Payment[]
   creditApplications CreditApplication[]
   creditNotes      CreditNote[]
   paymentAllocations PaymentAllocation[]
@@ -1759,6 +1786,17 @@ model InvoiceItem {
   // Tax information
   vatRate   Decimal? @db.Decimal(5, 2) // Tax Rate - VAT percentage
   vatAmount Decimal? @db.Decimal(10, 2) // Tax Amount - calculated VAT amount
+
+  // Tax rule snapshot (Module 7 rules engine). The rate and amount above are
+  // what the invoice was issued with; these record *which* rule produced them,
+  // so an invoice dated under an old rate stays explicable after the rule
+  // changes, and a mixed-tax invoice says which line was which.
+  taxRuleId String?
+  taxRule   TaxRule? @relation(fields: [taxRuleId], references: [id], onDelete: SetNull)
+  taxCode   String? // e.g. "VAT", "GST", "WHT" — snapshotted so the document
+                     // is readable even if the rule is renamed or deleted
+  taxBasis  TaxBasis?
+  taxTreatment TaxTreatment?
 
   // Additional classification
   className String? // Class - additional classification for reporting
@@ -2295,6 +2333,109 @@ model CreditNoteLine {
 
   @@index([creditNoteId])
   @@map("credit_note_lines")
+}
+
+/// Module 7 — Finance & Accounting: the configurable tax rules engine.
+///
+/// Tax is configuration, not code. An organization says where it operates and
+/// its accountant records the tax types that apply there; nothing in the
+/// codebase assumes a country, a currency, or that "VAT at 16%" is a constant.
+/// Renaming `code`, changing a rate, or adding a jurisdiction is a data change.
+///
+/// One rule = one tax type for a period. Multiple rules may be active at once
+/// (VAT plus a withholding tax, or a standard and a reduced rate), which is why
+/// calculation is a small pipeline rather than a single multiplication.
+model TaxRule {
+  id String @id @default(cuid())
+  code String
+  name String
+  description String? @db.Text
+
+  // ISO-3166-1 alpha-2 country the rule belongs to (KE, GB, DE, ...). A null
+  // country means the rule is the organization's fallback for anywhere it
+  // trades without a more specific match.
+  countryCode String? @db.Char(2)
+
+  // Optional sub-national level (US state, German Bundesland, ...). When set,
+  // the rule only applies to an organization whose `taxRegionCode` matches.
+  regionCode String?
+
+  /// How this tax relates to the stated price.
+  ///
+  /// `INCLUSIVE` — the price already contains the tax (a €119 VAT-inclusive
+  /// rate is 100 + 19), which is how most consumer sales are advertised.
+  /// `EXCLUSIVE` — tax is added on top of the price.
+  ///
+  /// Some jurisdictions are mixed (goods exclusive, services inclusive), so
+  /// this is per rule and not a global switch.
+  basis TaxBasis @default(EXCLUSIVE)
+
+  /// Tax charged on top of another tax (EU-style compound VAT, or an Indian
+  /// GST-on-service-fee). `compoundOnRuleId` names the rule it stacks onto;
+  /// the engine rejects a compound rule with nothing to compound on.
+  isCompound Boolean @default(false)
+  compoundOnRuleId String?
+  compoundOnRule   TaxRule?  @relation("CompoundTax", fields: [compoundOnRuleId], references: [id], onDelete: SetNull)
+  compoundsOn      TaxRule[] @relation("CompoundTax")
+
+  /// Percentage rate, four decimal places so reduced and fractional rates
+  /// (7.7% Brazil ISS, 5% reduced VAT) are exact. Stored as a percentage, not
+  /// a fraction: 16.0000 means 16%.
+  rate Decimal @db.Decimal(7, 4)
+
+  /// Where the collected tax lands in the ledger. Without it the engine posts
+  /// every tax to 2100 (VAT payable), which silently merges a withholding tax
+  /// into VAT and makes the trial balance a lie.
+  ledgerAccountCode String? @default("2100")
+
+  /// Whether the tax is shown as its own line on an invoice (sales tax) or is
+  /// withheld from the customer's payment and never billed to them
+  /// (withholding tax).
+  treatment TaxTreatment @default(CHARGED)
+
+  /// Which kind of charge this rate is for. `'*'` (the default) applies
+  /// everywhere. A jurisdiction with a standard and a reduced rate — Germany's
+  /// 19% and 7% VAT — sets both to `'*'` plus one category, and an invoice line
+  /// tagged with that category gets the reduced rate instead of both. Matching
+  /// is by the line's `revenueExpenseItem`, falling back to `'*'`.
+  appliesToCategory String @default("*")
+
+  /// Effective window. Two rules may exist for the same country/code with
+  /// different windows so a rate change is data, not a migration — and an
+  /// invoice dated inside the old window keeps the old rate.
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  isActive Boolean @default(true)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Identity of a rule: one tax, in one place, for one line category, from one
+  // date. `appliesToCategory` is part of it because a standard and a reduced
+  // rate of the same tax are two rules with the same code and different
+  // categories.
+  @@unique([organizationId, code, countryCode, regionCode, appliesToCategory, validFrom])
+  @@index([organizationId])
+  @@index([countryCode])
+  invoiceItems InvoiceItem[]
+  @@map("tax_rules")
+}
+
+enum TaxBasis {
+  EXCLUSIVE
+  INCLUSIVE
+}
+
+enum TaxTreatment {
+  /// Added to the invoice as a visible line the customer pays.
+  CHARGED
+  /// Deducted by us when paying the supplier/authority; the customer never
+  /// sees it on an invoice.
+  WITHHELD
 }
 
 model ReceiptLine {

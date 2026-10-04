@@ -4,12 +4,14 @@ import { Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { AccountingService } from '../accounting/accounting.service';
 import { ACCOUNT_CODES } from '../accounting/chart-of-accounts';
+import { TaxService } from '../tax/tax.service';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     private prisma: PrismaService,
     private accountingService: AccountingService,
+    private taxService: TaxService,
   ) {}
 
   // Generate invoice number
@@ -23,7 +25,7 @@ export class InvoicesService {
     return `INV-${year}${month}-${random}`;
   }
 
-  create(
+  async create(
     data: {
       invoiceNumber?: string;
       landlordId?: string;
@@ -46,6 +48,14 @@ export class InvoicesService {
       paidAmount?: number;
       balanceAmount: number;
       status?: string;
+      /**
+       * Compute tax from the organization's configured rules instead of the
+       * amounts supplied. Omitted tax amounts already imply this — an explicit
+       * `vatAmount` is respected as typed, so existing callers are unaffected.
+       */
+      calculateTax?: boolean;
+      /** Price the lines as tax-inclusive (a rate added on top by default). */
+      taxInclusive?: boolean;
       invoiceItems?: {
         revenueExpenseItem?: string;
         particular?: string;
@@ -60,83 +70,133 @@ export class InvoicesService {
     },
     tenantId?: string,
   ) {
-    const invoiceData: Prisma.InvoiceCreateInput = {
-      invoiceNumber: data.invoiceNumber || this.generateInvoiceNumber(),
-      transactionClass: data.transactionClass,
-      acReceivable: data.acReceivable,
-      billTo: data.billTo,
-      issueDate: new Date(data.issueDate),
-      dueDate: new Date(data.dueDate),
-      currency: data.currency || 'KES',
-      spotRate: data.spotRate || 1,
-      lpoNumber: data.lpoNumber,
-      signOnEfims: data.signOnEfims || false,
-      paymentInfo: data.paymentInfo,
-      termsConditions: data.termsConditions,
-      memo: data.memo,
-      amount: data.amount,
-      vatAmount: data.vatAmount,
-      totalAmount: data.totalAmount,
-      paidAmount: data.paidAmount || 0,
-      balanceAmount: data.balanceAmount,
-      status: (data.status as any) || 'PENDING',
-    };
-
-    // Add tenant organization if provided
-    if (tenantId) {
-      invoiceData.organization = { connect: { id: tenantId } };
-    }
-
-    // Add landlord relation if provided
-    if (data.landlordId) {
-      invoiceData.landlord = { connect: { id: data.landlordId } };
-    }
-
-    // Add rental agreement relation if provided (backward compatibility)
-    if (data.rentalAgreementId) {
-      invoiceData.rentalAgreement = { connect: { id: data.rentalAgreementId } };
-    }
-
-    // Add invoice items if provided
-    if (data.invoiceItems && data.invoiceItems.length > 0) {
-      invoiceData.invoiceItems = {
-        create: data.invoiceItems.map((item) => ({
-          description: item.particular || '',
-          revenueExpenseItem: item.revenueExpenseItem,
-          incomeAccount: item.incomeAccount,
-          quantity: item.qty || 1,
-          unitPrice: item.unitCost || 0,
-          amount: item.lineTotal || 0,
-          vatRate: item.taxRate || 0,
-          vatAmount: item.taxAmount || 0,
-          className: item.className,
-        })),
-      };
-    }
-
-    // The invoice and its double-entry GL effect must land together: if the
-    // ledger rejects the entry (unbalanced, missing account) the invoice must
-    // not exist without its accounting record.
     return this.prisma.$transaction(async (tx) => {
+      const issueDate = new Date(data.issueDate);
+
+      // Tax first: the invoice's money columns depend on what the engine
+      // decided, so this has to happen before the row is built.
+      const priced =
+        tenantId && data.invoiceItems?.length
+          ? await this.priceWithTaxRules(data, issueDate, tenantId, tx)
+          : null;
+
+      const amount = priced?.netAmount ?? Number(data.amount);
+      const chargedTax = priced?.chargedTax ?? Number(data.vatAmount ?? 0);
+      const totalAmount = priced
+        ? priced.netAmount + priced.chargedTax
+        : Number(data.totalAmount);
+      const balanceAmount = priced
+        ? Math.max(0, totalAmount - Number(data.paidAmount ?? 0))
+        : Number(data.balanceAmount);
+
+      const invoiceData: Prisma.InvoiceCreateInput = {
+        invoiceNumber: data.invoiceNumber || this.generateInvoiceNumber(),
+        transactionClass: data.transactionClass,
+        acReceivable: data.acReceivable,
+        billTo: data.billTo,
+        issueDate,
+        dueDate: new Date(data.dueDate),
+        currency: data.currency || 'KES',
+        spotRate: data.spotRate || 1,
+        lpoNumber: data.lpoNumber,
+        signOnEfims: data.signOnEfims || false,
+        paymentInfo: data.paymentInfo,
+        termsConditions: data.termsConditions,
+        memo: data.memo,
+        amount,
+        vatAmount: chargedTax,
+        totalAmount,
+        paidAmount: data.paidAmount || 0,
+        balanceAmount,
+        status: (data.status as never) || 'PENDING',
+        taxWithheldAmount: priced?.withheldTax ?? 0,
+        taxJurisdiction: priced?.jurisdiction || undefined,
+        taxBasis: priced?.basis,
+        taxSummary: priced?.summary
+          ? (priced.summary as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+      };
+
+      // Add tenant organization if provided
+      if (tenantId) {
+        invoiceData.organization = { connect: { id: tenantId } };
+      }
+
+      // Add landlord relation if provided
+      if (data.landlordId) {
+        invoiceData.landlord = { connect: { id: data.landlordId } };
+      }
+
+      // Add rental agreement relation if provided (backward compatibility)
+      if (data.rentalAgreementId) {
+        invoiceData.rentalAgreement = {
+          connect: { id: data.rentalAgreementId },
+        };
+      }
+
+      if (data.invoiceItems && data.invoiceItems.length > 0) {
+        invoiceData.invoiceItems = {
+          create: data.invoiceItems.map((item, index) => {
+            const computed = priced?.lines[index];
+            const charged = computed?.taxes.find(
+              (tax) => tax.treatment !== 'WITHHELD',
+            );
+            const firstTax = computed?.taxes[0];
+            return {
+              description: item.particular || '',
+              revenueExpenseItem: item.revenueExpenseItem,
+              incomeAccount: item.incomeAccount,
+              quantity: item.qty || 1,
+              unitPrice: item.unitCost || 0,
+              amount: computed?.netAmount ?? item.lineTotal ?? 0,
+              // The engine's rate wins when it ran; otherwise the typed-in one.
+              vatRate: firstTax?.ratePercent ?? item.taxRate ?? 0,
+              vatAmount: computed
+                ? (charged?.amount ?? 0)
+                : (item.taxAmount ?? 0),
+              taxRuleId: firstTax?.ruleId,
+              taxCode: firstTax?.code,
+              taxBasis: firstTax?.basis,
+              taxTreatment: firstTax?.treatment,
+              className: item.className,
+            };
+          }),
+        };
+      }
+
+      // The invoice and its double-entry GL effect must land together: if the
+      // ledger rejects the entry (unbalanced, missing account) the invoice must
+      // not exist without its accounting record.
       const invoice = await tx.invoice.create({ data: invoiceData });
 
       if (tenantId) {
-        // The invoice amount may be VAT-inclusive (total = net + VAT) or
-        // VAT-exclusive (total = amount + VAT); revenue is always the net.
-        const total = Number(data.totalAmount);
-        const vat = Number(data.vatAmount ?? 0);
-        const amount = Number(data.amount ?? 0);
-        const exclusive = Math.abs(amount + vat - total) < 0.01;
-        const net = exclusive ? amount : Math.round((total - vat) * 100) / 100;
-
         await this.accountingService.postInvoiceIssued(
           {
             invoiceId: invoice.id,
             invoiceNumber: invoice.invoiceNumber,
             issueDate: invoice.issueDate,
-            totalAmount: total,
-            vatAmount: vat,
-            netAmount: net,
+            totalAmount,
+            vatAmount: chargedTax,
+            netAmount: amount,
+            taxes: priced?.summary
+              ?.filter(
+                (entry) => entry.treatment !== 'WITHHELD' && entry.amount > 0,
+              )
+              .map((entry) => ({
+                code: entry.code,
+                name: entry.name,
+                amount: entry.amount,
+                accountCode: entry.account,
+              })),
+            taxWithheld:
+              priced && priced.withheldTax > 0
+                ? {
+                    amount: priced.withheldTax,
+                    code: priced.summary.find(
+                      (entry) => entry.treatment === 'WITHHELD',
+                    )?.code,
+                  }
+                : undefined,
             status: invoice.status,
             incomeAccountCode:
               data.transactionClass === 'SALE'
@@ -151,6 +211,48 @@ export class InvoicesService {
 
       return invoice;
     });
+  }
+
+  /**
+   * Run the organization's configured tax rules over the invoice lines.
+   *
+   * Skipped (returning null) when the caller supplied an explicit `vatAmount`,
+   * because an amount a person typed in beats a rule we inferred — and when the
+   * organization has no rules at all, in which case there is nothing to apply.
+   */
+  private async priceWithTaxRules(
+    data: {
+      vatAmount?: number;
+      calculateTax?: boolean;
+      invoiceItems?: { particular?: string; lineTotal?: number }[];
+    },
+    issueDate: Date,
+    tenantId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    const shouldCalculate = data.calculateTax ?? data.vatAmount === undefined;
+    if (!shouldCalculate) return null;
+
+    const computed = await this.taxService.computeFor(
+      tenantId,
+      (data.invoiceItems ?? []).map((item) => ({
+        description: item.particular ?? '',
+        amount: Number(item.lineTotal ?? 0),
+      })),
+      { at: issueDate },
+      tx,
+    );
+
+    // No configured tax means nothing to apply — leave the invoice exactly as
+    // the caller described it rather than inventing zeros.
+    if (computed.summary.length === 0) return null;
+
+    return {
+      ...computed,
+      basis: computed.rules.some((rule) => rule.basis === 'INCLUSIVE')
+        ? ('INCLUSIVE' as const)
+        : ('EXCLUSIVE' as const),
+    };
   }
 
   async update(

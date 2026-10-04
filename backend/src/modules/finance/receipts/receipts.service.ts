@@ -9,6 +9,8 @@ import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { AccountingService } from '../accounting/accounting.service';
 import { CreditsService } from '../credits/credits.service';
 import { allocateToInvoice } from '../invoice-allocation';
+import { withheldOn } from '../tax/withheld';
+import { syncInvoiceSettlement } from '../invoice-settlement';
 import { CustomerCreditSource, JournalEntrySource } from '@prisma/client';
 
 @Injectable()
@@ -220,7 +222,6 @@ export class ReceiptsService {
         : [];
 
     if (paymentsCreate.length > 0) {
-      receiptData.payments = { create: paymentsCreate };
       // The receipt total must equal what was actually applied
       const totalApplied = paymentsCreate.reduce(
         (sum, p) => sum + Number(p.amount),
@@ -249,6 +250,16 @@ export class ReceiptsService {
         const amount = this.round2(Number(payment.amount));
         const invoiceId = payment.invoice?.connect?.id;
 
+        // Created here rather than nested on the receipt, so the allocation row
+        // below can point at the exact payment this money came in on — two
+        // lines with the same amount would be indistinguishable otherwise.
+        const createdPayment = await tx.payment.create({
+          data: {
+            ...payment,
+            receipt: { connect: { id: receipt.id } },
+          },
+        });
+
         if (!invoiceId) {
           unallocated = this.round2(unallocated + amount);
           continue;
@@ -265,6 +276,8 @@ export class ReceiptsService {
             status: true,
             balanceAmount: true,
             paidAmount: true,
+            taxWithheldAmount: true,
+            taxSummary: true,
             rentalAgreement: { select: { tenantId: true } },
           },
         });
@@ -291,22 +304,9 @@ export class ReceiptsService {
           amount,
         );
 
-        await tx.invoice.update({
-          where: { id: invoice.id },
-          data: {
-            paidAmount: allocation.paidAmount,
-            balanceAmount: allocation.balanceAmount,
-            status: allocation.status,
-          },
-        });
-
         // Recorded as an allocation so a later refund knows exactly how much of
         // this payment settled the bill.
-        const createdPayment = await tx.payment.findFirst({
-          where: { receiptId: receipt.id, amount },
-          select: { id: true },
-        });
-        if (createdPayment) {
+        if (allocation.applied > 0) {
           await tx.paymentAllocation.create({
             data: {
               paymentId: createdPayment.id,
@@ -316,6 +316,9 @@ export class ReceiptsService {
             },
           });
         }
+
+        // One definition of the money columns — see invoice-settlement.ts.
+        await syncInvoiceSettlement(tx, invoice.id, tenantId);
 
         if (allocation.surplus > 0 && tenantId) {
           await this.creditsService.captureSurplus(
@@ -341,6 +344,7 @@ export class ReceiptsService {
               paymentMethod: payment.paymentMethod as string,
               reference: payment.paymentReference,
               description: `Receipt ${receipt.receiptId} — payment applied`,
+              taxWithheld: withheldOn(invoice),
               source: JournalEntrySource.RECEIPT,
               sourceRef: {
                 type: 'RECEIPT',

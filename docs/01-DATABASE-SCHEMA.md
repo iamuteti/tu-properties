@@ -5,9 +5,11 @@
 > **Before touching this doc's contents:** open `backend/src/prisma/schema.prisma` and treat it as the current source of truth. The schema currently has **20 Prisma models** (`schema.prisma` lines 17–905), verified by a full codebase audit — more than this doc's "believed existing" tables below account for individually, because several accounting/integration fields already exist on models below as placeholder columns with no logic behind them yet. Specifically verified as already present but **unwired**:
 > - `acReceivable`, `incomeAccount`, `spotRate` (accounting/GL-adjacent fields, likely on Property/Invoice/Account-like models) — no chart of accounts or GL engine consumes them yet.
 > - `Property.mpesaPropertyPayNumber` — a payment gateway config field exists, but no live payment gateway integration, reconciliation logic exists.
-> - `Invoice.signOnEfims` — a boolean flag referencing local tax compliance (eTIMS/KRA), but no actual tax compliance transmission/QR/ETR integration exists.
+> - `Invoice.signOnEfims` — a legacy boolean named after one country's e-invoicing system. It is **not** a multi-jurisdiction compliance flag: statutory e-invoicing differs per country (transmission API, document format, verification/QR scheme, fiscal-device rules). It is unwired and should be **replaced** by a jurisdiction-driven transmission status on the invoice, not extended with more single-country booleans. See `08-MODULE-finance-accounting.md`.
 > - `Receipt.bankingDate` — field exists, reconciliation logic doesn't.
 > - `exemptAllSms` — an SMS opt-out flag with no SMS sending system behind it yet.
+>
+> **Tax is now real and country-agnostic (added 2026-10-04).** `tax_rules` plus `Organization.taxCountryCode`/`taxRegionCode`/`taxRegistrationNumber` are live and drive invoice pricing — see the Finance & Accounting domain below. Nothing in the schema or code assumes a particular country, currency or rate; a jurisdiction is data.
 >
 > **Do not add duplicate fields for any of the above** — extend/wire the existing ones. Also verified: `AuditLog` model exists and a `logAction()` service exists (`backend/src/modules/audit/audit.service.ts`), but `logAction` is **never called anywhere in the codebase** — it needs to be wired into every create/update/delete on tenant data, not rebuilt.
 >
@@ -863,7 +865,7 @@ enum ChargeCategory {
 
 ---
 
-## Domain: Finance & Accounting (Module: Finance & Accounting) — ✅ GL landed 2026-10-04, rest still missing
+## Domain: Finance & Accounting (Module: Finance & Accounting) — ✅ GL and tax engine landed 2026-10-04, rest still missing
 
 The chart of accounts and general ledger below now exist in `schema.prisma`
 (`Account`, `JournalEntry`, `JournalLine`, with the `AccountType`,
@@ -880,6 +882,76 @@ documented above and differ. Differences worth knowing:
   reversal path queries.
 - A reversed entry is kept and marked `REVERSED` with `reversedByEntryId` /
   `reversesEntryId` set; entries are never deleted or edited.
+
+### Tax: configuration, not schema — and not one country
+
+`TaxRule` below is live as of 2026-10-04 (migration
+`20261004030000_module7_tax_rules`, with `20261004031000_module7_tax_rate_variants`
+and `20261004032000_module7_tax_variant_key` following). It is **country-agnostic
+by construction**: the country, the optional sub-national region, the rate, the
+ledger account and the validity window are all columns, so adding a market is a
+data insert rather than a migration.
+
+Things a future editor should not undo:
+
+- **`rate` is a percentage with four decimals** (16.0000 means 16%), not a
+  fraction — fractional rates such as a reduced VAT or a municipal ISS must be
+  expressible exactly.
+- **`basis` is per rule, not a global switch.** Some jurisdictions quote prices
+  inclusive of tax and others exclusive, and some are mixed, so it cannot be an
+  organization-level flag.
+- **`appliesToCategory` is part of the uniqueness constraint.** A standard and a
+  reduced rate of the *same* tax are two rules with the same `code` differing only
+  by category; they are not two taxes. Without this column in the key they cannot
+  coexist at all, and if they were given different codes instead, both would
+  apply to every line and double-charge.
+- **`validFrom`/`validTo` mean rate changes are data.** Superseding closes the old
+  rule rather than editing it, because an invoice issued last quarter must keep
+  citing the rate that applied then.
+- **Invoice snapshots are what make issued documents explicable**:
+  `Invoice.taxJurisdiction`, `taxBasis` and `taxSummary` (per-rule totals) plus
+  `InvoiceItem.taxRuleId`/`taxCode`/`taxBasis`/`taxTreatment`. The money columns
+  stay the source of truth; these record what the engine decided and whose rule
+  produced it.
+- `taxRegistrationNumber` is the VAT/GST registration printed on invoices, and is
+  separate from `Organization.taxId` (the company registration).
+
+The only thing *not* modelled here is statutory e-invoicing/fiscal-device
+compliance, which differs per jurisdiction and needs a provider-adapter design
+plus authority credentials; `Invoice.signOnEfims` is a legacy single-country
+boolean that should be replaced by a jurisdiction-driven transmission status
+rather than extended.
+
+Live shape (the target sketch further down does not include tax at all, because
+tax was modelled there as a hardcoded VAT field):
+
+```prisma
+model TaxRule {
+  id       String @id @default(cuid())
+  code     String            // "VAT", "GST", "SALES_TAX", "WHT" — free text
+  name     String
+  countryCode String? @db.Char(2)  // ISO-3166-1 alpha-2; null = fallback
+  regionCode  String?              // US state, German Bundesland, ...
+  basis       TaxBasis  @default(EXCLUSIVE)  // price includes the tax, or not
+  treatment   TaxTreatment @default(CHARGED) // billed to customer, or withheld by us
+  rate        Decimal @db.Decimal(7, 4)       // percentage: 16.0000 means 16%
+  ledgerAccountCode String? @default("2100")   // where the collected tax lands
+  isCompound     Boolean @default(false)      // charged on top of another tax
+  compoundOnRuleId String?                     // which tax it stacks onto
+  appliesToCategory String @default("*")      // '*' = every line; else a category
+  validFrom DateTime @default(now())
+  validTo   DateTime?
+  organizationId String?
+  @@unique([organizationId, code, countryCode, regionCode, appliesToCategory, validFrom])
+}
+
+enum TaxBasis { EXCLUSIVE INCLUSIVE }
+enum TaxTreatment { CHARGED WITHHELD }
+```
+
+On `Organization`, the jurisdiction the engine resolves against:
+`taxCountryCode String? @db.Char(2)`, `taxRegionCode String?`,
+`taxRegistrationNumber String?`.
 
 ```prisma
 model Account {

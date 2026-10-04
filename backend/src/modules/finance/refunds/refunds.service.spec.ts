@@ -64,7 +64,11 @@ describe('RefundsService', () => {
     };
 
     const invoice = {
-      findFirst: jest.fn().mockResolvedValue(payment.invoice),
+      findFirst: jest.fn().mockResolvedValue({
+        ...payment.invoice,
+        taxWithheldAmount: 0,
+      }),
+      findUnique: jest.fn().mockResolvedValue({ taxWithheldAmount: 0 }),
       update: jest.fn().mockImplementation(({ data }: any) => data),
     };
 
@@ -81,8 +85,8 @@ describe('RefundsService', () => {
           .fn()
           .mockResolvedValue([{ paymentId: 'pay-1', amount: 3_000 }]),
       },
-      paymentRefund,
       creditNote,
+      paymentRefund,
       creditApplication: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
       },
@@ -164,7 +168,10 @@ describe('RefundsService', () => {
     expect(prisma.invoice.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'inv-1' },
-        data: expect.objectContaining({ paidAmount: 3_000, balanceAmount: 7_000 }),
+        data: expect.objectContaining({
+          paidAmount: 3_000,
+          balanceAmount: 7_000,
+        }),
       }),
     );
   });

@@ -104,6 +104,24 @@ export async function creditAppliedAmount(
 }
 
 /**
+ * Tax the customer withheld and sent to the authority on our behalf. It settles
+ * the invoice just as cash does — the tenant paid one and the authority got the
+ * other — so counting it keeps the invoice from looking partly unpaid forever.
+ * Without this the business columns and the ledger disagree by exactly this
+ * amount.
+ */
+export async function taxWithheldSettled(
+  tx: Tx,
+  invoiceId: string,
+): Promise<number> {
+  const invoice = await tx.invoice.findUnique({
+    where: { id: invoiceId },
+    select: { taxWithheldAmount: true },
+  });
+  return Math.max(0, Number(invoice?.taxWithheldAmount ?? 0));
+}
+
+/**
  * Recompute an invoice's money columns from payments, refunds and credit, and
  * write them back. `previousStatus` keeps an untouched OVERDUE invoice overdue.
  */
@@ -122,7 +140,8 @@ export async function syncInvoiceSettlement(
   );
   const paid =
     (await livePaidAmountLegacySafe(tx, invoiceId)) +
-    (await creditAppliedAmount(tx, invoiceId));
+    (await creditAppliedAmount(tx, invoiceId)) +
+    (await taxWithheldSettled(tx, invoiceId));
 
   const progress = deriveInvoiceProgress(
     Number(invoice.totalAmount),

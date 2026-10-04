@@ -7,6 +7,7 @@ import { CreditStatus, CustomerCreditSource, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { allocateToInvoice, round2 } from '../invoice-allocation';
+import { syncInvoiceSettlement } from '../invoice-settlement';
 
 type Tx = Prisma.TransactionClient;
 
@@ -274,14 +275,6 @@ export class CreditsService {
       );
       if (allocation.applied <= 0) continue;
 
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          paidAmount: allocation.paidAmount,
-          balanceAmount: allocation.balanceAmount,
-          status: allocation.status,
-        },
-      });
       await tx.creditApplication.create({
         data: {
           creditId: credit.id,
@@ -290,6 +283,14 @@ export class CreditsService {
           appliedBy: options?.appliedBy,
         },
       });
+
+      // Recomputed rather than nudged, so a credit applied on top of a payment
+      // (or a withheld tax) cannot double-count.
+      await syncInvoiceSettlement(
+        tx,
+        invoice.id,
+        credit.organizationId ?? undefined,
+      );
 
       applications.push({ invoiceId: invoice.id, amount: allocation.applied });
       remaining = round2(remaining - allocation.applied);

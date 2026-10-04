@@ -28,6 +28,7 @@ import {
     Scale,
     Undo2,
     PiggyBank,
+    Globe2,
 } from "lucide-react";
 
 type UserRole =
@@ -119,6 +120,7 @@ const navItems: NavItem[] = [
     { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
 
     { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { href: "/settings/tax", label: "Tax Settings", icon: Globe2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
 ];
 
 const roleLabels: Record<UserRole, string> = {

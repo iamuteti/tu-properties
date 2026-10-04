@@ -629,6 +629,25 @@ export class AccountingService {
       totalAmount: number;
       vatAmount?: number | null;
       netAmount?: number;
+      /**
+       * Per-tax-type liabilities, from the tax rules engine. More than one entry
+       * means the invoice carried more than one tax — a sales tax alongside
+       * VAT, or a reduced-rate line — and each gets its own account, so the
+       * trial balance never quietly merges two taxes into one figure.
+       */
+      taxes?: {
+        code: string;
+        name: string;
+        amount: number;
+        accountCode?: string;
+      }[];
+      /**
+       * Tax the customer will withhold from this invoice and send straight to
+       * the authority. It is recognised here as a liability we owe on their
+       * behalf, and it is *not* revenue — that money never reaches us. The
+       * payment entry discharges the liability.
+       */
+      taxWithheld?: { amount: number; code?: string };
       status?: string;
       incomeAccountCode?: string;
       memo?: string;
@@ -657,16 +676,40 @@ export class AccountingService {
         description: `Invoice ${args.invoiceNumber}`,
       },
     ];
-    if (vat > 0) {
+    if (args.taxes?.length) {
+      for (const tax of args.taxes) {
+        const taxAmount = round2(tax.amount);
+        if (taxAmount === 0) continue;
+        lines.push({
+          accountCode: tax.accountCode || ACCOUNT_CODES.VAT_PAYABLE,
+          credit: taxAmount,
+          description: `${tax.code || tax.name} on invoice ${args.invoiceNumber}`,
+        });
+      }
+    } else if (vat > 0) {
       lines.push({
         accountCode: ACCOUNT_CODES.VAT_PAYABLE,
         credit: vat,
         description: `VAT on invoice ${args.invoiceNumber}`,
       });
     }
+
+    const withheld = round2(Number(args.taxWithheld?.amount ?? 0));
+    if (withheld > 0) {
+      // Recognised now, discharged by the payment: the customer withholds it
+      // from what they send us and hands it to the authority directly.
+      lines.push({
+        accountCode: ACCOUNT_CODES.WHT_PAYABLE,
+        credit: withheld,
+        description: `${args.taxWithheld?.code ?? 'Tax'} withheld on invoice ${args.invoiceNumber}`,
+      });
+    }
+
     lines.push({
       accountCode: revenue,
-      credit: net,
+      // Revenue is what we keep: the withheld tax never reaches us, so it is
+      // not income even though the customer was charged it.
+      credit: round2(net - Math.min(withheld, net)),
       description: `Revenue on invoice ${args.invoiceNumber}`,
     });
 
@@ -703,6 +746,21 @@ export class AccountingService {
       description: string;
       onBehalfOfLandlord?: boolean;
       reliefAccountCode?: string;
+      /**
+       * Tax withheld from a customer's payment.
+       *
+       * The invoice recognised it as a liability (see `postInvoiceIssued`), and the
+       * payment discharges it: the customer withheld the amount and sent it straight
+       * to the authority, so no cash of ours moves — only the liability clears.
+       *
+       * The receivable is credited by cash **plus** the withheld amount, because both
+       * settle the invoice: the customer paid one and the authority got the other.
+       * Crediting only the cash would leave the invoice looking partly unpaid forever.
+       */
+      taxWithheld?: {
+        amount: number;
+        code?: string;
+      };
       sourceRef?: Record<string, string | null>;
       source?: JournalEntrySource;
     },
@@ -717,6 +775,33 @@ export class AccountingService {
       ? ACCOUNT_CODES.RENT_HELD_FOR_LANDLORDS
       : (args.reliefAccountCode ?? ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
 
+    const withheld = round2(Number(args.taxWithheld?.amount ?? 0));
+
+    const lines: JournalLineInput[] = [
+      {
+        accountCode: cashCode,
+        debit: amount,
+        description: args.description,
+      },
+    ];
+
+    if (withheld > 0) {
+      // The customer sent the withheld part to the authority themselves, so the
+      // liability recognised on the invoice is now discharged.
+      lines.push({
+        accountCode: ACCOUNT_CODES.WHT_PAYABLE,
+        debit: withheld,
+        description: `${args.taxWithheld?.code ?? 'Tax'} remitted by customer`,
+      });
+    }
+
+    lines.push({
+      accountCode: creditCode,
+      // Cash plus the withheld amount: both settled the invoice.
+      credit: round2(amount + withheld),
+      description: args.description,
+    });
+
     return this.postEntry(
       {
         entryDate: args.paymentDate,
@@ -724,18 +809,59 @@ export class AccountingService {
         reference: args.reference,
         source: args.source ?? JournalEntrySource.RECEIPT,
         sourceRef: args.sourceRef,
-        lines: [
-          {
-            accountCode: cashCode,
-            debit: amount,
-            description: args.description,
-          },
-          {
-            accountCode: creditCode,
-            credit: amount,
-            description: args.description,
-          },
-        ],
+        lines,
+      },
+      tenantId,
+      tx,
+    );
+  }
+
+  /**
+   * Tax remitted to the authority *by us*: debit the liability, credit the bank.
+   *
+   * Only for the flow where the company collects the money and pays the
+   * authority later. When the customer withholds and sends it themselves — the
+   * usual rent-withholding arrangement — the liability is already discharged by
+   * `postPaymentReceived`, and calling this as well takes the account negative
+   * rather than silently doing nothing, which is the behaviour an accountant
+   * wants to notice.
+   */
+  async postTaxRemittance(
+    args: {
+      amount: number;
+      remittanceDate: Date;
+      /** Which liability is being settled: 2200 for VAT/withholding, 2100 … */
+      payableAccountCode?: string;
+      fromAccountCode?: string;
+      description: string;
+      reference?: string;
+      sourceRef?: Record<string, string | null>;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const amount = round2(Number(args.amount));
+    if (amount <= 0) return null;
+
+    const payable = args.payableAccountCode ?? ACCOUNT_CODES.WHT_PAYABLE;
+    const lines: JournalLineInput[] = [
+      { accountCode: payable, debit: amount, description: args.description },
+    ];
+
+    lines.push({
+      accountCode: args.fromAccountCode ?? '1010',
+      credit: amount,
+      description: args.description,
+    });
+
+    return this.postEntry(
+      {
+        entryDate: args.remittanceDate,
+        memo: args.description,
+        reference: args.reference,
+        source: JournalEntrySource.REFUND,
+        sourceRef: args.sourceRef,
+        lines,
       },
       tenantId,
       tx,

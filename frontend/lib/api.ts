@@ -672,6 +672,89 @@ export interface PaymentRefund {
     creditNote?: { id: string; creditNoteNumber: string; totalAmount: number } | null;
 }
 
+/**
+ * Tax rules (Module 7: Finance & Accounting). Tax is configuration, not code:
+ * a rule names its country and optional region, its rate, whether the price
+ * includes the tax, and which ledger account collects it. An organization
+ * declares where it is taxed; the engine resolves what applies at invoice date.
+ */
+export interface TaxRule {
+    id: string;
+    code: string;
+    name: string;
+    description?: string | null;
+    /** ISO-3166-1 alpha-2, or null for the organization's fallback rule. */
+    countryCode?: string | null;
+    regionCode?: string | null;
+    basis: 'EXCLUSIVE' | 'INCLUSIVE';
+    treatment: 'CHARGED' | 'WITHHELD';
+    rate: number | string;
+    ledgerAccountCode?: string | null;
+    isCompound: boolean;
+    /** '*' applies to every line; otherwise a category match is required. */
+    appliesToCategory: string;
+    validFrom: string;
+    validTo?: string | null;
+    isActive: boolean;
+}
+
+export interface TaxJurisdiction {
+    countryCode?: string | null;
+    regionCode?: string | null;
+    taxRegistrationNumber?: string | null;
+    currency: string;
+    label?: string;
+}
+
+export const taxApi = {
+    jurisdiction: () =>
+        api.get<TaxJurisdiction>('/finance/tax/jurisdiction'),
+
+    setJurisdiction: (data: {
+        countryCode?: string | null;
+        regionCode?: string | null;
+        taxRegistrationNumber?: string | null;
+    }) => api.put<TaxJurisdiction>('/finance/tax/jurisdiction', data),
+
+    findAll: (params?: { countryCode?: string }) =>
+        api.get<TaxRule[]>('/finance/tax/rules', { params }),
+
+    /** Price a draft without writing anything — what the invoice form calls. */
+    calculate: (lines: { description: string; amount: number; category?: string }[]) =>
+        api.post<{
+            netAmount: number;
+            chargedTax: number;
+            withheldTax: number;
+            totalAmount: number;
+            jurisdiction: string;
+            summary: { code: string; name: string; ratePercent: number; amount: number; account: string }[];
+        }>('/finance/tax/calculate', { lines }),
+
+    /** Passing an existing `id` supersedes that rule instead of editing it. */
+    create: (data: {
+        id?: string;
+        code: string;
+        name: string;
+        description?: string;
+        countryCode?: string | null;
+        regionCode?: string | null;
+        basis?: 'EXCLUSIVE' | 'INCLUSIVE';
+        treatment?: 'CHARGED' | 'WITHHELD';
+        ratePercent: number;
+        ledgerAccountCode?: string;
+        appliesToCategory?: string;
+        validFrom?: string;
+        validTo?: string;
+    }) => api.post<TaxRule>('/finance/tax/rules', data),
+
+    update: (
+        id: string,
+        data: { name?: string; description?: string; isActive?: boolean; validTo?: string },
+    ) => api.put<TaxRule>(`/finance/tax/rules/${id}`, data),
+
+    remove: (id: string) => api.delete(`/finance/tax/rules/${id}`),
+};
+
 export const creditsApi = {
     findAll: (params?: { status?: string; tenantId?: string; landlordId?: string }) =>
         api.get<CustomerCredit[]>('/finance/credits', { params }),

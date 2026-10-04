@@ -63,12 +63,41 @@ describe('CreditsService', () => {
 
     const invoice = {
       findMany: jest.fn().mockResolvedValue(invoicesFixture),
+      findFirst: jest.fn(({ where }: any) =>
+        Promise.resolve({
+          ...INVOICES.find((item) => item.id === where.id),
+          taxWithheldAmount: 0,
+        }),
+      ),
+      findUnique: jest.fn().mockResolvedValue({ taxWithheldAmount: 0 }),
       update: jest.fn().mockImplementation(({ data }: any) => data),
     };
 
-    const creditApplication = { create: jest.fn().mockResolvedValue({}) };
+    const creditApplication = {
+      create: jest.fn().mockResolvedValue({}),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+    };
 
-    const models = { customerCredit, invoice, creditApplication };
+    const paymentAllocation = {
+      findMany: jest.fn().mockResolvedValue([]),
+    };
+
+    const payment = {
+      findMany: jest.fn().mockResolvedValue([]),
+    };
+
+    const paymentRefund = {
+      groupBy: jest.fn().mockResolvedValue([]),
+    };
+
+    const models = {
+      customerCredit,
+      invoice,
+      creditApplication,
+      paymentAllocation,
+      payment,
+      paymentRefund,
+    };
 
     return {
       ...models,
@@ -99,23 +128,31 @@ describe('CreditsService', () => {
   it('spends oldest invoice first and carries the rest to the next', async () => {
     const result = await service.applyToInvoices('cr-1', undefined, 'org-1');
 
+    // What was applied to which invoice is the record that matters; the
+    // invoice's money columns are re-derived from it (see
+    // invoice-settlement.ts), which is why they are not asserted directly.
+    expect(prisma.creditApplication.create).toHaveBeenCalledTimes(2);
+    expect(prisma.creditApplication.create.mock.calls[0][0].data).toMatchObject(
+      {
+        invoiceId: 'inv-old',
+        amount: 3_000,
+      },
+    );
+    expect(prisma.creditApplication.create.mock.calls[1][0].data).toMatchObject(
+      {
+        invoiceId: 'inv-new',
+        amount: 2_000,
+      },
+    );
+    // …and both invoices were re-derived rather than left to drift.
     expect(prisma.invoice.update).toHaveBeenCalledTimes(2);
-    expect(prisma.invoice.update.mock.calls[0][0]).toEqual({
-      where: { id: 'inv-old' },
-      data: {
-        paidAmount: 3_000,
-        balanceAmount: 0,
-        status: InvoiceStatus.PAID,
-      },
+    expect(prisma.invoice.update.mock.calls[0][0].where).toEqual({
+      id: 'inv-old',
     });
-    expect(prisma.invoice.update.mock.calls[1][0]).toEqual({
-      where: { id: 'inv-new' },
-      data: {
-        paidAmount: 2_000,
-        balanceAmount: 7_000,
-        status: InvoiceStatus.PARTIALLY_PAID,
-      },
+    expect(prisma.invoice.update.mock.calls[1][0].where).toEqual({
+      id: 'inv-new',
     });
+
     expect(result.applications).toEqual([
       { invoiceId: 'inv-old', amount: 3_000 },
       { invoiceId: 'inv-new', amount: 2_000 },

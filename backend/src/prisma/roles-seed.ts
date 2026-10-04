@@ -38,6 +38,7 @@ export const PERMISSION_MODULES = [
   'accounting',
   'credits',
   'refunds',
+  'tax',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -123,6 +124,7 @@ export const SYSTEM_ROLES: {
       accounting: full(),
       credits: full(),
       refunds: full(),
+      tax: full(),
     }),
   },
   {
@@ -172,6 +174,7 @@ export const SYSTEM_ROLES: {
       accounting: view(),
       credits: view(),
       refunds: view(),
+      tax: view(),
     }),
   },
   {
@@ -206,6 +209,7 @@ export const SYSTEM_ROLES: {
       accounting: full(),
       credits: full(),
       refunds: full(),
+      tax: full(),
     }),
   },
   {

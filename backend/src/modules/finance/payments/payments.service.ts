@@ -15,6 +15,7 @@ import { AccountingService } from '../accounting/accounting.service';
 import { CreditsService } from '../credits/credits.service';
 import { allocateToInvoice, round2 } from '../invoice-allocation';
 import { syncInvoiceSettlement } from '../invoice-settlement';
+import { withheldOn } from '../tax/withheld';
 
 @Injectable()
 export class PaymentsService {
@@ -103,6 +104,8 @@ export class PaymentsService {
           paidAmount: true,
           status: true,
           landlordId: true,
+          taxWithheldAmount: true,
+          taxSummary: true,
           rentalAgreement: { select: { tenantId: true } },
         },
       });
@@ -136,15 +139,6 @@ export class PaymentsService {
         },
         amount,
       );
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          paidAmount: allocation.paidAmount,
-          balanceAmount: allocation.balanceAmount,
-          status: allocation.status,
-        },
-      });
-
       // The split is recorded, not just the outcome: a refund or reversal has
       // to be able to tell that 5,000 paid 3,000 of this bill and put 2,000 on
       // credit.
@@ -157,6 +151,11 @@ export class PaymentsService {
           },
         });
       }
+
+      // One definition of the money columns, covering payments, credit and tax
+      // the customer withheld on our behalf — rather than each caller adding up
+      // the sources it happens to know about.
+      await syncInvoiceSettlement(tx, invoice.id, tenantId);
 
       if (allocation.surplus > 0 && tenantId) {
         await this.creditsService.captureSurplus(
@@ -188,6 +187,7 @@ export class PaymentsService {
             paymentMethod: payment.paymentMethod as string,
             reference: payment.paymentReference ?? undefined,
             description: `Payment applied to invoice ${invoice.invoiceNumber}`,
+            taxWithheld: withheldOn(invoice),
             source: JournalEntrySource.PAYMENT,
             sourceRef: {
               type: 'PAYMENT',
