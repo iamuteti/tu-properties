@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import {
     LayoutDashboard,
     Building2,
@@ -30,6 +31,8 @@ import {
     PiggyBank,
     Globe2,
     Receipt,
+    Bell,
+    TrendingDown,
 } from "lucide-react";
 
 type UserRole =
@@ -106,6 +109,7 @@ const navItems: NavItem[] = [
         children: [
             { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/arrears", label: "Arrears", icon: TrendingDown, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/payables", label: "Payables", icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/suppliers", label: "Suppliers", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/refunds", label: "Refunds", icon: Undo2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
@@ -122,6 +126,7 @@ const navItems: NavItem[] = [
     { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
 
+    { href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
     { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/settings/tax", label: "Tax Settings", icon: Globe2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
 ];
@@ -247,6 +252,7 @@ export function Sidebar() {
                             </span>
                         </div>
                     </div>
+                    <NotificationBell />
                     <button
                         onClick={() => logout()}
                         className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"

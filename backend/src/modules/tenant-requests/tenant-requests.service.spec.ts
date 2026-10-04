@@ -6,6 +6,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { RentalAgreementsService } from '@/modules/leases/rental-agreements.service';
 import { MoveoutsService } from '@/modules/moveouts/moveouts.service';
+import { NotificationTriggersService } from '@/modules/notifications/notification-triggers.service';
 
 /**
  * The queue's own rules — the part that is new rather than delegated:
@@ -91,6 +92,9 @@ describe('TenantRequestsService', () => {
         { provide: AuditService, useValue: { logAction: jest.fn() } },
         { provide: RentalAgreementsService, useValue: leases },
         { provide: MoveoutsService, useValue: moveouts },
+        // Delivery of the decision to the resident is Module 17's job and is
+        // best-effort; stubbed here so the leasing rules can be tested alone.
+        { provide: NotificationTriggersService, useValue: { notifyRequestDecision: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(TenantRequestsService);

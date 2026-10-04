@@ -1193,6 +1193,33 @@ from a broken one.
 
 ---
 
+## Domain: Notifications (Module: Notifications) — ✅ landed 2026-10-04
+
+Migration `20261004060000_module17_notifications` added `notifications` and
+`notification_preferences` with the `NotificationType`, `NotificationChannel`,
+`NotificationPriority` and `NotificationStatus` enums.
+
+Three decisions a future editor should not undo:
+
+- **One message to three channels is three rows, not one row with three
+  booleans.** Each channel is delivered and failed independently, and one
+  provider being down must not lose the others. That is why `status` is on the
+  row rather than on the message.
+- **`SUPPRESSED` exists as a status distinct from `FAILED`.** "We chose not to
+  send this" (no provider configured, or the recipient opted out) is a different
+  fact from "we tried and it broke", and an operator reading the trail needs to
+  tell them apart.
+- **`dedupeKey` plus `@@unique([organizationId, dedupeKey, channel])` is the
+  idempotency mechanism.** A reminder job runs daily; the database, not a check
+  the scheduler must remember, is what stops the same message going out every
+  morning. Postgres allows many NULLs, so one-off messages opt out of dedupe by
+  leaving it null.
+
+`NotificationPreference` rows are opt-*out*: a missing row means every channel is
+wanted, so nobody is opted out of something they never chose.
+
+---
+
 ## Domain: Maintenance (Module: Maintenance Management) — 🆕 Not started
 
 ```prisma

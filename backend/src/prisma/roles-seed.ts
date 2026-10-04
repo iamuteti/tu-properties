@@ -41,6 +41,7 @@ export const PERMISSION_MODULES = [
   'tax',
   'payables',
   'billing',
+  'notifications',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -129,6 +130,9 @@ export const SYSTEM_ROLES: {
       tax: full(),
       payables: full(),
       billing: full(),
+      // Reading their own notifications needs no permission beyond signing in;
+      // running the reminder sweep does.
+      notifications: full(),
     }),
   },
   {
@@ -181,6 +185,7 @@ export const SYSTEM_ROLES: {
       tax: view(),
       payables: view(),
       billing: view(),
+      notifications: view(),
     }),
   },
   {
@@ -218,6 +223,7 @@ export const SYSTEM_ROLES: {
       tax: full(),
       payables: full(),
       billing: full(),
+      notifications: view(),
     }),
   },
   {

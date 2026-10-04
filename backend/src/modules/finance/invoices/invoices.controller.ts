@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
   Delete,
   Patch,
@@ -71,6 +72,25 @@ export class InvoicesController {
   findAll(@Request() req) {
     const tenantId = getTenantId(req);
     return this.invoicesService.findAll(tenantId);
+  }
+
+  /**
+   * Who owes what, and how stale: arrears by tenant and by property, bucketed by
+   * days past due. The receivable mirror of the AP aging report, and what a
+   * collections conversation actually needs.
+   */
+  @Get('arrears')
+  @Permissions('invoices.view')
+  arrears(
+    @Request() req,
+    @Query('asOf') asOf?: string,
+    @Query('propertyId') propertyId?: string,
+  ) {
+    return this.invoicesService.arrears(
+      getTenantId(req),
+      asOf ? new Date(asOf) : undefined,
+      propertyId,
+    );
   }
 
   @Get(':id')

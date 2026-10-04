@@ -20,6 +20,7 @@ import { RentalAgreementsModule } from './modules/leases/rental-agreements.modul
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { MoveoutsModule } from './modules/moveouts/moveouts.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { LandlordsModule } from './modules/landlords/landlords.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -53,6 +54,9 @@ import { SecurityModule } from './security/security.module';
     MoveoutsModule,
     RentalAgreementsModule,
     FinanceModule,
+    // Also imported where a module triggers a notification (tenant requests);
+    // Nest resolves the module registry by class, not by where it is imported.
+    NotificationsModule,
     LandlordsModule,
     AuditModule,
     AuthModule,

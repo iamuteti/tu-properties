@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { AgreementStatus, TenantRequestStatus, TenantRequestType } from '@prisma/client';
 import { getPortalTenantId, requireRecord } from '@/common/utils';
+import { NotificationTriggersService } from '../notifications/notification-triggers.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { RentalAgreementsService } from '@/modules/leases/rental-agreements.service';
 import { MoveoutsService } from '@/modules/moveouts/moveouts.service';
@@ -38,6 +39,7 @@ export class TenantRequestsService {
     private audit: AuditService,
     private leases: RentalAgreementsService,
     private moveouts: MoveoutsService,
+    private notificationTriggers: NotificationTriggersService,
   ) {}
 
   // ---------------------------------------------------------------- resident
@@ -122,7 +124,7 @@ export class TenantRequestsService {
       );
     }
 
-    return this.prisma.tenantRequest.update({
+    const updated = await this.prisma.tenantRequest.update({
       where: { id },
       data: {
         status: TenantRequestStatus.WITHDRAWN,
@@ -130,6 +132,50 @@ export class TenantRequestsService {
       },
       include: this.detailInclude(),
     });
+
+    // Delivery the leasing module left to Module 17. Best-effort: a resident
+    // confirming a withdrawal must not fail because a notification could not be
+    // written, and the state change has already committed.
+    await this.notifyDecision(updated, 'REQUEST_WITHDRAWN');
+
+    return updated;
+  }
+
+  /**
+   * Tell the resident what happened to their request.
+   *
+   * Failure is swallowed on purpose. The decision itself is the record; a
+   * notification is best-effort delivery on top of it, and turning a successful
+   * approval into an error because a row could not be inserted would be worse
+   * than a resident who opens the portal and sees the outcome.
+   */
+  private async notifyDecision(
+    request: {
+      id: string;
+      tenantId: string;
+      organizationId: string;
+      decisionNote: string | null;
+    },
+    outcome:
+      | 'REQUEST_APPROVED'
+      | 'REQUEST_REJECTED'
+      | 'REQUEST_WITHDRAWN',
+  ) {
+    try {
+      await this.notificationTriggers.notifyRequestDecision({
+        organizationId: request.organizationId,
+        tenantId: request.tenantId,
+        type: outcome,
+        requestId: request.id,
+        decisionNote: request.decisionNote,
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `Could not notify tenant ${request.tenantId} about ${outcome}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   // ------------------------------------------------------------------- staff
@@ -224,6 +270,11 @@ export class TenantRequestsService {
       updated,
       request,
       { tenantId, decisionNote: dto.decisionNote },
+    );
+
+    await this.notifyDecision(
+      updated,
+      dto.decision === 'APPROVE' ? 'REQUEST_APPROVED' : 'REQUEST_REJECTED',
     );
 
     return updated;

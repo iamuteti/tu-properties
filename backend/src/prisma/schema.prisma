@@ -95,6 +95,8 @@ model Organization {
   billPayments      BillPayment[]
   supplierCredits   SupplierCredit[]
   recurringBillingRuns RecurringBillingRun[]
+  notifications       Notification[]
+  notificationPreferences NotificationPreference[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -159,6 +161,8 @@ model User {
   completedInspections  InspectionReport[]
   refundedMoveOuts      MoveOutRequest[]
   decidedTenantRequests TenantRequest[]    @relation("UserDecidedTenantRequests")
+  notifications          Notification[]
+  notificationPreferences NotificationPreference[]
 
   // Status
   @@index([portalTenantId])
@@ -945,6 +949,7 @@ model Tenant {
   receipts          Receipt[]
   moveOutRequests   MoveOutRequest[]
   credits           CustomerCredit[] @relation("TenantCredits")
+  notifications     Notification[]    @relation("TenantNotifications")
   creditNotes       CreditNote[]    @relation("TenantCreditNotes")
 
   // Audit fields
@@ -2721,6 +2726,129 @@ model SupplierCreditApplication {
 /// "did rent go out this month?" without reading logs. Failures are recorded
 /// per lease rather than aborting the run: one bad lease must not stop the other
 /// two hundred from being billed.
+/// Module 17 — Notifications: one row per message, per channel.
+///
+/// One message to three channels is three rows, not one row with three
+/// booleans: each channel is delivered and failed independently, and one
+/// provider being down must not lose the others. `dedupeKey` is what stops a
+/// daily job sending the same reminder every morning — with the unique index
+/// below, "already sent today" is a database fact rather than a check the
+/// scheduler has to remember to do.
+model Notification {
+  id String @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// A staff recipient. Portal residents have no login of their own, so a
+  /// notification to a resident is addressed by `tenantId` instead.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String?
+  tenant   Tenant? @relation("TenantNotifications", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type     NotificationType
+  channel  NotificationChannel @default(IN_APP)
+  priority NotificationPriority @default(NORMAL)
+
+  title String
+  body  String @db.Text
+
+  /// Where the reader goes if this is surfaced in the app.
+  actionUrl String?
+
+  /// What the message is about, so a list can group and link without
+  /// re-parsing the body.
+  entityType String?
+  entityId   String?
+
+  status NotificationStatus @default(PENDING)
+
+  /// Stable key for "this exact reminder, for this day". Null disables dedupe.
+  dedupeKey String?
+
+  sentAt      DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+  errorMessage String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, dedupeKey, channel])
+  @@index([userId, readAt])
+  @@index([tenantId, readAt])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  RENT_DUE
+  RENT_OVERDUE
+  LEASE_EXPIRING
+  REQUEST_SUBMITTED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  REQUEST_WITHDRAWN
+  MAINTENANCE_UPDATE
+  APPROVAL_REQUESTED
+  OWNER_STATEMENT_READY
+  PAYOUT_PAID
+  CUSTOM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  /// Never suppressed by a user's opt-out — a tenant being overcharged or a
+  /// lease ending is not something they can consent to missing.
+  CRITICAL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  /// Deliberately not sent: no provider configured, or the recipient opted out
+  /// and the message is not critical. Distinct from FAILED so an operator can
+  /// tell "we chose not to" from "we tried and it broke".
+  SUPPRESSED
+}
+
+/// Per-recipient channel preferences. A missing row means "all channels on",
+/// which is the right default: nobody has opted in to being opted out of.
+model NotificationPreference {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  type     NotificationType
+  inApp    Boolean @default(true)
+  email    Boolean @default(true)
+  sms      Boolean @default(true)
+  push     Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type])
+  @@index([organizationId])
+  @@map("notification_preferences")
+}
+
 model RecurringBillingRun {
   id String @id @default(cuid())
 

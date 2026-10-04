@@ -5,6 +5,7 @@ import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { AccountingService } from '../accounting/accounting.service';
 import { ACCOUNT_CODES } from '../accounting/chart-of-accounts';
 import { TaxService } from '../tax/tax.service';
+import { round2 } from '../invoice-allocation';
 
 @Injectable()
 export class InvoicesService {
@@ -419,7 +420,115 @@ export class InvoicesService {
     });
   }
 
-  async findOne(id: string, tenantId?: string) {
+  /**
+ * Who owes what, and how stale.
+ *
+ * The receivable mirror of `PayablesService.aging`, and deliberately bucketed
+ * the same way: an outstanding total with no age cannot be prioritised, and
+ * "3 months late" is the only thing that tells a collections call where to
+ * start.
+ *
+ * An invoice is excluded once it is paid or void — arrears is money that is
+ * actually owed.
+ */
+async arrears(tenantId?: string, asOf: Date = new Date(), propertyId?: string) {
+  const invoices = await this.prisma.invoice.findMany({
+    where: {
+      ...(tenantId && { organizationId: tenantId }),
+      status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
+      balanceAmount: { gt: 0 },
+      ...(propertyId ? { rentalAgreement: { unit: { propertyId } } } : {}),
+    },
+    select: {
+      id: true,
+      invoiceNumber: true,
+      dueDate: true,
+      issueDate: true,
+      balanceAmount: true,
+      currency: true,
+      rentalAgreement: {
+        select: {
+          id: true,
+          tenantId: true,
+          tenant: { select: { id: true, surname: true, otherNames: true, phone: true } },
+          unit: { select: { name: true, property: { select: { id: true, name: true } } } },
+        },
+      },
+    },
+  });
+
+  const buckets = {
+    current: 0,
+    days1to30: 0,
+    days31to60: 0,
+    days61to90: 0,
+    over90: 0,
+  };
+
+  const byTenant = new Map<
+    string,
+    {
+      tenantId: string;
+      tenantName: string;
+      phone: string | null;
+      total: number;
+      overdue: number;
+      invoices: { id: string; invoiceNumber: string; dueDate: Date; balance: number }[];
+    }
+  >();
+
+  for (const invoice of invoices) {
+    const balance = round2(Number(invoice.balanceAmount));
+    const daysOverdue = Math.floor(
+      (asOf.getTime() - new Date(invoice.dueDate).getTime()) / (24 * 60 * 60 * 1000),
+    );
+
+    if (daysOverdue <= 0) buckets.current = round2(buckets.current + balance);
+    else if (daysOverdue <= 30) buckets.days1to30 = round2(buckets.days1to30 + balance);
+    else if (daysOverdue <= 60) buckets.days31to60 = round2(buckets.days31to60 + balance);
+    else if (daysOverdue <= 90) buckets.days61to90 = round2(buckets.days61to90 + balance);
+    else buckets.over90 = round2(buckets.over90 + balance);
+
+    // An invoice with no lease (a sale invoice, say) has no tenant to owe it;
+    // it is counted in the buckets and left out of the per-tenant list rather
+    // than being lumped under a blank name.
+    const lease = invoice.rentalAgreement;
+    if (!lease) continue;
+
+    const entry = byTenant.get(lease.tenantId) ?? {
+      tenantId: lease.tenantId,
+      tenantName: [lease.tenant?.surname, lease.tenant?.otherNames]
+        .filter(Boolean)
+        .join(' '),
+      phone: lease.tenant?.phone ?? null,
+      total: 0,
+      overdue: 0,
+      invoices: [],
+    };
+    entry.total = round2(entry.total + balance);
+    if (daysOverdue > 0) entry.overdue = round2(entry.overdue + balance);
+    entry.invoices.push({
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      dueDate: invoice.dueDate,
+      balance,
+    });
+    byTenant.set(lease.tenantId, entry);
+  }
+
+  const total = round2(invoices.reduce((sum, i) => sum + Number(i.balanceAmount), 0));
+  const overdue = round2(
+    total - (buckets.current || 0),
+  );
+
+  return {
+    asOf,
+    buckets: { ...buckets, total, overdue },
+    byTenant: [...byTenant.values()].sort((a, b) => b.overdue - a.overdue || b.total - a.total),
+  };
+}
+
+async findOne(id: string, tenantId?: string) {
     const where = tenantId ? { id, organizationId: tenantId } : { id };
     return requireRecord(
       this.prisma.invoice.findFirst({

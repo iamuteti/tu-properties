@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '@/modules/audit/audit.module';
+import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { RentalAgreementsModule } from '@/modules/leases/rental-agreements.module';
 import { MoveoutsModule } from '@/modules/moveouts/moveouts.module';
 import {
@@ -16,7 +17,7 @@ import { TenantRequestsService } from './tenant-requests.service';
  * go through the same services, gates and audit trail.
  */
 @Module({
-  imports: [RentalAgreementsModule, MoveoutsModule, AuditModule],
+  imports: [RentalAgreementsModule, MoveoutsModule, AuditModule, NotificationsModule],
   controllers: [TenantRequestsController, PortalRequestsController],
   providers: [TenantRequestsService],
   exports: [TenantRequestsService],

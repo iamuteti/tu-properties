@@ -625,6 +625,34 @@ export const financeApi = {
             { invoiceIds },
         ),
 
+    /** Who owes what, and how stale. */
+    arrears: (params?: { asOf?: string; propertyId?: string }) =>
+        api.get<{
+            asOf: string;
+            buckets: {
+                current: number;
+                days1to30: number;
+                days31to60: number;
+                days61to90: number;
+                over90: number;
+                total: number;
+                overdue: number;
+            };
+            byTenant: {
+                tenantId: string;
+                tenantName: string;
+                phone: string | null;
+                total: number;
+                overdue: number;
+                invoices: {
+                    id: string;
+                    invoiceNumber: string;
+                    dueDate: string;
+                    balance: number;
+                }[];
+            }[];
+        }>('/finance/invoices/arrears', { params }),
+
     // Receipts
     createReceipt: (data: CreateReceiptData) =>
         api.post<Receipt>('/finance/receipts', data),
@@ -1006,6 +1034,64 @@ export interface GLTrialBalanceRow {
     credit: number;
     balance: number;
 }
+
+/**
+ * Notifications (Module 17). In-app delivery is the only channel wired to a
+ * real provider; email and SMS rows exist and report honestly as suppressed when
+ * nothing is configured, rather than pretending to have been sent.
+ */
+export interface AppNotification {
+    id: string;
+    type: string;
+    channel: "IN_APP" | "EMAIL" | "SMS" | "WHATSAPP" | "PUSH";
+    priority: "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+    status: "PENDING" | "SENT" | "FAILED" | "SUPPRESSED";
+    title: string;
+    body: string;
+    actionUrl?: string | null;
+    entityType?: string | null;
+    entityId?: string | null;
+    readAt?: string | null;
+    createdAt: string;
+}
+
+export interface ArrearsTenant {
+    tenantId: string;
+    tenantName: string;
+    phone: string | null;
+    total: number;
+    overdue: number;
+    invoices: { id: string; invoiceNumber: string; dueDate: string; balance: number }[];
+}
+
+export const notificationsApi = {
+    findAll: (params?: { unreadOnly?: boolean; limit?: number }) =>
+        api.get<AppNotification[]>("/notifications", { params }),
+
+    unreadCount: () => api.get<{ count: number }>("/notifications/unread-count"),
+
+    markRead: (id: string) => api.post(`/notifications/${id}/read`),
+
+    markAllRead: () => api.post("/notifications/read-all"),
+
+    preferences: () => api.get("/notifications/preferences"),
+
+    setPreference: (data: {
+        type: string;
+        inApp?: boolean;
+        email?: boolean;
+        sms?: boolean;
+        push?: boolean;
+    }) => api.post("/notifications/preferences", data),
+
+    /** Administrative: run the reminder sweep now instead of waiting. */
+    runTriggers: (onDate?: string) =>
+        api.post<{ leases: number; due: number; overdue: number }>(
+            "/notifications/triggers/run",
+            { onDate },
+        ),
+};
+
 
 export const accountingApi = {
     listAccounts: () => api.get<GLAccount[]>('/finance/accounting/accounts'),
