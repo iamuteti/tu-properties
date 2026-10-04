@@ -981,47 +981,90 @@ enum BillStatus {
 
 ---
 
-## Domain: Payments (Module: Payments) — ⚠️ Partially existing, verify
+## Domain: Payments (Module: Payments) — ⚠️ Money handling built 2026-10-04; gateways still absent
+
+The block below is the **target** design, not the current tables. What actually
+exists today is documented above (`Payment`, `Receipt`, `ReceiptPayment`), plus
+these, added 2026-10-04 in migrations `20261004020000_module8_payments` and
+`20261004021000_module8_payment_allocations`:
 
 ```prisma
-model Payment {
-  id             String   @id @default(uuid())
-  organizationId String
-  invoiceId      String?
-  amount         Decimal  @db.Decimal(14,2)
-  method         PaymentMethod
-  reference      String?  // payment gateway reference, cheque number, etc.
-  status         PaymentStatus @default(COMPLETED)
-  paidAt         DateTime @default(now())
-  @@index([organizationId])
+/// What part of a payment settled which invoice. Without this the only record
+/// of the split is Invoice.paidAmount, and a refund cannot tell that 5,000 paid
+/// 3,000 of a bill and put 2,000 on credit. Every invoice figure is derived
+/// from these rows.
+model PaymentAllocation {
+  id        String  @id @default(cuid())
+  paymentId String
+  payment   Payment @relation(...)
+  invoiceId String
+  invoice   Invoice @relation(...)
+  amount    Decimal @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  createdBy String?
+  @@index([paymentId])
+  @@index([invoiceId])
 }
 
-enum PaymentMethod {
-  BANK_TRANSFER
-  STRIPE
-  MPESA
-  CREDIT_CARD
-  CASH
-  CHEQUE
+/// Money the customer is owed back — an overpayment, an unallocated receipt, a
+/// goodwill gesture, or the unspent part of a refunded payment. `appliedAmount`
+/// is what has been spent against invoices; the difference is still usable.
+model CustomerCredit {
+  id            String   @id @default(cuid())
+  amount        Decimal  @db.Decimal(12, 2)
+  appliedAmount Decimal  @default(0) @db.Decimal(12, 2)
+  source        CustomerCreditSource @default(MANUAL) // OVERPAYMENT, UNALLOCATED_RECEIPT, GOODWILL, REFUND_UNSPENT, MANUAL
+  status        CreditStatus @default(OPEN)            // OPEN, PARTIALLY_APPLIED, APPLIED, VOID
+  tenantId / landlordId / customerName  // at least one — credit is meaningless without an owner
+  sourcePaymentId String?
+  applications CreditApplication[]
 }
 
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
+model CreditApplication {
+  id        String  @id @default(cuid())
+  creditId  String
+  invoiceId String
+  amount    Decimal @db.Decimal(12, 2)
+  appliedAt DateTime @default(now())
+  appliedBy String?
 }
 
-model Receipt {
-  id             String   @id @default(uuid())
-  organizationId String
-  paymentId      String
-  receiptNumber  String
-  pdfUrl         String?
-  createdAt      DateTime @default(now())
-  @@index([organizationId])
+/// A refund records money going *out*; the Payment row is never edited or
+/// deleted to represent that. Capped at the payment's unrefunded amount, and
+/// each refund issues a CreditNote.
+model PaymentRefund {
+  id        String @id @default(cuid())
+  paymentId String
+  amount    Decimal @db.Decimal(12, 2)
+  reason    String  @db.Text
+  refundReference String?
+  processedAt DateTime @default(now())
+  creditNoteId String? @unique
+}
+
+model CreditNote {
+  id              String @id @default(cuid())
+  creditNoteNumber String @unique
+  invoiceId String?          // the bill it reduces; null for a goodwill note
+  refund   PaymentRefund?
+  totalAmount Decimal @db.Decimal(12, 2)
+  status   CreditNoteStatus @default(ISSUED) // DRAFT, ISSUED, VOID
+  lines    CreditNoteLine[]
 }
 ```
+
+Differences from the target block below that matter when continuing:
+
+- There is **no `PaymentStatus`**. Whether a payment is good is expressed by
+  `Payment.isReversed` / `reversedAt` / `reversedBy` plus the `PaymentRefund`
+  rows, because "this money was reversed" and "this money was returned" are
+  different facts with different ledger effects.
+- `PaymentMethod` has no `STRIPE`/`CREDIT_CARD`-as-gateway members: the enum is
+  CASH, BANK_TRANSFER, CHEQUE, MPESA, CARD, OTHER. A gateway is a `paidFrom`
+  value plus a reference, not a method — see the deferred Stripe work.
+- `Receipt` here means the rent-receipt document, not a payment receipt; the
+  payment-side receipt number lives on the `Payment` rows themselves. **Receipt
+  PDF generation does not exist.**
 
 ---
 

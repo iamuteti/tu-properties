@@ -615,6 +615,13 @@ export const financeApi = {
     reversePayment: (id: string) =>
         api.post(`/finance/payments/${id}/reverse`),
 
+    /** Spend a payment that arrived without an invoice, oldest invoice first. */
+    allocatePayment: (id: string, invoiceIds?: string[]) =>
+        api.post<{ allocations: { invoiceId: string; amount: number }[]; unallocated: number }>(
+            `/finance/payments/${id}/allocate`,
+            { invoiceIds },
+        ),
+
     // Receipts
     createReceipt: (data: CreateReceiptData) =>
         api.post<Receipt>('/finance/receipts', data),
@@ -630,6 +637,88 @@ export const financeApi = {
 
     deleteReceipts: (ids: string[]) =>
         api.post('/finance/receipts/bulk-delete', { ids }),
+};
+
+/**
+ * Credit balances and refunds (Module 8: Payments). A credit is money the
+ * customer is owed back — an overpayment, an unallocated transfer, goodwill —
+ * and it is spent against invoices rather than being lost.
+ */
+export interface CustomerCredit {
+    id: string;
+    amount: number;
+    appliedAmount: number;
+    currency: string;
+    reason?: string | null;
+    source: 'OVERPAYMENT' | 'UNALLOCATED_RECEIPT' | 'GOODWILL' | 'REFUND_UNSPENT' | 'MANUAL';
+    status: 'OPEN' | 'PARTIALLY_APPLIED' | 'APPLIED' | 'VOID';
+    tenantId?: string | null;
+    landlordId?: string | null;
+    customerName?: string | null;
+    createdAt: string;
+    tenant?: { surname: string; otherNames?: string | null } | null;
+    landlord?: { name: string } | null;
+    applications?: { id: string; amount: number; invoiceId: string; invoice?: { invoiceNumber: string } }[];
+}
+
+export interface PaymentRefund {
+    id: string;
+    amount: number;
+    reason: string;
+    refundReference?: string | null;
+    processedAt: string;
+    processedBy?: string | null;
+    payment?: { id: string; amount: number; paymentMethod: string } | null;
+    creditNote?: { id: string; creditNoteNumber: string; totalAmount: number } | null;
+}
+
+export const creditsApi = {
+    findAll: (params?: { status?: string; tenantId?: string; landlordId?: string }) =>
+        api.get<CustomerCredit[]>('/finance/credits', { params }),
+
+    balances: () =>
+        api.get<{ customerKey: string; label: string; balance: number; credits: number }[]>(
+            '/finance/credits/balances',
+        ),
+
+    findOne: (id: string) => api.get<CustomerCredit>(`/finance/credits/${id}`),
+
+    create: (data: {
+        tenantId?: string;
+        landlordId?: string;
+        customerName?: string;
+        amount: number;
+        reason?: string;
+    }) => api.post<CustomerCredit>('/finance/credits', data),
+
+    /** No invoiceIds = oldest outstanding invoice first. */
+    applyToInvoices: (id: string, invoiceIds?: string[], amount?: number) =>
+        api.post<{ applications: { invoiceId: string; amount: number }[]; unapplied: number }>(
+            `/finance/credits/${id}/apply`,
+            { invoiceIds, amount },
+        ),
+
+    void: (id: string) => api.delete(`/finance/credits/${id}`),
+};
+
+export const refundsApi = {
+    findAll: (params?: { paymentId?: string }) =>
+        api.get<PaymentRefund[]>('/finance/refunds', { params }),
+
+    findOne: (id: string) => api.get<PaymentRefund>(`/finance/refunds/${id}`),
+
+    refundable: (paymentId: string) =>
+        api.get<{ paymentAmount: number; refunded: number; refundable: number }>(
+            `/finance/refunds/refundable/${paymentId}`,
+        ),
+
+    create: (data: {
+        paymentId: string;
+        amount: number;
+        reason: string;
+        refundReference?: string;
+        toCredit?: boolean;
+    }) => api.post<PaymentRefund>('/finance/refunds', data),
 };
 
 /**

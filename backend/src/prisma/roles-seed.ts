@@ -36,6 +36,8 @@ export const PERMISSION_MODULES = [
   'owner_statements',
   'owner_payouts',
   'accounting',
+  'credits',
+  'refunds',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -119,6 +121,8 @@ export const SYSTEM_ROLES: {
       owner_payouts: full(),
       // Module 7: the general ledger is finance work too.
       accounting: full(),
+      credits: full(),
+      refunds: full(),
     }),
   },
   {
@@ -166,6 +170,8 @@ export const SYSTEM_ROLES: {
       // Module 7: they can read the ledger (e.g. commission basis) but must
       // not post or reverse entries.
       accounting: view(),
+      credits: view(),
+      refunds: view(),
     }),
   },
   {
@@ -198,6 +204,8 @@ export const SYSTEM_ROLES: {
       owner_payouts: full(),
       // Module 7: chart of accounts, journal entries and trial balance.
       accounting: full(),
+      credits: full(),
+      refunds: full(),
     }),
   },
   {

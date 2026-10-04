@@ -46,6 +46,24 @@ export class PaymentsController {
     );
   }
 
+  @Post(':id/allocate')
+  @Permissions('payments.update')
+  async allocate(
+    @Param('id') id: string,
+    @Body() body: { invoiceIds?: string[] },
+    @Request() req,
+  ) {
+    const user = await this.usersService.findOne(req.user.userId);
+    return this.paymentsService.allocate(
+      id,
+      {
+        invoiceIds: body.invoiceIds,
+        allocatedBy: user ? `${user.firstName} ${user.lastName}` : undefined,
+      },
+      getTenantId(req),
+    );
+  }
+
   @Post(':id/reverse')
   @Permissions('payments.update')
   async reverse(@Param('id') id: string, @Request() req) {

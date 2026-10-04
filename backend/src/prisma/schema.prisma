@@ -74,6 +74,9 @@ model Organization {
   landlordCharges   LandlordCharge[]
   accounts          Account[]
   journalEntries    JournalEntry[]
+  customerCredits   CustomerCredit[]
+  paymentRefunds    PaymentRefund[]
+  creditNotes       CreditNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -371,6 +374,8 @@ model Landlord {
   properties      Property[]
   invoices        Invoice[]
   receipts        Receipt[]
+  credits         CustomerCredit[] @relation("LandlordCredits")
+  creditNotes     CreditNote[]    @relation("LandlordCreditNotes")
   ownerStatements OwnerStatement[]
   payouts         LandlordPayout[]
   charges         LandlordCharge[]
@@ -921,6 +926,8 @@ model Tenant {
   emergencyContacts TenantEmergencyContact[]
   receipts          Receipt[]
   moveOutRequests   MoveOutRequest[]
+  credits           CustomerCredit[] @relation("TenantCredits")
+  creditNotes       CreditNote[]    @relation("TenantCreditNotes")
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -1708,8 +1715,11 @@ model Invoice {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  invoiceItems InvoiceItem[]
-  payments     Payment[]
+  invoiceItems     InvoiceItem[]
+  payments         Payment[]
+  creditApplications CreditApplication[]
+  creditNotes      CreditNote[]
+  paymentAllocations PaymentAllocation[]
 
   // Audit fields
   createdAt       DateTime         @default(now())
@@ -1879,6 +1889,17 @@ model Payment {
   reversedAt DateTime?
   reversedBy String?
 
+  // Module 8: how much of this payment has been pointed at an invoice. A
+  // payment that arrives without one stays at 0 until `allocate` runs, and the
+  // remainder becomes customer credit rather than being lost.
+  appliedAmount Decimal @default(0) @db.Decimal(12, 2)
+
+  // Module 8: refunds and the credits that overpayments create.
+  refunds        PaymentRefund[]
+  allocations    PaymentAllocation[]
+  sourceCredits  CustomerCredit[] @relation("CreditSourcePayments")
+
+
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -1895,6 +1916,32 @@ model Payment {
   @@index([paymentMethod])
   @@index([organizationId])
   @@map("payments")
+}
+/// Module 8 — Payments: what part of a payment settled which invoice.
+///
+/// Without this the only record of the split is `Invoice.paidAmount`, and the
+/// moment money comes back (a refund) or a payment is over-applied, the true
+/// figure cannot be recovered: a 5,000 payment against a 3,000 invoice is 3,000
+/// paid and 2,000 on credit, but `Payment.amount` says 5,000. Every figure the
+/// invoice shows is derived from these rows, so the split survives refunds and
+/// reversals.
+model PaymentAllocation {
+  id String @id @default(cuid())
+
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  @@index([paymentId])
+  @@index([invoiceId])
+  @@map("payment_allocations")
 }
 
 enum PaymentType {
@@ -2034,6 +2081,7 @@ enum JournalEntrySource {
   LEASE
   CREDIT_NOTE
   PAYOUT
+  REFUND
   OPENING_BALANCE
 }
 
@@ -2065,6 +2113,188 @@ model JournalLine {
   @@index([entryId])
   @@index([accountId])
   @@map("journal_lines")
+}
+
+/// Module 8 — Payments: money the customer is owed back.
+///
+/// A credit arises whenever money arrives that no invoice needs: an
+/// overpayment on an invoice, an unallocated receipt, a goodwill gesture, or
+/// the unspent part of a payment that was later refunded. Without this, an
+/// overpaid tenant's money simply vanishes from the system.
+///
+/// `amount` is what was granted, `appliedAmount` what has since been consumed
+/// against invoices — the usable balance is the difference. Credits are spent
+/// oldest-invoice-first by `CreditsService`.
+model CustomerCredit {
+  id String @id @default(cuid())
+  amount        Decimal @db.Decimal(12, 2)
+  appliedAmount Decimal @default(0) @db.Decimal(12, 2)
+  currency      String  @default("KES")
+
+  reason String? @db.Text
+
+  source CustomerCreditSource @default(MANUAL)
+
+  /// The payment that generated this credit, when it came from one.
+  sourcePaymentId String?
+  sourcePayment   Payment? @relation("CreditSourcePayments", fields: [sourcePaymentId], references: [id], onDelete: SetNull)
+
+  // Who the credit belongs to. At least one of these (or `customerName`) is
+  // set: credit is meaningless if you cannot say whose it is.
+  tenantId    String?
+  tenant      Tenant?   @relation("TenantCredits", fields: [tenantId], references: [id], onDelete: SetNull)
+  landlordId  String?
+  landlord    Landlord? @relation("LandlordCredits", fields: [landlordId], references: [id], onDelete: SetNull)
+  customerName String?
+
+  status CreditStatus @default(OPEN)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  applications CreditApplication[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([status])
+  @@map("customer_credits")
+}
+
+enum CustomerCreditSource {
+  OVERPAYMENT
+  UNALLOCATED_RECEIPT
+  GOODWILL
+  REFUND_UNSPENT
+  MANUAL
+}
+
+enum CreditStatus {
+  OPEN
+  PARTIALLY_APPLIED
+  APPLIED
+  VOID
+}
+
+/// One consumption of a credit against one invoice. Kept as rows (not a
+/// counter alone) so "which invoice did this credit pay?" is answerable.
+model CreditApplication {
+  id String @id @default(cuid())
+  creditId String
+  credit   CustomerCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(12, 2)
+
+  appliedAt DateTime @default(now())
+  appliedBy String?
+
+  @@index([creditId])
+  @@index([invoiceId])
+  @@map("credit_applications")
+}
+
+/// A refund of money already received. `Payment` rows are never edited or
+/// deleted to represent money going back — this records the direction explicitly
+/// and links to the credit note the refund produces, so the audit trail reads
+/// "they paid, we refunded", not "the payment never happened".
+model PaymentRefund {
+  id String @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(12, 2)
+  reason String  @db.Text
+
+  refundReference String?
+  processedAt DateTime @default(now())
+  processedBy     String?
+
+  creditNoteId String?     @unique
+  creditNote   CreditNote? @relation(fields: [creditNoteId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([paymentId])
+  @@map("payment_refunds")
+}
+
+/// Module 8 — Payments: a document reducing what a customer owes. Issued
+/// automatically when a payment is refunded, and available on its own for
+/// write-offs and corrections. Applying a credit note leaves a credit balance
+/// rather than pushing a negative amount onto an invoice.
+model CreditNote {
+  id String @id @default(cuid())
+  creditNoteNumber String @unique
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// The invoice this note reduces. Null for a goodwill/advance note.
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  refund PaymentRefund?
+
+  tenantId    String?
+  tenant      Tenant?   @relation("TenantCreditNotes", fields: [tenantId], references: [id], onDelete: SetNull)
+  landlordId  String?
+  landlord    Landlord? @relation("LandlordCreditNotes", fields: [landlordId], references: [id], onDelete: SetNull)
+
+  issueDate DateTime @default(now())
+
+  reason String @db.Text
+  notes  String? @db.Text
+
+  subtotal   Decimal @db.Decimal(12, 2)
+  vatAmount  Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal @db.Decimal(12, 2)
+  currency   String  @default("KES")
+
+  status CreditNoteStatus @default(ISSUED)
+
+  lines CreditNoteLine[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([invoiceId])
+  @@map("credit_notes")
+}
+
+enum CreditNoteStatus {
+  DRAFT
+  ISSUED
+  VOID
+}
+
+model CreditNoteLine {
+  id String @id @default(cuid())
+  creditNoteId String
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(12, 2)
+  amount      Decimal @db.Decimal(12, 2)
+
+  vatRate   Decimal? @db.Decimal(5, 2)
+  vatAmount Decimal? @db.Decimal(12, 2)
+
+  @@index([creditNoteId])
+  @@map("credit_note_lines")
 }
 
 model ReceiptLine {

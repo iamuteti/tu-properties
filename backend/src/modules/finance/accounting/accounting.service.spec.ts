@@ -22,34 +22,80 @@ describe('AccountingService', () => {
 
   function mockPrisma() {
     const accounts = [
-      { id: 'acc-ar', code: '1200', name: 'Accounts Receivable', isPostable: true, normalBalance: 'DEBIT' },
-      { id: 'acc-rent', code: '4000', name: 'Rent Income', isPostable: true, normalBalance: 'CREDIT' },
-      { id: 'acc-vat', code: '2100', name: 'VAT Payable', isPostable: true, normalBalance: 'CREDIT' },
-      { id: 'acc-cash', code: '1000', name: 'Cash on Hand', isPostable: true, normalBalance: 'DEBIT' },
-      { id: 'acc-hdr', code: '1001', name: 'Current Assets', isPostable: false, normalBalance: 'DEBIT' },
-      { id: 'acc-mpesa', code: '1100', name: 'M-Pesa / Mobile Money', isPostable: true, normalBalance: 'DEBIT' },
-      { id: 'acc-held', code: '2500', name: 'Rent Collected on Behalf of Landlords', isPostable: true, normalBalance: 'CREDIT' },
+      {
+        id: 'acc-ar',
+        code: '1200',
+        name: 'Accounts Receivable',
+        isPostable: true,
+        normalBalance: 'DEBIT',
+      },
+      {
+        id: 'acc-rent',
+        code: '4000',
+        name: 'Rent Income',
+        isPostable: true,
+        normalBalance: 'CREDIT',
+      },
+      {
+        id: 'acc-vat',
+        code: '2100',
+        name: 'VAT Payable',
+        isPostable: true,
+        normalBalance: 'CREDIT',
+      },
+      {
+        id: 'acc-cash',
+        code: '1000',
+        name: 'Cash on Hand',
+        isPostable: true,
+        normalBalance: 'DEBIT',
+      },
+      {
+        id: 'acc-hdr',
+        code: '1001',
+        name: 'Current Assets',
+        isPostable: false,
+        normalBalance: 'DEBIT',
+      },
+      {
+        id: 'acc-mpesa',
+        code: '1100',
+        name: 'M-Pesa / Mobile Money',
+        isPostable: true,
+        normalBalance: 'DEBIT',
+      },
+      {
+        id: 'acc-held',
+        code: '2500',
+        name: 'Rent Collected on Behalf of Landlords',
+        isPostable: true,
+        normalBalance: 'CREDIT',
+      },
     ];
 
     const account = {
       count: jest.fn().mockResolvedValue(accounts.length),
       createMany: jest.fn().mockResolvedValue({ count: accounts.length }),
       findMany: jest.fn().mockResolvedValue(accounts),
-      findFirst: jest.fn(async ({ where }: any) =>
-        accounts.find(
-          (a) =>
-            a.id === where.id ||
-            (where.code !== undefined &&
-              a.code === where.code &&
-              (where.organizationId === undefined ||
-                where.organizationId === org.id)),
-        ) ?? null,
+      findFirst: jest.fn(({ where }: any) =>
+        Promise.resolve(
+          accounts.find(
+            (a) =>
+              a.id === where.id ||
+              (where.code !== undefined &&
+                a.code === where.code &&
+                (where.organizationId === undefined ||
+                  where.organizationId === org.id)),
+          ) ?? null,
+        ),
       ),
-      findUnique: jest.fn(async ({ where }: any) =>
-        accounts.find((a) => a.id === where.id) ?? null,
+      findUnique: jest.fn(({ where }: any) =>
+        Promise.resolve(accounts.find((a) => a.id === where.id) ?? null),
       ),
       update: jest.fn().mockImplementation(({ data }: any) => ({ ...data })),
-      delete: jest.fn().mockImplementation(({ where }: any) => ({ id: where.id })),
+      delete: jest
+        .fn()
+        .mockImplementation(({ where }: any) => ({ id: where.id })),
     };
 
     const journalLine = {
@@ -66,7 +112,9 @@ describe('AccountingService', () => {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
-      update: jest.fn().mockImplementation(({ data }: any) => ({ id: 'je-1', ...data })),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }: any) => ({ id: 'je-1', ...data })),
     };
 
     return { account, journalEntry, journalLine };

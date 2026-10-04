@@ -234,6 +234,15 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
     normalBalance: BalanceSide.CREDIT,
   },
   {
+    code: '4290',
+    name: 'Refunds & Allowances',
+    type: AccountType.REVENUE,
+    subtype: 'Contra Revenue',
+    normalBalance: BalanceSide.DEBIT,
+    description:
+      'Debited when money is refunded or a credit note is issued, so a refund reduces revenue instead of vanishing.',
+  },
+  {
     code: '4900',
     name: 'Other Income',
     type: AccountType.REVENUE,
@@ -354,6 +363,7 @@ export const ACCOUNT_CODES = {
   PARKING_INCOME: '4020',
   UTILITY_INCOME: '4030',
   OTHER_INCOME: '4900',
+  REFUNDS_AND_ALLOWANCES: '4290',
 } as const;
 
 /** Default cash/bank account for each payment method. */

@@ -64,16 +64,15 @@ export class AccountingService {
   // ── Chart of accounts ─────────────────────────────────────────────────────
 
   /**
-   * Seed the default chart for an organization if it does not have one yet.
-   * Idempotent: safe to call on every auto-post (it is a single count query
-   * on the happy path).
+   * Make sure the organization has every standard account.
+   *
+   * Deliberately *not* an "if the tenant has any accounts, do nothing" check:
+   * accounts are added to the standard chart over time (4290 Refunds &
+   * Allowances arrived with Module 8), and an existing tenant must pick them up
+   * too, or the next refund would fail to post. `skipDuplicates` makes this a
+   * single no-op statement for a tenant that is already up to date.
    */
   async ensureAccounts(organizationId: string, tx: Tx = this.prisma) {
-    const existing = await tx.account.count({
-      where: { organizationId },
-    });
-    if (existing > 0) return;
-
     await tx.account.createMany({
       data: DEFAULT_CHART_OF_ACCOUNTS.map((account) => ({
         code: account.code,
@@ -733,6 +732,52 @@ export class AccountingService {
           },
           {
             accountCode: creditCode,
+            credit: amount,
+            description: args.description,
+          },
+        ],
+      },
+      tenantId,
+      tx,
+    );
+  }
+
+  /**
+   * Money going back out. A refund is the debit side of "revenue that was
+   * recognised and is now unwound" — it lands in the contra revenue account
+   * rather than vanishing, so revenue reports stay truthful.
+   */
+  async postRefund(
+    args: {
+      amount: number;
+      refundDate: Date;
+      /** Where the money leaves from — the account the payment landed in. */
+      fromAccountCode: string;
+      description: string;
+      reference?: string;
+      sourceRef?: Record<string, string | null>;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const amount = round2(Number(args.amount));
+    if (amount <= 0) return null;
+
+    return this.postEntry(
+      {
+        entryDate: args.refundDate,
+        memo: args.description,
+        reference: args.reference,
+        source: JournalEntrySource.REFUND,
+        sourceRef: args.sourceRef,
+        lines: [
+          {
+            accountCode: ACCOUNT_CODES.REFUNDS_AND_ALLOWANCES,
+            debit: amount,
+            description: args.description,
+          },
+          {
+            accountCode: args.fromAccountCode,
             credit: amount,
             description: args.description,
           },

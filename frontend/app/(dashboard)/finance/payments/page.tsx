@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Search, Trash2, CreditCard } from "lucide-react";
+import { Plus, Search, Trash2, ArrowRightLeft } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -106,7 +106,52 @@ const columns: ColumnDef<Payment>[] = [
     header: "Recorded By",
     cell: ({ row }) => row.original.recordedBy || "-",
   },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => {
+      const payment = row.original as Payment & {
+        invoice?: { invoiceNumber: string } | null;
+        isReversed?: boolean;
+      };
+      if (payment.invoice || payment.isReversed) return null;
+      // Money that arrived with no bill attached. Allocating it settles the
+      // customer's oldest invoices; anything left over becomes their credit.
+      return (
+        <Button variant="outline" size="sm" onClick={() => handleAllocate(payment.id)}>
+          <ArrowRightLeft className="mr-2 h-4 w-4" />
+          Allocate
+        </Button>
+      );
+    },
+  },
 ];
+
+const money = (value: number) =>
+  value.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+async function handleAllocate(paymentId: string) {
+  if (
+    !confirm(
+      "Allocate this payment across the customer's oldest outstanding invoices? Anything left over becomes their credit.",
+    )
+  ) {
+    return;
+  }
+  try {
+    const response = await financeApi.allocatePayment(paymentId);
+    const { allocations, unallocated } = response.data;
+    const applied = allocations.reduce((sum, entry) => sum + entry.amount, 0);
+    alert(
+      `Allocated ${money(applied)} across ${allocations.length} invoice(s).` +
+        (unallocated > 0 ? ` ${money(unallocated)} went to customer credit.` : ""),
+    );
+    window.location.reload();
+  } catch (err) {
+    console.error("Failed to allocate payment:", err);
+    alert("Failed to allocate the payment. Please try again.");
+  }
+}
 
 export default function PaymentsPage() {
   const { payments: allPayments, isLoading, error, refetch } = useFinance({ payments: true });

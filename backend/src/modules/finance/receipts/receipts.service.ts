@@ -7,13 +7,16 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { AccountingService } from '../accounting/accounting.service';
-import { JournalEntrySource } from '@prisma/client';
+import { CreditsService } from '../credits/credits.service';
+import { allocateToInvoice } from '../invoice-allocation';
+import { CustomerCreditSource, JournalEntrySource } from '@prisma/client';
 
 @Injectable()
 export class ReceiptsService {
   constructor(
     private prisma: PrismaService,
     private accountingService: AccountingService,
+    private creditsService: CreditsService,
   ) {}
 
   private round2(value: number): number {
@@ -257,9 +260,12 @@ export class ReceiptsService {
           where: invoiceWhere,
           select: {
             id: true,
+            invoiceNumber: true,
             totalAmount: true,
             status: true,
             balanceAmount: true,
+            paidAmount: true,
+            rentalAgreement: { select: { tenantId: true } },
           },
         });
         if (!invoice) {
@@ -267,27 +273,65 @@ export class ReceiptsService {
             'Invoice not found for payment allocation',
           );
         }
-        if (invoice.status === 'CANCELLED' || invoice.status === 'PAID') {
+        if (invoice.status === 'CANCELLED') {
           throw new BadRequestException(
-            `Invoice ${invoice.id} is ${invoice.status} and cannot receive payments`,
+            `Invoice ${invoice.invoiceNumber} is CANCELLED and cannot receive payments`,
           );
         }
 
-        // paid so far = total - outstanding balance
-        const newPaid = this.round2(
-          Number(invoice.totalAmount) - Number(invoice.balanceAmount) + amount,
+        // An invoice absorbs only what it still owes; the rest is the
+        // customer's money and is credited, not dropped.
+        const allocation = allocateToInvoice(
+          {
+            totalAmount: Number(invoice.totalAmount),
+            balanceAmount: Number(invoice.balanceAmount),
+            paidAmount: Number(invoice.paidAmount),
+            status: invoice.status,
+          },
+          amount,
         );
-        const newBalance = this.round2(Number(invoice.balanceAmount) - amount);
 
         await tx.invoice.update({
           where: { id: invoice.id },
           data: {
-            paidAmount: newPaid,
-            balanceAmount: this.round2(Math.max(0, newBalance)),
-            // We just accepted a payment, so anything left over is partial.
-            status: newBalance <= 0 ? 'PAID' : 'PARTIALLY_PAID',
+            paidAmount: allocation.paidAmount,
+            balanceAmount: allocation.balanceAmount,
+            status: allocation.status,
           },
         });
+
+        // Recorded as an allocation so a later refund knows exactly how much of
+        // this payment settled the bill.
+        const createdPayment = await tx.payment.findFirst({
+          where: { receiptId: receipt.id, amount },
+          select: { id: true },
+        });
+        if (createdPayment) {
+          await tx.paymentAllocation.create({
+            data: {
+              paymentId: createdPayment.id,
+              invoiceId: invoice.id,
+              amount: allocation.applied,
+              createdBy: data.recordedBy,
+            },
+          });
+        }
+
+        if (allocation.surplus > 0 && tenantId) {
+          await this.creditsService.captureSurplus(
+            {
+              amount: allocation.surplus,
+              reason: `Overpayment on invoice ${invoice.invoiceNumber}`,
+              source: CustomerCreditSource.OVERPAYMENT,
+              tenantId: invoice.rentalAgreement?.tenantId ?? undefined,
+              landlordId: data.landlordId,
+              currency: receipt.currency,
+              createdBy: data.recordedBy,
+            },
+            tenantId,
+            tx,
+          );
+        }
 
         if (tenantId) {
           await this.accountingService.postPaymentReceived(

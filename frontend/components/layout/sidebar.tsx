@@ -26,6 +26,8 @@ import {
     Banknote,
     BookOpen,
     Scale,
+    Undo2,
+    PiggyBank,
 } from "lucide-react";
 
 type UserRole =
@@ -102,6 +104,8 @@ const navItems: NavItem[] = [
         children: [
             { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/refunds", label: "Refunds", icon: Undo2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+            { href: "/finance/credits", label: "Customer Credits", icon: PiggyBank, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
             { href: "/finance/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
