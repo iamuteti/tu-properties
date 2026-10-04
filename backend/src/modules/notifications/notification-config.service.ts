@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  forwardRef,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -99,6 +101,10 @@ export class NotificationConfigService {
   constructor(
     private prisma: PrismaService,
     private readonly registry: SmsProviderRegistry,
+    // The email provider reads its configuration through this service, so the
+    // two import each other — hence `forwardRef` on both sides. Without it the
+    // application fails to boot with an unresolvable dependency.
+    @Inject(forwardRef(() => EmailChannelProvider))
     private readonly email: EmailChannelProvider,
   ) {}
 

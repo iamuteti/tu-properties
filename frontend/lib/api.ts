@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -974,13 +974,23 @@ export const refundsApi = {
             `/finance/refunds/refundable/${paymentId}`,
         ),
 
+    /**
+     * Raises a refund request (Module 18).
+     *
+     * The response is the approval request, not a refund: nothing has moved yet
+     * unless `autoApproved` is true, which means no policy applied and it was
+     * processed directly. Treat the two cases as different, because they are.
+     */
     create: (data: {
         paymentId: string;
         amount: number;
         reason: string;
         refundReference?: string;
         toCredit?: boolean;
-    }) => api.post<PaymentRefund>('/finance/refunds', data),
+    }) =>
+        api.post<
+            WorkflowInstance & { autoApproved: boolean; note: string | null }
+        >('/finance/refunds', data),
 };
 
 /**
@@ -1656,4 +1666,92 @@ export const tenantRequestsApi = {
             decision,
             decisionNote,
         }),
+};
+
+// ============================================
+// WORKFLOW ENGINE API (Module 18)
+// ============================================
+
+export const workflowsApi = {
+    // ── The approvals inbox ────────────────────────────────────────────────
+    // One queue for every entity type on purpose: an approver's job is "decide
+    // what is waiting on me", and splitting that by module is how approval
+    // inboxes end up unmonitored.
+    inbox: () => api.get<ApprovalInbox>('/workflows/inbox'),
+
+    instances: (params?: { status?: string; entityType?: string; page?: number; limit?: number }) =>
+        api.get<PaginatedResponse<WorkflowInstance>>('/workflows/instances', { params }),
+
+    findOne: (id: string) => api.get<WorkflowInstance>(`/workflows/instances/${id}`),
+
+    /** The live approval for a record, if there is one. */
+    forEntity: (entityType: string, entityId: string) =>
+        api.get<WorkflowInstance | null>(`/workflows/entity/${entityType}/${entityId}`),
+
+    /** A rejection must carry a note — it is what the requester reads. */
+    decide: (id: string, decision: 'APPROVE' | 'REJECT', comment?: string) =>
+        api.post<WorkflowInstance>(`/workflows/instances/${id}/decision`, {
+            decision,
+            comment,
+        }),
+
+    cancel: (id: string, reason: string) =>
+        api.post<WorkflowInstance>(`/workflows/instances/${id}/cancel`, { reason }),
+
+    // ── Policies ───────────────────────────────────────────────────────────
+    definitions: (entityType?: string) =>
+        api.get<WorkflowDefinition[]>('/workflows/definitions', {
+            params: entityType ? { entityType } : undefined,
+        }),
+
+    approverOptions: () =>
+        api.get<{
+            users: {
+                id: string;
+                firstName: string;
+                lastName: string;
+                email: string;
+            }[];
+            roles: { id: string; name: string; isSystem: boolean }[];
+        }>('/workflows/definitions/approver-options'),
+
+    createDefinition: (data: {
+        entityType: string;
+        name: string;
+        description?: string;
+        steps: WorkflowStepTemplate[];
+        isActive?: boolean;
+        priority?: number;
+    }) => api.post<WorkflowDefinition>('/workflows/definitions', data),
+
+    updateDefinition: (
+        id: string,
+        data: {
+            name?: string;
+            description?: string;
+            steps?: WorkflowStepTemplate[];
+            isActive?: boolean;
+            priority?: number;
+        },
+    ) => api.patch<WorkflowDefinition>(`/workflows/definitions/${id}`, data),
+
+    deleteDefinition: (id: string) =>
+        api.delete<{ deleted: boolean }>(`/workflows/definitions/${id}`),
+
+    // ── Delegation: "while I am away, this colleague decides" ───────────────
+    delegations: () =>
+        api.get<{
+            givenByMe: WorkflowDelegation[];
+            givenToMe: WorkflowDelegation[];
+        }>('/workflows/delegations'),
+
+    createDelegation: (data: {
+        toUserId: string;
+        startsAt?: string;
+        endsAt?: string;
+        reason?: string;
+    }) => api.post<WorkflowDelegation>('/workflows/delegations', data),
+
+    removeDelegation: (id: string) =>
+        api.delete<{ deleted: boolean }>(`/workflows/delegations/${id}`),
 };

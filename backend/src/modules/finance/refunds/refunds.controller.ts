@@ -12,14 +12,18 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
-import { getTenantId } from '@/common/utils';
+import { getTenantId, getUserId } from '@/common/utils';
+import { RefundApprovalsService } from './refund-approvals.service';
 import { RefundsService } from './refunds.service';
 
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
 @Controller('finance/refunds')
 export class RefundsController {
-  constructor(private readonly refundsService: RefundsService) {}
+  constructor(
+    private readonly refundsService: RefundsService,
+    private readonly approvals: RefundApprovalsService,
+  ) {}
 
   @Get()
   @Permissions('refunds.view')
@@ -39,6 +43,15 @@ export class RefundsController {
     return this.refundsService.findOne(id, getTenantId(req));
   }
 
+  /**
+   * Ask for a refund (Module 18).
+   *
+   * This used to move the money. It now raises an approval request: the refund
+   * itself is issued when the last required level approves, inside the same
+   * transaction as that decision. The response is the approval request — check
+   * `autoApproved` to tell "processed straight away because no workflow is
+   * configured" from "waiting on Finance review".
+   */
   @Post()
   @Permissions('refunds.create')
   create(
@@ -52,6 +65,10 @@ export class RefundsController {
     },
     @Request() req,
   ) {
-    return this.refundsService.create(body, getTenantId(req));
+    return this.approvals.request(
+      body,
+      getTenantId(req) as string,
+      getUserId(req),
+    );
   }
 }

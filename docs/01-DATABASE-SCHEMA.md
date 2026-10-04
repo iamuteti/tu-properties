@@ -1507,7 +1507,19 @@ model Notification {
 
 ---
 
-## Domain: Workflow Engine (Module: Workflow Engine) — 🆕 Not started
+## Domain: Workflow Engine (Module: Workflow Engine) — ✅ Built 2026-10-04
+
+> The sketch below is what was planned. What shipped is a superset with three
+> deliberate differences, all recorded in `19-MODULE-workflow-engine.md`:
+> `WorkflowInstance.workflowDefinitionId` is **nullable** (retiring a policy must
+> not delete approvals already in flight) and the instance keeps its own frozen
+> `steps` copy; `WorkflowStep` and `WorkflowEvent` exist because the inbox,
+> delegation and escalation need rows to query and a trail to read; and
+> `WorkflowInstance.context` holds the caller's payload, which is what the level
+> `condition`s are evaluated against. Migrations
+> `20261004122018_module18_workflow_engine`,
+> `20261004123401_module18_approval_notification_types`,
+> `20261004125302_module18_workflow_instance_context`.
 
 ```prisma
 model WorkflowDefinition {

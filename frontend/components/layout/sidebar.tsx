@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { workflowsApi } from "@/lib/api";
 import {
     LayoutDashboard,
     Building2,
@@ -30,9 +31,11 @@ import {
     Undo2,
     PiggyBank,
     Globe2,
-    Receipt,
+Receipt,
     Bell,
     TrendingDown,
+    CheckSquare,
+    GitBranch,
 } from "lucide-react";
 
 type UserRole =
@@ -48,6 +51,8 @@ interface NavItem {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     roles: UserRole[];
+    /** Show a live count on this item (Module 18's approvals inbox). */
+    badge?: 'approvals';
     children?: NavItem[];
 }
 
@@ -126,10 +131,12 @@ const navItems: NavItem[] = [
     { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
 
-    { href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
+{ href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
+    { href: "/approvals", label: "Approvals", icon: CheckSquare, badge: 'approvals', roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
     { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/settings/tax", label: "Tax Settings", icon: Globe2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
     { href: "/settings/notifications", label: "Notification Settings", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { href: "/settings/workflows", label: "Approval Workflows", icon: GitBranch, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -145,6 +152,30 @@ export function Sidebar() {
     const pathname = usePathname();
     const { user, isLoading, logout } = useAuth();
     const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+    // How many approvals are waiting on this person. Polled rather than pushed
+    // because it is a count, not an event: the inbox itself is the notification,
+    // and this is only there so somebody does not have to open it to find out.
+    const [pendingApprovals, setPendingApprovals] = React.useState<number | null>(null);
+
+    React.useEffect(() => {
+        if (!user) return;
+        let active = true;
+        const load = async () => {
+            try {
+                const inbox = (await workflowsApi.inbox()).data;
+                if (active) setPendingApprovals(inbox.counts.pending);
+            } catch {
+                // A badge is not worth an error message; the page still works.
+                if (active) setPendingApprovals(0);
+            }
+        };
+        load();
+        const timer = setInterval(load, 60_000);
+        return () => {
+            active = false;
+            clearInterval(timer);
+        };
+    }, [user]);
 
     // Filter nav items based on user role
     const filteredNavItems = navItems.filter(
@@ -166,6 +197,8 @@ export function Sidebar() {
         const children = item.children;
         const hasChildren = children && children.length > 0;
         const isExpanded = expandedItems.includes(item.label);
+        const badgeCount =
+            item.badge === 'approvals' ? pendingApprovals : null;
 
         if (hasChildren) {
             // A parent group is "active" if any child route matches, so the
@@ -223,7 +256,19 @@ export function Sidebar() {
                 )}
             >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {badgeCount ? (
+                    <span
+                        className={cn(
+                            "rounded-full px-2 py-0.5 text-xs font-semibold",
+                            isActive
+                                ? "bg-primary-foreground/20 text-primary-foreground"
+                                : "bg-amber-100 text-amber-800"
+                        )}
+                    >
+                        {badgeCount}
+                    </span>
+                ) : null}
             </Link>
         );
     };

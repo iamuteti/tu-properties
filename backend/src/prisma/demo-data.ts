@@ -22,6 +22,10 @@ import {
   ChargeCategory,
   OwnerStatementStatus,
   PayoutStatus,
+  WorkflowApproverKind,
+  WorkflowEventType,
+  WorkflowInstanceStatus,
+  WorkflowStepStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -1603,6 +1607,315 @@ function daysFromNow(days: number): Date {
   return date;
 }
 
+function hoursAgo(hours: number): Date {
+  return new Date(Date.now() - hours * 3_600_000);
+}
+
+function hoursFromNow(hours: number): Date {
+  return new Date(Date.now() + hours * 3_600_000);
+}
+
+/**
+ * Module 18 — Workflow Engine demo data.
+ *
+ * Two things are demonstrated here that no other screen can show:
+ *
+ *   1. **A policy is configuration.** A platform default for `REFUND` (two
+ *      levels, the second conditional on amount) plus Rohi's own one-level
+ *      policy that shadows it and escalates after 24 hours. Editing either row
+ *      changes how the next request behaves — no code, no deploy.
+ *   2. **The states an approval really gets into**: waiting on Finance, already
+ *      declined with a note, and blown past its deadline and escalated to the
+ *      administrator. All three are recorded truthfully — none of them has moved
+ *      money, which is exactly why they are safe to seed.
+ */
+async function generateWorkflowData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const admin = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.ADMIN },
+    select: { id: true },
+  });
+  const accountant = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.ACCOUNTANT },
+    select: { id: true },
+  });
+  const propertyManager = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.PROPERTY_MANAGER },
+    select: { id: true },
+  });
+
+  const payment = await prisma.payment.findFirst({
+    where: { organizationId },
+    orderBy: { paymentDate: 'desc' },
+    select: { id: true, amount: true, currency: true, paymentReference: true },
+  });
+  if (!payment) return;
+
+  // ── platform default policy, shared by every organization ──────────────
+  const defaultSteps = [
+    {
+      name: 'Finance review',
+      approverKind: 'ROLE',
+      approverRole: 'Accountant',
+      approverUserId: null,
+      condition: null,
+      escalateAfterHours: 48,
+      escalateToUserId: null,
+    },
+    {
+      name: 'Director sign-off',
+      approverKind: 'ROLE',
+      approverRole: 'Company Admin',
+      approverUserId: null,
+      // Only a large refund gets the second pair of eyes.
+      condition: { field: 'amount', op: 'gt', value: 50000 },
+      escalateAfterHours: null,
+      escalateToUserId: null,
+    },
+  ];
+
+  const existingDefault = await prisma.workflowDefinition.findFirst({
+    where: { organizationId: null, entityType: 'REFUND' },
+  });
+  const defaultDefinition = existingDefault
+    ? await prisma.workflowDefinition.update({
+        where: { id: existingDefault.id },
+        data: { steps: defaultSteps, isActive: true },
+      })
+    : await prisma.workflowDefinition.create({
+        data: {
+          organizationId: null,
+          entityType: 'REFUND',
+          name: 'Refund approval (default)',
+          description:
+            'Finance reviews every refund; anything above 50,000 also needs the director. Offered to every organization, who may copy and change it.',
+          steps: defaultSteps,
+          isActive: true,
+          priority: 0,
+        },
+      });
+
+  // ── Rohi's own policy: shadows the default, and escalates ──────────────
+  const ownSteps = [
+    {
+      name: 'Finance review',
+      approverKind: 'ROLE',
+      approverRole: 'Accountant',
+      approverUserId: null,
+      condition: null,
+      // Rohi wants an unattended refund chased after a day, not two.
+      escalateAfterHours: 24,
+      escalateToUserId: admin?.id ?? null,
+    },
+  ];
+
+  const existingOwn = await prisma.workflowDefinition.findFirst({
+    where: { organizationId, entityType: 'REFUND' },
+  });
+  const ownDefinition = existingOwn
+    ? await prisma.workflowDefinition.update({
+        where: { id: existingOwn.id },
+        data: { steps: ownSteps, isActive: true, priority: 10 },
+      })
+    : await prisma.workflowDefinition.create({
+        data: {
+          organizationId,
+          entityType: 'REFUND',
+          name: 'Refund approval',
+          description:
+            'One level: the accountant reviews every refund and escalates to an administrator after 24 hours.',
+          steps: ownSteps,
+          isActive: true,
+          priority: 10,
+        },
+      });
+
+  const label = (amount: number) =>
+    `Refund of ${payment.currency || 'KES'} ${amount.toLocaleString()} on payment ${payment.paymentReference ?? payment.id}`;
+
+  // ── 1. waiting on Finance ──────────────────────────────────────────────
+  await prisma.workflowInstance.create({
+    data: {
+      organizationId,
+      workflowDefinitionId: ownDefinition.id,
+      entityType: 'REFUND',
+      entityId: payment.id,
+      entityLabel: label(8500),
+      steps: ownSteps,
+      context: {
+        paymentId: payment.id,
+        amount: 8500,
+        currency: payment.currency,
+        reason: 'Overpayment returned after the tenancy was credited',
+        refundReference: null,
+        toCredit: false,
+        payer: 'Achieng Otieno',
+        invoiceNumber: null,
+      },
+      status: WorkflowInstanceStatus.IN_PROGRESS,
+      currentStep: 0,
+      startedById: propertyManager?.id ?? null,
+      startedAt: hoursAgo(6),
+      stepInstances: {
+        create: {
+          stepIndex: 0,
+          name: 'Finance review',
+          approverKind: WorkflowApproverKind.ROLE,
+          approverRole: 'Accountant',
+          status: WorkflowStepStatus.ACTIVE,
+          dueAt: hoursFromNow(18),
+          escalateToUserId: admin?.id ?? null,
+        },
+      },
+      events: {
+        create: {
+          type: WorkflowEventType.STARTED,
+          actorUserId: propertyManager?.id ?? null,
+          stepIndex: 0,
+        },
+      },
+    },
+  });
+
+  // ── 2. declined, with the note the requester reads ─────────────────────
+  const smallSteps = [
+    {
+      name: 'Finance review',
+      approverKind: 'ROLE',
+      approverRole: 'Accountant',
+      approverUserId: null,
+      condition: null,
+      escalateAfterHours: 24,
+      escalateToUserId: admin?.id ?? null,
+    },
+  ];
+  await prisma.workflowInstance.create({
+    data: {
+      organizationId,
+      workflowDefinitionId: ownDefinition.id,
+      entityType: 'REFUND',
+      entityId: payment.id,
+      entityLabel: label(2400),
+      steps: smallSteps,
+      context: {
+        paymentId: payment.id,
+        amount: 2400,
+        currency: payment.currency,
+        reason: 'Resident asked for the duplicate posting back',
+        refundReference: null,
+        toCredit: false,
+        payer: 'Achieng Otieno',
+        invoiceNumber: null,
+      },
+      status: WorkflowInstanceStatus.REJECTED,
+      currentStep: 0,
+      finalComment:
+        'This is the same money as the 8,500 request raised earlier today — it is already being refunded once.',
+      startedById: propertyManager?.id ?? null,
+      startedAt: hoursAgo(30),
+      completedAt: hoursAgo(28),
+      stepInstances: {
+        create: {
+          stepIndex: 0,
+          name: 'Finance review',
+          approverKind: WorkflowApproverKind.ROLE,
+          approverRole: 'Accountant',
+          status: WorkflowStepStatus.REJECTED,
+          dueAt: hoursFromNow(-6),
+          actedById: accountant?.id ?? null,
+          actedAt: hoursAgo(28),
+          comment:
+            'This is the same money as the 8,500 request raised earlier today — it is already being refunded once.',
+        },
+      },
+      events: {
+        create: [
+          {
+            type: WorkflowEventType.STARTED,
+            actorUserId: propertyManager?.id ?? null,
+            stepIndex: 0,
+            createdAt: hoursAgo(30),
+          },
+          {
+            type: WorkflowEventType.REJECTED,
+            actorUserId: accountant?.id ?? null,
+            stepIndex: 0,
+            comment:
+              'This is the same money as the 8,500 request raised earlier today — it is already being refunded once.',
+            createdAt: hoursAgo(28),
+          },
+        ],
+      },
+    },
+  });
+
+  // ── 3. blown past its deadline and escalated to an administrator ───────
+  if (admin) {
+    await prisma.workflowInstance.create({
+      data: {
+        organizationId,
+        workflowDefinitionId: ownDefinition.id,
+        entityType: 'REFUND',
+        entityId: payment.id,
+        entityLabel: label(41000),
+        steps: smallSteps,
+        context: {
+          paymentId: payment.id,
+          amount: 41000,
+          currency: payment.currency,
+          reason: 'Deposit released early after a negotiated termination',
+          refundReference: null,
+          toCredit: false,
+          payer: 'Achieng Otieno',
+          invoiceNumber: null,
+        },
+        status: WorkflowInstanceStatus.ESCALATED,
+        currentStep: 0,
+        startedById: propertyManager?.id ?? null,
+        startedAt: hoursAgo(52),
+        stepInstances: {
+          create: {
+            stepIndex: 0,
+            name: 'Finance review',
+            // Escalation reassigns the level rather than copying it, so the
+            // inbox and the authorization check need no special case.
+            approverKind: WorkflowApproverKind.USER,
+            approverUserId: admin.id,
+            approverRole: null,
+            status: WorkflowStepStatus.ESCALATED,
+            dueAt: hoursFromNow(-28),
+            escalatedAt: hoursAgo(28),
+            escalateToUserId: admin.id,
+          },
+        },
+        events: {
+          create: [
+            {
+              type: WorkflowEventType.STARTED,
+              actorUserId: propertyManager?.id ?? null,
+              stepIndex: 0,
+              createdAt: hoursAgo(52),
+            },
+            {
+              type: WorkflowEventType.ESCALATED,
+              stepIndex: 0,
+              comment:
+                '"Finance review" passed its deadline and was escalated.',
+              createdAt: hoursAgo(28),
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  console.log(
+    `  Approval workflows: "${defaultDefinition.name}" (platform default) + "${ownDefinition.name}" (this organization), 3 sample requests`,
+  );
+}
+
 // Main function to run demo data generation standalone
 export async function seedDemoData() {
   const connectionString = process.env.DATABASE_URL;
@@ -1620,6 +1933,14 @@ export async function seedDemoData() {
     // Clean the database (in correct order to handle foreign keys)
     // Preserve super admin user
     console.log('Cleaning database...');
+    await prisma.workflowEvent.deleteMany();
+    await prisma.workflowStep.deleteMany();
+    await prisma.workflowInstance.deleteMany();
+    await prisma.workflowDelegation.deleteMany();
+    // Platform defaults (organizationId = null) survive, exactly like system roles.
+    await prisma.workflowDefinition.deleteMany({
+      where: { organizationId: { not: null } },
+    });
     await prisma.payment.deleteMany();
     await prisma.receiptLine.deleteMany();
     await prisma.receipt.deleteMany();
@@ -1746,8 +2067,74 @@ export async function seedDemoData() {
       },
     });
 
+    // The two roles a two-level approval needs on the Rohi side (Module 18).
+    //
+    // Rohi previously had a single staff account, which made a multi-level
+    // approval impossible to demonstrate — there was nobody to hold the second
+    // role. Both also get explicit `RoleAssignment` rows, because role *names*
+    // are still not mapped onto the `UserRole` enum (master doc issue 51) and
+    // the workflow engine matches on the name.
+    await prisma.user.create({
+      data: {
+        email: 'finance@rohi.co.ke',
+        firstName: 'Ruhi',
+        lastName: 'Finance',
+        phone: '+254700000006',
+        passwordHash,
+        role: UserRole.ACCOUNTANT,
+        organizationId: rohiOrg.id,
+      },
+    });
+
+    await prisma.user.create({
+      data: {
+        email: 'manager@rohi.co.ke',
+        firstName: 'Rohi',
+        lastName: 'Operations',
+        phone: '+254700000007',
+        passwordHash,
+        role: UserRole.PROPERTY_MANAGER,
+        organizationId: rohiOrg.id,
+      },
+    });
+
+    // Structured role assignments for every staff login, so the role matrix is
+    // real in the demo rather than only implied by the legacy enum.
+    const systemRoles = await prisma.role.findMany({
+      where: { organizationId: null },
+      select: { id: true, name: true },
+    });
+    const staffRoleAssignments: {
+      email: string;
+      roleName: string;
+    }[] = [
+      { email: 'admin@westhill.co.ke', roleName: 'Company Admin' },
+      { email: 'manager@westhill.co.ke', roleName: 'Property Manager' },
+      { email: 'accountant@westhill.co.ke', roleName: 'Accountant' },
+      { email: 'admin@rohi.co.ke', roleName: 'Company Admin' },
+      { email: 'manager@rohi.co.ke', roleName: 'Property Manager' },
+      { email: 'finance@rohi.co.ke', roleName: 'Accountant' },
+    ];
+    for (const assignment of staffRoleAssignments) {
+      const user = await prisma.user.findUnique({
+        where: { email: assignment.email },
+        select: { id: true },
+      });
+      const role = systemRoles.find(
+        (candidate) => candidate.name === assignment.roleName,
+      );
+      if (!user || !role) continue;
+      await prisma.roleAssignment.create({
+        data: { userId: user.id, roleId: role.id },
+      });
+    }
+
     // Generate demo data for Rohi Estate Management
     await generateDemoData(prisma, rohiOrg.id);
+
+    // Approval policies and sample requests (Module 18). After the data, so a
+    // real payment exists for the refund requests to point at.
+    await generateWorkflowData(prisma, rohiOrg.id);
 
     // Tenant portal logins (Module 5 checklist, auth in Module 1).
     //

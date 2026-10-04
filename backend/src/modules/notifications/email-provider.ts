@@ -1,9 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import {
   NotificationChannelProvider,
   DeliveryResult,
 } from './notifications.service';
+import { NotificationConfigService } from './notification-config.service';
+import { SmsProviderRegistry } from './sms-provider-registry';
 import nodemailer from 'nodemailer';
 
 /**
@@ -50,6 +58,15 @@ export interface TransportFactory {
 
 type Address = { address: string };
 
+/**
+ * Injection token for the nodemailer transport factory.
+ *
+ * It has to be a token rather than a default parameter value: Nest reads
+ * `design:paramtypes`, sees `Function` for a defaulted parameter and tries to
+ * resolve a provider called `Function`, which fails the boot.
+ */
+export const SMTP_TRANSPORT_FACTORY = 'SMTP_TRANSPORT_FACTORY';
+
 const defaultTransportFactory: TransportFactory = (credentials) => {
   return nodemailer.createTransport({
     host: credentials.host,
@@ -72,9 +89,17 @@ export class EmailChannelProvider implements NotificationChannelProvider {
   private readonly logger = new Logger(EmailChannelProvider.name);
 
   constructor(
-    private readonly config: import('./notification-config.service').NotificationConfigService,
-    private readonly registry: import('./sms-provider-registry').SmsProviderRegistry,
-    private readonly createTransport: TransportFactory = defaultTransportFactory,
+    // `forwardRef` is required, not stylistic: `NotificationConfigService`
+    // calls this provider's `testSend`, so the two import each other. Without it
+    // the metadata is read while the other module is still half-loaded and the
+    // dependency comes back `undefined` — which crashed the whole application
+    // at boot. Do not "tidy" these into plain imports.
+    @Inject(forwardRef(() => NotificationConfigService))
+    private readonly config: NotificationConfigService,
+    private readonly registry: SmsProviderRegistry,
+    @Optional()
+    @Inject(SMTP_TRANSPORT_FACTORY)
+    private readonly createTransport?: TransportFactory,
   ) {}
 
   isConfigured(): boolean {
@@ -119,7 +144,7 @@ export class EmailChannelProvider implements NotificationChannelProvider {
 
     const credentials = active.credentials as unknown as SmtpCredentials;
     try {
-      const transport = this.createTransport(credentials);
+      const transport = (this.createTransport ?? defaultTransportFactory)(credentials);
       await transport.sendMail({
         from: credentials.from,
         to: target,
@@ -167,7 +192,7 @@ export class EmailChannelProvider implements NotificationChannelProvider {
 
     const credentials = config as unknown as SmtpCredentials;
     try {
-      const transport = this.createTransport(credentials);
+      const transport = (this.createTransport ?? defaultTransportFactory)(credentials);
       await transport.sendMail({
         from: credentials.from,
         to,
@@ -186,7 +211,7 @@ export class EmailChannelProvider implements NotificationChannelProvider {
 
   /** Exposed so the registry-free email path can reach the factory. */
   factory(): TransportFactory {
-    return this.createTransport;
+    return this.createTransport ?? defaultTransportFactory;
   }
 
   /** Unused by delivery, kept so `registry` is not an unused dependency. */

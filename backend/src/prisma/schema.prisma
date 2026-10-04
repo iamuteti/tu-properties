@@ -48,8 +48,8 @@ model Organization {
   // jurisdiction do the rest. `taxCountryCode` is ISO-3166-1 alpha-2 (KE, GB,
   // DE, US, ...); `taxRegionCode` is the optional sub-national level that many
   // countries actually tax by (US state, German Bundesland, Brazilian estado).
-  taxCountryCode String? @db.Char(2)
-  taxRegionCode  String?
+  taxCountryCode        String? @db.Char(2)
+  taxRegionCode         String?
   // VAT/GST/sales-tax registration number, printed on invoices where the law
   // requires it. Separate from `taxId`, which is the company registration.
   taxRegistrationNumber String?
@@ -60,44 +60,48 @@ model Organization {
   timezone String @default("Africa/Nairobi")
 
   // Relationships
-  users             User[]
-  properties        Property[]
-  tenants           Tenant[]
-  landlords         Landlord[]
-  leases            RentalAgreement[]
-  moveOutRequests   MoveOutRequest[]
-  invoices          Invoice[]
-  payments          Payment[]
-  receipts          Receipt[]
-  auditLogs         AuditLog[]
-  branches          Branch[]
-  roles             Role[]
-  documents         Document[]
-  leads             Lead[]
-  contacts          Contact[]
-  communicationLogs CommunicationLog[]
-  saleTransactions  SaleTransaction[]
-  commissions       Commission[]
-  leaseTemplates    LeaseTemplate[]
-  inspectionReports InspectionReport[]
-  tenantRequests    TenantRequest[]
-  ownerStatements   OwnerStatement[]
-  landlordPayouts   LandlordPayout[]
-  landlordCharges   LandlordCharge[]
-  accounts          Account[]
-  journalEntries    JournalEntry[]
-  customerCredits   CustomerCredit[]
-  paymentRefunds    PaymentRefund[]
-  creditNotes       CreditNote[]
-  taxRules          TaxRule[]
-  suppliers         Supplier[]
-  supplierBills     SupplierBill[]
-  billPayments      BillPayment[]
-  supplierCredits   SupplierCredit[]
-  recurringBillingRuns RecurringBillingRun[]
-  notifications       Notification[]
-  notificationPreferences NotificationPreference[]
+  users                      User[]
+  properties                 Property[]
+  tenants                    Tenant[]
+  landlords                  Landlord[]
+  leases                     RentalAgreement[]
+  moveOutRequests            MoveOutRequest[]
+  invoices                   Invoice[]
+  payments                   Payment[]
+  receipts                   Receipt[]
+  auditLogs                  AuditLog[]
+  branches                   Branch[]
+  roles                      Role[]
+  documents                  Document[]
+  leads                      Lead[]
+  contacts                   Contact[]
+  communicationLogs          CommunicationLog[]
+  saleTransactions           SaleTransaction[]
+  commissions                Commission[]
+  leaseTemplates             LeaseTemplate[]
+  inspectionReports          InspectionReport[]
+  tenantRequests             TenantRequest[]
+  ownerStatements            OwnerStatement[]
+  landlordPayouts            LandlordPayout[]
+  landlordCharges            LandlordCharge[]
+  accounts                   Account[]
+  journalEntries             JournalEntry[]
+  customerCredits            CustomerCredit[]
+  paymentRefunds             PaymentRefund[]
+  creditNotes                CreditNote[]
+  taxRules                   TaxRule[]
+  suppliers                  Supplier[]
+  supplierBills              SupplierBill[]
+  billPayments               BillPayment[]
+  supplierCredits            SupplierCredit[]
+  recurringBillingRuns       RecurringBillingRun[]
+  notifications              Notification[]
+  notificationPreferences    NotificationPreference[]
   notificationChannelConfigs NotificationChannelConfig[]
+  // Module 18 — Workflow Engine
+  workflowDefinitions        WorkflowDefinition[]
+  workflowInstances          WorkflowInstance[]
+  workflowDelegations        WorkflowDelegation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -149,21 +153,30 @@ model User {
   mfaSecret  String?
   mfaEnabled Boolean @default(false)
 
-  auditLogs             AuditLog[]
-  sessions              Session[]
-  roleAssignments       RoleAssignment[]
-  uploadedDocuments     Document[]
-  assignedLeads         Lead[]             @relation("UserAssignedLeads")
-  loggedCommunications  CommunicationLog[] @relation("UserLoggedCommunications")
-  sales                 SaleTransaction[]  @relation("UserSales")
-  commissions           Commission[]       @relation("UserCommissions")
-  approvedCommissions   Commission[]       @relation("UserApprovedCommissions")
-  approvedDeductions    MoveOutDeduction[]
-  completedInspections  InspectionReport[]
-  refundedMoveOuts      MoveOutRequest[]
-  decidedTenantRequests TenantRequest[]    @relation("UserDecidedTenantRequests")
-  notifications          Notification[]
+  auditLogs               AuditLog[]
+  sessions                Session[]
+  roleAssignments         RoleAssignment[]
+  uploadedDocuments       Document[]
+  assignedLeads           Lead[]                   @relation("UserAssignedLeads")
+  loggedCommunications    CommunicationLog[]       @relation("UserLoggedCommunications")
+  sales                   SaleTransaction[]        @relation("UserSales")
+  commissions             Commission[]             @relation("UserCommissions")
+  approvedCommissions     Commission[]             @relation("UserApprovedCommissions")
+  approvedDeductions      MoveOutDeduction[]
+  completedInspections    InspectionReport[]
+  refundedMoveOuts        MoveOutRequest[]
+  decidedTenantRequests   TenantRequest[]          @relation("UserDecidedTenantRequests")
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
+
+  // Module 18 — Workflow Engine: every "who did what to this approval" pointer.
+  startedWorkflows       WorkflowInstance[]   @relation("UserStartedWorkflows")
+  assignedWorkflowSteps  WorkflowStep[]       @relation("UserAssignedWorkflowSteps")
+  actedWorkflowSteps     WorkflowStep[]       @relation("UserActedWorkflowSteps")
+  workflowEventActors    WorkflowEvent[]      @relation("UserWorkflowEventActors")
+  workflowEventDelegates WorkflowEvent[]      @relation("UserWorkflowEventDelegates")
+  delegatedApprovalsOut  WorkflowDelegation[] @relation("UserWorkflowDelegatedFrom")
+  delegatedApprovalsIn   WorkflowDelegation[] @relation("UserWorkflowDelegatedTo")
 
   // Status
   @@index([portalTenantId])
@@ -398,7 +411,7 @@ model Landlord {
   invoices        Invoice[]
   receipts        Receipt[]
   credits         CustomerCredit[] @relation("LandlordCredits")
-  creditNotes     CreditNote[]    @relation("LandlordCreditNotes")
+  creditNotes     CreditNote[]     @relation("LandlordCreditNotes")
   ownerStatements OwnerStatement[]
   payouts         LandlordPayout[]
   charges         LandlordCharge[]
@@ -949,9 +962,9 @@ model Tenant {
   emergencyContacts TenantEmergencyContact[]
   receipts          Receipt[]
   moveOutRequests   MoveOutRequest[]
-  credits           CustomerCredit[] @relation("TenantCredits")
-  notifications     Notification[]    @relation("TenantNotifications")
-  creditNotes       CreditNote[]    @relation("TenantCreditNotes")
+  credits           CustomerCredit[]         @relation("TenantCredits")
+  notifications     Notification[]           @relation("TenantNotifications")
+  creditNotes       CreditNote[]             @relation("TenantCreditNotes")
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -1744,25 +1757,25 @@ model Invoice {
   // remain the single source of truth for the money; these record what the
   // engine decided and under whose jurisdiction, so a document issued in one
   // country is not silently re-read under another's rules.
-  taxJurisdiction String? // e.g. "KE", "US-CA" — snapshotted at issue
-  taxBasis        TaxBasis?
+  taxJurisdiction   String? // e.g. "KE", "US-CA" — snapshotted at issue
+  taxBasis          TaxBasis?
   /// Per-rule totals, e.g. [{ "code": "VAT", "rate": 16, "amount": 1600,
   /// "account": "2100" }]. JSON so a jurisdiction with three tax types does not
   /// need a migration to invoice its fourth.
-  taxSummary      Json?
+  taxSummary        Json?
   // Withholding tax collected on the invoice is deducted from what we remit,
   // never added to what the customer owes.
-  taxWithheldAmount Decimal @default(0) @db.Decimal(10, 2)
+  taxWithheldAmount Decimal   @default(0) @db.Decimal(10, 2)
 
   // Organization/Tenant association
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  invoiceItems InvoiceItem[]
-  payments     Payment[]
+  invoiceItems       InvoiceItem[]
+  payments           Payment[]
   creditApplications CreditApplication[]
-  creditNotes      CreditNote[]
+  creditNotes        CreditNote[]
   paymentAllocations PaymentAllocation[]
 
   // Audit fields
@@ -1809,11 +1822,11 @@ model InvoiceItem {
   // what the invoice was issued with; these record *which* rule produced them,
   // so an invoice dated under an old rate stays explicable after the rule
   // changes, and a mixed-tax invoice says which line was which.
-  taxRuleId String?
-  taxRule   TaxRule? @relation(fields: [taxRuleId], references: [id], onDelete: SetNull)
-  taxCode   String? // e.g. "VAT", "GST", "WHT" — snapshotted so the document
-                     // is readable even if the rule is renamed or deleted
-  taxBasis  TaxBasis?
+  taxRuleId    String?
+  taxRule      TaxRule?      @relation(fields: [taxRuleId], references: [id], onDelete: SetNull)
+  taxCode      String? // e.g. "VAT", "GST", "WHT" — snapshotted so the document
+  // is readable even if the rule is renamed or deleted
+  taxBasis     TaxBasis?
   taxTreatment TaxTreatment?
 
   // Additional classification
@@ -1951,10 +1964,9 @@ model Payment {
   appliedAmount Decimal @default(0) @db.Decimal(12, 2)
 
   // Module 8: refunds and the credits that overpayments create.
-  refunds        PaymentRefund[]
-  allocations    PaymentAllocation[]
-  sourceCredits  CustomerCredit[] @relation("CreditSourcePayments")
-
+  refunds       PaymentRefund[]
+  allocations   PaymentAllocation[]
+  sourceCredits CustomerCredit[]    @relation("CreditSourcePayments")
 
   // Organization/Tenant association
   organizationId String?
@@ -1973,6 +1985,7 @@ model Payment {
   @@index([organizationId])
   @@map("payments")
 }
+
 /// Module 8 — Payments: what part of a payment settled which invoice.
 ///
 /// Without this the only record of the split is `Invoice.paidAmount`, and the
@@ -2034,12 +2047,12 @@ enum DRTOrDRF {
 /// (or can read) each other's ledger structure. `code` is unique per
 /// organization, `type` drives the trial balance grouping.
 model Account {
-  id     String @id @default(cuid())
-  code   String
-  name   String
-  type   AccountType
-  subtype String?
-  description String? @db.Text
+  id          String      @id @default(cuid())
+  code        String
+  name        String
+  type        AccountType
+  subtype     String?
+  description String?     @db.Text
 
   // Normal balance of the account, used when rendering balances and when
   // validating manual journal entries.
@@ -2087,12 +2100,12 @@ enum BalanceSide {
 /// received) are auto-posted by `AccountingService`; entries created manually
 /// carry `source = MANUAL`.
 model JournalEntry {
-  id String @id @default(cuid())
+  id          String @id @default(cuid())
   entryNumber String
 
   entryDate DateTime @default(now())
 
-  memo String? @db.Text
+  memo      String? @db.Text
   reference String?
 
   source JournalEntrySource @default(MANUAL)
@@ -2106,10 +2119,10 @@ model JournalEntry {
 
   /// Reversal bookkeeping — a reversed entry keeps its lines and points at the
   /// reversing entry instead of being deleted, so history stays auditable.
-  reversedByEntryId String?   @unique
-  reversedByEntry   JournalEntry?  @relation("EntryReversal", fields: [reversedByEntryId], references: [id], onDelete: SetNull)
-  reversesEntryId   String?   @unique
-  reversesEntry     JournalEntry?  @relation("EntryReversal")
+  reversedByEntryId String?       @unique
+  reversedByEntry   JournalEntry? @relation("EntryReversal", fields: [reversedByEntryId], references: [id], onDelete: SetNull)
+  reversesEntryId   String?       @unique
+  reversesEntry     JournalEntry? @relation("EntryReversal")
 
   postedBy String?
   postedAt DateTime?
@@ -2151,7 +2164,7 @@ enum JournalEntryStatus {
 /// One side of a journal entry. Exactly one of debit/credit is non-zero; the
 /// entry as a whole must balance (see `AccountingService.postEntry`).
 model JournalLine {
-  id String @id @default(cuid())
+  id      String       @id @default(cuid())
   entryId String
   entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
@@ -2184,7 +2197,7 @@ model JournalLine {
 /// against invoices — the usable balance is the difference. Credits are spent
 /// oldest-invoice-first by `CreditsService`.
 model CustomerCredit {
-  id String @id @default(cuid())
+  id            String  @id @default(cuid())
   amount        Decimal @db.Decimal(12, 2)
   appliedAmount Decimal @default(0) @db.Decimal(12, 2)
   currency      String  @default("KES")
@@ -2199,10 +2212,10 @@ model CustomerCredit {
 
   // Who the credit belongs to. At least one of these (or `customerName`) is
   // set: credit is meaningless if you cannot say whose it is.
-  tenantId    String?
-  tenant      Tenant?   @relation("TenantCredits", fields: [tenantId], references: [id], onDelete: SetNull)
-  landlordId  String?
-  landlord    Landlord? @relation("LandlordCredits", fields: [landlordId], references: [id], onDelete: SetNull)
+  tenantId     String?
+  tenant       Tenant?   @relation("TenantCredits", fields: [tenantId], references: [id], onDelete: SetNull)
+  landlordId   String?
+  landlord     Landlord? @relation("LandlordCredits", fields: [landlordId], references: [id], onDelete: SetNull)
   customerName String?
 
   status CreditStatus @default(OPEN)
@@ -2241,7 +2254,7 @@ enum CreditStatus {
 /// One consumption of a credit against one invoice. Kept as rows (not a
 /// counter alone) so "which invoice did this credit pay?" is answerable.
 model CreditApplication {
-  id String @id @default(cuid())
+  id       String         @id @default(cuid())
   creditId String
   credit   CustomerCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
 
@@ -2263,7 +2276,7 @@ model CreditApplication {
 /// and links to the credit note the refund produces, so the audit trail reads
 /// "they paid, we refunded", not "the payment never happened".
 model PaymentRefund {
-  id String @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
@@ -2274,7 +2287,7 @@ model PaymentRefund {
   reason String  @db.Text
 
   refundReference String?
-  processedAt DateTime @default(now())
+  processedAt     DateTime @default(now())
   processedBy     String?
 
   creditNoteId String?     @unique
@@ -2292,7 +2305,7 @@ model PaymentRefund {
 /// write-offs and corrections. Applying a credit note leaves a credit balance
 /// rather than pushing a negative amount onto an invoice.
 model CreditNote {
-  id String @id @default(cuid())
+  id               String @id @default(cuid())
   creditNoteNumber String @unique
 
   organizationId String?
@@ -2304,20 +2317,20 @@ model CreditNote {
 
   refund PaymentRefund?
 
-  tenantId    String?
-  tenant      Tenant?   @relation("TenantCreditNotes", fields: [tenantId], references: [id], onDelete: SetNull)
-  landlordId  String?
-  landlord    Landlord? @relation("LandlordCreditNotes", fields: [landlordId], references: [id], onDelete: SetNull)
+  tenantId   String?
+  tenant     Tenant?   @relation("TenantCreditNotes", fields: [tenantId], references: [id], onDelete: SetNull)
+  landlordId String?
+  landlord   Landlord? @relation("LandlordCreditNotes", fields: [landlordId], references: [id], onDelete: SetNull)
 
   issueDate DateTime @default(now())
 
-  reason String @db.Text
+  reason String  @db.Text
   notes  String? @db.Text
 
-  subtotal   Decimal @db.Decimal(12, 2)
-  vatAmount  Decimal @default(0) @db.Decimal(12, 2)
+  subtotal    Decimal @db.Decimal(12, 2)
+  vatAmount   Decimal @default(0) @db.Decimal(12, 2)
   totalAmount Decimal @db.Decimal(12, 2)
-  currency   String  @default("KES")
+  currency    String  @default("KES")
 
   status CreditNoteStatus @default(ISSUED)
 
@@ -2339,7 +2352,7 @@ enum CreditNoteStatus {
 }
 
 model CreditNoteLine {
-  id String @id @default(cuid())
+  id           String     @id @default(cuid())
   creditNoteId String
   creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
 
@@ -2366,9 +2379,9 @@ model CreditNoteLine {
 /// (VAT plus a withholding tax, or a standard and a reduced rate), which is why
 /// calculation is a small pipeline rather than a single multiplication.
 model TaxRule {
-  id String @id @default(cuid())
-  code String
-  name String
+  id          String  @id @default(cuid())
+  code        String
+  name        String
   description String? @db.Text
 
   // ISO-3166-1 alpha-2 country the rule belongs to (KE, GB, DE, ...). A null
@@ -2393,7 +2406,7 @@ model TaxRule {
   /// Tax charged on top of another tax (EU-style compound VAT, or an Indian
   /// GST-on-service-fee). `compoundOnRuleId` names the rule it stacks onto;
   /// the engine rejects a compound rule with nothing to compound on.
-  isCompound Boolean @default(false)
+  isCompound       Boolean   @default(false)
   compoundOnRuleId String?
   compoundOnRule   TaxRule?  @relation("CompoundTax", fields: [compoundOnRuleId], references: [id], onDelete: SetNull)
   compoundsOn      TaxRule[] @relation("CompoundTax")
@@ -2431,8 +2444,9 @@ model TaxRule {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  invoiceItems InvoiceItem[]
 
   // Identity of a rule: one tax, in one place, for one line category, from one
   // date. `appliesToCategory` is part of it because a standard and a reduced
@@ -2441,7 +2455,6 @@ model TaxRule {
   @@unique([organizationId, code, countryCode, regionCode, appliesToCategory, validFrom])
   @@index([organizationId])
   @@index([countryCode])
-  invoiceItems InvoiceItem[]
   @@map("tax_rules")
 }
 
@@ -2468,20 +2481,20 @@ enum TaxTreatment {
 /// is the same shape as a tenant who overpaid us — `SupplierCredit` is the
 /// payable-side counterpart of `CustomerCredit`.
 model Supplier {
-  id String @id @default(cuid())
+  id   String @id @default(cuid())
   code String @unique
   name String
 
   status SupplierStatus @default(ACTIVE)
 
-  email String?
-  phone String?
+  email   String?
+  phone   String?
   address String? @db.Text
-  city   String?
+  city    String?
   country String?
 
   /// VAT/GST registration — printed on bills where the law requires it.
-  taxPin String?
+  taxPin        String?
   vatRegistered Boolean @default(false)
 
   /// Terms in days, used to derive `dueDate` from the bill date.
@@ -2497,12 +2510,12 @@ model Supplier {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  bills        SupplierBill[]
-  credits      SupplierCredit[]
+  bills   SupplierBill[]
+  credits SupplierCredit[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([organizationId])
   @@index([name])
@@ -2538,7 +2551,7 @@ enum BillCategory {
 }
 
 model SupplierBill {
-  id String @id @default(cuid())
+  id         String @id @default(cuid())
   billNumber String
 
   organizationId String?
@@ -2558,8 +2571,8 @@ model SupplierBill {
 
   category BillCategory @default(OTHER)
 
-  subtotal  Decimal @db.Decimal(14, 2)
-  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+  subtotal    Decimal @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
   totalAmount Decimal @db.Decimal(14, 2)
 
   paidAmount    Decimal @default(0) @db.Decimal(14, 2)
@@ -2570,7 +2583,7 @@ model SupplierBill {
   /// Tax provenance, mirroring invoices: the bill snapshots what the rules
   /// decided so a later rule change cannot rewrite a document already paid.
   taxJurisdiction String?
-  taxSummary     Json?
+  taxSummary      Json?
 
   /// Snapshot of the expense lines, so a VOID or corrected bill still explains
   /// itself after the supplier's own references change.
@@ -2578,8 +2591,8 @@ model SupplierBill {
 
   notes String? @db.Text
 
-  lines        SupplierBillLine[]
-  payments     BillPayment[]
+  lines              SupplierBillLine[]
+  payments           BillPayment[]
   creditApplications SupplierCreditApplication[]
 
   createdAt DateTime @default(now())
@@ -2597,7 +2610,7 @@ model SupplierBill {
 }
 
 model SupplierBillLine {
-  id String @id @default(cuid())
+  id     String       @id @default(cuid())
   billId String
   bill   SupplierBill @relation(fields: [billId], references: [id], onDelete: Cascade)
 
@@ -2626,20 +2639,20 @@ model SupplierBillLine {
 /// receivable-side record: a bill payment settles `SupplierBill`, not an
 /// `Invoice`, and conflating them is how an AP total ends up wrong.
 model BillPayment {
-  id String @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   billId String
   bill   SupplierBill @relation(fields: [billId], references: [id], onDelete: Cascade)
 
-  amount Decimal @db.Decimal(14, 2)
-  currency String @default("KES")
+  amount   Decimal @db.Decimal(14, 2)
+  currency String  @default("KES")
 
-  paymentDate DateTime @default(now())
+  paymentDate DateTime      @default(now())
   method      PaymentMethod @default(BANK_TRANSFER)
   reference   String?
-  notes       String? @db.Text
+  notes       String?       @db.Text
 
   /// How much of this payment is pointed at an invoice-equivalent bill; the
   /// remainder is credit owed back to us by the supplier.
@@ -2664,12 +2677,12 @@ model BillPayment {
 /// What a supplier owes us back — we overpaid, or returned goods. Spent against
 /// their next bills, oldest first, exactly as `CustomerCredit` is.
 model SupplierCredit {
-  id String @id @default(cuid())
+  id            String  @id @default(cuid())
   amount        Decimal @db.Decimal(14, 2)
   appliedAmount Decimal @default(0) @db.Decimal(14, 2)
   currency      String  @default("KES")
 
-  reason String? @db.Text
+  reason String?              @db.Text
   source SupplierCreditSource @default(OVERPAYMENT)
 
   supplierId String?
@@ -2706,7 +2719,7 @@ enum SupplierCreditSource {
 }
 
 model SupplierCreditApplication {
-  id String @id @default(cuid())
+  id       String         @id @default(cuid())
   creditId String
   credit   SupplierCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
 
@@ -2736,7 +2749,7 @@ model SupplierCreditApplication {
 /// below, "already sent today" is a database fact rather than a check the
 /// scheduler has to remember to do.
 model Notification {
-  id String @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
@@ -2749,7 +2762,7 @@ model Notification {
   tenant   Tenant? @relation("TenantNotifications", fields: [tenantId], references: [id], onDelete: Cascade)
 
   type     NotificationType
-  channel  NotificationChannel @default(IN_APP)
+  channel  NotificationChannel  @default(IN_APP)
   priority NotificationPriority @default(NORMAL)
 
   title String
@@ -2768,10 +2781,10 @@ model Notification {
   /// Stable key for "this exact reminder, for this day". Null disables dedupe.
   dedupeKey String?
 
-  sentAt      DateTime?
-  readAt      DateTime?
-  failedAt    DateTime?
-  errorMessage String? @db.Text
+  sentAt       DateTime?
+  readAt       DateTime?
+  failedAt     DateTime?
+  errorMessage String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2794,6 +2807,10 @@ enum NotificationType {
   REQUEST_WITHDRAWN
   MAINTENANCE_UPDATE
   APPROVAL_REQUESTED
+  // Module 18: the two facts an approval queue needs to tell apart — a decision
+  // was made on a request, or a level blew its SLA and moved up a level.
+  APPROVAL_DECIDED
+  APPROVAL_ESCALATED
   OWNER_STATEMENT_READY
   PAYOUT_PAID
   CUSTOM
@@ -2835,7 +2852,7 @@ enum NotificationStatus {
 /// secrets to a readable column has turned every database backup into a
 /// credential leak.
 model NotificationChannelConfig {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -2875,11 +2892,11 @@ model NotificationPreference {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  type     NotificationType
-  inApp    Boolean @default(true)
-  email    Boolean @default(true)
-  sms      Boolean @default(true)
-  push     Boolean @default(true)
+  type  NotificationType
+  inApp Boolean          @default(true)
+  email Boolean          @default(true)
+  sms   Boolean          @default(true)
+  push  Boolean          @default(true)
 
   updatedAt DateTime @updatedAt
 
@@ -2895,7 +2912,7 @@ model RecurringBillingRun {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   /// The day the run was for, e.g. "2026-10-01".
-  billingDate DateTime
+  billingDate   DateTime
   /// The period billed, e.g. "2026-10".
   billingPeriod String
 
@@ -2906,10 +2923,10 @@ model RecurringBillingRun {
   /// Per-lease outcome, including why a lease was skipped or what it failed on.
   details Json?
 
-  status RecurringRunStatus @default(COMPLETED)
-  errorMessage String? @db.Text
+  status       RecurringRunStatus @default(COMPLETED)
+  errorMessage String?            @db.Text
 
-  startedAt DateTime @default(now())
+  startedAt  DateTime  @default(now())
   finishedAt DateTime?
 
   triggeredBy String? // null for the scheduled run
@@ -2945,4 +2962,271 @@ model ReceiptLine {
 
   @@index([receiptId])
   @@map("receipt_lines")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Module 18 — Workflow Engine
+//
+// Multi-step approvals as configuration, not code. The reason this exists is
+// that "who signs off a refund, and when" is a policy an organization decides
+// and changes; hardcoding it into a finance service means every customer gets
+// our policy. The engine knows nothing about refunds, leases or work orders —
+// it moves a request from one named approver to the next and reports the result.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The policy: "for this kind of request, these are the approval levels, in
+/// this order, with these conditions".
+///
+/// `organizationId = null` marks a **system default** available to every
+/// organization (seeded by the platform); a non-null value is that
+/// organization's own policy and shadows the default. Resolution is
+/// org-specific-first, then system default, highest `priority` wins.
+///
+/// `steps` is the ordered template, one entry per level:
+///   { "name": "Finance review",
+///     "approverKind": "ROLE",            // or "USER"
+///     "approverRole": "Accountant",      // matched against system role names
+///     "approverUserId": null,            // required when approverKind = USER
+///     "condition": { "field": "amount", "op": "gt", "value": 50000 },
+///     "escalateAfterHours": 24,
+///     "escalateToUserId": null }
+/// A level whose `condition` is false is skipped rather than blocking, which is
+/// how "director approval only above 50,000" is expressed.
+model WorkflowDefinition {
+  id String @id @default(cuid())
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// What kind of request this governs: "REFUND", "EXPENSE", "LEASE",
+  /// "PURCHASE_ORDER", "WORK_ORDER", "PAYOUT", ... Free-form on purpose — a new
+  /// entity type is a definition row, not a migration.
+  entityType String
+
+  name        String
+  description String? @db.Text
+
+  steps Json
+
+  isActive Boolean @default(true)
+
+  /// Tie-breaker when more than one definition matches. Higher wins.
+  priority Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  instances WorkflowInstance[]
+
+  @@index([organizationId, entityType])
+  @@index([entityType])
+  @@map("workflow_definitions")
+}
+
+/// One request travelling through a definition. `context` is the payload the
+/// caller supplied (the amount, the reason, whatever the completion handler
+/// needs) and is also what step `condition`s are evaluated against.
+///
+/// `workflowDefinitionId` is nullable **on purpose**: deleting a policy must not
+/// delete approvals that are already in flight. The instance keeps its own copy
+/// of what it is doing, and a running approval survives its definition being
+/// retired.
+model WorkflowInstance {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  workflowDefinitionId String?
+  workflowDefinition   WorkflowDefinition? @relation(fields: [workflowDefinitionId], references: [id], onDelete: SetNull)
+
+  entityType String
+  entityId   String
+
+  /// Denormalized one-liner for the approvals inbox, so the queue does not have
+  /// to join back into whatever table the entity lives in.
+  entityLabel String?
+
+  /// Frozen copy of the definition's steps as they were when this started.
+  /// Editing a policy must not rewrite the approvals already raised under it.
+  steps Json
+
+  /// What the caller asked for — the amount, the reason, whatever the completion
+  /// handler needs — and what every step `condition` is evaluated against.
+  /// Frozen with the instance, so a later change to the record cannot quietly
+  /// move an approval across a threshold.
+  context Json
+
+  status      WorkflowInstanceStatus @default(IN_PROGRESS)
+  currentStep Int                    @default(0)
+
+  finalComment String? @db.Text
+
+  startedById String?
+  startedBy   User?   @relation("UserStartedWorkflows", fields: [startedById], references: [id], onDelete: SetNull)
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stepInstances WorkflowStep[]
+  events        WorkflowEvent[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([entityType, entityId])
+  @@index([startedById])
+  @@map("workflow_instances")
+}
+
+enum WorkflowInstanceStatus {
+  IN_PROGRESS
+  /// The current level blew its SLA and the decision was handed to somebody
+  /// higher up. Still actionable — an escalated approval is a late approval, not
+  /// a dead one.
+  ESCALATED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// One materialized approval level of an instance. This is a row rather than
+/// JSON because the inbox has to answer "what is waiting on me", and delegation
+/// and escalation have to survive a process restart.
+model WorkflowStep {
+  id         String           @id @default(cuid())
+  instanceId String
+  instance   WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  stepIndex Int
+  name      String
+
+  approverKind   WorkflowApproverKind @default(ROLE)
+  /// Set when approverKind = USER.
+  approverUserId String?
+  /// Set when approverKind = ROLE. Matched against `Role.name` and the legacy
+  /// `UserRole` enum value, case-insensitively, because role names are still
+  /// not mapped onto the enum (master doc issue 51).
+  approverRole   String?
+
+  status WorkflowStepStatus @default(PENDING)
+
+  /// When the level's SLA expires and the sweep escalates it.
+  dueAt            DateTime?
+  escalatedAt      DateTime?
+  /// Who the level escalates to once overdue. Null = flag only.
+  escalateToUserId String?
+
+  /// The decision, and who made it. `actedById` differs from the assignee when
+  /// somebody acted under a delegation, which is worth being able to see.
+  actedById            String?
+  actedAt              DateTime?
+  actedViaDelegationId String?
+  comment              String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  actedBy            User?               @relation("UserActedWorkflowSteps", fields: [actedById], references: [id], onDelete: SetNull)
+  approverUser       User?               @relation("UserAssignedWorkflowSteps", fields: [approverUserId], references: [id], onDelete: SetNull)
+  actedViaDelegation WorkflowDelegation? @relation(fields: [actedViaDelegationId], references: [id], onDelete: SetNull)
+
+  @@unique([instanceId, stepIndex])
+  @@index([approverUserId, status])
+  @@index([status, dueAt])
+  @@map("workflow_steps")
+}
+
+enum WorkflowApproverKind {
+  ROLE
+  USER
+}
+
+enum WorkflowStepStatus {
+  PENDING
+  /// Waiting on somebody now.
+  ACTIVE
+  APPROVED
+  REJECTED
+  /// Past its SLA. Still decidable — see WorkflowInstanceStatus.ESCALATED.
+  ESCALATED
+  /// Its condition was false, so this level was never required.
+  SKIPPED
+}
+
+/// The immutable trail: who asked, who decided, who escalated, who delegated,
+/// with the comment each of those carried. `WorkflowStep` records only the
+/// decision itself, which is not the same as a readable history.
+model WorkflowEvent {
+  id         String           @id @default(cuid())
+  instanceId String
+  instance   WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  type WorkflowEventType
+
+  actorUserId String?
+
+  /// Set when a delegate acted on the assignee's behalf.
+  onBehalfOfUserId String?
+
+  /// The delegation that authorised the delegate, when there was one.
+  delegationId String?
+
+  stepIndex Int?
+  comment   String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  actorUser      User?               @relation("UserWorkflowEventActors", fields: [actorUserId], references: [id], onDelete: SetNull)
+  onBehalfOfUser User?               @relation("UserWorkflowEventDelegates", fields: [onBehalfOfUserId], references: [id], onDelete: SetNull)
+  delegation     WorkflowDelegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
+
+  @@index([instanceId])
+  @@index([createdAt])
+  @@map("workflow_events")
+}
+
+enum WorkflowEventType {
+  STARTED
+  APPROVED
+  REJECTED
+  ESCALATED
+  DELEGATED
+  CANCELLED
+  SKIPPED
+  /// No definition was configured, so the request went straight through. Kept
+  /// explicitly rather than silently: "it was approved because nobody set up a
+  /// policy" is a fact an auditor needs to be able to see.
+  AUTO_APPROVED
+}
+
+/// "While I am on leave, Sarah approves what is waiting on me." Checked at the
+/// moment of the decision, not when the task arrived, so a delegation created
+/// after the fact still applies and one that has expired does not.
+model WorkflowDelegation {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fromUserId String
+  fromUser   User   @relation("UserWorkflowDelegatedFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+
+  toUserId String
+  toUser   User   @relation("UserWorkflowDelegatedTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime  @default(now())
+  endsAt   DateTime?
+  reason   String?   @db.Text
+
+  createdAt DateTime @default(now())
+
+  actedSteps WorkflowStep[]
+  events     WorkflowEvent[]
+
+  @@index([organizationId])
+  @@index([fromUserId, toUserId])
+  @@map("workflow_delegations")
 }

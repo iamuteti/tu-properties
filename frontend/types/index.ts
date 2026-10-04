@@ -1622,3 +1622,164 @@ export interface TenantRequest {
     } | null;
     decidedBy?: { id: string; firstName: string; lastName: string } | null;
 }
+
+// ============================================
+// WORKFLOW ENGINE (Module 18)
+// ============================================
+
+export type WorkflowInstanceStatus =
+    | 'IN_PROGRESS'
+    | 'ESCALATED'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'CANCELLED';
+
+export type WorkflowStepStatus =
+    | 'PENDING'
+    | 'ACTIVE'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'ESCALATED'
+    | 'SKIPPED';
+
+export type WorkflowApproverKind = 'ROLE' | 'USER';
+
+export type WorkflowEventType =
+    | 'STARTED'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'ESCALATED'
+    | 'DELEGATED'
+    | 'CANCELLED'
+    | 'SKIPPED'
+    | 'AUTO_APPROVED';
+
+export interface WorkflowCondition {
+    field: string;
+    op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'exists';
+    value?: unknown;
+}
+
+/** One level of a policy, as stored on a definition and frozen onto an instance. */
+export interface WorkflowStepTemplate {
+    name: string;
+    approverKind: WorkflowApproverKind;
+    approverUserId?: string | null;
+    approverRole?: string | null;
+    condition?: WorkflowCondition | null;
+    escalateAfterHours?: number | null;
+    escalateToUserId?: string | null;
+}
+
+export interface WorkflowDefinition {
+    id: string;
+    organizationId: string | null;
+    entityType: string;
+    name: string;
+    description?: string | null;
+    steps: WorkflowStepTemplate[];
+    isActive: boolean;
+    priority: number;
+    createdAt: string;
+    organization?: { id: string; name: string } | null;
+    _count?: { instances: number };
+}
+
+export interface WorkflowStep {
+    id: string;
+    stepIndex: number;
+    name: string;
+    approverKind: WorkflowApproverKind;
+    approverUserId?: string | null;
+    approverRole?: string | null;
+    status: WorkflowStepStatus;
+    dueAt?: string | null;
+    escalatedAt?: string | null;
+    escalateToUserId?: string | null;
+    actedById?: string | null;
+    actedAt?: string | null;
+    comment?: string | null;
+    actedViaDelegationId?: string | null;
+}
+
+export interface WorkflowEvent {
+    id: string;
+    type: WorkflowEventType;
+    stepIndex?: number | null;
+    comment?: string | null;
+    createdAt: string;
+    actorUserId?: string | null;
+    actorUser?: { id: string; firstName: string; lastName: string } | null;
+    onBehalfOfUser?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface WorkflowInstance {
+    id: string;
+    organizationId: string;
+    entityType: string;
+    entityId: string;
+    entityLabel?: string | null;
+    /** What the requester asked for, and what level conditions are read against. */
+    context: Record<string, unknown>;
+    status: WorkflowInstanceStatus;
+    currentStep: number;
+    finalComment?: string | null;
+    startedById?: string | null;
+    startedAt: string;
+    completedAt?: string | null;
+    createdAt: string;
+    stepInstances: WorkflowStep[];
+    events: WorkflowEvent[];
+    startedBy?: { id: string; firstName: string; lastName: string; email?: string } | null;
+    workflowDefinition?: { id: string; name: string; entityType: string } | null;
+    /** Only on the response that started a request with no policy configured. */
+    autoApproved?: boolean;
+    note?: string | null;
+    /** What the approval actually did (e.g. the refund it issued). */
+    effect?: Record<string, unknown> | null;
+}
+
+/** A level waiting on this person, as the inbox sees it. */
+export interface ApprovalTask {
+    stepId: string;
+    instanceId: string;
+    stepIndex: number;
+    stepName: string;
+    status: WorkflowStepStatus;
+    dueAt?: string | null;
+    escalatedAt?: string | null;
+    overdue: boolean;
+    viaDelegation: boolean;
+    onBehalfOfUserId?: string | null;
+    viaOverride: boolean;
+    entityType: string;
+    entityId: string;
+    entityLabel?: string | null;
+    context: Record<string, unknown>;
+    requestedAt: string;
+    requestedBy?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface ApprovalInbox {
+    pending: ApprovalTask[];
+    requestedByMe: WorkflowInstance[];
+    counts: {
+        pending: number;
+        overdue: number;
+        escalated: number;
+        requested: number;
+    };
+}
+
+export interface WorkflowDelegation {
+    id: string;
+    organizationId: string;
+    fromUserId: string;
+    toUserId: string;
+    startsAt: string;
+    endsAt?: string | null;
+    reason?: string | null;
+    createdAt: string;
+    toUser?: { id: string; firstName: string; lastName: string; email?: string };
+    fromUser?: { id: string; firstName: string; lastName: string; email?: string };
+}

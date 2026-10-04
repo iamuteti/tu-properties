@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AxiosError } from "axios";
-import { Undo2 } from "lucide-react";
+import { toast } from "sonner";
+import { Clock, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,20 +18,32 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { financeApi, PaymentRefund, refundsApi } from "@/lib/api";
-import { Payment } from "@/types";
+import { financeApi, PaymentRefund, refundsApi, workflowsApi } from "@/lib/api";
+import { WORKFLOW_STATUS_META } from "@/lib/constants";
+import { Payment, WorkflowInstance } from "@/types";
 
 const money = (value: number | string) =>
     Number(value).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
- * Refunds (Module 8). A payment is never deleted to undo money — a refund
- * records the direction, issues a credit note, and re-opens exactly the invoice
- * balance it closed. Only payments that are live and still have refundable
- * money are offered here.
+ * Refunds (Module 8), routed through the approval engine (Module 18).
+ *
+ * A payment is never deleted to undo money — a refund records the direction,
+ * issues a credit note, and re-opens exactly the invoice balance it closed.
+ *
+ * What changed in Module 18 is *who decides*. This form used to move money on
+ * submit, which made the person pressing the button the person signing it off.
+ * It now raises a request: the refund itself is issued when the last level
+ * approves, inside the same transaction as that decision. Where no policy is
+ * configured it is processed directly, exactly as before — so this is not a gate
+ * an organization cannot open.
+ *
+ * Requests still waiting are listed above the ones already issued, because a
+ * request that has not moved money is not a refund and must not look like one.
  */
 export default function RefundsPage() {
     const [refunds, setRefunds] = useState<PaymentRefund[]>([]);
+    const [pending, setPending] = useState<WorkflowInstance[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -43,12 +57,20 @@ export default function RefundsPage() {
         setIsLoading(true);
         setError(null);
         try {
-            const [refundsResponse, paymentsResponse] = await Promise.all([
+            const [refundsResponse, paymentsResponse, instances] = await Promise.all([
                 refundsApi.findAll(),
                 financeApi.findAllPayments(),
+                // Requests that have not been decided yet. Best-effort: a viewer
+                // without `workflows.view` should still see the refund list.
+                workflowsApi.instances({
+                    entityType: 'REFUND',
+                    status: 'IN_PROGRESS',
+                    limit: 20,
+                }).catch(() => null),
             ]);
             setRefunds(refundsResponse.data);
             setPayments(paymentsResponse.data);
+            if (instances) setPending(instances.data.data);
         } catch (err) {
             setError(
                 err instanceof AxiosError
@@ -89,17 +111,33 @@ export default function RefundsPage() {
         setIsSubmitting(true);
         setError(null);
         try {
-            await refundsApi.create({
+            const created = (await refundsApi.create({
                 paymentId: selectedPaymentId,
                 amount: Number(amount),
                 reason,
                 refundReference: reference || undefined,
-            });
+            })).data;
             setAmount("");
             setReason("");
             setReference("");
             setSelectedPaymentId("");
-            fetchData();
+            await fetchData();
+            // Money going back out is the one thing in this module worth two
+            // people agreeing to, so the request now waits for a decision
+            // instead of moving on the spot. Say which of the two happened —
+            // "recorded" would be a lie when it is still waiting.
+            if (created.autoApproved) {
+                toast.success("Refund recorded", {
+                    description:
+                        created.note ??
+                        "No approval policy applied, so it was processed directly.",
+                });
+            } else {
+                toast.success("Refund requested", {
+                    description: "It is now waiting for approval. Nothing has moved yet.",
+                });
+                setPending((list) => [created, ...list]);
+            }
         } catch (err) {
             setError(
                 err instanceof AxiosError
@@ -122,7 +160,7 @@ export default function RefundsPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">Record a refund</CardTitle>
+                    <CardTitle className="text-lg">Request a refund</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-4">
@@ -185,26 +223,91 @@ export default function RefundsPage() {
                         <div className="flex items-end">
                             <Button type="submit" disabled={isSubmitting || !selectedPaymentId}>
                                 <Undo2 className="mr-2 h-4 w-4" />
-                                {isSubmitting ? "Recording..." : "Record refund"}
+                                {isSubmitting ? "Requesting..." : "Request refund"}
                             </Button>
                         </div>
                     </form>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                        This does not move money on its own. It asks whoever your
+                        approval policy names to sign it off; the refund is issued when
+                        they do.
+                    </p>
                 </CardContent>
             </Card>
 
             {error && <div className="text-destructive text-sm">{error}</div>}
+
+            {pending.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Clock className="h-4 w-4" aria-hidden="true" />
+                            Awaiting approval
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Requested</TableHead>
+                                    <TableHead>Reason</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {pending.map((request) => {
+                                    const meta = WORKFLOW_STATUS_META[request.status];
+                                    return (
+                                        <TableRow key={request.id}>
+                                            <TableCell>
+                                                {new Date(request.startedAt).toLocaleDateString()}
+                                            </TableCell>
+                                            <TableCell className="max-w-xs truncate">
+                                                {String(request.context?.reason ?? "—")}
+                                            </TableCell>
+                                            <TableCell>
+                                                <span
+                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                                        meta?.className ?? "bg-slate-100"
+                                                    }`}
+                                                >
+                                                    {meta?.label ?? request.status}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                {money(String(request.context?.amount ?? 0))}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                            Nothing here has moved money yet.{" "}
+                            <Link href="/approvals" className="underline">
+                                Open approvals
+                            </Link>{" "}
+                            to follow them.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {isLoading ? (
                 <div>Loading refunds...</div>
             ) : refunds.length === 0 ? (
                 <Card>
                     <CardContent className="py-10 text-center text-muted-foreground">
-                        No refunds recorded.
+                        No refunds recorded yet.
                     </CardContent>
                 </Card>
             ) : (
                 <Card>
-                    <CardContent className="pt-6">
+                    <CardHeader>
+                        <CardTitle className="text-lg">Refunds issued</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>

@@ -426,3 +426,120 @@ export const STATEMENT_PERIOD_PRESETS: Array<{
     { value: 'last-quarter', label: 'Last quarter' },
     { value: 'custom', label: 'Custom dates' },
 ];
+
+// ============================================
+// WORKFLOW ENGINE (Module 18)
+// ============================================
+
+/**
+ * What a request's status means, in words an approver can act on.
+ *
+ * `ESCALATED` is deliberately *not* a dead end: a level that blew its deadline
+ * has been handed to somebody higher up and can still be decided.
+ */
+export const WORKFLOW_STATUS_META: Record<
+    string,
+    { label: string; className: string; description: string }
+> = {
+    IN_PROGRESS: {
+        label: 'Waiting',
+        className: 'bg-amber-100 text-amber-800',
+        description: 'Somebody still has to decide this.',
+    },
+    ESCALATED: {
+        label: 'Escalated',
+        className: 'bg-orange-100 text-orange-800',
+        description: 'It missed its deadline and was handed to somebody higher up.',
+    },
+    APPROVED: {
+        label: 'Approved',
+        className: 'bg-emerald-100 text-emerald-700',
+        description: 'Every level that had to sign off has.',
+    },
+    REJECTED: {
+        label: 'Rejected',
+        className: 'bg-red-100 text-red-700',
+        description: 'Somebody declined it. The note explains why.',
+    },
+    CANCELLED: {
+        label: 'Withdrawn',
+        className: 'bg-slate-100 text-slate-600',
+        description: 'The person who raised it pulled it back.',
+    },
+};
+
+export const WORKFLOW_STEP_STATUS_META: Record<
+    string,
+    { label: string; className: string }
+> = {
+    PENDING: { label: 'Not started', className: 'bg-slate-100 text-slate-600' },
+    ACTIVE: { label: 'Waiting on you', className: 'bg-amber-100 text-amber-800' },
+    APPROVED: { label: 'Approved', className: 'bg-emerald-100 text-emerald-700' },
+    REJECTED: { label: 'Rejected', className: 'bg-red-100 text-red-700' },
+    ESCALATED: { label: 'Escalated', className: 'bg-orange-100 text-orange-800' },
+    SKIPPED: { label: 'Did not apply', className: 'bg-slate-100 text-slate-500' },
+};
+
+export const WORKFLOW_EVENT_LABELS: Record<string, string> = {
+    STARTED: 'Requested',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
+    ESCALATED: 'Escalated',
+    DELEGATED: 'Delegated',
+    CANCELLED: 'Withdrawn',
+    SKIPPED: 'Skipped',
+    AUTO_APPROVED: 'Processed without approval',
+};
+
+/**
+ * Entity types the engine knows how to carry. Free-form in the database — a new
+ * type is a policy row, not a migration — so this is for the picker's benefit.
+ */
+export const WORKFLOW_ENTITY_TYPES: Array<{ value: string; label: string }> = [
+    { value: 'REFUND', label: 'Refund (money going back out)' },
+    { value: 'EXPENSE', label: 'Expense' },
+    { value: 'PAYOUT', label: 'Landlord payout' },
+    { value: 'WRITE_OFF', label: 'Write-off' },
+    { value: 'DISCOUNT', label: 'Discount' },
+    { value: 'LEASE', label: 'Lease' },
+    { value: 'PURCHASE_ORDER', label: 'Purchase order' },
+    { value: 'WORK_ORDER', label: 'Work order' },
+];
+
+export const WORKFLOW_CONDITION_OPS: Array<{ value: string; label: string }> = [
+    { value: 'gt', label: 'is greater than' },
+    { value: 'gte', label: 'is at least' },
+    { value: 'lt', label: 'is less than' },
+    { value: 'lte', label: 'is at most' },
+    { value: 'eq', label: 'equals' },
+    { value: 'neq', label: 'does not equal' },
+    { value: 'in', label: 'is one of' },
+    { value: 'contains', label: 'contains' },
+    { value: 'exists', label: 'is present' },
+];
+
+/** Context keys an approver is most likely to need, by entity type. */
+export const WORKFLOW_CONTEXT_HINTS: Record<string, string[]> = {
+    REFUND: ['amount', 'currency', 'reason', 'payer', 'invoiceNumber', 'refundable'],
+    EXPENSE: ['amount', 'currency', 'reason', 'category'],
+    PAYOUT: ['amount', 'currency', 'reason', 'landlord'],
+    WRITE_OFF: ['amount', 'currency', 'reason'],
+    DISCOUNT: ['amount', 'reason'],
+    LEASE: ['rentAmount', 'tenant', 'reason'],
+    PURCHASE_ORDER: ['amount', 'supplier', 'reason'],
+    WORK_ORDER: ['amount', 'reason', 'priority'],
+};
+
+export function formatWorkflowCurrency(value: unknown, fallback = ''): string {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return fallback;
+    try {
+        return new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency: fallback || 'KES',
+            maximumFractionDigits: 2,
+        }).format(amount);
+    } catch {
+        return `${fallback || 'KES'} ${amount.toLocaleString()}`;
+    }
+}

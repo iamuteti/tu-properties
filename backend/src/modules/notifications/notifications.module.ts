@@ -9,11 +9,18 @@ import {
   NotificationsService,
   SmsChannelProvider,
 } from './notifications.service';
-import { EmailChannelProvider } from './email-provider';
+import {
+  EmailChannelProvider,
+  SMTP_TRANSPORT_FACTORY,
+} from './email-provider';
 import { NotificationTriggersService } from './notification-triggers.service';
 import { NotificationConfigService } from './notification-config.service';
 import { SmsProviderRegistry } from './sms-provider-registry';
-import { AfricasTalkingSmsProvider, TwilioSmsProvider } from './sms-providers';
+import {
+  AfricasTalkingSmsProvider,
+  SMS_HTTP_CLIENT,
+  TwilioSmsProvider,
+} from './sms-providers';
 
 // Channels are providers rather than hardcoded branches, so adding WhatsApp or
 // a real SMTP client later is a new class registered here — not a change to the
@@ -35,6 +42,11 @@ import { AfricasTalkingSmsProvider, TwilioSmsProvider } from './sms-providers';
       provide: SmsProviderRegistry,
       useFactory: () => new SmsProviderRegistry(),
     },
+    // Both outbound seams are tokens resolving to the real implementations.
+    // A test overrides the token, not the provider, so it can assert the exact
+    // request (or the exact SMTP message) with no network and no server.
+    { provide: SMTP_TRANSPORT_FACTORY, useFactory: () => undefined },
+    { provide: SMS_HTTP_CLIENT, useFactory: () => undefined },
     InAppChannelProvider,
     EmailChannelProvider,
     SmsChannelProvider,

@@ -42,6 +42,11 @@ export class RefundsService {
   /**
    * Refund part or all of a payment. Refunds the surplus back to the customer's
    * credit balance rather than pushing a negative payment onto an invoice.
+   *
+   * `tx` is passed in by the workflow engine when an approval authorises this
+   * (Module 18): the decision and the money movement then commit together, so an
+   * approval can never be recorded for a refund that did not happen. Called
+   * directly — with no workflow configured — it opens its own transaction.
    */
   async create(
     data: {
@@ -55,6 +60,7 @@ export class RefundsService {
       processedBy?: string;
     },
     tenantId?: string,
+    tx?: Tx,
   ) {
     if (!data.reason?.trim()) {
       throw new BadRequestException('A refund needs a reason');
@@ -67,9 +73,9 @@ export class RefundsService {
       throw new BadRequestException('A tenant scope is required to refund');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const execute = async (client: Tx) => {
       const payment = await requireRecord(
-        tx.payment.findFirst({
+        client.payment.findFirst({
           where: { id: data.paymentId, organizationId: tenantId },
           include: { invoice: { include: { rentalAgreement: true } } },
         }),
@@ -84,7 +90,7 @@ export class RefundsService {
       const alreadyRefunded = round2(
         Number(
           (
-            await tx.paymentRefund.aggregate({
+            await client.paymentRefund.aggregate({
               where: { paymentId: payment.id },
               _sum: { amount: true },
             })
@@ -99,7 +105,7 @@ export class RefundsService {
       }
 
       const creditNote = await this.issueCreditNote(
-        tx,
+        client,
         {
           payment,
           amount,
@@ -112,7 +118,7 @@ export class RefundsService {
         tenantId,
       );
 
-      const refund = await tx.paymentRefund.create({
+      const refund = await client.paymentRefund.create({
         data: {
           paymentId: payment.id,
           amount,
@@ -141,7 +147,7 @@ export class RefundsService {
             createdBy: data.processedBy,
           },
           tenantId,
-          tx,
+          client,
         );
       }
 
@@ -161,21 +167,80 @@ export class RefundsService {
           },
         },
         tenantId,
-        tx,
+        client,
       );
 
       if (payment.invoiceId) {
-        await syncInvoiceSettlement(tx, payment.invoiceId, tenantId);
+        await syncInvoiceSettlement(client, payment.invoiceId, tenantId);
       }
 
-      return tx.paymentRefund.findUniqueOrThrow({
+      return client.paymentRefund.findUniqueOrThrow({
         where: { id: refund.id },
         include: {
           creditNote: { include: { lines: true } },
           payment: { include: { invoice: true } },
         },
       });
-    });
+    };
+
+    return tx ? execute(tx) : this.prisma.$transaction(execute);
+  }
+
+  /**
+   * Everything a refund request needs to be checkable before it is *asked for*.
+   *
+   * Validating here rather than at approval time means an impossible request is
+   * refused while the person is still looking at the payment, instead of dying
+   * in an approver's face days later. The check runs again when the refund is
+   * actually made — the payment may have been refunded since.
+   */
+  async assertRefundable(
+    args: { paymentId: string; amount: number },
+    tenantId: string,
+  ) {
+    const payment = await requireRecord(
+      this.prisma.payment.findFirst({
+        where: { id: args.paymentId, organizationId: tenantId },
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          paymentReference: true,
+          payee: true,
+          paidFrom: true,
+          isReversed: true,
+          invoiceId: true,
+          invoice: { select: { invoiceNumber: true } },
+        },
+      }),
+      'Payment',
+    );
+
+    if (payment.isReversed) {
+      throw new BadRequestException(
+        'This payment was reversed — reverse the reversal instead of refunding it',
+      );
+    }
+
+    const alreadyRefunded = round2(
+      Number(
+        (
+          await this.prisma.paymentRefund.aggregate({
+            where: { paymentId: payment.id },
+            _sum: { amount: true },
+          })
+        )._sum.amount ?? 0,
+      ),
+    );
+    const refundable = round2(Number(payment.amount) - alreadyRefunded);
+
+    return {
+      payment,
+      alreadyRefunded,
+      refundable,
+      /** Enough to label the request in an approvals inbox. */
+      label: `Refund of ${payment.currency || 'KES'} ${round2(Number(args.amount)).toLocaleString()} on payment ${payment.paymentReference ?? payment.id}`,
+    };
   }
 
   private async issueCreditNote(

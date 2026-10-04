@@ -42,6 +42,7 @@ export const PERMISSION_MODULES = [
   'payables',
   'billing',
   'notifications',
+  'workflows',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -133,6 +134,9 @@ export const SYSTEM_ROLES: {
       // Reading their own notifications needs no permission beyond signing in;
       // running the reminder sweep does.
       notifications: full(),
+      // Module 18: deciding what is waiting on them, plus the administrator's
+      // separate power to rewrite the approval policy itself.
+      workflows: full(),
     }),
   },
   {
@@ -155,6 +159,9 @@ export const SYSTEM_ROLES: {
       leases: full(),
       // Resident requests raised from the tenant portal.
       tenant_requests: full(),
+      // Module 18: refund and purchase approvals arrive at a property manager,
+      // but the *policy* stays with an administrator.
+      workflows: viewWrite(),
     }),
   },
   {
@@ -186,6 +193,8 @@ export const SYSTEM_ROLES: {
       payables: view(),
       billing: view(),
       notifications: view(),
+      // Module 18: they can be an approver on a policy, not the author of it.
+      workflows: view(),
     }),
   },
   {
@@ -224,6 +233,9 @@ export const SYSTEM_ROLES: {
       payables: full(),
       billing: full(),
       notifications: view(),
+      // Module 18: money approvals are their job — the accountant is who
+      // approves refunds and expenses below the director level.
+      workflows: full(),
     }),
   },
   {
@@ -233,6 +245,8 @@ export const SYSTEM_ROLES: {
       properties: view(),
       units: view(),
       documents: viewWrite(),
+      // Module 18: work-order approvals land here once maintenance exists.
+      workflows: viewWrite(),
     }),
   },
   {
@@ -273,6 +287,8 @@ export const SYSTEM_ROLES: {
       properties: view(),
       units: view(),
       documents: viewWrite(),
+      // Module 18: purchase requests are the workflow this role exists for.
+      workflows: viewWrite(),
     }),
   },
   {

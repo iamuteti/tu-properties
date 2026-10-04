@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { NotificationChannel, NotificationStatus } from '@prisma/client';
 
 /**
@@ -42,6 +47,13 @@ export type HttpClientLike = (
   text: () => Promise<string>;
 }>;
 
+/**
+ * Injection token for the HTTP client. A defaulted constructor parameter would
+ * make Nest look for a provider literally called `Function` and fail the boot, so
+ * the seam has to be a token.
+ */
+export const SMS_HTTP_CLIENT = 'SMS_HTTP_CLIENT';
+
 export const defaultHttpClient: HttpClientLike = (url, init) =>
   fetch(url, init as RequestInit);
 
@@ -50,7 +62,11 @@ export class TwilioSmsProvider {
   readonly id = 'TWILIO';
   private readonly logger = new Logger(TwilioSmsProvider.name);
 
-  constructor(private readonly http: HttpClientLike = defaultHttpClient) {}
+  constructor(
+    @Optional()
+    @Inject(SMS_HTTP_CLIENT)
+    private readonly http?: HttpClientLike,
+  ) {}
 
   /**
    * Twilio's Messages API: form-encoded, authenticated with the account SID
@@ -77,7 +93,7 @@ export class TwilioSmsProvider {
       `${credentials.accountSid}:${credentials.authToken}`,
     ).toString('base64');
 
-    const response = await this.http(url, {
+    const response = await (this.http ?? defaultHttpClient)(url, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${authorization}`,
@@ -104,7 +120,11 @@ export class AfricasTalkingSmsProvider {
   readonly id = 'AFRICAS_TALKING';
   private readonly logger = new Logger(AfricasTalkingSmsProvider.name);
 
-  constructor(private readonly http: HttpClientLike = defaultHttpClient) {}
+  constructor(
+    @Optional()
+    @Inject(SMS_HTTP_CLIENT)
+    private readonly http?: HttpClientLike,
+  ) {}
 
   /**
    * Africa's Talking takes the API key as the HTTP Basic username and the
@@ -133,7 +153,7 @@ export class AfricasTalkingSmsProvider {
       `${credentials.apiKey}:${credentials.username}`,
     ).toString('base64');
 
-    const response = await this.http(url, {
+    const response = await (this.http ?? defaultHttpClient)(url, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${authorization}`,
