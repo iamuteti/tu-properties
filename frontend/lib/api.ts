@@ -606,6 +606,9 @@ export const financeApi = {
     findAllPayments: () =>
         api.get<Payment[]>('/finance/payments'),
 
+    getPaymentById: (id: string) =>
+        api.get<Payment>(`/finance/payments/${id}`),
+
     deletePayment: (id: string) =>
         api.delete(`/finance/payments/${id}`),
 
