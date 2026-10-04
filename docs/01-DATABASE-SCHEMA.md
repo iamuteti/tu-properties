@@ -1140,6 +1140,35 @@ Differences from the target block below that matter when continuing:
 
 ---
 
+## Domain: Accounts Payable (Module: Finance & Accounting) — ✅ landed 2026-10-04
+
+Live as of 2026-10-04 (migrations `20261004040000_module7_accounts_payable` and
+`20261004041000_module7_supplier_credit_source`): `Supplier`, `SupplierBill` +
+`SupplierBillLine`, `BillPayment`, `SupplierCredit` + `SupplierCreditApplication`,
+the `SupplierStatus`/`BillStatus`/`BillCategory`/`SupplierCreditSource` enums,
+and `BILL`/`BILL_PAYMENT` journal sources.
+
+The target sketch further down does not exist as written — this domain was built
+to mirror the receivable side, and three decisions are worth not undoing:
+
+- **`BillPayment` is its own model, not a reuse of `Payment`.** A bill payment
+  settles a `SupplierBill`; `Payment` settles an `Invoice`. One table for both
+  is how an AP total ends up wrong.
+- **A bill's money columns are derived** from `BillPayment.appliedAmount` plus
+  `SupplierCreditApplication` amounts (`syncBill`), never decremented. This is
+  the same rule the receivable side uses, for the same reason: a reversal, a
+  credit and an overpayment can all move a bill backwards.
+- **`SupplierCredit.sourcePaymentId` exists** so reversing an overpaying payment
+  can void the credit it produced. Without the link the supplier keeps a credit
+  balance that no longer corresponds to any money.
+
+`BillCategory` maps to an expense account in
+`accounting/bill-categories.ts` rather than in the schema, so the mapping is
+reviewable in one place and an unmapped category is an error rather than a
+silent "Other Expense".
+
+---
+
 ## Domain: Maintenance (Module: Maintenance Management) — 🆕 Not started
 
 ```prisma

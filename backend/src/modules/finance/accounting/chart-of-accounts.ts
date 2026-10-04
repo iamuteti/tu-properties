@@ -84,6 +84,15 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
     normalBalance: BalanceSide.DEBIT,
   },
   {
+    code: '1350',
+    name: 'VAT Recoverable',
+    type: AccountType.ASSET,
+    subtype: 'Current Asset',
+    normalBalance: BalanceSide.DEBIT,
+    description:
+      'Input tax paid to suppliers, reclaimed from the authority. The payable side of 2100.',
+  },
+  {
     code: '1500',
     name: 'Property, Plant & Equipment',
     type: AccountType.ASSET,
@@ -144,6 +153,15 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
     normalBalance: BalanceSide.CREDIT,
     description:
       'Held pending owner statement payout — money that is not income yet.',
+  },
+  {
+    code: '2550',
+    name: 'Credit Owed by Suppliers',
+    type: AccountType.LIABILITY,
+    subtype: 'Current Liability',
+    normalBalance: BalanceSide.CREDIT,
+    description:
+      'Credit a supplier owes us — our overpayment, or goods returned. The payable side of customer credit.',
   },
   {
     code: '2600',
@@ -353,6 +371,7 @@ export const ACCOUNT_CODES = {
   SECURITY_DEPOSITS_RECEIVABLE: '1300',
   RENT_RECEIVABLE_LANDLORDS: '1400',
   ACCOUNTS_PAYABLE: '2000',
+  SUPPLIER_CREDIT: '2550',
   VAT_PAYABLE: '2100',
   WHT_PAYABLE: '2200',
   SECURITY_DEPOSITS_HELD: '2400',
@@ -364,6 +383,14 @@ export const ACCOUNT_CODES = {
   UTILITY_INCOME: '4030',
   OTHER_INCOME: '4900',
   REFUNDS_AND_ALLOWANCES: '4290',
+  VAT_RECOVERABLE: '1350',
+  REPAIRS_MAINTENANCE: '5010',
+  UTILITIES_EXPENSE: '5020',
+  LEGAL_PROFESSIONAL: '5060',
+  MARKETING_EXPENSE: '5050',
+  OFFICE_ADMIN: '5080',
+  SALARIES_WAGES: '5090',
+  OTHER_EXPENSE: '5900',
 } as const;
 
 /** Default cash/bank account for each payment method. */

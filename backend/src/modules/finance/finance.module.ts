@@ -3,6 +3,7 @@ import { AccountingModule } from './accounting/accounting.module';
 import { CreditsModule } from './credits/credits.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { TaxModule } from './tax/tax.module';
+import { PayablesModule } from './payables/payables.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -13,6 +14,7 @@ import { PaymentsModule } from './payments/payments.module';
     CreditsModule,
     // Invoices need the tax engine to price themselves, so it goes first.
     TaxModule,
+    PayablesModule,
     InvoicesModule,
     ReceiptsModule,
     PaymentsModule,
@@ -23,6 +25,7 @@ import { PaymentsModule } from './payments/payments.module';
     AccountingModule,
     CreditsModule,
     TaxModule,
+    PayablesModule,
     InvoicesModule,
     ReceiptsModule,
     PaymentsModule,

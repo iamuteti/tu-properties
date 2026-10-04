@@ -868,6 +868,143 @@ export class AccountingService {
     );
   }
 
+/**
+ * Accounts payable: a supplier bill is accepted.
+ *
+ * The mirror of `postInvoiceIssued`, and deliberately not a copy-paste of it —
+ * the direction reverses. We receive goods or services, so the expense and the
+ * recoverable tax are debited and the supplier is credited:
+ *
+ *   Dr Expense (per line, by category or an explicit account)
+ *   Dr VAT recoverable   (input tax we will reclaim)
+ *   Cr Accounts payable  (the bill total)
+ *
+ * Input tax goes to a recoverable asset rather than into expense, because it is
+ * not a cost — folding it into the expense line would understate both the
+ * expense and the reclaim.
+ */
+  async postBillAccepted(
+    args: {
+      billId: string;
+      billNumber: string;
+      billDate: Date;
+      totalAmount: number;
+      taxAmount?: number;
+      /** One entry per expense account, so a mixed bill posts each part to the right place. */
+      expenses: { accountCode: string; amount: number; description?: string }[];
+      taxAccountCode?: string;
+      memo?: string;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const total = round2(Number(args.totalAmount));
+    if (total <= 0) return null;
+
+    const tax = round2(Number(args.taxAmount ?? 0));
+    const lines: JournalLineInput[] = [];
+
+    let expenseTotal = 0;
+    for (const expense of args.expenses) {
+      const amount = round2(expense.amount);
+      if (amount === 0) continue;
+      expenseTotal = round2(expenseTotal + amount);
+      lines.push({
+        accountCode: expense.accountCode,
+        debit: amount,
+        description: expense.description ?? `Expense on bill ${args.billNumber}`,
+      });
+    }
+
+    if (tax > 0) {
+      lines.push({
+        accountCode: args.taxAccountCode ?? ACCOUNT_CODES.VAT_RECOVERABLE,
+        debit: tax,
+        description: `Recoverable tax on bill ${args.billNumber}`,
+      });
+    }
+
+    // The line amounts plus tax must equal what we owe, or the entry would not
+    // balance and the reason would surface as a confusing "does not balance".
+    if (Math.abs(round2(expenseTotal + tax) - total) > 0.01) {
+      throw new BadRequestException(
+        `Bill ${args.billNumber} does not add up: lines ${expenseTotal.toFixed(
+          2,
+        )} + tax ${tax.toFixed(2)} should equal ${total.toFixed(2)}`,
+      );
+    }
+
+    lines.push({
+      accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE,
+      credit: total,
+      description: `Supplier bill ${args.billNumber}`,
+    });
+
+    return this.postEntry(
+      {
+        entryDate: args.billDate,
+        memo: args.memo ?? `Supplier bill ${args.billNumber} accepted`,
+        reference: args.billNumber,
+        source: JournalEntrySource.BILL,
+        sourceRef: { type: 'SUPPLIER_BILL', id: args.billId, number: args.billNumber },
+        lines,
+      },
+      tenantId,
+      tx,
+    );
+  }
+
+  /**
+   * Money paid to a supplier: the payable we owe is reduced and the cash that
+   * left the business is recognised. The cash account is derived from the
+   * payment method, the same mapping receipts use, so money out lands where the
+   * accounting already expects it to.
+   */
+  async postBillPaid(
+    args: {
+      billId: string;
+      billNumber: string;
+      amount: number;
+      paymentDate: Date;
+      paymentMethod: string;
+      reference?: string;
+      description?: string;
+      /** Credit the supplier is owed instead of cash leaving — see `postBillPaidFromCredit`. */
+      relievedByCredit?: boolean;
+      sourceRef?: Record<string, string | null>;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const amount = round2(Number(args.amount));
+    if (amount <= 0) return null;
+
+    const creditAccount = args.relievedByCredit
+      ? ACCOUNT_CODES.SUPPLIER_CREDIT
+      : (PAYMENT_METHOD_ACCOUNT[args.paymentMethod] ?? '1010');
+    const description = args.description ?? `Payment to supplier for ${args.billNumber}`;
+
+    return this.postEntry(
+      {
+        entryDate: args.paymentDate,
+        memo: description,
+        reference: args.reference,
+        source: JournalEntrySource.BILL_PAYMENT,
+        sourceRef: args.sourceRef ?? {
+          type: 'BILL_PAYMENT',
+          id: args.billId,
+          number: args.billNumber,
+        },
+        lines: [
+          { accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE, debit: amount, description },
+          { accountCode: creditAccount, credit: amount, description },
+        ],
+      },
+      tenantId,
+      tx,
+    );
+  }
+
   /**
    * Money going back out. A refund is the debit side of "revenue that was
    * recognised and is now unwound" — it lands in the contra revenue account

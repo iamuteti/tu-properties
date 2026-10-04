@@ -90,6 +90,10 @@ model Organization {
   paymentRefunds    PaymentRefund[]
   creditNotes       CreditNote[]
   taxRules          TaxRule[]
+  suppliers         Supplier[]
+  supplierBills     SupplierBill[]
+  billPayments      BillPayment[]
+  supplierCredits   SupplierCredit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2120,6 +2124,8 @@ enum JournalEntrySource {
   CREDIT_NOTE
   PAYOUT
   REFUND
+  BILL
+  BILL_PAYMENT
   OPENING_BALANCE
 }
 
@@ -2436,6 +2442,271 @@ enum TaxTreatment {
   /// Deducted by us when paying the supplier/authority; the customer never
   /// sees it on an invoice.
   WITHHELD
+}
+
+/// Module 7 — Finance & Accounting: the accounts payable side.
+///
+/// The mirror of what already exists for receivables, and deliberately built on
+/// the same primitives: money never moves without a `PaymentAllocation`-style
+/// record saying which bill it settled, an invoice-like bill's money columns are
+/// derived rather than decremented, and correcting anything posts a reversal
+/// rather than editing history. A supplier who overpays us is owed money, which
+/// is the same shape as a tenant who overpaid us — `SupplierCredit` is the
+/// payable-side counterpart of `CustomerCredit`.
+model Supplier {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+
+  status SupplierStatus @default(ACTIVE)
+
+  email String?
+  phone String?
+  address String? @db.Text
+  city   String?
+  country String?
+
+  /// VAT/GST registration — printed on bills where the law requires it.
+  taxPin String?
+  vatRegistered Boolean @default(false)
+
+  /// Terms in days, used to derive `dueDate` from the bill date.
+  paymentTermsDays Int?
+
+  bankName      String?
+  bankBranch    String?
+  accountName   String?
+  accountNumber String?
+
+  notes String? @db.Text
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  bills        SupplierBill[]
+  credits      SupplierCredit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt  DateTime?
+
+  @@index([organizationId])
+  @@index([name])
+  @@map("suppliers")
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum BillStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+/// What kind of cost a bill is, so the right expense account is used without
+/// anyone having to remember an account code. `other` falls back to 5900.
+enum BillCategory {
+  MAINTENANCE
+  UTILITIES
+  INSURANCE
+  PROFESSIONAL
+  MARKETING
+  OFFICE
+  SALARIES
+  TAX
+  OTHER
+}
+
+model SupplierBill {
+  id String @id @default(cuid())
+  billNumber String
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  /// The supplier's own invoice/reference number, so a bill can be traced back
+  /// to the document it came from.
+  supplierReference String?
+
+  billDate DateTime @default(now())
+  dueDate  DateTime
+
+  currency String @default("KES")
+
+  category BillCategory @default(OTHER)
+
+  subtotal  Decimal @db.Decimal(14, 2)
+  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  paidAmount    Decimal @default(0) @db.Decimal(14, 2)
+  balanceAmount Decimal @db.Decimal(14, 2)
+
+  status BillStatus @default(OPEN)
+
+  /// Tax provenance, mirroring invoices: the bill snapshots what the rules
+  /// decided so a later rule change cannot rewrite a document already paid.
+  taxJurisdiction String?
+  taxSummary     Json?
+
+  /// Snapshot of the expense lines, so a VOID or corrected bill still explains
+  /// itself after the supplier's own references change.
+  lineSnapshot Json?
+
+  notes String? @db.Text
+
+  lines        SupplierBillLine[]
+  payments     BillPayment[]
+  creditApplications SupplierCreditApplication[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  voidedAt DateTime?
+
+  @@unique([organizationId, billNumber])
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("supplier_bills")
+}
+
+model SupplierBillLine {
+  id String @id @default(cuid())
+  billId String
+  bill   SupplierBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  description String
+
+  quantity  Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(12, 2)
+  amount    Decimal @db.Decimal(14, 2)
+
+  taxRate   Decimal? @db.Decimal(7, 4)
+  taxAmount Decimal? @db.Decimal(12, 2)
+  taxCode   String?
+
+  /// Optional explicit expense account for this line. Validated against the
+  /// chart when posted, so a typo cannot produce an entry that fails at the
+  /// ledger.
+  expenseAccountCode String?
+
+  createdAt DateTime @default(now())
+
+  @@index([billId])
+  @@map("supplier_bill_lines")
+}
+
+/// Money paid to a supplier. Kept separate from `Payment`, which is the
+/// receivable-side record: a bill payment settles `SupplierBill`, not an
+/// `Invoice`, and conflating them is how an AP total ends up wrong.
+model BillPayment {
+  id String @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  billId String
+  bill   SupplierBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(14, 2)
+  currency String @default("KES")
+
+  paymentDate DateTime @default(now())
+  method      PaymentMethod @default(BANK_TRANSFER)
+  reference   String?
+  notes       String? @db.Text
+
+  /// How much of this payment is pointed at an invoice-equivalent bill; the
+  /// remainder is credit owed back to us by the supplier.
+  appliedAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  isReversed Boolean   @default(false)
+  reversedAt DateTime?
+  reversedBy String?
+
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  // Supplier credit this payment created as an overpayment.
+  sourceCredits SupplierCredit[] @relation("CreditSourcePayments")
+
+  @@index([organizationId])
+  @@index([billId])
+  @@index([paymentDate])
+  @@map("bill_payments")
+}
+
+/// What a supplier owes us back — we overpaid, or returned goods. Spent against
+/// their next bills, oldest first, exactly as `CustomerCredit` is.
+model SupplierCredit {
+  id String @id @default(cuid())
+  amount        Decimal @db.Decimal(14, 2)
+  appliedAmount Decimal @default(0) @db.Decimal(14, 2)
+  currency      String  @default("KES")
+
+  reason String? @db.Text
+  source SupplierCreditSource @default(OVERPAYMENT)
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  /// The overpaying payment this credit came from. Reversing that payment has
+  /// to unwind the credit too, or the supplier keeps a credit balance that no
+  /// longer corresponds to any money.
+  sourcePaymentId String?
+  sourcePayment   BillPayment? @relation("CreditSourcePayments", fields: [sourcePaymentId], references: [id], onDelete: SetNull)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  status CreditStatus @default(OPEN)
+
+  applications SupplierCreditApplication[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("supplier_credits")
+}
+
+enum SupplierCreditSource {
+  OVERPAYMENT
+  UNALLOCATED
+  GOODWILL
+  MANUAL
+}
+
+model SupplierCreditApplication {
+  id String @id @default(cuid())
+  creditId String
+  credit   SupplierCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
+
+  billId String
+  bill   SupplierBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(14, 2)
+
+  appliedAt DateTime @default(now())
+  appliedBy String?
+
+  @@index([creditId])
+  @@index([billId])
+  @@map("supplier_credit_applications")
 }
 
 model ReceiptLine {

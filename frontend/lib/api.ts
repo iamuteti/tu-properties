@@ -755,6 +755,154 @@ export const taxApi = {
     remove: (id: string) => api.delete(`/finance/tax/rules/${id}`),
 };
 
+/**
+ * Accounts payable (Module 7). The payable-side mirror of the billing side:
+ * suppliers, their bills, payments against them, credit when we overpay, and an
+ * aging report. `calculateTax` is optional — a bill is priced by the same
+ * jurisdiction rules as an invoice unless the caller supplies the figures from
+ * the supplier's own document.
+ */
+export interface Supplier {
+    id: string;
+    code: string;
+    name: string;
+    status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+    email?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    country?: string | null;
+    taxPin?: string | null;
+    paymentTermsDays?: number | null;
+    bills?: { balanceAmount: number | string }[];
+}
+
+export interface SupplierBill {
+    id: string;
+    billNumber: string;
+    supplierId: string;
+    supplier?: Supplier;
+    supplierReference?: string | null;
+    billDate: string;
+    dueDate: string;
+    currency: string;
+    category: string;
+    subtotal: number | string;
+    taxAmount: number | string;
+    totalAmount: number | string;
+    paidAmount: number | string;
+    balanceAmount: number | string;
+    status: 'DRAFT' | 'OPEN' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
+    notes?: string | null;
+    lines?: {
+        id: string;
+        description: string;
+        quantity: number | string;
+        unitPrice: number | string;
+        amount: number | string;
+        expenseAccountCode?: string | null;
+    }[];
+    payments?: BillPayment[];
+}
+
+export interface BillPayment {
+    id: string;
+    billId: string;
+    amount: number | string;
+    paymentDate: string;
+    method: string;
+    reference?: string | null;
+    appliedAmount: number | string;
+    isReversed: boolean;
+    bill?: SupplierBill;
+}
+
+export interface SupplierCredit {
+    id: string;
+    amount: number | string;
+    appliedAmount: number | string;
+    reason?: string | null;
+    status: string;
+    supplier?: Supplier;
+}
+
+export const payablesApi = {
+    findSuppliers: (params?: { status?: string }) =>
+        api.get<Supplier[]>('/finance/payables/suppliers', { params }),
+
+    findSupplier: (id: string) => api.get<Supplier>(`/finance/payables/suppliers/${id}`),
+
+    createSupplier: (data: {
+        name: string;
+        email?: string;
+        phone?: string;
+        city?: string;
+        country?: string;
+        taxPin?: string;
+        paymentTermsDays?: number;
+    }) => api.post<Supplier>('/finance/payables/suppliers', data),
+
+    updateSupplier: (id: string, data: Partial<Supplier>) =>
+        api.patch<Supplier>(`/finance/payables/suppliers/${id}`, data),
+
+    deleteSupplier: (id: string) =>
+        api.delete(`/finance/payables/suppliers/${id}`),
+
+    findBills: (params?: { supplierId?: string; status?: string; overdueOnly?: boolean }) =>
+        api.get<SupplierBill[]>('/finance/payables/bills', { params }),
+
+    findBill: (id: string) => api.get<SupplierBill>(`/finance/payables/bills/${id}`),
+
+    createBill: (data: {
+        supplierId: string;
+        supplierReference?: string;
+        billDate?: string;
+        dueDate?: string;
+        category?: string;
+        taxAmount?: number;
+        subtotal?: number;
+        totalAmount?: number;
+        notes?: string;
+        lines: { description: string; quantity?: number; unitPrice: number; amount?: number }[];
+    }) => api.post<SupplierBill>('/finance/payables/bills', data),
+
+    voidBill: (id: string) => api.post(`/finance/payables/bills/${id}/void`),
+
+    findPayments: (params?: { billId?: string }) =>
+        api.get<BillPayment[]>('/finance/payables/payments', { params }),
+
+    createPayment: (data: {
+        billId: string;
+        amount: number;
+        paymentDate?: string;
+        method?: string;
+        reference?: string;
+        notes?: string;
+    }) => api.post<BillPayment>('/finance/payables/payments', data),
+
+    reversePayment: (id: string) =>
+        api.post(`/finance/payables/payments/${id}/reverse`),
+
+    findCredits: (params?: { supplierId?: string }) =>
+        api.get<SupplierCredit[]>('/finance/payables/credits', { params }),
+
+    applyCredit: (id: string, billIds?: string[]) =>
+        api.post(`/finance/payables/credits/${id}/apply`, { billIds }),
+
+    aging: () =>
+        api.get<{
+            asOf: string;
+            buckets: {
+                current: number;
+                days1to30: number;
+                days31to60: number;
+                days61to90: number;
+                over90: number;
+                total: number;
+            };
+            bySupplier: { supplierId: string; supplierName: string; total: number; overdue: number }[];
+        }>('/finance/payables/aging'),
+};
+
 export const creditsApi = {
     findAll: (params?: { status?: string; tenantId?: string; landlordId?: string }) =>
         api.get<CustomerCredit[]>('/finance/credits', { params }),
