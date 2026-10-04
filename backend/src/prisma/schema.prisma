@@ -102,6 +102,12 @@ model Organization {
   workflowDefinitions        WorkflowDefinition[]
   workflowInstances          WorkflowInstance[]
   workflowDelegations        WorkflowDelegation[]
+  // Module 9 — Maintenance
+  workOrders                 WorkOrder[]
+  workOrderTasks             WorkOrderTask[]
+  assets                     Asset[]
+  pmSchedules                PreventiveMaintenanceSchedule[]
+  pmRuns                     PreventiveMaintenanceRun[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -178,6 +184,12 @@ model User {
   delegatedApprovalsOut  WorkflowDelegation[] @relation("UserWorkflowDelegatedFrom")
   delegatedApprovalsIn   WorkflowDelegation[] @relation("UserWorkflowDelegatedTo")
 
+  // Module 9 — Maintenance: who is on the job, who raised it, who ticked a task.
+  assignedWorkOrders     WorkOrder[]           @relation("UserAssignedWorkOrders")
+  raisedWorkOrders       WorkOrder[]           @relation("UserRaisedWorkOrders")
+  completedWorkOrderTasks WorkOrderTask[]      @relation("UserCompletedWorkOrderTasks")
+  assignedPmSchedules    PreventiveMaintenanceSchedule[] @relation("UserPmSchedules")
+
   // Status
   @@index([portalTenantId])
   @@index([email])
@@ -195,6 +207,11 @@ enum UserRole {
   // so it could be granted permissions but never held. See master doc issue 48.
   LEASING_OFFICER
   ACCOUNTANT
+  // Module 9: the seeded Maintenance Manager and Technician roles had the same
+  // problem — permissions nobody could hold, and a work order with nobody to
+  // assign it to. Same fix as LEASING_OFFICER, for the same reason.
+  MAINTENANCE_MANAGER
+  TECHNICIAN
   USER
 }
 
@@ -686,6 +703,11 @@ model Property {
   securityDeposits PropertySecurityDeposit[]
   amenities        PropertyAmenity[]
   landlordCharges  LandlordCharge[]
+  // Module 9: the equipment this building actually owns, and the faults found
+  // against it. Both are SetNull on the way in, so retiring a property row does
+  // not delete its maintenance history.
+  assets           Asset[]
+  workOrders       WorkOrder[] @relation("PropertyWorkOrders")
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -765,6 +787,9 @@ model Unit {
   meterNumbers     UnitMeterNumber[]
   features         UnitFeature[]
   inspections      InspectionReport[]
+  // Module 9: faults reported against this unit, plus any unit-level equipment.
+  workOrders       WorkOrder[]
+  assets           Asset[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -965,6 +990,9 @@ model Tenant {
   credits           CustomerCredit[]         @relation("TenantCredits")
   notifications     Notification[]           @relation("TenantNotifications")
   creditNotes       CreditNote[]             @relation("TenantCreditNotes")
+  // Module 9: maintenance issues this resident reported. SetNull rather than
+  // Cascade — a resident record is financial history and outlives their tenancy.
+  workOrders        WorkOrder[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -3229,4 +3257,344 @@ model WorkflowDelegation {
   @@index([organizationId])
   @@index([fromUserId, toUserId])
   @@map("workflow_delegations")
+}
+
+// ============================================
+// MAINTENANCE (Module 9)
+// ============================================
+
+/// The trade the job falls under. Drives nothing by itself — the point of
+/// recording it is that "8 electrical faults this month" is the report an owner
+/// asks for, and it is only answerable if every work order carries a category.
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  CLEANING
+  PAINTING
+  SECURITY
+  OTHER
+}
+
+/// The documented pipeline: REQUESTED → INSPECTION → APPROVED → ASSIGNED →
+/// IN_PROGRESS → COMPLETED → CLOSED. `CANCELLED` is the addition, and it is
+/// deliberate: a reported fault that turns out to be a tenancy dispute or a
+/// duplicate would otherwise have to be "completed" with a resolution note that
+/// says nothing happened, which is a lie in the one field a tenant reads.
+enum WorkOrderStatus {
+  REQUESTED
+  INSPECTION
+  APPROVED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+/// Emergency means "today", and the service derives the response deadline from
+/// it rather than storing a second date somebody has to keep in step.
+enum WorkOrderPriority {
+  LOW
+  NORMAL
+  HIGH
+  EMERGENCY
+}
+
+/// Who raised it. Kept on the record rather than inferred from the tenant,
+/// because a tenant-portal report and a caretaker's walk-in look identical
+/// afterwards but are different facts for a dispute.
+enum WorkOrderSource {
+  STAFF
+  TENANT_PORTAL
+  TENANT_REQUEST
+  PREVENTIVE
+}
+
+model WorkOrder {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Human reference (`WO-2026-0007`), unique per organization — the codebase
+  /// already numbers INVOICEs, RECEIPTs and credit notes this way, and a
+  /// work order quoted over the phone needs one that is not a cuid.
+  reference String
+
+  title       String
+  description String               @db.Text
+  category    MaintenanceCategory
+  priority    WorkOrderPriority    @default(NORMAL)
+  status      WorkOrderStatus      @default(REQUESTED)
+  source      WorkOrderSource      @default(STAFF)
+
+  // Where the fault is. `propertyId` is the anchor: it is what the list filters
+  /// on and what keeps a work order attributable when it is about a whole
+  /// building (a lift, a generator) rather than one home. Nullable so a work
+  /// order can be raised against an asset before anyone knows where it is.
+  propertyId String?
+  property   Property? @relation("PropertyWorkOrders", fields: [propertyId], references: [id], onDelete: SetNull)
+
+  unitId String?
+  unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  assetId String?
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  assignedTechnicianId String?
+  assignedTechnician   User?   @relation("UserAssignedWorkOrders", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+
+  /// How to get in — gate codes, "the neighbour has the only spare key".
+  /// Written by whoever knows, because a technician standing outside a locked
+  /// door is the most common cause of a wasted visit.
+  accessInstructions String? @db.Text
+
+  // Money. Decimal(12,2) like the other money columns in this schema, and
+  // optional: the cost of an unapproved repair is genuinely unknown, and a
+  // fabricated estimate is worse than a blank one.
+  estimatedCost Decimal? @db.Decimal(12, 2)
+  actualCost    Decimal? @db.Decimal(12, 2)
+
+  reportedAt   DateTime  @default(now())
+  scheduledFor DateTime?
+  inspectedAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  closedAt     DateTime?
+  cancelledAt  DateTime?
+
+  inspectionNote     String? @db.Text
+  resolutionNote     String? @db.Text
+  cancellationReason String? @db.Text
+
+  /// Set when an approval was asked for (Module 18's engine, entity WORK_ORDER).
+  /// The instance itself is found by (entityType, entityId); this is only the
+  /// record that sign-off was requested at all, and when.
+  approvalRequestedAt DateTime?
+
+  // Preventive maintenance provenance. `pmDueOn` is the day the schedule fell
+  // due, truncated to midnight, and (pmScheduleId, pmDueOn) is unique — the
+  /// sweep can run twice, be run by hand, and be run by two instances, and the
+  /// database is what stops the same service being raised twice for one period.
+  // Both columns are nullable, and NULLs are distinct in a Postgres unique
+  // index, so ordinary work orders never collide with each other.
+  pmScheduleId String?
+  pmSchedule   PreventiveMaintenanceSchedule? @relation(fields: [pmScheduleId], references: [id], onDelete: SetNull)
+  pmDueOn      DateTime?
+
+  raisedById String?
+  raisedBy   User?   @relation("UserRaisedWorkOrders", fields: [raisedById], references: [id], onDelete: SetNull)
+
+  tasks WorkOrderTask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@unique([pmScheduleId, pmDueOn])
+  @@index([organizationId])
+  @@index([status])
+  @@index([category])
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([tenantId])
+  @@index([assignedTechnicianId])
+  @@map("work_orders")
+}
+
+/// A line of the job. The checklist a technician works through, and the record
+/// of what was actually done — including on a preventive visit, where the
+/// schedule's `checklist` is copied onto the work order so the historic visit
+/// keeps the list it was performed against.
+model WorkOrderTask {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  description String
+  sortOrder   Int      @default(0)
+  isDone      Boolean  @default(false)
+  completedAt DateTime?
+  completedById String?
+  completedBy   User?     @relation("UserCompletedWorkOrderTasks", fields: [completedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([workOrderId])
+  @@map("work_order_tasks")
+}
+
+enum AssetType {
+  ELEVATOR
+  GENERATOR
+  HVAC
+  WATER_PUMP
+  CCTV
+  OTHER
+}
+
+/// Service state of the equipment itself, separate from its maintenance
+/// schedule: an asset can be OUT_OF_SERVICE because it broke, or SERVICE_DUE
+/// because the calendar says so, and the two call for different responses.
+/// RETIRED is terminal and means "history only" — no new work orders, no new
+/// preventive schedules, and no moving it back to service. It is a status
+/// rather than a `retiredAt` date because a state machine has one source of
+/// truth: two ways to say "we no longer own this" is how one of them rots.
+enum AssetStatus {
+  OPERATIONAL
+  SERVICE_DUE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+/// The register of plant and equipment a property owns.
+///
+/// Deliberately not a spreadsheet: `retiredAt` is a date rather than a status
+/// that can be toggled back and forth, because "we no longer own this lift" is
+/// not a reversible fact, and a retired asset must not keep generating
+/// preventive work orders.
+model Asset {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  /// Unit-level plant (a split AC, a washing machine) hangs off a unit too.
+  unitId String?
+  unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  type AssetType
+  name String
+
+  /// The tag painted on the machine. Unique per organization when present, so
+  /// a technician can be told "GEN-01" instead of "the generator", but a
+  /// property with untagged kit still accepts rows.
+  assetTag     String?
+  serialNumber String?
+  manufacturer String?
+  model        String?
+  location     String?
+  capacity     String?
+
+  installedAt      DateTime?
+  warrantyExpiresAt DateTime?
+
+  status AssetStatus @default(OPERATIONAL)
+  notes  String?     @db.Text
+
+  workOrders  WorkOrder[]
+  pmSchedules PreventiveMaintenanceSchedule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, assetTag])
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([type])
+  @@index([status])
+  @@map("assets")
+}
+
+/// A recurring service interval for one asset — the generator that needs
+/// running monthly whatever anybody asks for.
+model PreventiveMaintenanceSchedule {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String? @db.Text
+
+  /// Days between services. A frequency is the interval, not a list of future
+  /// dates: `nextDueAt` is recomputed from the service that just happened, so
+  /// a missed month does not shift every later month with it.
+  frequencyDays Int
+
+  /// Raise the work order this many days before it falls due, so there is time
+  /// to book a contractor. 0 means "raise it on the day".
+  leadTimeDays Int @default(0)
+
+  /// The steps to perform, as an array of strings. Copied onto each generated
+  /// work order rather than read at display time, so a historic visit keeps
+  /// the list it was actually done against.
+  checklist Json?
+
+  assignedTechnicianId String?
+  assignedTechnician   User?   @relation("UserPmSchedules", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+
+  active Boolean @default(true)
+
+  nextDueAt DateTime
+
+  /// The last service the sweep actually raised, and when. Reporting on
+  /// overdue plant needs "when was this last done", and deriving it from work
+  /// orders means also deriving the ones that were cancelled and never done.
+  lastRunAt DateTime?
+
+  notes String? @db.Text
+
+  workOrders WorkOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([assetId])
+  @@index([active, nextDueAt])
+  @@map("preventive_maintenance_schedules")
+}
+
+enum PmRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+/// One sweep of the schedules, so "did the generator actually get serviced in
+/// March?" is answerable from a record rather than from inference. Mirrors
+/// `RecurringBillingRun` for the same reason: a job that might run twice needs
+/// to be able to show that it ran, and what it decided not to do.
+model PreventiveMaintenanceRun {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  runOn DateTime
+  status PmRunStatus @default(RUNNING)
+
+  schedulesConsidered Int @default(0)
+  workOrdersCreated   Int @default(0)
+  schedulesSkipped    Int @default(0)
+  schedulesFailed     Int @default(0)
+
+  /// Per-schedule outcome, so a partial failure is diagnosable: which schedule,
+  /// and why nothing was raised for it.
+  details Json?
+
+  triggeredBy String?
+  errorMessage String?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([organizationId])
+  @@index([runOn])
+  @@map("preventive_maintenance_runs")
 }

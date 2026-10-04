@@ -543,3 +543,211 @@ export function formatWorkflowCurrency(value: unknown, fallback = ''): string {
         return `${fallback || 'KES'} ${amount.toLocaleString()}`;
     }
 }
+
+// ---------------------------------------------------------------------------
+// Module 9: Maintenance — work orders, plant, preventive maintenance
+// ---------------------------------------------------------------------------
+
+/**
+ * The work-order pipeline, in order.
+ *
+ * The order matters: the board renders one column per state in exactly this
+ * sequence, so a job reads left to right as it progresses. `CANCELLED` is last
+ * because it leaves the pipeline rather than moving along it.
+ */
+export const WORK_ORDER_STATUSES: Array<{
+    value: string;
+    label: string;
+    className: string;
+    /** What "done" means for this state — drives the empty-state copy. */
+    hint: string;
+}> = [
+    {
+        value: 'REQUESTED',
+        label: 'Requested',
+        className: 'bg-slate-100 text-slate-700',
+        hint: 'Reported and waiting for someone to look at it',
+    },
+    {
+        value: 'INSPECTION',
+        label: 'Inspection',
+        className: 'bg-violet-100 text-violet-700',
+        hint: 'Being assessed before anyone commits money',
+    },
+    {
+        value: 'APPROVED',
+        label: 'Approved',
+        className: 'bg-blue-100 text-blue-700',
+        hint: 'Signed off, waiting for a technician',
+    },
+    {
+        value: 'ASSIGNED',
+        label: 'Assigned',
+        className: 'bg-cyan-100 text-cyan-700',
+        hint: 'Somebody is booked to do it',
+    },
+    {
+        value: 'IN_PROGRESS',
+        label: 'In progress',
+        className: 'bg-amber-100 text-amber-800',
+        hint: 'On site, work under way',
+    },
+    {
+        value: 'COMPLETED',
+        label: 'Completed',
+        className: 'bg-emerald-100 text-emerald-700',
+        hint: 'Fixed, waiting to be signed off',
+    },
+    {
+        value: 'CLOSED',
+        label: 'Closed',
+        className: 'bg-slate-800 text-white',
+        hint: 'Done and finished with',
+    },
+    {
+        value: 'CANCELLED',
+        label: 'Cancelled',
+        className: 'bg-slate-100 text-slate-500',
+        hint: 'Called off, with the reason recorded',
+    },
+];
+
+export const WORK_ORDER_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+    WORK_ORDER_STATUSES.map((status) => [status.value, status.label]),
+);
+
+/** The states that are still live work. Mirrors `OPEN_STATUSES` on the API. */
+export const OPEN_WORK_ORDER_STATUSES = [
+    'REQUESTED',
+    'INSPECTION',
+    'APPROVED',
+    'ASSIGNED',
+    'IN_PROGRESS',
+];
+
+export const WORK_ORDER_PRIORITIES: Array<{
+    value: string;
+    label: string;
+    className: string;
+    /** The response window, so the list can say why a job is red. */
+    window: string;
+}> = [
+    { value: 'EMERGENCY', label: 'Emergency', className: 'bg-red-100 text-red-700', window: '24 hours' },
+    { value: 'HIGH', label: 'High', className: 'bg-orange-100 text-orange-700', window: '3 days' },
+    { value: 'NORMAL', label: 'Normal', className: 'bg-slate-100 text-slate-700', window: '7 days' },
+    { value: 'LOW', label: 'Low', className: 'bg-slate-100 text-slate-500', window: '30 days' },
+];
+
+export const MAINTENANCE_CATEGORIES: Array<{ value: string; label: string }> = [
+    { value: 'PLUMBING', label: 'Plumbing' },
+    { value: 'ELECTRICAL', label: 'Electrical' },
+    { value: 'CLEANING', label: 'Cleaning' },
+    { value: 'PAINTING', label: 'Painting' },
+    { value: 'SECURITY', label: 'Security' },
+    { value: 'OTHER', label: 'Other' },
+];
+
+export const WORK_ORDER_SOURCES: Array<{ value: string; label: string }> = [
+    { value: 'STAFF', label: 'Staff' },
+    { value: 'TENANT_PORTAL', label: 'Resident portal' },
+    { value: 'TENANT_REQUEST', label: 'Resident request queue' },
+    { value: 'PREVENTIVE', label: 'Preventive service' },
+];
+
+/**
+ * The buttons a work order offers, in the order the state machine allows them.
+ *
+ * These are the *offered* actions — each one asks for the fields it needs in its
+ * own dialog — so the API decides what actually happens and returns a refusal
+ * written for the person who pressed the button.
+ */
+export const WORK_ORDER_ACTIONS: Record<string, { value: string; label: string }[]> = {
+    REQUESTED: [
+        { value: 'INSPECT', label: 'Record inspection' },
+        { value: 'ASSIGN', label: 'Assign technician' },
+        { value: 'CANCEL', label: 'Cancel' },
+    ],
+    INSPECTION: [
+        { value: 'APPROVE', label: 'Approve & assign' },
+        { value: 'CANCEL', label: 'Cancel' },
+    ],
+    APPROVED: [
+        { value: 'ASSIGN', label: 'Assign technician' },
+        { value: 'CANCEL', label: 'Cancel' },
+    ],
+    ASSIGNED: [
+        { value: 'START', label: 'Start work' },
+        { value: 'CANCEL', label: 'Cancel' },
+    ],
+    IN_PROGRESS: [{ value: 'COMPLETE', label: 'Complete' }],
+    COMPLETED: [{ value: 'CLOSE', label: 'Close' }],
+    CLOSED: [],
+    CANCELLED: [],
+};
+
+export const WORK_ORDER_ACTION_LABELS: Record<string, string> = {
+    INSPECT: 'Record inspection',
+    APPROVE: 'Approve & assign',
+    ASSIGN: 'Assign technician',
+    START: 'Start work',
+    COMPLETE: 'Complete',
+    CLOSE: 'Close',
+    CANCEL: 'Cancel',
+};
+
+export const ASSET_TYPES: Array<{ value: string; label: string }> = [
+    { value: 'ELEVATOR', label: 'Lift / elevator' },
+    { value: 'GENERATOR', label: 'Generator' },
+    { value: 'HVAC', label: 'Air conditioning' },
+    { value: 'WATER_PUMP', label: 'Water pump' },
+    { value: 'CCTV', label: 'CCTV / security' },
+    { value: 'OTHER', label: 'Other plant' },
+];
+
+export const ASSET_STATUSES: Array<{
+    value: string;
+    label: string;
+    className: string;
+    hint: string;
+}> = [
+    {
+        value: 'OPERATIONAL',
+        label: 'Operational',
+        className: 'bg-emerald-100 text-emerald-700',
+        hint: 'In service',
+    },
+    {
+        value: 'SERVICE_DUE',
+        label: 'Service due',
+        className: 'bg-amber-100 text-amber-800',
+        hint: 'The service calendar says it is due',
+    },
+    {
+        value: 'OUT_OF_SERVICE',
+        label: 'Out of service',
+        className: 'bg-red-100 text-red-700',
+        hint: 'Broken or switched off',
+    },
+    {
+        value: 'RETIRED',
+        label: 'Retired',
+        className: 'bg-slate-100 text-slate-500',
+        hint: 'No longer owned; kept for its history',
+    },
+];
+
+/** Intervals offered by the schedule form, in the words people use. */
+export const PM_CADENCES: Array<{ value: number; label: string }> = [
+    { value: 7, label: 'Weekly' },
+    { value: 14, label: 'Fortnightly' },
+    { value: 30, label: 'Monthly' },
+    { value: 90, label: 'Quarterly' },
+    { value: 180, label: 'Every six months' },
+    { value: 365, label: 'Yearly' },
+];
+
+/** "Every 30 days" — for a schedule row, where days are all we store. */
+export function describeCadence(frequencyDays: number): string {
+    const match = PM_CADENCES.find((cadence) => cadence.value === frequencyDays);
+    return match ? match.label : `Every ${frequencyDays} days`;
+}

@@ -1783,3 +1783,255 @@ export interface WorkflowDelegation {
     toUser?: { id: string; firstName: string; lastName: string; email?: string };
     fromUser?: { id: string; firstName: string; lastName: string; email?: string };
 }
+
+// ---------------------------------------------------------------------------
+// Module 9: Maintenance
+// ---------------------------------------------------------------------------
+
+export type WorkOrderStatus =
+    | 'REQUESTED'
+    | 'INSPECTION'
+    | 'APPROVED'
+    | 'ASSIGNED'
+    | 'IN_PROGRESS'
+    | 'COMPLETED'
+    | 'CLOSED'
+    | 'CANCELLED';
+
+export type WorkOrderAction =
+    | 'INSPECT'
+    | 'APPROVE'
+    | 'ASSIGN'
+    | 'START'
+    | 'COMPLETE'
+    | 'CLOSE'
+    | 'CANCEL';
+
+export interface WorkOrderTask {
+    id: string;
+    workOrderId: string;
+    description: string;
+    sortOrder: number;
+    isDone: boolean;
+    completedAt?: string | null;
+    completedBy?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface WorkOrder {
+    id: string;
+    organizationId: string;
+    reference: string;
+    title: string;
+    description: string;
+    category: string;
+    priority: string;
+    status: WorkOrderStatus;
+    statusLabel?: string;
+    source: string;
+    propertyId?: string | null;
+    unitId?: string | null;
+    tenantId?: string | null;
+    assetId?: string | null;
+    assignedTechnicianId?: string | null;
+    accessInstructions?: string | null;
+    estimatedCost?: string | number | null;
+    actualCost?: string | number | null;
+    reportedAt: string;
+    scheduledFor?: string | null;
+    inspectedAt?: string | null;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    closedAt?: string | null;
+    cancelledAt?: string | null;
+    inspectionNote?: string | null;
+    resolutionNote?: string | null;
+    cancellationReason?: string | null;
+    approvalRequestedAt?: string | null;
+    pmDueOn?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    property?: { id: string; name: string } | null;
+    unit?: { id: string; name: string; property?: { name: string } | null } | null;
+    tenant?: {
+        id: string;
+        code: string;
+        accountNumber?: string;
+        surname: string;
+        otherNames?: string | null;
+        phone?: string | null;
+        email?: string | null;
+    } | null;
+    asset?: { id: string; name: string; type: string; assetTag?: string | null } | null;
+    assignedTechnician?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        phone?: string | null;
+    } | null;
+    raisedBy?: { id: string; firstName: string; lastName: string } | null;
+    tasks?: WorkOrderTask[];
+    /** Derived by the API, never stored: see `work-order-lifecycle.ts`. */
+    overdue?: boolean;
+    hoursRemaining?: number;
+    openTasks?: number;
+    availableActions?: WorkOrderAction[];
+    /** The live approval for this work order, when one was requested. */
+    approval?: WorkflowInstance | null;
+}
+
+export interface WorkOrderStats {
+    open: number;
+    overdue: number;
+    emergency: number;
+    unassigned: number;
+    scheduledThisWeek: number;
+    awaitingApproval: number;
+    byStatus: Partial<Record<WorkOrderStatus, number>>;
+    byCategory: Record<string, number>;
+}
+
+/** What a resident sees of their own requests — no money, no internal notes. */
+export interface PortalWorkOrder {
+    id: string;
+    reference: string;
+    title: string;
+    description: string;
+    category: string;
+    priority: string;
+    status: WorkOrderStatus;
+    statusLabel?: string;
+    reportedAt: string;
+    scheduledFor?: string | null;
+    completedAt?: string | null;
+    cancelledAt?: string | null;
+    cancellationReason?: string | null;
+    property?: { id: string; name: string } | null;
+    unit?: { id: string; name: string } | null;
+    assignedTechnician?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+    } | null;
+}
+
+export interface MaintenanceTechnician {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+    email?: string | null;
+    role?: string;
+    /** Live work already on their plate, for the dispatch picker. */
+    openWorkOrders?: number;
+}
+
+export interface Asset {
+    id: string;
+    organizationId: string;
+    propertyId: string;
+    unitId?: string | null;
+    type: string;
+    name: string;
+    assetTag?: string | null;
+    serialNumber?: string | null;
+    manufacturer?: string | null;
+    model?: string | null;
+    location?: string | null;
+    capacity?: string | null;
+    installedAt?: string | null;
+    warrantyExpiresAt?: string | null;
+    status: string;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    property?: { id: string; name: string } | null;
+    unit?: { id: string; name: string } | null;
+    pmSchedules?: { id: string; title: string; nextDueAt: string }[];
+    _count?: { workOrders: number };
+}
+
+export interface AssetDetail extends Asset {
+    openWorkOrders: number;
+    totalWorkOrders: number;
+    nextServiceDue?: string | null;
+    workOrders: Pick<
+        WorkOrder,
+        | 'id'
+        | 'reference'
+        | 'title'
+        | 'status'
+        | 'source'
+        | 'priority'
+        | 'reportedAt'
+        | 'completedAt'
+        | 'actualCost'
+    >[];
+    serviceHistory: {
+        id: string;
+        reference: string;
+        reportedAt: string;
+        completedAt?: string | null;
+        pmSchedule?: { title: string; frequencyDays: number } | null;
+    }[];
+}
+
+export interface AssetStats {
+    total: number;
+    serviceOverdue: number;
+    byType: Record<string, number>;
+    byStatus: Record<string, number>;
+}
+
+export interface PmSchedule {
+    id: string;
+    organizationId: string;
+    assetId: string;
+    title: string;
+    description?: string | null;
+    frequencyDays: number;
+    leadTimeDays: number;
+    checklist?: string[] | null;
+    assignedTechnicianId?: string | null;
+    active: boolean;
+    nextDueAt: string;
+    lastRunAt?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    asset?: {
+        id: string;
+        name: string;
+        type: string;
+        assetTag?: string | null;
+        status: string;
+        property?: { id: string; name: string } | null;
+    } | null;
+    assignedTechnician?: { id: string; firstName: string; lastName: string } | null;
+    /** Derived by the API. */
+    overdue?: boolean;
+    daysUntilDue?: number;
+    workOrders?: Pick<
+        WorkOrder,
+        | 'id'
+        | 'reference'
+        | 'status'
+        | 'reportedAt'
+        | 'completedAt'
+        | 'pmDueOn'
+    >[];
+}
+
+export interface PmRun {
+    id: string;
+    runOn: string;
+    status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+    schedulesConsidered: number;
+    workOrdersCreated: number;
+    schedulesSkipped: number;
+    schedulesFailed: number;
+    details?: Record<string, string> | null;
+    triggeredBy?: string | null;
+    errorMessage?: string | null;
+    startedAt: string;
+    finishedAt?: string | null;
+}

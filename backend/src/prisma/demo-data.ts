@@ -26,6 +26,12 @@ import {
   WorkflowEventType,
   WorkflowInstanceStatus,
   WorkflowStepStatus,
+  AssetType,
+  AssetStatus,
+  MaintenanceCategory,
+  WorkOrderPriority,
+  WorkOrderSource,
+  WorkOrderStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -1916,6 +1922,481 @@ async function generateWorkflowData(
   );
 }
 
+/**
+ * Module 9 — Maintenance demo data.
+ *
+ * Built so the module can be *demonstrated* rather than described: a plant
+ * register, service intervals with real checklists, and a work-order queue
+ * spread across the whole pipeline — including the two states that are easy to
+ * forget, a cancelled job and a completed one, so the closed-forever behaviour is
+ * visible rather than theoretical.
+ *
+ * References are allocated sequentially per organization, the same scheme the
+ * service uses, because the seeded rows are what makes the next reference
+ * `WO-2026-0007` instead of `WO-2026-0001`.
+ */
+async function generateMaintenanceData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const technician = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.TECHNICIAN },
+    select: { id: true },
+  });
+  const maintenanceManager = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.MAINTENANCE_MANAGER },
+    select: { id: true },
+  });
+  const assignee = technician?.id ?? maintenanceManager?.id;
+
+  const properties = await prisma.property.findMany({
+    where: { organizationId },
+    orderBy: { createdAt: 'asc' },
+    take: 4,
+    select: {
+      id: true,
+      name: true,
+      units: {
+        where: { status: UnitStatus.OCCUPIED },
+        take: 2,
+        select: {
+          id: true,
+          name: true,
+          rentalAgreements: {
+            where: { status: AgreementStatus.ACTIVE },
+            take: 1,
+            select: { tenant: { select: { id: true, code: true } } },
+          },
+        },
+      },
+    },
+  });
+  if (properties.length === 0) return;
+
+  const day = 86_400_000;
+  const now = Date.now();
+  let reference = 1;
+  const nextReference = () =>
+    `WO-${new Date().getFullYear()}-${String(reference++).padStart(4, '0')}`;
+
+  // ── the plant register ────────────────────────────────────────────────
+  const plantPlan: {
+    type: AssetType;
+    name: string;
+    assetTag: string;
+    location: string;
+    capacity?: string;
+    manufacturer?: string;
+  }[] = [
+    {
+      type: AssetType.GENERATOR,
+      name: 'Diesel standby generator',
+      assetTag: 'GEN-01',
+      location: 'Basement plant room',
+      capacity: '80 kVA',
+      manufacturer: 'Cummins',
+    },
+    {
+      type: AssetType.WATER_PUMP,
+      name: 'Booster pump set',
+      assetTag: 'PUMP-01',
+      location: 'Roof tank house',
+      capacity: '15 m³/h',
+    },
+    {
+      type: AssetType.ELEVATOR,
+      name: 'Passenger lift',
+      assetTag: 'LIFT-01',
+      location: 'Main core',
+      capacity: '8 persons',
+    },
+    {
+      type: AssetType.CCTV,
+      name: 'Perimeter camera ring',
+      assetTag: 'CCTV-01',
+      location: 'Perimeter and lobby',
+    },
+    {
+      type: AssetType.HVAC,
+      name: 'Rooftop chiller',
+      assetTag: 'HVAC-01',
+      location: 'Roof plant deck',
+      capacity: '120 kW',
+    },
+  ];
+
+  const assets: {
+    id: string;
+    name: string;
+    assetTag: string | null;
+    type: AssetType;
+    propertyId: string;
+    propertyName: string;
+  }[] = [];
+
+  for (const [index, property] of properties.entries()) {
+    const forProperty = plantPlan.slice(index % 3, index % 3 + 2);
+    for (const [offset, item] of forProperty.entries()) {
+      const asset = await prisma.asset.create({
+        data: {
+          organizationId,
+          propertyId: property.id,
+          type: item.type,
+          name: item.name,
+          // Tagged per property so two buildings never share an asset tag.
+          assetTag: `${item.assetTag}-${String.fromCharCode(
+            65 + index,
+          )}`,
+          location: item.location,
+          manufacturer: item.manufacturer ?? null,
+          capacity: item.capacity ?? null,
+          installedAt: new Date(now - (400 + offset * 120) * day),
+          warrantyExpiresAt: new Date(now + 200 * day),
+          status: AssetStatus.OPERATIONAL,
+        },
+        select: {
+          id: true,
+          name: true,
+          assetTag: true,
+          type: true,
+          propertyId: true,
+          property: { select: { name: true } },
+        },
+      });
+      assets.push({ ...asset, propertyName: property.name });
+    }
+  }
+
+  // ── preventive maintenance intervals ──────────────────────────────────
+  // Keyed by the *kind* of plant rather than by position, so "quarterly lift
+  // inspection" really is attached to a lift rather than to whatever happened to
+  // be created third.
+  const schedulePlan: {
+    assetType: AssetType;
+    title: string;
+    frequencyDays: number;
+    leadTimeDays: number;
+    nextDueInDays: number;
+    checklist: string[];
+    description: string;
+  }[] = [
+    {
+      assetType: AssetType.GENERATOR,
+      title: 'Monthly generator service',
+      frequencyDays: 30,
+      leadTimeDays: 5,
+      nextDueInDays: 4,
+      description:
+        'Oil and filter change, belt tension, battery terminals, and a 10-minute load test.',
+      checklist: [
+        'Check oil level and top up',
+        'Change engine oil and oil filter',
+        'Inspect and tension drive belts',
+        'Check battery terminals and electrolyte',
+        'Inspect fuel lines for leaks',
+        'Run under load for 10 minutes and record readings',
+      ],
+    },
+    {
+      assetType: AssetType.WATER_PUMP,
+      title: 'Weekly booster pump check',
+      frequencyDays: 7,
+      leadTimeDays: 1,
+      nextDueInDays: 1,
+      description: 'Weekly check of the roof-tank booster set.',
+      checklist: [
+        'Run pump for 5 minutes and listen for cavitation',
+        'Check for leaks at joints and seals',
+        'Confirm the pressure switch cuts in and out',
+      ],
+    },
+    {
+      assetType: AssetType.ELEVATOR,
+      title: 'Quarterly lift inspection',
+      frequencyDays: 90,
+      leadTimeDays: 14,
+      nextDueInDays: -6,
+      description:
+        'Quarterly statutory service. The car was serviced nine weeks ago and is already overdue — which is the point: the register should show it.',
+      checklist: [
+        'Test the emergency alarm and two-way communication',
+        'Inspect door closers and interlocks',
+        'Check brake and traction wear',
+        'Verify the pit stop and roof access trip',
+        'Certificate the car',
+      ],
+    },
+    {
+      assetType: AssetType.CCTV,
+      title: 'Monthly camera ring check',
+      frequencyDays: 30,
+      leadTimeDays: 3,
+      nextDueInDays: 11,
+      description: 'Walk every camera in the ring and confirm the recording.',
+      checklist: [
+        'Confirm each camera records and the timestamp is right',
+        'Clean lenses',
+        'Check the DVR storage is not full',
+      ],
+    },
+  ];
+
+  const schedules: { id: string; title: string }[] = [];
+  for (const plan of schedulePlan) {
+    const asset = assets.find((candidate) => candidate.type === plan.assetType);
+    if (!asset) continue;
+
+    const schedule = await prisma.preventiveMaintenanceSchedule.create({
+      data: {
+        organizationId,
+        assetId: asset.id,
+        title: plan.title,
+        description: plan.description,
+        frequencyDays: plan.frequencyDays,
+        leadTimeDays: plan.leadTimeDays,
+        checklist: plan.checklist,
+        ...(assignee ? { assignedTechnicianId: assignee } : {}),
+        active: true,
+        nextDueAt: new Date(now + plan.nextDueInDays * day),
+      },
+      select: { id: true, title: true },
+    });
+    schedules.push(schedule);
+  }
+
+  // ── the queue, spread across the whole pipeline ───────────────────────
+  const occupied = properties.flatMap((property) =>
+    property.units.map((unit) => ({
+      propertyId: property.id,
+      propertyName: property.name,
+      unitId: unit.id,
+      unitName: unit.name,
+      tenantId: unit.rentalAgreements[0]?.tenant.id ?? null,
+    })),
+  );
+  const first = occupied[0];
+  const second = occupied[1] ?? first;
+  if (!first) return;
+
+  const asset = assets[0];
+
+  await prisma.workOrder.create({
+    data: {
+      organizationId,
+      reference: nextReference(),
+      title: 'Water leaking from the shower mixer',
+      description:
+        'The hot shower drips constantly and there is water staining on the bathroom ceiling below.',
+      category: MaintenanceCategory.PLUMBING,
+      priority: WorkOrderPriority.HIGH,
+      status: WorkOrderStatus.IN_PROGRESS,
+      source: WorkOrderSource.TENANT_PORTAL,
+      reportedAt: new Date(now - 3 * day),
+      startedAt: new Date(now - day),
+      inspectionNote: 'Cartridge worn; the whole mixer is due for replacement.',
+      propertyId: first.propertyId,
+      unitId: first.unitId,
+      ...(first.tenantId ? { tenantId: first.tenantId } : {}),
+      ...(assignee ? { assignedTechnicianId: assignee } : {}),
+      accessInstructions: 'Key box by the main gate, code given at reception.',
+      estimatedCost: 6500,
+      tasks: {
+        create: [
+          {
+            organizationId,
+            description: 'Isolate the water supply to the bathroom',
+            sortOrder: 0,
+            isDone: true,
+            completedAt: new Date(now - day),
+            ...(assignee ? { completedById: assignee } : {}),
+          },
+          {
+            organizationId,
+            description: 'Replace the cartridge and re-seat the handle',
+            sortOrder: 1,
+            isDone: false,
+          },
+          {
+            organizationId,
+            description: 'Check the seal and test for 10 minutes',
+            sortOrder: 2,
+            isDone: false,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.workOrder.create({
+    data: {
+      organizationId,
+      reference: nextReference(),
+      title: 'Bedroom socket not working',
+      description:
+        'The socket beside the bed has no power. The one in the hallway is fine.',
+      category: MaintenanceCategory.ELECTRICAL,
+      priority: WorkOrderPriority.NORMAL,
+      status: WorkOrderStatus.ASSIGNED,
+      source: WorkOrderSource.STAFF,
+      reportedAt: new Date(now - 2 * day),
+      scheduledFor: new Date(now + day),
+      inspectionNote: 'Likely a failed socket; will replace if the circuit is sound.',
+      propertyId: second.propertyId,
+      unitId: second.unitId,
+      ...(second.tenantId ? { tenantId: second.tenantId } : {}),
+      ...(assignee ? { assignedTechnicianId: assignee } : {}),
+      estimatedCost: 1800,
+    },
+  });
+
+  await prisma.workOrder.create({
+    data: {
+      organizationId,
+      reference: nextReference(),
+      title: 'Gate lamp flickering at night',
+      description:
+        'The lamp above the main gate flickers for the first ten minutes after dark.',
+      category: MaintenanceCategory.ELECTRICAL,
+      priority: WorkOrderPriority.LOW,
+      status: WorkOrderStatus.INSPECTION,
+      source: WorkOrderSource.STAFF,
+      reportedAt: new Date(now - 9 * day),
+      inspectionNote:
+        'Failing driver rather than the lamp itself. Needs an electrician.',
+      propertyId: first.propertyId,
+      estimatedCost: 4200,
+    },
+  });
+
+  await prisma.workOrder.create({
+    data: {
+      organizationId,
+      reference: nextReference(),
+      title: 'Burst pipe in the storeroom',
+      description:
+        'Water is coming through the ceiling of the ground-floor storeroom. Seems to be the water tank feed.',
+      category: MaintenanceCategory.PLUMBING,
+      priority: WorkOrderPriority.EMERGENCY,
+      status: WorkOrderStatus.REQUESTED,
+      source: WorkOrderSource.STAFF,
+      reportedAt: new Date(now - 6 * 3_600_000),
+      propertyId: first.propertyId,
+      accessInstructions:
+        'Storeroom key is with the caretaker; gate code 4417.',
+    },
+  });
+
+  await prisma.workOrder.create({
+    data: {
+      organizationId,
+      reference: nextReference(),
+      title: 'Window handle broken in the lounge',
+      description: 'The lounge window will not latch shut.',
+      category: MaintenanceCategory.OTHER,
+      priority: WorkOrderPriority.NORMAL,
+      status: WorkOrderStatus.COMPLETED,
+      source: WorkOrderSource.TENANT_PORTAL,
+      reportedAt: new Date(now - 12 * day),
+      startedAt: new Date(now - 10 * day),
+      completedAt: new Date(now - 9 * day),
+      inspectionNote: 'Handle mechanism broken; the frame is fine.',
+      resolutionNote:
+        'Replaced the handle mechanism and latched the sash. Tested closed.',
+      propertyId: second.propertyId,
+      unitId: second.unitId,
+      ...(second.tenantId ? { tenantId: second.tenantId } : {}),
+      ...(assignee ? { assignedTechnicianId: assignee } : {}),
+      estimatedCost: 2400,
+      actualCost: 1800,
+    },
+  });
+
+  await prisma.workOrder.create({
+    data: {
+      organizationId,
+      reference: nextReference(),
+      title: 'Repaint the stairwell landing',
+      description: 'Requested after the last water incident.',
+      category: MaintenanceCategory.PAINTING,
+      priority: WorkOrderPriority.LOW,
+      status: WorkOrderStatus.CANCELLED,
+      source: WorkOrderSource.STAFF,
+      reportedAt: new Date(now - 20 * day),
+      cancelledAt: new Date(now - 15 * day),
+      cancellationReason:
+        'Duplicated by the refurbishment work already booked with the contractor.',
+    },
+  });
+
+  // One completed preventive service, so the asset's service history has
+  // something in it before the sweep has ever run.
+  const completedSchedule = schedules[0];
+  if (completedSchedule && asset) {
+    const servedOn = new Date(now - 26 * day);
+    await prisma.workOrder.create({
+      data: {
+        organizationId,
+        reference: nextReference(),
+        title: `${completedSchedule.title} — ${asset.name}`,
+        description:
+          'Scheduled preventive maintenance carried out by the site technician.',
+        category: MaintenanceCategory.ELECTRICAL,
+        priority: WorkOrderPriority.NORMAL,
+        status: WorkOrderStatus.CLOSED,
+        source: WorkOrderSource.PREVENTIVE,
+        reportedAt: servedOn,
+        startedAt: servedOn,
+        completedAt: servedOn,
+        closedAt: servedOn,
+        inspectionNote: 'Routine service as scheduled.',
+        resolutionNote:
+          'Oil and filters changed, belts and battery checked, load test passed.',
+        propertyId: asset.propertyId,
+        assetId: asset.id,
+        ...(assignee ? { assignedTechnicianId: assignee } : {}),
+        actualCost: 9500,
+        pmScheduleId: completedSchedule.id,
+        pmDueOn: new Date(
+          Date.UTC(
+            servedOn.getUTCFullYear(),
+            servedOn.getUTCMonth(),
+            servedOn.getUTCDate(),
+          ),
+        ),
+      },
+    });
+
+    await prisma.preventiveMaintenanceSchedule.update({
+      where: { id: completedSchedule.id },
+      data: { lastRunAt: servedOn },
+    });
+  }
+
+  // A record that the sweep ran, so the schedule page shows a history rather
+  // than an empty state on a fresh database.
+  await prisma.preventiveMaintenanceRun.create({
+    data: {
+      organizationId,
+      runOn: new Date(now - 26 * day),
+      status: 'COMPLETED',
+      schedulesConsidered: 4,
+      workOrdersCreated: 1,
+      schedulesSkipped: 3,
+      schedulesFailed: 0,
+      details: {
+        [completedSchedule?.id ?? 'pm-1']: 'raised WO-2026-0007',
+      },
+      triggeredBy: 'scheduled',
+      startedAt: new Date(now - 26 * day),
+      finishedAt: new Date(now - 26 * day),
+    },
+  });
+
+  console.log(
+    `  Maintenance: ${assets.length} assets, ${schedules.length} schedules, ${reference - 1} work orders`,
+  );
+}
+
 // Main function to run demo data generation standalone
 export async function seedDemoData() {
   const connectionString = process.env.DATABASE_URL;
@@ -1959,6 +2440,15 @@ export async function seedDemoData() {
     await prisma.lead.deleteMany();
     await prisma.contact.deleteMany();
     await prisma.tenant.deleteMany();
+    // Module 9: work orders point at properties, units, tenants, assets and users,
+    // and preventive schedules point at assets, so all of it is cleared before the
+    // tables they hang off. The order here is the only thing keeping this seed
+    // from tripping a foreign key on the second run.
+    await prisma.workOrderTask.deleteMany();
+    await prisma.workOrder.deleteMany();
+    await prisma.preventiveMaintenanceRun.deleteMany();
+    await prisma.preventiveMaintenanceSchedule.deleteMany();
+    await prisma.asset.deleteMany();
     await prisma.unitFeature.deleteMany();
     await prisma.unitMeterNumber.deleteMany();
     await prisma.unitServiceCharge.deleteMany();
@@ -2098,6 +2588,48 @@ export async function seedDemoData() {
       },
     });
 
+    // Maintenance staff (Module 9). Until these existed there was nobody a work
+    // order could be assigned to — the seeded Maintenance Manager and Technician
+    // roles had permissions nobody held, which is the same hole Module 5 found
+    // for the leasing role (master doc issues 51/54).
+    const maintenanceStaff = [
+      {
+        email: 'maintenance@rohi.co.ke',
+        firstName: 'Mercy',
+        lastName: 'Achieng',
+        phone: '+254700000008',
+        role: UserRole.MAINTENANCE_MANAGER,
+        organizationId: rohiOrg.id,
+      },
+      {
+        email: 'technician@rohi.co.ke',
+        firstName: 'Daniel',
+        lastName: 'Mutua',
+        phone: '+254700000009',
+        role: UserRole.TECHNICIAN,
+        organizationId: rohiOrg.id,
+      },
+      {
+        email: 'maintenance@westhill.co.ke',
+        firstName: 'Grace',
+        lastName: 'Njeri',
+        phone: '+254700000010',
+        role: UserRole.MAINTENANCE_MANAGER,
+        organizationId: defaultOrg.id,
+      },
+      {
+        email: 'technician@westhill.co.ke',
+        firstName: 'Peter',
+        lastName: 'Kariuki',
+        phone: '+254700000011',
+        role: UserRole.TECHNICIAN,
+        organizationId: defaultOrg.id,
+      },
+    ];
+    for (const staff of maintenanceStaff) {
+      await prisma.user.create({ data: { passwordHash, ...staff } });
+    }
+
     // Structured role assignments for every staff login, so the role matrix is
     // real in the demo rather than only implied by the legacy enum.
     const systemRoles = await prisma.role.findMany({
@@ -2114,6 +2646,10 @@ export async function seedDemoData() {
       { email: 'admin@rohi.co.ke', roleName: 'Company Admin' },
       { email: 'manager@rohi.co.ke', roleName: 'Property Manager' },
       { email: 'finance@rohi.co.ke', roleName: 'Accountant' },
+      { email: 'maintenance@rohi.co.ke', roleName: 'Maintenance Manager' },
+      { email: 'technician@rohi.co.ke', roleName: 'Technician' },
+      { email: 'maintenance@westhill.co.ke', roleName: 'Maintenance Manager' },
+      { email: 'technician@westhill.co.ke', roleName: 'Technician' },
     ];
     for (const assignment of staffRoleAssignments) {
       const user = await prisma.user.findUnique({
@@ -2131,6 +2667,9 @@ export async function seedDemoData() {
 
     // Generate demo data for Rohi Estate Management
     await generateDemoData(prisma, rohiOrg.id);
+
+    // Plant register, service intervals and a work-order queue (Module 9).
+    await generateMaintenanceData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.

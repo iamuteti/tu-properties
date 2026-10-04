@@ -10,6 +10,7 @@ import { NotificationTriggersService } from '../notifications/notification-trigg
 import { AuditService } from '@/modules/audit/audit.service';
 import { RentalAgreementsService } from '@/modules/leases/rental-agreements.service';
 import { MoveoutsService } from '@/modules/moveouts/moveouts.service';
+import { WorkOrdersService } from '@/modules/maintenance/work-orders.service';
 import type {
   CreateTenantRequestDto,
   DecideTenantRequestDto,
@@ -39,6 +40,7 @@ export class TenantRequestsService {
     private audit: AuditService,
     private leases: RentalAgreementsService,
     private moveouts: MoveoutsService,
+    private workOrders: WorkOrdersService,
     private notificationTriggers: NotificationTriggersService,
   ) {}
 
@@ -359,9 +361,35 @@ export class TenantRequestsService {
       };
     }
 
+    if (request.type === TenantRequestType.MAINTENANT) {
+      // Module 9 gave this request type an owning module, so approving it now
+      // files the fault rather than recording that somebody still has to.
+      const workOrder = await this.workOrders.createFromTenantRequest({
+        requestId: request.id,
+        tenantId: request.tenantId,
+        organizationId: request.organizationId,
+        description:
+          payload.notes?.trim() ||
+          'Reported through the resident request queue.',
+        payload: payload as {
+          category?: string;
+          priority?: string;
+          title?: string;
+        } | null,
+        ...(userId ? { userId } : {}),
+      });
+
+      return {
+        action: 'WORK_ORDER_RAISED',
+        workOrderId: workOrder.id,
+        workOrderReference: workOrder.reference,
+      };
+    }
+
     // No delegate yet for these types: the decision is recorded and the work is
-    // done in the owning module (Finance for a payment plan, Maintenance for a
-    // repair). Recorded here so the queue is not silently incomplete.
+    // done in the owning module (Finance for a payment plan, a lease amendment
+    // is still a manual job). Recorded here so the queue is not silently
+    // incomplete.
     return {
       action: 'RECORDED_ONLY',
       note: 'Approved — no automated action exists for this request type yet; complete it in the owning module.',

@@ -35,6 +35,7 @@ import { PortalModule } from './modules/portal/portal.module';
 import { TenantRequestsModule } from './modules/tenant-requests/tenant-requests.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -70,8 +71,9 @@ import { SecurityModule } from './security/security.module';
     SalesModule,
     InspectionsModule,
     PortalModule,
-    TenantRequestsModule,
+TenantRequestsModule,
     WorkflowModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
   providers: [

@@ -41,8 +41,13 @@ export const PERMISSION_MODULES = [
   'tax',
   'payables',
   'billing',
-  'notifications',
+'notifications',
   'workflows',
+  // Module 9 — Maintenance. Three modules, because three different jobs: the
+  // queue, the plant register and the service calendar.
+  'work_orders',
+  'assets',
+  'pm_schedules',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -137,6 +142,10 @@ export const SYSTEM_ROLES: {
       // Module 18: deciding what is waiting on them, plus the administrator's
       // separate power to rewrite the approval policy itself.
       workflows: full(),
+      // Module 9: maintenance is day-to-day company work, not an add-on.
+      work_orders: full(),
+      assets: full(),
+      pm_schedules: full(),
     }),
   },
   {
@@ -162,6 +171,12 @@ export const SYSTEM_ROLES: {
       // Module 18: refund and purchase approvals arrive at a property manager,
       // but the *policy* stays with an administrator.
       workflows: viewWrite(),
+      // Module 9: repairs happen in their buildings, so they run the queue — but
+      // the plant register and the service calendar belong to whoever maintains
+      // it, not to every property manager.
+      work_orders: full(),
+      assets: view(),
+      pm_schedules: view(),
     }),
   },
   {
@@ -195,6 +210,9 @@ export const SYSTEM_ROLES: {
       notifications: view(),
       // Module 18: they can be an approver on a policy, not the author of it.
       workflows: view(),
+      // Module 9: a leasing officer gets told about a broken door, not the asset
+      // register behind it.
+      work_orders: view(),
     }),
   },
   {
@@ -236,6 +254,10 @@ export const SYSTEM_ROLES: {
       // Module 18: money approvals are their job — the accountant is who
       // approves refunds and expenses below the director level.
       workflows: full(),
+      // Module 9: the accountant pays for repairs, so the cost figures matter —
+      // but they do not dispatch technicians or edit the plant register.
+      work_orders: view(),
+      assets: view(),
     }),
   },
   {
@@ -244,9 +266,15 @@ export const SYSTEM_ROLES: {
     permissions: set({
       properties: view(),
       units: view(),
+      tenants: view(),
       documents: viewWrite(),
-      // Module 18: work-order approvals land here once maintenance exists.
+      // Module 18: work-order approvals land here.
       workflows: viewWrite(),
+      // Module 9: the module this role exists for. Full on the queue and the
+      // register; the service calendar is theirs to set up and pause.
+      work_orders: full(),
+      assets: full(),
+      pm_schedules: full(),
     }),
   },
   {
@@ -255,6 +283,11 @@ export const SYSTEM_ROLES: {
     permissions: set({
       properties: view(),
       units: view(),
+      // Module 9: a technician needs the work order they are standing in front
+      // of, and the asset's service history to know what was done last time.
+      // They do not get the register, the calendar or the delete rights.
+      work_orders: viewWrite(),
+      assets: view(),
     }),
   },
   {
@@ -311,6 +344,12 @@ export const LEGACY_ROLE_TO_SYSTEM_ROLE: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
   ADMIN: 'Company Admin',
   PROPERTY_MANAGER: 'Property Manager',
+  // Module 5 and Module 9 added these enum values because the seeded roles had
+  // no way to be held; these two lines are what make a user with the enum value
+  // actually inherit the seeded role's permissions (master doc issues 51/54).
+  LEASING_OFFICER: 'Leasing Officer',
+  MAINTENANCE_MANAGER: 'Maintenance Manager',
+  TECHNICIAN: 'Technician',
   ACCOUNTANT: 'Accountant',
   USER: 'Tenant',
 };

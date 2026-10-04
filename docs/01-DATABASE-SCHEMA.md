@@ -1220,7 +1220,48 @@ wanted, so nobody is opted out of something they never chose.
 
 ---
 
-## Domain: Maintenance (Module: Maintenance Management) — 🆕 Not started
+## Domain: Maintenance (Module: Maintenance Management) — ✅ Built 2026-10-04 (Module 9)
+
+The target sketch below is implemented with the additions the live implementation proved
+necessary. Differences worth knowing:
+
+- **`WorkOrder.reference`** (`WO-YYYY-NNNN`, unique per organization) was added — the target had
+  only a cuid, and a work order quoted over the phone needs something readable. It is allocated
+  sequentially by the service with a retry, because two staff raising a fault in the same second
+  must not produce one order and one 500.
+- **`CANCELLED`** was added to `WorkOrderStatus`. The target chain has no way to say "not our
+  problem", which would force a duplicate report to be *completed* with a resolution note claiming
+  nothing happened — a lie in the one field a resident reads.
+- **`title`, `priority`, `source`, `accessInstructions`, `estimatedCost`, `actualCost`, `tenantId`,
+  `assetId`, `inspectionNote`, `resolutionNote`, `cancellationReason`** were added: the first three
+  are what a queue is sorted by, `accessInstructions` is the difference between a visit and a wasted
+  one, and the two notes are the fields people actually read (the approver reads the inspection, the
+  resident reads the resolution).
+- **`WorkOrderTask`** is a new table: the checklist a technician works through and the record of what
+  was done. Completion is refused while items are open, because a "completed" repair with an empty
+  checklist is how a half-finished job gets closed.
+- **`(pmScheduleId, pmDueOn)` is unique** on `WorkOrder`. That is the preventive sweep's idempotency
+  guard, in the database rather than in the scheduler's memory — the same lesson as
+  `RecurringBillingRun`. Both columns are nullable and NULLs are distinct in a Postgres unique index,
+  so ordinary work orders never collide with each other.
+- **`PreventiveMaintenanceRun`** records each sweep (considered/created/skipped/failed plus a
+  per-schedule detail), mirroring `RecurringBillingRun`, so "was the generator serviced in March?" is
+  answerable from a record rather than from inference.
+- **`Asset.assetTag`** is unique per organization *when present* — a property with untagged kit still
+  accepts rows — and `Asset.status` is a small validated machine where `RETIRED` is terminal, so the
+  sweep never services equipment the company no longer owns.
+- **`UserRole` gained `MAINTENANCE_MANAGER` and `TECHNICIAN`** so the two seeded roles can actually be
+  held (a work order had nobody to assign), and `Property`/`Unit`/`Tenant`/`User` gained the
+  back-relations.
+- **Money is `Decimal(12,2)`**, not integer cents, matching the other money columns in this schema.
+  The integer-cents convention elsewhere in this doc applies to ledger and invoice maths; a repair
+  estimate is a figure somebody types, not a total nobody sums.
+
+Migration `20261004155053_module9_maintenance`; the implemented schema lives in
+`backend/src/prisma/schema.prisma`. The target sketch is kept below for comparison.
+
+---
+
 
 ```prisma
 model WorkOrder {

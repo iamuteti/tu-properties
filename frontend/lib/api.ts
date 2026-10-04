@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -1754,4 +1754,217 @@ export const workflowsApi = {
 
     removeDelegation: (id: string) =>
         api.delete<{ deleted: boolean }>(`/workflows/delegations/${id}`),
+};
+
+/**
+ * Module 9 — Maintenance.
+ *
+ * Every state change is its own method rather than a generic `update(status)`:
+ * the API refuses an illegal transition with a message, so the client should not
+ * be able to ask for one. The list methods return whatever the endpoint returns
+ * rather than normalising, because the endpoints already scope to the caller.
+ */
+export const maintenanceApi = {
+    // ── Work orders ─────────────────────────────────────────────────────────
+    workOrders: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<WorkOrder[]>('/maintenance/work-orders', { params }),
+
+    workOrder: (id: string) => api.get<WorkOrder>(`/maintenance/work-orders/${id}`),
+
+    workOrderStats: () => api.get<WorkOrderStats>('/maintenance/work-orders/stats'),
+
+    /**
+     * Browser-navigable CSV download. The httpOnly cookie is sent
+     * automatically, so this can be opened in a new tab — which is why the
+     * export endpoints are GET and not a POST returning a blob.
+     */
+    workOrdersExportUrl: (params?: {
+        status?: string;
+        category?: string;
+        priority?: string;
+        propertyId?: string;
+        open?: string;
+        search?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/maintenance/work-orders/export${search ? `?${search}` : ''}`;
+    },
+
+    /** Who can be dispatched, with their live workload. */
+    technicians: () =>
+        api.get<MaintenanceTechnician[]>('/maintenance/work-orders/technicians'),
+
+    createWorkOrder: (data: {
+        title: string;
+        description: string;
+        category: string;
+        priority?: string;
+        propertyId?: string;
+        unitId?: string;
+        tenantId?: string;
+        assetId?: string;
+        accessInstructions?: string;
+        estimatedCost?: number;
+        scheduledFor?: string;
+        assignedTechnicianId?: string;
+    }) => api.post<WorkOrder>('/maintenance/work-orders', data),
+
+    /** Descriptive fields only — the API has no status field here by design. */
+    updateWorkOrder: (
+        id: string,
+        data: {
+            title?: string;
+            description?: string;
+            category?: string;
+            priority?: string;
+            propertyId?: string;
+            unitId?: string;
+            assetId?: string;
+            accessInstructions?: string;
+            estimatedCost?: number;
+            scheduledFor?: string;
+        },
+    ) => api.patch<WorkOrder>(`/maintenance/work-orders/${id}`, data),
+
+    deleteWorkOrder: (id: string) =>
+        api.delete<{ message: string }>(`/maintenance/work-orders/${id}`),
+
+    inspectWorkOrder: (id: string, data: { inspectionNote: string; estimatedCost?: number }) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/inspect`, data),
+
+    /** The direct approve-and-dispatch path, with no approval policy involved. */
+    approveWorkOrder: (
+        id: string,
+        data: { technicianId: string; scheduledFor?: string; note?: string },
+    ) => api.post<WorkOrder>(`/maintenance/work-orders/${id}/approve`, data),
+
+    /** Routes through the approval engine. Auto-approves if no policy exists. */
+    requestWorkOrderApproval: (id: string) =>
+        api.post<{ approval: WorkflowInstance; workOrder: WorkOrder }>(
+            `/maintenance/work-orders/${id}/request-approval`,
+        ),
+
+    assignWorkOrder: (id: string, data: { technicianId: string; scheduledFor?: string }) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/assign`, data),
+
+    reassignWorkOrder: (id: string, technicianId: string) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/reassign`, { technicianId }),
+
+    startWorkOrder: (id: string) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/start`),
+
+    completeWorkOrder: (id: string, data: { resolutionNote: string; actualCost?: number }) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/complete`, data),
+
+    closeWorkOrder: (id: string) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/close`),
+
+    cancelWorkOrder: (id: string, reason: string) =>
+        api.post<WorkOrder>(`/maintenance/work-orders/${id}/cancel`, { reason }),
+
+    /** Per-row outcomes: some rows are refused and some are not. */
+    bulkAssignWorkOrders: (data: {
+        workOrderIds: string[];
+        technicianId: string;
+        scheduledFor?: string;
+    }) =>
+        api.post<{ assigned: number; failed: number; results: { id: string; ok: boolean; reason?: string }[] }>(
+            '/maintenance/work-orders/bulk-assign',
+            data,
+        ),
+
+    addWorkOrderTask: (id: string, description: string) =>
+        api.post<WorkOrderTask>(`/maintenance/work-orders/${id}/tasks`, { description }),
+
+    setWorkOrderTaskDone: (id: string, taskId: string, isDone: boolean) =>
+        api.patch<WorkOrderTask>(`/maintenance/work-orders/${id}/tasks/${taskId}`, { isDone }),
+
+    deleteWorkOrderTask: (id: string, taskId: string) =>
+        api.delete<{ message: string }>(`/maintenance/work-orders/${id}/tasks/${taskId}`),
+
+    // ── Asset register ─────────────────────────────────────────────────────
+    assets: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<Asset[]>('/maintenance/assets', { params }),
+
+    asset: (id: string) => api.get<AssetDetail>(`/maintenance/assets/${id}`),
+
+    assetStats: () => api.get<AssetStats>('/maintenance/assets/stats'),
+
+    assetsExportUrl: (params?: {
+        type?: string;
+        status?: string;
+        propertyId?: string;
+        search?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/maintenance/assets/export${search ? `?${search}` : ''}`;
+    },
+
+    createAsset: (data: Record<string, string | number | undefined>) =>
+        api.post<Asset>('/maintenance/assets', data),
+
+    updateAsset: (id: string, data: Record<string, string | number | null | undefined>) =>
+        api.patch<Asset>(`/maintenance/assets/${id}`, data),
+
+    changeAssetStatus: (id: string, status: string) =>
+        api.post<Asset>(`/maintenance/assets/${id}/status`, { status }),
+
+    deleteAsset: (id: string) =>
+        api.delete<{ message: string }>(`/maintenance/assets/${id}`),
+
+    // ── Preventive maintenance ──────────────────────────────────────────────
+    pmSchedules: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<PmSchedule[]>('/maintenance/pm-schedules', { params }),
+
+    pmSchedule: (id: string) => api.get<PmSchedule>(`/maintenance/pm-schedules/${id}`),
+
+    pmStats: () =>
+        api.get<{ active: number; overdue: number; dueThisWeek: number }>(
+            '/maintenance/pm-schedules/stats',
+        ),
+
+    pmRuns: () => api.get<PmRun[]>('/maintenance/pm-schedules/runs'),
+
+    createPmSchedule: (data: Record<string, string | number | string[] | undefined>) =>
+        api.post<PmSchedule>('/maintenance/pm-schedules', data),
+
+    updatePmSchedule: (
+        id: string,
+        data: Record<string, string | number | boolean | string[] | undefined>,
+    ) => api.patch<PmSchedule>(`/maintenance/pm-schedules/${id}`, data),
+
+    deletePmSchedule: (id: string) =>
+        api.delete<{ message: string }>(`/maintenance/pm-schedules/${id}`),
+
+    /** Raise one schedule's work order now. Refused if it is not due yet. */
+    runPmSchedule: (id: string) =>
+        api.post<{ created: boolean; id?: string; reference?: string }>(
+            `/maintenance/pm-schedules/${id}/run`,
+        ),
+
+    /** The daily sweep, by hand. Idempotent, so a missed day is recoverable. */
+    runDuePmSchedules: () =>
+        api.post<PmRun>('/maintenance/pm-schedules/run-due'),
+
+    // ── Resident portal ─────────────────────────────────────────────────────
+    portalWorkOrders: () => api.get<PortalWorkOrder[]>('/portal/maintenance'),
+
+    reportIssue: (data: {
+        title: string;
+        description: string;
+        category: string;
+        priority?: string;
+        accessInstructions?: string;
+    }) => api.post<PortalWorkOrder>('/portal/maintenance', data),
+
+    withdrawIssue: (id: string) =>
+        api.post<PortalWorkOrder>(`/portal/maintenance/${id}/withdraw`),
 };

@@ -36,6 +36,10 @@ Receipt,
     TrendingDown,
     CheckSquare,
     GitBranch,
+    Wrench,
+    KanbanSquare,
+    CalendarClock,
+    Settings2,
 } from "lucide-react";
 
 type UserRole =
@@ -43,6 +47,8 @@ type UserRole =
     | 'ADMIN'
     | 'PROPERTY_MANAGER'
     | 'LEASING_OFFICER'
+    | 'MAINTENANCE_MANAGER'
+    | 'TECHNICIAN'
     | 'ACCOUNTANT'
     | 'USER';
 
@@ -59,9 +65,23 @@ interface NavItem {
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
     { href: "/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
+// Module 9 — Maintenance. The queue is where the work is; the register and the
+    // service calendar are what the queue is judged against, so a technician gets
+    // all three but a leasing officer only needs to see that the queue exists.
     {
-        label: "Landlords",
-        icon: Landmark,
+        label: 'Maintenance',
+        icon: Wrench,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'],
+        children: [
+            { href: '/maintenance/work-orders', label: 'Work orders', icon: Wrench, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'] },
+            { href: '/maintenance/work-orders/board', label: 'Board', icon: KanbanSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
+            { href: '/maintenance/assets', label: 'Plant register', icon: Settings2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
+            { href: '/maintenance/schedules', label: 'Service schedule', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
+        ],
+    },
+    {
+        label: 'Landlords',
+    icon: Landmark,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
         children: [
             { href: "/landlords", label: "Owners", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
@@ -144,6 +164,10 @@ const roleLabels: Record<UserRole, string> = {
     ADMIN: 'Admin',
     PROPERTY_MANAGER: 'Property Manager',
     LEASING_OFFICER: 'Leasing Officer',
+    // Module 9: these two enum values were added because a work order needs
+    // somebody to assign it to (master doc issues 51/54).
+    MAINTENANCE_MANAGER: 'Maintenance Manager',
+    TECHNICIAN: 'Technician',
     ACCOUNTANT: 'Accountant',
     USER: 'User',
 };

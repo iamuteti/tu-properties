@@ -6,6 +6,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { RentalAgreementsService } from '@/modules/leases/rental-agreements.service';
 import { MoveoutsService } from '@/modules/moveouts/moveouts.service';
+import { WorkOrdersService } from '@/modules/maintenance/work-orders.service';
 import { NotificationTriggersService } from '@/modules/notifications/notification-triggers.service';
 
 /**
@@ -92,6 +93,16 @@ describe('TenantRequestsService', () => {
         { provide: AuditService, useValue: { logAction: jest.fn() } },
         { provide: RentalAgreementsService, useValue: leases },
         { provide: MoveoutsService, useValue: moveouts },
+        // Module 9: a MAINTENANT request delegates to the maintenance module, so
+        // approving one files a real work order rather than a "to do" note.
+        {
+          provide: WorkOrdersService,
+          useValue: {
+            createFromTenantRequest: jest
+              .fn()
+              .mockResolvedValue({ id: 'wo-1', reference: 'WO-2026-0001' }),
+          },
+        },
         // Delivery of the decision to the resident is Module 17's job and is
         // best-effort; stubbed here so the leasing rules can be tested alone.
         { provide: NotificationTriggersService, useValue: { notifyRequestDecision: jest.fn() } },

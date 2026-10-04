@@ -85,6 +85,23 @@ const STATUS_STYLES: Record<string, string> = {
     // Unit types
     two: 'bg-slate-100 text-slate-700',
     one: 'bg-slate-100 text-slate-700',
+    // Module 9: work-order pipeline. The order is the pipeline — grey while
+    // nobody has looked at it, violet for the assessment, blue once it is
+    // signed off, cyan when somebody owns it, amber while it is happening,
+    // green when it is done and near-black when it is closed.
+    REQUESTED: 'bg-slate-100 text-slate-700',
+    INSPECTION: 'bg-violet-100 text-violet-700',
+    APPROVED: 'bg-blue-100 text-blue-700',
+    ASSIGNED: 'bg-cyan-100 text-cyan-700',
+    IN_PROGRESS: 'bg-amber-100 text-amber-800',
+    COMPLETED: 'bg-emerald-100 text-emerald-700',
+    CLOSED: 'bg-slate-800 text-white',
+    CANCELLED: 'bg-slate-100 text-slate-500',
+    // Module 9: asset service state.
+    OPERATIONAL: 'bg-emerald-100 text-emerald-700',
+    SERVICE_DUE: 'bg-amber-100 text-amber-800',
+    OUT_OF_SERVICE: 'bg-red-100 text-red-700',
+    RETIRED: 'bg-slate-100 text-slate-500',
 };
 
 /** Coloured status pill, shared by property and unit lists/details. */
