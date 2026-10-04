@@ -94,6 +94,7 @@ model Organization {
   supplierBills     SupplierBill[]
   billPayments      BillPayment[]
   supplierCredits   SupplierCredit[]
+  recurringBillingRuns RecurringBillingRun[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1723,6 +1724,12 @@ model Invoice {
   // Status
   status InvoiceStatus @default(PENDING)
 
+  // Recurring billing (Module 7): the period this invoice bills for, e.g.
+  // "2026-10". Set only by the generator, and unique per lease — so a second run
+  // of the same period cannot produce a duplicate rent bill, which is the whole
+  // reason a scheduler needs one. Null on every manually raised invoice.
+  billingPeriod String?
+
   // Payment tracking
   paidAmount    Decimal @default(0) @db.Decimal(10, 2)
   balanceAmount Decimal @db.Decimal(10, 2)
@@ -1757,6 +1764,7 @@ model Invoice {
   updatedAt       DateTime         @updatedAt
   saleInstallment SaleInstallment?
 
+  @@unique([rentalAgreementId, billingPeriod])
   @@index([rentalAgreementId])
   @@index([saleTransactionId])
   @@index([status])
@@ -2707,6 +2715,47 @@ model SupplierCreditApplication {
   @@index([creditId])
   @@index([billId])
   @@map("supplier_credit_applications")
+}
+
+/// One execution of the recurring billing job, kept so an operator can answer
+/// "did rent go out this month?" without reading logs. Failures are recorded
+/// per lease rather than aborting the run: one bad lease must not stop the other
+/// two hundred from being billed.
+model RecurringBillingRun {
+  id String @id @default(cuid())
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// The day the run was for, e.g. "2026-10-01".
+  billingDate DateTime
+  /// The period billed, e.g. "2026-10".
+  billingPeriod String
+
+  invoicesCreated Int @default(0)
+  leasesSkipped   Int @default(0)
+  leasesFailed    Int @default(0)
+
+  /// Per-lease outcome, including why a lease was skipped or what it failed on.
+  details Json?
+
+  status RecurringRunStatus @default(COMPLETED)
+  errorMessage String? @db.Text
+
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+
+  triggeredBy String? // null for the scheduled run
+
+  @@index([organizationId])
+  @@index([billingPeriod])
+  @@map("recurring_billing_runs")
+}
+
+enum RecurringRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 model ReceiptLine {

@@ -4,6 +4,7 @@ import { CreditsModule } from './credits/credits.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { TaxModule } from './tax/tax.module';
 import { PayablesModule } from './payables/payables.module';
+import { RecurringBillingModule } from './recurring/recurring-billing.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -15,6 +16,8 @@ import { PaymentsModule } from './payments/payments.module';
     // Invoices need the tax engine to price themselves, so it goes first.
     TaxModule,
     PayablesModule,
+    // Imports InvoicesModule itself, so it must come after it.
+    RecurringBillingModule,
     InvoicesModule,
     ReceiptsModule,
     PaymentsModule,
@@ -30,6 +33,7 @@ import { PaymentsModule } from './payments/payments.module';
     ReceiptsModule,
     PaymentsModule,
     RefundsModule,
+    RecurringBillingModule,
   ],
 })
 export class FinanceModule {}

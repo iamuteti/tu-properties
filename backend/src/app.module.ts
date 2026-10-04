@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { PublicGuard } from './security/guards/public.guard';
 import { RolesGuard } from './security/guards/roles.guard';
@@ -39,6 +40,9 @@ import { SecurityModule } from './security/security.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // Recurring billing and other scheduled work. Registered here because a
+    // @Cron() only fires if the scheduler is in the application context.
+    ScheduleModule.forRoot(),
     PrismaModule,
     SecurityModule,
     PermissionsModule,

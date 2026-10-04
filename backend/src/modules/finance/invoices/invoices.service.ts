@@ -15,14 +15,48 @@ export class InvoicesService {
   ) {}
 
   // Generate invoice number
-  private generateInvoiceNumber(): string {
+  /**
+   * An invoice number nobody is using.
+   *
+   * The obvious implementation — four random digits — collides about once per
+   * few hundred invoices by the birthday bound, and a bulk run generates
+   * hundreds at a time. A collision here throws on a unique constraint, which
+   * in the recurring job looks indistinguishable from "already billed" and
+   * silently loses a tenant's invoice. So the number is checked before use, and
+   * a counter is the fallback rather than more randomness.
+   */
+  private async generateInvoiceNumber(
+    tx: Prisma.TransactionClient,
+    billingPeriod?: string,
+  ): Promise<string> {
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0');
-    return `INV-${year}${month}-${random}`;
+
+    if (billingPeriod) {
+      const taken = await tx.invoice.count({ where: { billingPeriod } });
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = `INV-${billingPeriod}-${String(taken + attempt + 1).padStart(5, '0')}`;
+        const clash = await tx.invoice.findUnique({
+          where: { invoiceNumber: candidate },
+          select: { id: true },
+        });
+        if (!clash) return candidate;
+      }
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const random = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+      const candidate = `INV-${year}${month}-${random}`;
+      const clash = await tx.invoice.findUnique({
+        where: { invoiceNumber: candidate },
+        select: { id: true },
+      });
+      if (!clash) return candidate;
+    }
+
+    // Last resort: guaranteed unique, if less readable.
+    return `INV-${year}${month}-${Date.now().toString(36).toUpperCase()}`;
   }
 
   async create(
@@ -48,6 +82,13 @@ export class InvoicesService {
       paidAmount?: number;
       balanceAmount: number;
       status?: string;
+      /**
+       * Recurring billing tags its invoices with the period they bill for. It is
+       * set on insert, not afterwards, so the unique constraint on
+       * (rentalAgreementId, billingPeriod) fires inside the insert — a duplicate
+       * run is refused atomically instead of two invoices existing briefly.
+       */
+      billingPeriod?: string;
       /**
        * Compute tax from the organization's configured rules instead of the
        * amounts supplied. Omitted tax amounts already imply this — an explicit
@@ -90,7 +131,9 @@ export class InvoicesService {
         : Number(data.balanceAmount);
 
       const invoiceData: Prisma.InvoiceCreateInput = {
-        invoiceNumber: data.invoiceNumber || this.generateInvoiceNumber(),
+        invoiceNumber:
+          data.invoiceNumber ||
+          (await this.generateInvoiceNumber(tx, data.billingPeriod)),
         transactionClass: data.transactionClass,
         acReceivable: data.acReceivable,
         billTo: data.billTo,
@@ -109,6 +152,7 @@ export class InvoicesService {
         paidAmount: data.paidAmount || 0,
         balanceAmount,
         status: (data.status as never) || 'PENDING',
+        billingPeriod: data.billingPeriod,
         taxWithheldAmount: priced?.withheldTax ?? 0,
         taxJurisdiction: priced?.jurisdiction || undefined,
         taxBasis: priced?.basis,

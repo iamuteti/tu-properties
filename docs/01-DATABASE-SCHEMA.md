@@ -1169,6 +1169,30 @@ silent "Other Expense".
 
 ---
 
+## Domain: Recurring Billing (Module: Finance & Accounting) — ✅ landed 2026-10-04
+
+Migration `20261004050000_module7_recurring_billing` added `RecurringBillingRun`
+with the `RecurringRunStatus` enum, plus two things on `Invoice` that matter
+more than the run table:
+
+- **`billingPeriod String?`** — the period a generated invoice bills for,
+  e.g. `"2026-10"`. Null on every manually raised invoice.
+- **`@@unique([rentalAgreementId, billingPeriod])`** — the idempotency guard.
+  A scheduler that runs twice, or two instances, or a pressed button, must not
+  bill a tenant twice, and the only reliable place to enforce that is the
+  database. Postgres allows many NULLs in a unique index, so manual invoices are
+  unaffected.
+
+Because of that constraint, anything that generates invoices must set
+`billingPeriod` **in the insert**. Setting it in a follow-up `update` leaves a
+window in which two identical invoices both exist.
+
+`RecurringBillingRun` keeps one row per execution with per-lease outcomes in
+`details`, because a scheduler that silently does nothing is indistinguishable
+from a broken one.
+
+---
+
 ## Domain: Maintenance (Module: Maintenance Management) — 🆕 Not started
 
 ```prisma
