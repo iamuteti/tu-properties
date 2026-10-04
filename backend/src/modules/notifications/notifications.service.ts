@@ -8,6 +8,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { requireRecord } from '@/common/utils';
+import { NotificationConfigService } from './notification-config.service';
+import { SmsProviderRegistry } from './sms-provider-registry';
 
 type Tx = Prisma.TransactionClient;
 
@@ -55,11 +57,14 @@ export interface DeliveryResult {
 export interface NotificationChannelProvider {
   readonly channel: NotificationChannel;
   isConfigured(): boolean;
-  deliver(notification: {
-    title: string;
-    body: string;
-    to: { email?: string | null; phone?: string | null };
-  }): Promise<DeliveryResult>;
+  deliver(
+    notification: {
+      title: string;
+      body: string;
+      to: { email?: string | null; phone?: string | null };
+    },
+    organizationId?: string,
+  ): Promise<DeliveryResult>;
 }
 
 /**
@@ -75,8 +80,13 @@ export class InAppChannelProvider implements NotificationChannelProvider {
     return true;
   }
 
-  async deliver(): Promise<DeliveryResult> {
-    return { channel: this.channel, status: NotificationStatus.SENT };
+  // Nothing to await: the in-app channel "delivers" by being readable in the
+  // notification list, which the row itself is.
+  deliver(): Promise<DeliveryResult> {
+    return Promise.resolve({
+      channel: this.channel,
+      status: NotificationStatus.SENT,
+    });
   }
 }
 
@@ -98,7 +108,7 @@ abstract class UnconfiguredChannelProvider implements NotificationChannelProvide
     return false;
   }
 
-  async deliver(notification: {
+  deliver(notification: {
     title: string;
     to: { email?: string | null; phone?: string | null };
   }): Promise<DeliveryResult> {
@@ -107,11 +117,11 @@ abstract class UnconfiguredChannelProvider implements NotificationChannelProvide
         notification.to.email ? ` to ${notification.to.email}` : ''
       }`,
     );
-    return {
+    return Promise.resolve({
       channel: this.channel,
       status: NotificationStatus.SUPPRESSED,
       reason: `No ${this.channel} provider is configured`,
-    };
+    });
   }
 }
 
@@ -120,9 +130,73 @@ export class EmailChannelProvider extends UnconfiguredChannelProvider {
   readonly channel = NotificationChannel.EMAIL;
 }
 
+/**
+ * SMS: routed to whichever provider the organization has made active.
+ *
+ * There is deliberately no "configured" here beyond having an active row: the
+ * admin panel enforces one provider per channel, so this resolves a single
+ * vendor and calls it. With nothing active the channel is SUPPRESSED with the
+ * reason, which is the honest outcome — an SMS nobody set up did not fail, it
+ * was never going to be sent.
+ */
 @Injectable()
-export class SmsChannelProvider extends UnconfiguredChannelProvider {
+export class SmsChannelProvider implements NotificationChannelProvider {
   readonly channel = NotificationChannel.SMS;
+
+  constructor(
+    private prisma: PrismaService,
+    private readonly config: NotificationConfigService,
+    private readonly providers: SmsProviderRegistry,
+  ) {}
+
+  /** Whether *any* organization has SMS set up — see `deliver` for the rest. */
+  isConfigured(): boolean {
+    return true;
+  }
+
+  async deliver(
+    notification: {
+      title: string;
+      body: string;
+      to: { email?: string | null; phone?: string | null };
+    },
+    organizationId?: string,
+  ): Promise<DeliveryResult> {
+    const target = notification.to.phone;
+    if (!target) {
+      return {
+        channel: this.channel,
+        status: NotificationStatus.SUPPRESSED,
+        reason: 'Recipient has no phone number on file',
+      };
+    }
+
+    const active = await this.config.activeProvider(
+      organizationId,
+      this.channel,
+    );
+    if (!active) {
+      return {
+        channel: this.channel,
+        status: NotificationStatus.SUPPRESSED,
+        reason: 'No SMS provider is active — configure one in the admin panel',
+      };
+    }
+
+    const result = await this.providers
+      .resolve(active.provider)
+      .send(
+        active.credentials as never,
+        { to: target, body: notification.body },
+        active.settings,
+      );
+
+    return {
+      channel: this.channel,
+      status: result.status,
+      reason: result.reason,
+    };
+  }
 }
 
 @Injectable()
@@ -161,7 +235,10 @@ export class NotificationsService {
     for (const channel of channels) {
       // A critical alert ignores opt-outs: being overcharged, or a lease ending,
       // is not something a tenant can consent to missing.
-      if (!priorityIsCritical(priority) && !(await this.wants(recipient, request.type, channel))) {
+      if (
+        !priorityIsCritical(priority) &&
+        !(await this.wants(recipient, request.type, channel))
+      ) {
         results.push({
           channel,
           status: NotificationStatus.SUPPRESSED,
@@ -185,11 +262,16 @@ export class NotificationsService {
           reason: `No ${channel} provider is configured`,
         };
       } else {
-        outcome = await provider.deliver({
-          title: request.title,
-          body: request.body,
-          to: contact,
-        });
+        outcome = await provider.deliver(
+          {
+            title: request.title,
+            body: request.body,
+            to: contact,
+          },
+          // Which provider is active is per-organization, so the channel has to
+          // be told whose configuration to read.
+          request.organizationId,
+        );
       }
 
       results.push(outcome);
@@ -261,7 +343,9 @@ export class NotificationsService {
     }
   }
 
-  private providerFor(channel: NotificationChannel): NotificationChannelProvider | null {
+  private providerFor(
+    channel: NotificationChannel,
+  ): NotificationChannelProvider | null {
     switch (channel) {
       case NotificationChannel.IN_APP:
         return this.inApp;
@@ -326,7 +410,9 @@ export class NotificationsService {
     return this.prisma.notification.findMany({
       where: {
         userId,
-        ...(options?.unreadOnly ? { readAt: null, status: NotificationStatus.SENT } : {}),
+        ...(options?.unreadOnly
+          ? { readAt: null, status: NotificationStatus.SENT }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(options?.limit ?? 50, 200),
@@ -334,11 +420,16 @@ export class NotificationsService {
   }
 
   /** For portal residents, who have no user account of their own. */
-  async listForTenant(tenantId: string, options?: { unreadOnly?: boolean; limit?: number }) {
+  async listForTenant(
+    tenantId: string,
+    options?: { unreadOnly?: boolean; limit?: number },
+  ) {
     return this.prisma.notification.findMany({
       where: {
         tenantId,
-        ...(options?.unreadOnly ? { readAt: null, status: NotificationStatus.SENT } : {}),
+        ...(options?.unreadOnly
+          ? { readAt: null, status: NotificationStatus.SENT }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(options?.limit ?? 50, 200),

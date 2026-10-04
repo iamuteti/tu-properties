@@ -29,9 +29,14 @@ describe('NotificationTriggersService', () => {
     };
   }
 
-  function mockPrisma(leases: ReturnType<typeof lease>[] = [], invoices: unknown[] = []) {
+  function mockPrisma(
+    leases: ReturnType<typeof lease>[] = [],
+    invoices: unknown[] = [],
+  ) {
     return {
-      organization: { findMany: jest.fn().mockResolvedValue([{ id: 'org-1' }]) },
+      organization: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'org-1' }]),
+      },
       rentalAgreement: { findMany: jest.fn().mockResolvedValue(leases) },
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
       user: { findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }) },
@@ -43,7 +48,9 @@ describe('NotificationTriggersService', () => {
     notifications = {
       notify: jest
         .fn()
-        .mockResolvedValue([{ channel: 'IN_APP', status: NotificationStatus.SENT }]),
+        .mockResolvedValue([
+          { channel: 'IN_APP', status: NotificationStatus.SENT },
+        ]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -82,7 +89,9 @@ describe('NotificationTriggersService', () => {
     ]);
     await service.runDailyReminders(new Date('2026-10-01'));
 
-    const keys = notifications.notify.mock.calls.map((call) => call[0].dedupeKey);
+    const keys = notifications.notify.mock.calls.map(
+      (call) => call[0].dedupeKey,
+    );
     // 20 days is inside the 30- and 14-day windows, not the 60-day one.
     expect(keys).toContain('lease-expiring:lease-1:30');
     expect(keys).not.toContain('lease-expiring:lease-1:60');

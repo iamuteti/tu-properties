@@ -97,6 +97,7 @@ model Organization {
   recurringBillingRuns RecurringBillingRun[]
   notifications       Notification[]
   notificationPreferences NotificationPreference[]
+  notificationChannelConfigs NotificationChannelConfig[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2823,6 +2824,44 @@ enum NotificationStatus {
   /// and the message is not critical. Distinct from FAILED so an operator can
   /// tell "we chose not to" from "we tried and it broke".
   SUPPRESSED
+}
+
+/// Module 17 — Notifications: which provider sends a channel, and with what
+/// credentials.
+///
+/// One row per channel per organization, which is what enforces "only one
+/// provider active at a time" — there is no second row to activate. Credentials
+/// are stored **encrypted**, never in plaintext: an admin panel that writes
+/// secrets to a readable column has turned every database backup into a
+/// credential leak.
+model NotificationChannelConfig {
+  id String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  channel NotificationChannel
+
+  /// Which vendor to use: TWILIO or AFRICAS_TALKING for SMS. Stored as a string
+  /// rather than an enum so a third provider can be added by registering it in
+  /// the service without a migration.
+  provider String
+
+  /// AES-256-GCM ciphertext of the provider's credentials, as JSON.
+  credentialsEncrypted String @db.Text
+
+  /// Non-secret settings (sender id, sender name, region). Safe to read.
+  settings Json?
+
+  isActive Boolean @default(false)
+
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, channel])
+  @@index([organizationId])
+  @@map("notification_channel_configs")
 }
 
 /// Per-recipient channel preferences. A missing row means "all channels on",

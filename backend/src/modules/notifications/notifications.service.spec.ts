@@ -10,6 +10,8 @@ import {
   NotificationsService,
   SmsChannelProvider,
 } from './notifications.service';
+import { NotificationConfigService } from './notification-config.service';
+import { SmsProviderRegistry } from './sms-provider-registry';
 import { PrismaService } from '@/prisma/prisma.service';
 
 /**
@@ -32,7 +34,9 @@ describe('NotificationsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue({ id: 'n-1', readAt: null }),
         findUnique: jest.fn().mockResolvedValue(null),
-        update: jest.fn().mockImplementation(({ data }: any) => ({ id: 'n-1', ...data })),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }: any) => ({ id: 'n-1', ...data })),
         updateMany: jest.fn().mockResolvedValue({ count: 3 }),
         count: jest.fn().mockResolvedValue(2),
       },
@@ -40,8 +44,16 @@ describe('NotificationsService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn().mockImplementation(({ data }: any) => data),
       },
-      user: { findUnique: jest.fn().mockResolvedValue({ email: 'a@b.co', phone: '0700' }) },
-      tenant: { findUnique: jest.fn().mockResolvedValue({ email: 't@b.co', phone: '0701' }) },
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ email: 'a@b.co', phone: '0700' }),
+      },
+      tenant: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ email: 't@b.co', phone: '0701' }),
+      },
     };
   }
 
@@ -54,6 +66,14 @@ describe('NotificationsService', () => {
         EmailChannelProvider,
         SmsChannelProvider,
         { provide: PrismaService, useValue: prisma },
+        // SMS routes through whichever provider the organization has made
+        // active; with nothing configured it is suppressed, which is what these
+        // tests assert.
+        {
+          provide: NotificationConfigService,
+          useValue: { activeProvider: jest.fn().mockResolvedValue(null) },
+        },
+        { provide: SmsProviderRegistry, useValue: { resolve: jest.fn() } },
       ],
     }).compile();
     service = module.get(NotificationsService);
@@ -61,7 +81,10 @@ describe('NotificationsService', () => {
 
   it('refuses a message with nobody to send it to', async () => {
     await expect(
-      service.notify({ type: NotificationType.CUSTOM, title: 'x', body: 'y' }, {}),
+      service.notify(
+        { type: NotificationType.CUSTOM, title: 'x', body: 'y' },
+        {},
+      ),
     ).rejects.toThrow(/needs a userId or a tenantId/i);
   });
 

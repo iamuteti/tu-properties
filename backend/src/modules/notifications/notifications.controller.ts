@@ -55,7 +55,14 @@ export class NotificationsController {
 
   @Post('preferences')
   setPreference(
-    @Body() body: { type: NotificationType; inApp?: boolean; email?: boolean; sms?: boolean; push?: boolean },
+    @Body()
+    body: {
+      type: NotificationType;
+      inApp?: boolean;
+      email?: boolean;
+      sms?: boolean;
+      push?: boolean;
+    },
     @Request() req,
   ) {
     return this.notifications.setPreference(

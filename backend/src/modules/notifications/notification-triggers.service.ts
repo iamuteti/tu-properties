@@ -17,9 +17,7 @@ const OVERDUE_ESCALATION_DAYS = [1, 7, 30];
 /** The request outcomes a resident can be told about. */
 type RequestDecisionType = Extract<
   NotificationType,
-  | 'REQUEST_APPROVED'
-  | 'REQUEST_REJECTED'
-  | 'REQUEST_WITHDRAWN'
+  'REQUEST_APPROVED' | 'REQUEST_REJECTED' | 'REQUEST_WITHDRAWN'
 >;
 
 /**
@@ -67,7 +65,10 @@ export class NotificationTriggersService {
 
     const summary = { leases: 0, due: 0, overdue: 0 };
     for (const organization of organizations) {
-      summary.leases += await this.remindExpiringLeases(organization.id, onDate);
+      summary.leases += await this.remindExpiringLeases(
+        organization.id,
+        onDate,
+      );
       summary.due += await this.remindRentDue(organization.id, onDate);
       summary.overdue += await this.remindOverdueRent(organization.id, onDate);
     }
@@ -186,7 +187,8 @@ export class NotificationTriggersService {
         {
           organizationId,
           type: NotificationType.RENT_DUE,
-          priority: days <= 3 ? NotificationPriority.HIGH : NotificationPriority.NORMAL,
+          priority:
+            days <= 3 ? NotificationPriority.HIGH : NotificationPriority.NORMAL,
           title: `Rent of ${money(Number(invoice.balanceAmount))} due ${days === 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`}`,
           body: `Invoice ${invoice.invoiceNumber} for ${money(Number(invoice.balanceAmount))} falls due on ${invoice.dueDate.toDateString()}.`,
           entityType: 'Invoice',
@@ -241,7 +243,8 @@ export class NotificationTriggersService {
         if (!tenantId) continue;
 
         const overdueDays = Math.floor(
-          (onDate.getTime() - invoice.dueDate.getTime()) / (24 * 60 * 60 * 1000),
+          (onDate.getTime() - invoice.dueDate.getTime()) /
+            (24 * 60 * 60 * 1000),
         );
         if (overdueDays < days) continue;
         if (upperBound !== undefined && overdueDays >= upperBound) continue;
@@ -251,7 +254,9 @@ export class NotificationTriggersService {
             organizationId,
             type: NotificationType.RENT_OVERDUE,
             priority:
-              days >= 7 ? NotificationPriority.CRITICAL : NotificationPriority.HIGH,
+              days >= 7
+                ? NotificationPriority.CRITICAL
+                : NotificationPriority.HIGH,
             title: `Rent overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'}`,
             body: `Invoice ${invoice.invoiceNumber} for ${money(Number(invoice.balanceAmount))} was due on ${invoice.dueDate.toDateString()}. Please arrange payment, or contact us if you need to discuss it.`,
             entityType: 'Invoice',
@@ -319,7 +324,9 @@ export class NotificationTriggersService {
 }
 
 /** Kept separate so `notifications.service` can use it without a cycle. */
-export const notificationWhereFor = (userId: string): Prisma.NotificationWhereInput => ({
+export const notificationWhereFor = (
+  userId: string,
+): Prisma.NotificationWhereInput => ({
   userId,
   readAt: null,
 });

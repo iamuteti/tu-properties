@@ -1084,6 +1084,54 @@ export const notificationsApi = {
         push?: boolean;
     }) => api.post("/notifications/preferences", data),
 
+    // ── Provider configuration (admin panel) ───────────────────────────────
+    providers: () =>
+        api.get<
+            {
+                id: string;
+                label: string;
+                channel: "SMS" | "EMAIL";
+                fields: { name: string; label: string; secret: boolean; required: boolean }[];
+                docsUrl: string;
+            }[]
+        >("/notifications/config/providers"),
+
+    /** Current configuration per channel, credentials masked. */
+    channelConfig: () =>
+        api.get<
+            {
+                channel: string;
+                configured: boolean;
+                active: boolean;
+                provider: string | null;
+                maskedCredentials: Record<string, string> | null;
+                settings: Record<string, unknown> | null;
+                updatedAt: string | null;
+                error?: string;
+            }[]
+        >("/notifications/config"),
+
+    /** Saving does not activate: test first, then switch over. */
+    saveChannelConfig: (data: {
+        channel: string;
+        provider: string;
+        credentials: Record<string, unknown>;
+        settings?: Record<string, unknown>;
+    }) => api.post("/notifications/config", data),
+
+    activateChannel: (channel: string) =>
+        api.post(`/notifications/config/${channel}/activate`),
+
+    deactivateChannel: (channel: string) =>
+        api.post(`/notifications/config/${channel}/deactivate`),
+
+    /** Send a test message through the saved config, active or not. */
+    testChannel: (channel: string, to: string) =>
+        api.post<{ ok: boolean; status: string; reason?: string; externalId?: string }>(
+            `/notifications/config/${channel}/test`,
+            { to },
+        ),
+
     /** Administrative: run the reminder sweep now instead of waiting. */
     runTriggers: (onDate?: string) =>
         api.post<{ leases: number; due: number; overdue: number }>(

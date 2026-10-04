@@ -129,6 +129,7 @@ const navItems: NavItem[] = [
     { href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
     { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/settings/tax", label: "Tax Settings", icon: Globe2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
+    { href: "/settings/notifications", label: "Notification Settings", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 const roleLabels: Record<UserRole, string> = {
