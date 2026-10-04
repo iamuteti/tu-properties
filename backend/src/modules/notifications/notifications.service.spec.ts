@@ -5,11 +5,11 @@ import {
   NotificationType,
 } from '@prisma/client';
 import {
-  EmailChannelProvider,
   InAppChannelProvider,
   NotificationsService,
   SmsChannelProvider,
 } from './notifications.service';
+import { EmailChannelProvider } from './email-provider';
 import { NotificationConfigService } from './notification-config.service';
 import { SmsProviderRegistry } from './sms-provider-registry';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -63,7 +63,27 @@ describe('NotificationsService', () => {
       providers: [
         NotificationsService,
         InAppChannelProvider,
-        EmailChannelProvider,
+        // The SMTP provider has its own spec; here a stub stands in so these
+        // tests stay about routing and suppression, not about mail.
+        {
+          provide: EmailChannelProvider,
+          useValue: {
+            channel: 'EMAIL',
+            isConfigured: () => false,
+            deliver: () =>
+              Promise.resolve({
+                channel: 'EMAIL',
+                status: NotificationStatus.SUPPRESSED,
+                reason:
+                  'No email provider is active — configure SMTP in the admin panel',
+              }),
+            testSend: () =>
+              Promise.resolve({
+                ok: false,
+                status: NotificationStatus.SUPPRESSED,
+              }),
+          },
+        },
         SmsChannelProvider,
         { provide: PrismaService, useValue: prisma },
         // SMS routes through whichever provider the organization has made

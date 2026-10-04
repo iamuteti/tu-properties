@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/require-await */
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { NotificationChannel } from '@prisma/client';
 import { NotificationConfigService } from './notification-config.service';
 import { SmsProviderRegistry } from './sms-provider-registry';
+import { EmailChannelProvider } from './email-provider';
 import {
   decryptCredentials,
   maskCredential,
@@ -121,7 +123,13 @@ describe('NotificationConfigService', () => {
         { provide: PrismaService, useValue: prisma },
         // The test-send path resolves a vendor client; these tests never send,
         // so the real registry is fine and nothing needs stubbing.
-        { provide: SmsProviderRegistry, useFactory: () => new SmsProviderRegistry() },
+        {
+          provide: SmsProviderRegistry,
+          useFactory: () => new SmsProviderRegistry(),
+        },
+        // Test sends are exercised in the provider's own spec; here a stub
+        // keeps these tests about storage, masking and activation.
+        { provide: EmailChannelProvider, useValue: { testSend: jest.fn() } },
       ],
     }).compile();
     service = module.get(NotificationConfigService);
@@ -290,7 +298,9 @@ describe('NotificationConfigService', () => {
       expect(prisma.rows.size).toBe(2);
     });
 
-    it('refuses to activate a provider that is not implemented', async () => {
+    it('activates SMTP now that it has a client behind it', async () => {
+      // Email was refused at activation for a while. That was a missing mail
+      // client, not a design decision, and it is now implemented.
       await service.save('org-1', {
         channel: NotificationChannel.EMAIL,
         provider: 'SMTP',
@@ -302,8 +312,25 @@ describe('NotificationConfigService', () => {
           from: 'noreply@example.com',
         },
       });
+      const activated = await service.activate(
+        'org-1',
+        NotificationChannel.EMAIL,
+      );
+      expect(activated.isActive).toBe(true);
+    });
+
+    it('refuses to activate a provider that is not implemented', async () => {
+      await service.save('org-1', {
+        channel: NotificationChannel.SMS,
+        provider: 'TWILIO',
+        credentials: dummyTwilio,
+      });
+      // A row naming a vendor nobody has written a client for cannot be
+      // switched on, however plausible the name.
+      const row = prisma.rows.get(`org-1:${NotificationChannel.SMS}`)!;
+      row.provider = 'CARRIER_PIGEON';
       await expect(
-        service.activate('org-1', NotificationChannel.EMAIL),
+        service.activate('org-1', NotificationChannel.SMS),
       ).rejects.toThrow(BadRequestException);
     });
 

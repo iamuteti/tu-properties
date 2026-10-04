@@ -12,10 +12,9 @@ import {
   encryptCredentials,
   maskAll,
 } from './credential-crypto';
-import {
-  isSmsProvider,
-} from './sms-providers';
+import { isSmsProvider } from './sms-providers';
 import { SmsProviderRegistry } from './sms-provider-registry';
+import { EmailChannelProvider } from './email-provider';
 
 /**
  * What each provider needs, and which fields are secret.
@@ -100,6 +99,7 @@ export class NotificationConfigService {
   constructor(
     private prisma: PrismaService,
     private readonly registry: SmsProviderRegistry,
+    private readonly email: EmailChannelProvider,
   ) {}
 
   /** Provider catalogue, so the admin panel can render the right form. */
@@ -123,51 +123,49 @@ export class NotificationConfigService {
       where: { organizationId },
     });
 
-    return Promise.all(
-      (Object.values(NotificationChannel) as NotificationChannel[]).map(
-        async (channel) => {
-          const row = rows.find((item) => item.channel === channel);
-          if (!row) {
-            return {
-              channel,
-              configured: false,
-              active: false,
-              provider: null,
-              maskedCredentials: null,
-              settings: null,
-              updatedAt: null,
-            };
-          }
-          let credentials: Record<string, unknown> = {};
-          try {
-            credentials = decryptCredentials(row.credentialsEncrypted);
-          } catch {
-            // A key that cannot be decrypted — the encryption key changed, or
-            // the row was tampered with — must not leak, and must not be
-            // silently reported as configured-and-working.
-            return {
-              channel,
-              configured: false,
-              active: false,
-              provider: row.provider,
-              maskedCredentials: null,
-              settings: null,
-              updatedAt: row.updatedAt,
-              error:
-                'Stored credentials could not be decrypted — re-enter them',
-            };
-          }
+    // Decryption is synchronous, so this is a plain map — no promises needed.
+    return (Object.values(NotificationChannel) as NotificationChannel[]).map(
+      (channel) => {
+        const row = rows.find((item) => item.channel === channel);
+        if (!row) {
           return {
             channel,
-            configured: true,
-            active: row.isActive,
-            provider: row.provider,
-            maskedCredentials: maskAll(row.provider, credentials),
-            settings: (row.settings ?? {}) as Record<string, unknown>,
-            updatedAt: row.updatedAt,
+            configured: false,
+            active: false,
+            provider: null,
+            maskedCredentials: null,
+            settings: null,
+            updatedAt: null,
           };
-        },
-      ),
+        }
+        let credentials: Record<string, unknown> = {};
+        try {
+          credentials = decryptCredentials(row.credentialsEncrypted);
+        } catch {
+          // A key that cannot be decrypted — the encryption key changed, or
+          // the row was tampered with — must not leak, and must not be
+          // silently reported as configured-and-working.
+          return {
+            channel,
+            configured: false,
+            active: false,
+            provider: row.provider,
+            maskedCredentials: null,
+            settings: null,
+            updatedAt: row.updatedAt,
+            error: 'Stored credentials could not be decrypted — re-enter them',
+          };
+        }
+        return {
+          channel,
+          configured: true,
+          active: row.isActive,
+          provider: row.provider,
+          maskedCredentials: maskAll(row.provider, credentials),
+          settings: (row.settings ?? {}) as Record<string, unknown>,
+          updatedAt: row.updatedAt,
+        };
+      },
     );
   }
 
@@ -224,13 +222,13 @@ export class NotificationConfigService {
       }
     }
     for (const [key, value] of Object.entries(input.credentials ?? {})) {
-      if (
-        value !== undefined &&
-        value !== null &&
-        String(value).trim() !== ''
-      ) {
-        merged[key] = String(value).trim();
-      }
+      const text =
+        value === null || value === undefined
+          ? ''
+          : (typeof value === 'string' ? value : JSON.stringify(value)).trim();
+      // A blank field means "leave what is stored alone", not "clear it" — the
+      // panel shows masked values, so an empty input is not an instruction.
+      if (text) merged[key] = text;
     }
 
     const missing = spec.fields
@@ -293,10 +291,11 @@ export class NotificationConfigService {
       'Channel configuration',
     );
 
-    // SMTP is catalogued so the admin panel can describe it, but there is no
-    // mail client behind it — activating it would report a working channel that
-    // sends nothing.
-    if (!isSmsProvider(config.provider)) {
+    // Every catalogued provider now has a client behind it: the two SMS vendors
+    // via the registry, SMTP via the email provider.
+    const implemented =
+      isSmsProvider(config.provider) || config.provider === 'SMTP';
+    if (!implemented) {
       throw new BadRequestException(
         `Provider "${config.provider}" is not implemented and cannot be activated`,
       );
@@ -329,13 +328,36 @@ export class NotificationConfigService {
   }
 
   /**
- * Send a test message through the **saved** configuration, active or not.
- *
- * Testing before activating is the whole reason saving does not activate: an
- * administrator with a freshly typed key needs to know it works before the
- * channel is switched over. With dummy credentials this fails, and reports the
- * vendor's own reason — which is exactly the feedback worth having.
- */
+   * The configuration on file for a channel, whether or not it is active.
+   *
+   * A test send needs exactly this: the credentials an administrator just typed,
+   * before the channel is switched over to them.
+   */
+  async savedProvider(
+    organizationId: string,
+    channel: NotificationChannel,
+  ): Promise<Record<string, unknown> | null> {
+    const row = await this.prisma.notificationChannelConfig.findUnique({
+      where: { organizationId_channel: { organizationId, channel } },
+    });
+    if (!row) return null;
+    try {
+      return decryptCredentials(row.credentialsEncrypted);
+    } catch {
+      // Undecryptable is reported by the caller as "re-enter the credentials",
+      // not silently treated as no configuration.
+      return null;
+    }
+  }
+
+  /**
+   * Send a test message through the **saved** configuration, active or not.
+   *
+   * Testing before activating is the whole reason saving does not activate: an
+   * administrator with a freshly typed key needs to know it works before the
+   * channel is switched over. With dummy credentials this fails, and reports the
+   * vendor's own reason — which is exactly the feedback worth having.
+   */
   async testSend(
     organizationId: string,
     channel: NotificationChannel,
@@ -352,7 +374,10 @@ export class NotificationConfigService {
         'This channel has no provider configured yet',
       );
     }
-    if (!isSmsProvider(config.provider)) {
+    if (
+      channel === NotificationChannel.SMS &&
+      !isSmsProvider(config.provider)
+    ) {
       throw new BadRequestException(
         `${config.provider} is not implemented, so a test send is not possible`,
       );
@@ -367,13 +392,21 @@ export class NotificationConfigService {
       );
     }
 
-    const result = await this.registry
-      .resolve(config.provider)
-      .send(credentials as never, {
+    if (channel === NotificationChannel.EMAIL) {
+      // Routed through the email provider so SMTP settings and its transport
+      // seam live in one place, and a test exercises the real sending path.
+      return this.email.testSend(to.trim(), organizationId);
+    }
+
+    const result = await this.registry.resolve(config.provider).send(
+      credentials as never,
+      {
         to: to.trim(),
         body: 'TU Properties test message — no action needed.',
         sender: (config.settings as { from?: string } | null)?.from ?? null,
-      }, (config.settings ?? {}) as Record<string, unknown>);
+      },
+      (config.settings ?? {}) as Record<string, unknown>,
+    );
 
     return {
       ok: result.status === 'SENT',

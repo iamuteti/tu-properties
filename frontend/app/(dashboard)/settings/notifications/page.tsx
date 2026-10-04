@@ -214,7 +214,23 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    const smsOnly = useMemo(() => channels.filter((item) => item.channel === "SMS"), [channels]);
+    // Every channel the backend knows about, so email stops being a
+    // placeholder and is configured the same way SMS is.
+    const configurable = useMemo(() => {
+        const known = ["SMS", "EMAIL"] as const;
+        return known.map(
+            (channel) =>
+                channels.find((item) => item.channel === channel) ?? {
+                    channel,
+                    configured: false,
+                    active: false,
+                    provider: null,
+                    maskedCredentials: null,
+                    settings: null,
+                    updatedAt: null,
+                },
+        );
+    }, [channels]);
 
     return (
         <div className="space-y-6">
@@ -236,7 +252,7 @@ export default function NotificationSettingsPage() {
                 <div>Loading settings...</div>
             ) : (
                 <>
-                    {smsOnly.map((channel) => {
+                    {configurable.map((channel) => {
                         const provider = currentProvider(channel.channel);
                         const options = providersFor(channel.channel);
                         return (
@@ -377,11 +393,17 @@ export default function NotificationSettingsPage() {
                                         <div className="flex flex-wrap items-end gap-4 border-t pt-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor={`test-${channel.channel}`}>
-                                                    Send a test message to
+                                                    {channel.channel === "EMAIL"
+                                                        ? "Send a test email to"
+                                                        : "Send a test message to"}
                                                 </Label>
                                                 <Input
                                                     id={`test-${channel.channel}`}
-                                                    placeholder="+254700000000"
+                                                    placeholder={
+                                                        channel.channel === "EMAIL"
+                                                            ? "someone@example.com"
+                                                            : "+254700000000"
+                                                    }
                                                     value={testNumber[channel.channel] ?? ""}
                                                     onChange={(event) =>
                                                         setTestNumber((current) => ({
@@ -416,20 +438,6 @@ export default function NotificationSettingsPage() {
                             </Card>
                         );
                     })}
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">Email</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Email is catalogued (SMTP settings can be stored) but no mail
-                                client is wired yet, so the channel cannot be activated and
-                                email deliveries are recorded as not sent. In-app notifications
-                                work regardless of this page.
-                            </p>
-                        </CardContent>
-                    </Card>
 
                     <p className="text-sm text-muted-foreground">
                         Reminders for lease expiry, rent due and overdue rent are sent daily and

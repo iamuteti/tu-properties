@@ -5,11 +5,11 @@ import {
 } from './notifications.controller';
 import { NotificationConfigController } from './notification-config.controller';
 import {
-  EmailChannelProvider,
   InAppChannelProvider,
   NotificationsService,
   SmsChannelProvider,
 } from './notifications.service';
+import { EmailChannelProvider } from './email-provider';
 import { NotificationTriggersService } from './notification-triggers.service';
 import { NotificationConfigService } from './notification-config.service';
 import { SmsProviderRegistry } from './sms-provider-registry';
@@ -31,7 +31,10 @@ import { AfricasTalkingSmsProvider, TwilioSmsProvider } from './sms-providers';
     NotificationConfigService,
     // Constructed directly rather than injected: its optional HTTP client is a
     // seam for tests, not a Nest dependency.
-    { provide: SmsProviderRegistry, useFactory: () => new SmsProviderRegistry() },
+    {
+      provide: SmsProviderRegistry,
+      useFactory: () => new SmsProviderRegistry(),
+    },
     InAppChannelProvider,
     EmailChannelProvider,
     SmsChannelProvider,

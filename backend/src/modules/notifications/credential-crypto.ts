@@ -88,10 +88,25 @@ export function decryptCredentials<T = Record<string, unknown>>(
  * admin whether the right key is stored, useless to anyone who reads it.
  */
 export function maskCredential(value: unknown): string {
-  const text = String(value ?? '');
+  const text = asText(value);
   if (!text) return '';
   if (text.length <= 4) return '••••';
   return `${text.slice(0, 2)}${'•'.repeat(6)}${text.slice(-2)}`;
+}
+
+/**
+ * Credentials are strings in practice, but they arrive from an admin form as
+ * `unknown`. Masking must never render "[object Object]" — that would show an
+ * administrator a plausible-looking hint for a value that is not the key they
+ * typed, which is worse than showing nothing.
+ */
+function asText(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? '';
 }
 
 /** Every secret field of a provider's credentials, by name. */
@@ -108,9 +123,7 @@ export function maskAll(
   const secrets = SECRET_FIELDS[provider] ?? [];
   const masked: Record<string, string> = {};
   for (const [key, value] of Object.entries(credentials)) {
-    masked[key] = secrets.includes(key)
-      ? maskCredential(value)
-      : String(value ?? '');
+    masked[key] = secrets.includes(key) ? maskCredential(value) : asText(value);
   }
   return masked;
 }

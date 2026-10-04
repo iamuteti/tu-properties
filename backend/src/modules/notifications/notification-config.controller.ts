@@ -98,7 +98,11 @@ export class NotificationConfigController {
     @Body() body: { to: string },
     @Request() req,
   ) {
-    return this.config.testSend(this.requireTenant(req), channel, body?.to ?? '');
+    return this.config.testSend(
+      this.requireTenant(req),
+      channel,
+      body?.to ?? '',
+    );
   }
 
   private requireTenant(req: unknown): string {

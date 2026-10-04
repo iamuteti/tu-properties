@@ -10,6 +10,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { requireRecord } from '@/common/utils';
 import { NotificationConfigService } from './notification-config.service';
 import { SmsProviderRegistry } from './sms-provider-registry';
+import { EmailChannelProvider } from './email-provider';
 
 type Tx = Prisma.TransactionClient;
 
@@ -88,46 +89,6 @@ export class InAppChannelProvider implements NotificationChannelProvider {
       status: NotificationStatus.SENT,
     });
   }
-}
-
-/**
- * Email and SMS placeholders.
- *
- * They report honestly that nothing is configured rather than pretending to
- * send: there is no SMTP server or SMS provider in this deployment, and a
- * message that silently vanishes into a stub is worse than one recorded as
- * suppressed. Wiring a real provider is a matter of implementing `deliver`
- * against the vendor's client and registering it in `NotificationsModule`.
- */
-abstract class UnconfiguredChannelProvider implements NotificationChannelProvider {
-  abstract readonly channel: NotificationChannel;
-
-  protected readonly logger = new Logger(this.constructor.name);
-
-  isConfigured(): boolean {
-    return false;
-  }
-
-  deliver(notification: {
-    title: string;
-    to: { email?: string | null; phone?: string | null };
-  }): Promise<DeliveryResult> {
-    this.logger.warn(
-      `${this.channel} is not configured — "${notification.title}" was not sent${
-        notification.to.email ? ` to ${notification.to.email}` : ''
-      }`,
-    );
-    return Promise.resolve({
-      channel: this.channel,
-      status: NotificationStatus.SUPPRESSED,
-      reason: `No ${this.channel} provider is configured`,
-    });
-  }
-}
-
-@Injectable()
-export class EmailChannelProvider extends UnconfiguredChannelProvider {
-  readonly channel = NotificationChannel.EMAIL;
 }
 
 /**

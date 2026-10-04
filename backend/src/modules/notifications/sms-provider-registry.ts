@@ -45,7 +45,9 @@ export class SmsProviderRegistry {
   resolve(provider: string): SmsSender {
     const client = this.clients[provider];
     if (!client) {
-      throw new BadRequestException(`Provider "${provider}" is not implemented`);
+      throw new BadRequestException(
+        `Provider "${provider}" is not implemented`,
+      );
     }
     return client;
   }
