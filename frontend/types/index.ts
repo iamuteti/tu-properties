@@ -2035,3 +2035,417 @@ export interface PmRun {
     startedAt: string;
     finishedAt?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Module 10: Procurement
+// ---------------------------------------------------------------------------
+
+export type PurchaseRequestStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export type PurchaseRequestAction =
+    | 'SUBMIT'
+    | 'APPROVE'
+    | 'REJECT'
+    | 'CANCEL'
+    | 'REOPEN'
+    | 'RAISE_RFQ';
+
+export interface PurchaseRequestLine {
+    id: string;
+    description: string;
+    specification?: string | null;
+    quantity: string | number;
+    unitPrice?: string | number | null;
+    estimatedAmount?: string | number | null;
+    sortOrder: number;
+}
+
+export interface PurchaseRequest {
+    id: string;
+    organizationId: string;
+    reference: string;
+    title: string;
+    description?: string | null;
+    category: string;
+    priority: string;
+    status: PurchaseRequestStatus;
+    statusLabel?: string;
+    department?: string | null;
+    currency: string;
+    estimatedAmount?: string | number | null;
+    neededBy?: string | null;
+    requestedById?: string | null;
+    approvalRequestedAt?: string | null;
+    decisionNote?: string | null;
+    rejectionReason?: string | null;
+    decidedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    requestedBy?: { id: string; firstName: string; lastName: string; role?: string } | null;
+    decidedBy?: { id: string; firstName: string; lastName: string } | null;
+    lines: PurchaseRequestLine[];
+    rfqs?: { id: string; reference: string; status: string; createdAt: string }[];
+    orders?: { id: string; reference: string; status: string; totalAmount: string | number }[];
+    /** Derived by the API, never stored. */
+    lineCount?: number;
+    rfqCount?: number;
+    availableActions?: PurchaseRequestAction[];
+    /** The live approval for this request, when one was requested. */
+    approval?: WorkflowInstance | null;
+}
+
+export interface PurchaseRequestStats {
+    total: number;
+    open: number;
+    awaitingApproval: number;
+    urgentOpen: number;
+    estimatedOpen: number;
+    byStatus: Partial<Record<PurchaseRequestStatus, number>>;
+    byCategory: Record<string, number>;
+}
+
+export type RfqStatus = 'DRAFT' | 'ISSUED' | 'QUOTES_RECEIVED' | 'CLOSED' | 'AWARDED' | 'CANCELLED';
+
+export type RfqAction = 'ISSUE' | 'RECORD_QUOTE' | 'CLOSE' | 'REOPEN' | 'AWARD' | 'CANCEL';
+
+export type QuoteStatus = 'SUBMITTED' | 'SHORTLISTED' | 'REJECTED' | 'AWARDED' | 'WITHDRAWN';
+
+export interface RfqInvitation {
+    id: string;
+    supplierId: string;
+    status: 'INVITED' | 'QUOTED' | 'DECLINED';
+    invitedAt: string;
+    respondedAt?: string | null;
+    declineReason?: string | null;
+    supplier?: { id: string; name: string; code: string; category?: string | null; rating?: number | null } | null;
+}
+
+export interface RfqQuoteLine {
+    id: string;
+    description: string;
+    quantity: string | number;
+    unitPrice: string | number;
+    amount: string | number;
+    purchaseRequestLineId?: string | null;
+}
+
+export interface RfqQuote {
+    id: string;
+    rfqId: string;
+    supplierId: string;
+    status: QuoteStatus;
+    totalAmount: string | number;
+    currency: string;
+    leadTimeDays?: number | null;
+    validUntil?: string | null;
+    notes?: string | null;
+    submittedAt: string;
+    supplier?: { id: string; name: string; code?: string; category?: string | null; rating?: number | null } | null;
+    lines: RfqQuoteLine[];
+}
+
+/** One row of the bid comparison. Every figure is derived server-side. */
+export interface ComparisonRow {
+    quoteId: string;
+    supplierId: string;
+    supplierName: string;
+    totalAmount: number;
+    leadTimeDays: number | null;
+    /** Difference from the request's estimate; null when there was none. */
+    variance: number | null;
+    variancePercent: number | null;
+    linesCovered: number;
+    linesTotal: number;
+    coversAllLines: boolean;
+    cheapest: boolean;
+    fastest: boolean;
+    /** Only set when one quote wins on both price and lead time. */
+    recommended: boolean;
+    rank: number;
+    expired: boolean;
+}
+
+export interface QuoteComparison {
+    rows: ComparisonRow[];
+    lowest: number | null;
+    highest: number | null;
+    average: number | null;
+    quotesReceived: number;
+    quotesRanked: number;
+    singleSource: boolean;
+    lowestQuoteId: string | null;
+    fastestQuoteId: string | null;
+    recommendedQuoteId: string | null;
+}
+
+export interface Rfq {
+    id: string;
+    organizationId: string;
+    reference: string;
+    title: string;
+    notes?: string | null;
+    status: RfqStatus;
+    statusLabel?: string;
+    currency: string;
+    quotesDueAt?: string | null;
+    issuedAt?: string | null;
+    closedAt?: string | null;
+    awardedAt?: string | null;
+    awardedQuoteId?: string | null;
+    cancellationReason?: string | null;
+    purchaseRequestId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    raisedBy?: { id: string; firstName: string; lastName: string } | null;
+    purchaseRequest?: {
+        id: string;
+        reference: string;
+        title: string;
+        category: string;
+        estimatedAmount?: string | number | null;
+        currency: string;
+        lines: {
+            id: string;
+            description: string;
+            specification?: string | null;
+            quantity: string | number;
+            estimatedAmount?: string | number | null;
+            sortOrder: number;
+        }[];
+    } | null;
+    invitations: RfqInvitation[];
+    quotes: RfqQuote[];
+    awardedQuote?: {
+        id: string;
+        supplierId: string;
+        totalAmount: string | number;
+        /** What the winning supplier promised; the order's date came from this. */
+        leadTimeDays?: number | null;
+    } | null;
+    orders?: { id: string; reference: string; status: string; totalAmount: string | number }[];
+    /** Derived by the API. */
+    overdue?: boolean;
+    daysOverdue?: number;
+    singleSource?: boolean;
+    quotesReceived?: number;
+    declinedCount?: number;
+    availableActions?: RfqAction[];
+    comparison?: QuoteComparison;
+}
+
+export interface RfqStats {
+    total: number;
+    open: number;
+    awaitingQuotes: number;
+    overdue: number;
+    singleSource: number;
+    byStatus: Partial<Record<RfqStatus, number>>;
+}
+
+export type PurchaseOrderStatus =
+    | 'DRAFT'
+    | 'SENT'
+    | 'ACCEPTED'
+    | 'PARTIALLY_RECEIVED'
+    | 'RECEIVED'
+    | 'CLOSED'
+    | 'CANCELLED';
+
+export type PurchaseOrderAction =
+    | 'SEND'
+    | 'ACCEPT'
+    | 'RECEIVE'
+    | 'RECEIVE_PART'
+    | 'CLOSE'
+    | 'CANCEL'
+    | 'REOPEN';
+
+export interface PurchaseOrderLine {
+    id: string;
+    description: string;
+    specification?: string | null;
+    quantity: string | number;
+    unitPrice: string | number;
+    amount: string | number;
+    /** Derived from the receipts, never decremented. */
+    receivedQuantity: string | number;
+    sortOrder: number;
+}
+
+export interface GoodsReceipt {
+    id: string;
+    purchaseOrderId: string;
+    receivedAt: string;
+    deliveryNote?: string | null;
+    conditionNote?: string | null;
+    receivedBy?: { id: string; firstName: string; lastName: string } | null;
+    lines: {
+        id: string;
+        purchaseOrderLineId: string;
+        quantity: string | number;
+        /** Set when the Inventory module has booked the stock in. */
+        stockInRecordedAt?: string | null;
+    }[];
+}
+
+export interface PurchaseOrder {
+    id: string;
+    organizationId: string;
+    reference: string;
+    supplierId: string;
+    status: PurchaseOrderStatus;
+    statusLabel?: string;
+    category: string;
+    currency: string;
+    subtotal: string | number;
+    taxAmount: string | number;
+    totalAmount: string | number;
+    orderDate: string;
+    expectedDelivery?: string | null;
+    deliveryAddress?: string | null;
+    terms?: string | null;
+    notes?: string | null;
+    rfqId?: string | null;
+    quoteId?: string | null;
+    purchaseRequestId?: string | null;
+    supplierBillId?: string | null;
+    sentAt?: string | null;
+    acceptedAt?: string | null;
+    receivedAt?: string | null;
+    closedAt?: string | null;
+    cancelledAt?: string | null;
+    cancellationReason?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    supplier?: { id: string; code: string; name: string; email?: string | null; phone?: string | null } | null;
+    raisedBy?: { id: string; firstName: string; lastName: string } | null;
+    rfq?: { id: string; reference: string; status: string } | null;
+    quote?: { id: string; totalAmount: string | number; leadTimeDays?: number | null } | null;
+    purchaseRequest?: { id: string; reference: string; title: string; category: string } | null;
+    supplierBill?: {
+        id: string;
+        billNumber: string;
+        status: string;
+        totalAmount: string | number;
+        balanceAmount: string | number;
+    } | null;
+    lines: PurchaseOrderLine[];
+    deliveries: GoodsReceipt[];
+    /** Derived by the API. */
+    overdue?: boolean;
+    daysOverdue?: number;
+    outstandingQuantity?: number;
+    outstandingValue?: number;
+    receivedPercent?: number;
+    pendingStockInLines?: number;
+    availableActions?: PurchaseOrderAction[];
+}
+
+export interface PurchaseOrderStats {
+    total: number;
+    open: number;
+    openValue: number;
+    awaitingDelivery: number;
+    overdue: number;
+    awaitingBill: number;
+    byStatus: Partial<Record<PurchaseOrderStatus, number>>;
+    bySupplier: { supplierId: string; orders: number; value: number }[];
+}
+
+/** What has arrived and still needs stock-in, pending the Inventory module. */
+export interface PendingStockIn {
+    inventoryModuleAvailable: boolean;
+    note: string;
+    pendingLines: {
+        receiptId: string;
+        receivedAt: string;
+        purchaseOrderLineId: string;
+        quantity: string | number;
+    }[];
+}
+
+/**
+ * Performance figures, all derived on read from the orders and quotations.
+ * `null` rather than zero for a rate means "nothing to measure", which is a
+ * different statement from "never on time".
+ */
+export interface SupplierPerformance {
+    orders: number;
+    openOrders: number;
+    totalSpend: number;
+    delivered: number;
+    onTimeDeliveries: number;
+    onTimeRate: number | null;
+    /** How many rounds this supplier has ever quoted on. */
+    quotations: number;
+    quotationsWon: number;
+    /** `null` means "never quoted", which is not the same as "won none". */
+    winRate: number | null;
+}
+
+export interface ProcurementSupplier {
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    city?: string | null;
+    country?: string | null;
+    paymentTermsDays?: number | null;
+    category?: string | null;
+    rating?: number | null;
+    contractStartDate?: string | null;
+    contractEndDate?: string | null;
+    contractReference?: string | null;
+    performance: SupplierPerformance;
+    contractExpired?: boolean;
+    contractExpiringSoon?: boolean;
+    bills?: {
+        id: string;
+        billNumber: string;
+        status: string;
+        totalAmount: string | number;
+        balanceAmount: string | number;
+        dueDate: string;
+    }[];
+    orders?: {
+        id: string;
+        reference: string;
+        status: PurchaseOrderStatus;
+        totalAmount: string | number;
+        orderDate: string;
+        expectedDelivery?: string | null;
+        receivedAt?: string | null;
+    }[];
+    quotations?: {
+        id: string;
+        status: QuoteStatus;
+        totalAmount: string | number;
+        currency: string;
+        leadTimeDays?: number | null;
+        validUntil?: string | null;
+        submittedAt: string;
+        rfq: { id: string; reference: string; title: string; status: string };
+    }[];
+    invitations?: {
+        id: string;
+        status: string;
+        invitedAt: string;
+        respondedAt?: string | null;
+        declineReason?: string | null;
+        rfq: { id: string; reference: string; title: string; status: string };
+    }[];
+}
+
+export interface SupplierSpendRow {
+    supplierId: string;
+    supplierName: string;
+    supplierCode: string;
+    category: string | null;
+    orders: number;
+    total: number;
+    received: number;
+    open: number;
+}

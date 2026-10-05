@@ -41,13 +41,21 @@ export const PERMISSION_MODULES = [
   'tax',
   'payables',
   'billing',
-'notifications',
+  'notifications',
   'workflows',
   // Module 9 — Maintenance. Three modules, because three different jobs: the
   // queue, the plant register and the service calendar.
   'work_orders',
   'assets',
   'pm_schedules',
+  // Module 10 — Procurement. Three modules because three documents and three
+  // decisions: who asks, who we buy from, and what gets committed. `suppliers`
+  // is separate from `payables` on purpose — the buyer curates the vendor list,
+  // the accountant owns what is owed to them.
+  'purchase_requests',
+  'suppliers',
+  'rfqs',
+  'purchase_orders',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -146,6 +154,12 @@ export const SYSTEM_ROLES: {
       work_orders: full(),
       assets: full(),
       pm_schedules: full(),
+      // Module 10: procurement is company work too, and the administrator is
+      // who signs the big ones when no policy has been configured.
+      purchase_requests: full(),
+      suppliers: full(),
+      rfqs: full(),
+      purchase_orders: full(),
     }),
   },
   {
@@ -177,6 +191,13 @@ export const SYSTEM_ROLES: {
       work_orders: full(),
       assets: view(),
       pm_schedules: view(),
+      // Module 10: a property manager raises the requests ("we need six lift
+      // ropes") and approves small ones, but running the supplier side — the
+      // vendor list and the purchase orders — is the procurement officer's job.
+      purchase_requests: full(),
+      suppliers: view(),
+      rfqs: view(),
+      purchase_orders: view(),
     }),
   },
   {
@@ -258,6 +279,13 @@ export const SYSTEM_ROLES: {
       // but they do not dispatch technicians or edit the plant register.
       work_orders: view(),
       assets: view(),
+      // Module 10: procurement is read-only to finance, which is what makes the
+      // `create-bill` seam work — the buyer raises the order, the accountant
+      // turns it into a payable and posts the ledger entry.
+      purchase_requests: view(),
+      suppliers: full(),
+      rfqs: view(),
+      purchase_orders: full(),
     }),
   },
   {
@@ -275,6 +303,12 @@ export const SYSTEM_ROLES: {
       work_orders: full(),
       assets: full(),
       pm_schedules: full(),
+      // Module 10: they specify what they need ("six lift ropes") but do not
+      // choose a supplier or commit the company to a purchase.
+      purchase_requests: full(),
+      suppliers: view(),
+      rfqs: view(),
+      purchase_orders: view(),
     }),
   },
   {
@@ -315,13 +349,20 @@ export const SYSTEM_ROLES: {
   {
     name: 'Procurement Officer',
     description:
-      'Procurement operations with read access to properties and units.',
+      'Runs the purchase cycle: requests, supplier records, quotation rounds and purchase orders.',
     permissions: set({
       properties: view(),
       units: view(),
       documents: viewWrite(),
       // Module 18: purchase requests are the workflow this role exists for.
       workflows: viewWrite(),
+      // Module 10: the module this role exists for. Note the absence of
+      // `payables` — this role commits the company to buying, and the accountant
+      // turns that commitment into money. Splitting those two is the point.
+      purchase_requests: full(),
+      suppliers: full(),
+      rfqs: full(),
+      purchase_orders: full(),
     }),
   },
   {
@@ -350,6 +391,10 @@ export const LEGACY_ROLE_TO_SYSTEM_ROLE: Record<string, string> = {
   LEASING_OFFICER: 'Leasing Officer',
   MAINTENANCE_MANAGER: 'Maintenance Manager',
   TECHNICIAN: 'Technician',
+  // Module 10: same hole as Leasing Officer and the two maintenance roles — the
+  // seeded Procurement Officer had permissions but no enum value, so it could be
+  // granted but never held.
+  PROCUREMENT_OFFICER: 'Procurement Officer',
   ACCOUNTANT: 'Accountant',
   USER: 'Tenant',
 };

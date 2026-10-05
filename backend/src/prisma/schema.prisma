@@ -108,6 +108,17 @@ model Organization {
   assets                     Asset[]
   pmSchedules                PreventiveMaintenanceSchedule[]
   pmRuns                     PreventiveMaintenanceRun[]
+  // Module 10 — Procurement
+  purchaseRequests           PurchaseRequest[]
+  purchaseRequestLines       PurchaseRequestLine[]
+  rfqs                       Rfq[]
+  rfqInvitations             RfqInvitation[]
+  rfqQuotes                  RfqQuote[]
+  rfqQuoteLines              RfqQuoteLine[]
+  purchaseOrders             PurchaseOrder[]
+  purchaseOrderLines         PurchaseOrderLine[]
+  goodsReceipts              GoodsReceipt[]
+  goodsReceiptLines          GoodsReceiptLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -185,10 +196,18 @@ model User {
   delegatedApprovalsIn   WorkflowDelegation[] @relation("UserWorkflowDelegatedTo")
 
   // Module 9 — Maintenance: who is on the job, who raised it, who ticked a task.
-  assignedWorkOrders     WorkOrder[]           @relation("UserAssignedWorkOrders")
-  raisedWorkOrders       WorkOrder[]           @relation("UserRaisedWorkOrders")
-  completedWorkOrderTasks WorkOrderTask[]      @relation("UserCompletedWorkOrderTasks")
-  assignedPmSchedules    PreventiveMaintenanceSchedule[] @relation("UserPmSchedules")
+  assignedWorkOrders      WorkOrder[]                     @relation("UserAssignedWorkOrders")
+  raisedWorkOrders        WorkOrder[]                     @relation("UserRaisedWorkOrders")
+  completedWorkOrderTasks WorkOrderTask[]                 @relation("UserCompletedWorkOrderTasks")
+  assignedPmSchedules     PreventiveMaintenanceSchedule[] @relation("UserPmSchedules")
+
+  // Module 10 — Procurement: who asked, who raised the RFQ, who raised the
+  // order, who signed for the goods, who decided the request.
+  requestedPurchaseRequests PurchaseRequest[] @relation("UserRequestedPurchases")
+  decidedPurchaseRequests   PurchaseRequest[] @relation("UserDecidedPurchaseRequests")
+  raisedRfqs                Rfq[]             @relation("UserRaisedRfqs")
+  raisedPurchaseOrders      PurchaseOrder[]   @relation("UserRaisedPurchaseOrders")
+  receivedPurchaseOrders    GoodsReceipt[]    @relation("UserReceivedPurchaseOrders")
 
   // Status
   @@index([portalTenantId])
@@ -212,6 +231,10 @@ enum UserRole {
   // assign it to. Same fix as LEASING_OFFICER, for the same reason.
   MAINTENANCE_MANAGER
   TECHNICIAN
+  // Module 10: the seeded Procurement Officer role had exactly the same hole as
+  // Leasing Officer and the two maintenance roles — permissions nobody could
+  // hold, and a purchase request with nobody who is allowed to raise the RFQ.
+  PROCUREMENT_OFFICER
   USER
 }
 
@@ -707,7 +730,7 @@ model Property {
   // against it. Both are SetNull on the way in, so retiring a property row does
   // not delete its maintenance history.
   assets           Asset[]
-  workOrders       WorkOrder[] @relation("PropertyWorkOrders")
+  workOrders       WorkOrder[]               @relation("PropertyWorkOrders")
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -2541,6 +2564,29 @@ model Supplier {
   bills   SupplierBill[]
   credits SupplierCredit[]
 
+  // Module 10 — Procurement. The doc's `Supplier` had only a name and a phone;
+  // the fields below are the ones a buyer actually needs, added here rather than
+  // as a parallel vendor table because a bill and a purchase order that point at
+  // two different "supplier" records is how an AP total goes wrong.
+  /// What this supplier supplies, so the RFQ picker can offer relevant vendors
+  /// rather than every electrician in the city for a request for office chairs.
+  category SupplierCategory?
+
+  /// A human rating (1–5) kept alongside the derived performance figures in
+  /// `Supplier.performance` — a buyer's judgement and the numbers are different
+  /// things, and only one of them is a calculation.
+  rating Int?
+
+  /// Contract window, for the suppliers under an annual agreement rather than
+  /// bought from ad hoc.
+  contractStartDate DateTime?
+  contractEndDate   DateTime?
+  contractReference String?
+
+  rfqInvitations RfqInvitation[]
+  rfqQuotes      RfqQuote[]
+  purchaseOrders PurchaseOrder[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -2554,6 +2600,26 @@ enum SupplierStatus {
   ACTIVE
   INACTIVE
   ARCHIVED
+}
+
+/// What a supplier supplies. Narrower and deliberately different from both
+/// `PurchaseCategory` (what is being bought this time) and `BillCategory` (which
+/// expense account the invoice lands in): a plumber is a SUPPLIER_CATEGORY once
+/// and stays one, while the category of any particular job from them is
+/// decided by the requester.
+enum SupplierCategory {
+  PLUMBING
+  ELECTRICAL
+  MECHANICAL
+  BUILDING_MATERIALS
+  FURNITURE
+  IT_AND_TECH
+  CLEANING
+  SECURITY
+  PEST_CONTROL
+  LANDSCAPING
+  PROFESSIONAL_SERVICES
+  GENERAL
 }
 
 enum BillStatus {
@@ -2622,6 +2688,11 @@ model SupplierBill {
   lines              SupplierBillLine[]
   payments           BillPayment[]
   creditApplications SupplierCreditApplication[]
+
+  // Module 10 — Procurement. A bill raised from a purchase order points back at
+  // it. Named, because `SupplierBill` also has no relation of this name today and
+  // the back-reference has to be unambiguous from both sides.
+  purchaseOrders PurchaseOrder[] @relation("PurchaseOrderBill")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3322,11 +3393,11 @@ model WorkOrder {
   reference String
 
   title       String
-  description String               @db.Text
+  description String              @db.Text
   category    MaintenanceCategory
-  priority    WorkOrderPriority    @default(NORMAL)
-  status      WorkOrderStatus      @default(REQUESTED)
-  source      WorkOrderSource      @default(STAFF)
+  priority    WorkOrderPriority   @default(NORMAL)
+  status      WorkOrderStatus     @default(REQUESTED)
+  source      WorkOrderSource     @default(STAFF)
 
   // Where the fault is. `propertyId` is the anchor: it is what the list filters
   /// on and what keeps a work order attributable when it is about a whole
@@ -3418,10 +3489,10 @@ model WorkOrderTask {
   workOrderId String
   workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
 
-  description String
-  sortOrder   Int      @default(0)
-  isDone      Boolean  @default(false)
-  completedAt DateTime?
+  description   String
+  sortOrder     Int       @default(0)
+  isDone        Boolean   @default(false)
+  completedAt   DateTime?
   completedById String?
   completedBy   User?     @relation("UserCompletedWorkOrderTasks", fields: [completedById], references: [id], onDelete: SetNull)
 
@@ -3487,7 +3558,7 @@ model Asset {
   location     String?
   capacity     String?
 
-  installedAt      DateTime?
+  installedAt       DateTime?
   warrantyExpiresAt DateTime?
 
   status AssetStatus @default(OPERATIONAL)
@@ -3576,7 +3647,7 @@ model PreventiveMaintenanceRun {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  runOn DateTime
+  runOn  DateTime
   status PmRunStatus @default(RUNNING)
 
   schedulesConsidered Int @default(0)
@@ -3588,7 +3659,7 @@ model PreventiveMaintenanceRun {
   /// and why nothing was raised for it.
   details Json?
 
-  triggeredBy String?
+  triggeredBy  String?
   errorMessage String?
 
   startedAt  DateTime  @default(now())
@@ -3597,4 +3668,507 @@ model PreventiveMaintenanceRun {
   @@index([organizationId])
   @@index([runOn])
   @@map("preventive_maintenance_runs")
+}
+
+// ============================================
+// Module 10 — Procurement
+// ============================================
+
+/// What a purchase request is for. Deliberately its own enum rather than a reuse
+/// of `BillCategory`: the bill category answers "which expense account does this
+/// land in", which is decided at *invoice* time by finance, while this answers
+/// "what is being bought", which is what the requester picks months earlier. The
+/// service maps between them when the purchase order becomes a bill, so a
+/// request typed as EQUIPMENT still posts to whichever account the supplier's
+/// bill belongs in.
+enum PurchaseCategory {
+  MAINTENANCE_PARTS
+  EQUIPMENT
+  FURNITURE
+  IT_AND_TECH
+  STATIONERY
+  CLEANING
+  SECURITY
+  UTILITIES
+  PROFESSIONAL_SERVICES
+  OTHER
+}
+
+/// How urgently it is needed. Derived urgency (an `urgent` flag somebody sets)
+/// is how a request for a spare part ends up sitting for a week.
+enum PurchasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// The request lifecycle. DRAFT exists because nobody wants half-written
+/// requests in the approval inbox, and CANCELLED is distinct from REJECTED
+/// because "we do not want this" and "we did not approve this" are different
+/// answers to give the requester.
+enum PurchaseRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A department's request for something to be bought. The lines are the reason
+/// it exists: a request with no lines has nothing to compare quotations against,
+/// so `PurchaseRequestLine` is required rather than a description blob.
+model PurchaseRequest {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Human reference (`PR-2026-0007`), unique per organization — the codebase
+  /// already numbers invoices, receipts and work orders this way, and a request
+  /// read out over the phone needs one that is not a cuid.
+  reference String
+
+  title       String
+  description String?          @db.Text
+  category    PurchaseCategory
+  priority    PurchasePriority @default(NORMAL)
+
+  status PurchaseRequestStatus @default(DRAFT)
+
+  /// Free-text department ("Maintenance", "Front Office"). The doc's
+  /// `departmentId` implies a department table that does not exist; a lookup
+  /// table here would be a second organization-wide concept to keep in step for
+  /// no reporting gain. Kept as text until a real departments table exists.
+  department String?
+
+  neededBy DateTime?
+
+  /// What the requester expects to spend. Nullable on purpose: a request is
+  /// often raised before anyone knows, and a fabricated estimate is worse than a
+  /// blank — the same rule the work-order cost fields follow.
+  estimatedAmount Decimal? @db.Decimal(14, 2)
+
+  currency String @default("KES")
+
+  requestedById String?
+  requestedBy   User?   @relation("UserRequestedPurchases", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  /// Set when approval was requested through Module 18's engine (entity
+  /// PURCHASE_REQUEST). The instance itself is found by (entityType, entityId).
+  approvalRequestedAt DateTime?
+
+  decisionNote    String? @db.Text
+  rejectionReason String? @db.Text
+
+  decidedAt   DateTime?
+  decidedById String?
+  decidedBy   User?     @relation("UserDecidedPurchaseRequests", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  lines  PurchaseRequestLine[]
+  rfqs   Rfq[]
+  orders PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
+  @@index([status])
+  @@index([category])
+  @@index([requestedById])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestLine {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+
+  description   String
+  specification String? @db.Text
+
+  quantity        Decimal  @default(1) @db.Decimal(10, 2)
+  unitPrice       Decimal? @db.Decimal(14, 2)
+  estimatedAmount Decimal? @db.Decimal(14, 2)
+
+  sortOrder Int @default(0)
+
+  /// Which quotations answered this line, so a comparison view can show "every
+  /// supplier priced this" rather than only the ones who happened to name a
+  /// matching description.
+  quotes RfqQuoteLine[]
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([purchaseRequestId])
+  @@map("purchase_request_lines")
+}
+
+/// The request-quotation round: "here is what we need, tell us what it costs".
+/// It is separate from the request because one request commonly goes to several
+/// suppliers, and the whole point is the comparison between their answers.
+///
+/// `CLOSED` and `CANCELLED` are both terminal and distinct, for the same reason
+/// they are on `PurchaseOrderStatus`: a round that ran its course is history,
+/// while a round that was called off needs a recorded reason.
+enum RfqStatus {
+  DRAFT
+  ISSUED
+  QUOTES_RECEIVED
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+model Rfq {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  reference String
+
+  title String
+  notes String? @db.Text
+
+  purchaseRequestId String?
+  purchaseRequest   PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+
+  status RfqStatus @default(DRAFT)
+
+  currency String @default("KES")
+
+  /// When quotations are wanted back. Compared on read, never stored as a
+  /// separate overdue flag.
+  quotesDueAt DateTime?
+
+  issuedAt           DateTime?
+  closedAt           DateTime?
+  awardedAt          DateTime?
+  cancellationReason String?   @db.Text
+
+  /// The suppliers that were asked, as their own rows rather than an id array:
+  /// the invitation is a record with a date and an outcome, and a
+  /// `String[]` has nowhere to put "invited on Tuesday, never replied".
+  invitations RfqInvitation[]
+  quotes      RfqQuote[]
+
+  awardedQuoteId String?   @unique
+  awardedQuote   RfqQuote? @relation("AwardedRfqQuote", fields: [awardedQuoteId], references: [id], onDelete: SetNull)
+
+  raisedById String?
+  raisedBy   User?   @relation("UserRaisedRfqs", fields: [raisedById], references: [id], onDelete: SetNull)
+
+  orders PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
+  @@index([status])
+  @@index([purchaseRequestId])
+  @@map("rfqs")
+}
+
+enum RfqInvitationStatus {
+  INVITED
+  QUOTED
+  DECLINED
+}
+
+model RfqInvitation {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  rfqId String
+  rfq   Rfq    @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  status RfqInvitationStatus @default(INVITED)
+
+  invitedAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  /// Why they said no. Required to decline — a supplier who stops answering is
+  /// invisible otherwise, and one silently dropped supplier is how a
+  /// single-source purchase happens without anybody deciding it.
+  declineReason String? @db.Text
+
+  @@unique([rfqId, supplierId])
+  @@index([organizationId])
+  @@index([supplierId])
+  @@map("rfq_invitations")
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  SHORTLISTED
+  REJECTED
+  AWARDED
+  WITHDRAWN
+}
+
+model RfqQuote {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  rfqId String
+  rfq   Rfq    @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  status QuoteStatus @default(SUBMITTED)
+
+  /// The supplier's own total, as stated. `totalAmount` is derived from the
+  /// quote's own lines, so a comparison table can never show a total that
+  /// disagrees with the lines under it.
+  totalAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  currency String @default("KES")
+
+  /// How long they can hold the price, and when they can deliver. Both are the
+  /// comparison's whole justification for preferring one quote over another —
+  /// the cheapest price for something needed next week is not the cheapest.
+  leadTimeDays Int?
+  validUntil   DateTime?
+
+  notes String? @db.Text
+
+  awardedFor Rfq? @relation("AwardedRfqQuote")
+
+  lines  RfqQuoteLine[]
+  orders PurchaseOrder[]
+
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([rfqId, supplierId])
+  @@index([organizationId])
+  @@index([rfqId])
+  @@index([supplierId])
+  @@map("rfq_quotes")
+}
+
+model RfqQuoteLine {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  quoteId String
+  quote   RfqQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  /// Which requested line this answers. Optional, because a supplier may quote
+  /// for the whole job in one line, or split it differently — forcing a match
+  /// would make honest quotations impossible to enter.
+  purchaseRequestLineId String?
+  purchaseRequestLine   PurchaseRequestLine? @relation(fields: [purchaseRequestLineId], references: [id], onDelete: SetNull)
+
+  description String
+
+  quantity  Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(14, 2)
+  amount    Decimal @db.Decimal(14, 2)
+
+  sortOrder Int @default(0)
+
+  @@index([organizationId])
+  @@index([quoteId])
+  @@index([purchaseRequestLineId])
+  @@map("rfq_quote_lines")
+}
+
+/// A purchase order lifecycle. ACCEPTED is the supplier's confirmation, and
+/// RECEIVED is goods physically arriving — the two are separate because the
+/// failure everybody hits is a PO marked delivered because the supplier sent an
+/// invoice. `CLOSED` and `CANCELLED` are both terminal but distinct: a closed
+/// order was fulfilled and paid, a cancelled one never happened and its reason
+/// is the audit trail.
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  reference String
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  status PurchaseOrderStatus @default(DRAFT)
+
+  /// What this order is for, copied from the request/RFQ rather than looked up
+  /// through them: an order outlives the documents that produced it, and the
+  /// bill created from it needs a category regardless of whether the PR is
+  /// still around.
+  category PurchaseCategory
+  currency String           @default("KES")
+
+  subtotal    Decimal @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  orderDate        DateTime  @default(now())
+  /// Promised delivery, used to derive "overdue" on read rather than storing a
+  /// flag that would rot while the supplier is quiet.
+  expectedDelivery DateTime?
+
+  deliveryAddress String? @db.Text
+  terms           String? @db.Text
+  notes           String? @db.Text
+
+  rfqId String?
+  rfq   Rfq?    @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+
+  quoteId String?
+  quote   RfqQuote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  purchaseRequestId String?
+  purchaseRequest   PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+
+  /// The bill finance raised against this order. The doc's task list asks for PO
+  /// completion to create a `SupplierBill`; master doc issue 70 warned against
+  /// adding a speculative `billId` before deciding the direction, and this is
+  /// that decision — the *bill* records the order (so a paid bill can always
+  /// say which order it settles), and the order points back at its latest bill
+  /// for convenience. A supplier may invoice in instalments, so this is not
+  /// unique.
+  supplierBillId String?
+  supplierBill   SupplierBill? @relation("PurchaseOrderBill", fields: [supplierBillId], references: [id], onDelete: SetNull)
+
+  sentAt             DateTime?
+  acceptedAt         DateTime?
+  receivedAt         DateTime?
+  closedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?   @db.Text
+
+  raisedById String?
+  raisedBy   User?   @relation("UserRaisedPurchaseOrders", fields: [raisedById], references: [id], onDelete: SetNull)
+
+  lines      PurchaseOrderLine[]
+  deliveries GoodsReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([rfqId])
+  @@index([purchaseRequestId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  description   String
+  specification String? @db.Text
+
+  quantity  Decimal @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(14, 2)
+  amount    Decimal @db.Decimal(14, 2)
+
+  /// Derived from the goods receipts, never decremented — a reversal or a
+  /// short delivery must not be able to make a line look unreceived.
+  receivedQuantity Decimal @default(0) @db.Decimal(10, 2)
+
+  sortOrder Int @default(0)
+
+  receiptLines GoodsReceiptLine[]
+
+  @@index([organizationId])
+  @@index([purchaseOrderId])
+  @@map("purchase_order_lines")
+}
+
+/// One delivery of goods against an order. Kept as rows rather than a boolean on
+/// the line because goods arrive in instalments and a partial delivery that
+/// overwrote the line would lose the history of what came when.
+model GoodsReceipt {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  receivedAt DateTime @default(now())
+
+  /// The supplier's delivery note or waybill number.
+  deliveryNote String?
+
+  conditionNote String? @db.Text
+
+  receivedById String?
+  receivedBy   User?   @relation("UserReceivedPurchaseOrders", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  lines GoodsReceiptLine[]
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([purchaseOrderId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  goodsReceiptId String
+  goodsReceipt   GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+
+  purchaseOrderLineId String
+  purchaseOrderLine   PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Cascade)
+
+  quantity Decimal @db.Decimal(10, 2)
+
+  /// Stock-in is Module 11's job. Until that module exists this column is
+  /// deliberately null rather than a fake flag: the receipt records that goods
+  /// arrived, and Module 11 fills in what happened to the stock. See master doc
+  /// issue 70 for why no speculative link was added instead.
+  inventoryItemId   String?
+  stockInRecordedAt DateTime?
+
+  @@index([organizationId])
+  @@index([goodsReceiptId])
+  @@index([purchaseOrderLineId])
+  @@map("goods_receipt_lines")
 }

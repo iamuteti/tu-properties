@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, PendingStockIn } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -1965,6 +1965,312 @@ export const maintenanceApi = {
         accessInstructions?: string;
     }) => api.post<PortalWorkOrder>('/portal/maintenance', data),
 
-    withdrawIssue: (id: string) =>
+withdrawIssue: (id: string) =>
         api.post<PortalWorkOrder>(`/portal/maintenance/${id}/withdraw`),
+};
+
+/**
+ * Module 10 — Procurement.
+ *
+ * Four things are deliberately four objects rather than one: a purchase request,
+ * a quotation round, a purchase order and a supplier are four documents with
+ * four different owners, and merging them into one `procurementApi` would make
+ * "which permission does this button need" unanswerable from the client.
+ *
+ * As in the maintenance module, every state change is its own method rather than
+ * a generic `update(status)`: the API refuses an illegal transition with a
+ * message written for the person who pressed the button, so the client should
+ * not be able to ask for one. Which buttons a row offers comes from the
+ * record's `availableActions`, computed server-side — the two cannot drift.
+ *
+ * Suppliers appear here too, but only for what procurement adds to them
+ * (performance figures, contract window). Creating and editing a supplier is
+ * `payablesApi`'s job, so there is one supplier record and one code sequence.
+ */
+export const procurementApi = {
+    // ── Purchase requests ───────────────────────────────────────────────────
+    purchaseRequests: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<PurchaseRequest[]>('/procurement/purchase-requests', { params }),
+
+    purchaseRequest: (id: string) =>
+        api.get<PurchaseRequest>(`/procurement/purchase-requests/${id}`),
+
+    purchaseRequestStats: () =>
+        api.get<PurchaseRequestStats>('/procurement/purchase-requests/stats'),
+
+    purchaseRequestsExportUrl: (params?: {
+        status?: string;
+        category?: string;
+        open?: string;
+        search?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/procurement/purchase-requests/export${search ? `?${search}` : ''}`;
+    },
+
+    /**
+     * `lines` is required: a request with nothing on it cannot be quoted for,
+     * so the API refuses to create one. `saveAsDraft` keeps it out of the
+     * approval inbox until the line prices are right.
+     */
+    createPurchaseRequest: (data: {
+        title: string;
+        description?: string;
+        category: string;
+        priority?: string;
+        department?: string;
+        neededBy?: string;
+        estimatedAmount?: number;
+        lines: { description: string; specification?: string; quantity?: number; unitPrice?: number }[];
+        saveAsDraft?: boolean;
+    }) => api.post<PurchaseRequest>('/procurement/purchase-requests', data),
+
+    /** Descriptive fields only — there is no status here by design. */
+    updatePurchaseRequest: (
+        id: string,
+        data: {
+            title?: string;
+            description?: string;
+            category?: string;
+            priority?: string;
+            department?: string;
+            neededBy?: string | null;
+            estimatedAmount?: number;
+        },
+    ) => api.patch<PurchaseRequest>(`/procurement/purchase-requests/${id}`, data),
+
+    /** Replaces the whole line set; only a draft or reopened request accepts it. */
+    replacePurchaseRequestLines: (
+        id: string,
+        lines: PurchaseRequestLine[] | { description: string; quantity?: number; unitPrice?: number }[],
+    ) => api.put<PurchaseRequest>(`/procurement/purchase-requests/${id}/lines`, { lines }),
+
+    deletePurchaseRequest: (id: string) =>
+        api.delete<{ message: string }>(`/procurement/purchase-requests/${id}`),
+
+    submitPurchaseRequest: (id: string, note?: string) =>
+        api.post<PurchaseRequest>(`/procurement/purchase-requests/${id}/submit`, { note }),
+
+    /** The direct path, with no approval policy involved. */
+    approvePurchaseRequest: (id: string, note?: string) =>
+        api.post<PurchaseRequest>(`/procurement/purchase-requests/${id}/approve`, { note }),
+
+    /**
+     * Routes through the approval engine. Auto-approves where no
+     * PURCHASE_REQUEST policy is configured; otherwise the request stays PENDING
+     * until the last approver decides.
+     */
+    requestPurchaseRequestApproval: (id: string) =>
+        api.post<{ approval: WorkflowInstance; request: PurchaseRequest }>(
+            `/procurement/purchase-requests/${id}/request-approval`,
+        ),
+
+    rejectPurchaseRequest: (id: string, reason: string) =>
+        api.post<PurchaseRequest>(`/procurement/purchase-requests/${id}/reject`, { reason }),
+
+    cancelPurchaseRequest: (id: string, reason: string) =>
+        api.post<PurchaseRequest>(`/procurement/purchase-requests/${id}/cancel`, { reason }),
+
+    reopenPurchaseRequest: (id: string) =>
+        api.post<PurchaseRequest>(`/procurement/purchase-requests/${id}/reopen`),
+
+    // ── RFQs and quotations ─────────────────────────────────────────────────
+    rfqs: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<Rfq[]>('/procurement/rfqs', { params }),
+
+    rfq: (id: string) => api.get<Rfq>(`/procurement/rfqs/${id}`),
+
+    rfqStats: () => api.get<RfqStats>('/procurement/rfqs/stats'),
+
+    /** The bid comparison, computed server-side from the quotations' own lines. */
+    rfqComparison: (id: string) =>
+        api.get<QuoteComparison>(`/procurement/rfqs/${id}/comparison`),
+
+    createRfq: (data: {
+        title: string;
+        notes?: string;
+        purchaseRequestId?: string;
+        quotesDueAt?: string;
+        currency?: string;
+        supplierIds?: string[];
+    }) => api.post<Rfq>('/procurement/rfqs', data),
+
+    inviteSuppliers: (id: string, supplierIds: string[], notes?: string) =>
+        api.post<Rfq>(`/procurement/rfqs/${id}/invite`, { supplierIds, notes }),
+
+    /** One quotation per supplier per round; a resubmission replaces the last. */
+    recordQuote: (
+        id: string,
+        data: {
+            supplierId: string;
+            lines: { description: string; quantity: number; unitPrice: number; purchaseRequestLineId?: string }[];
+            leadTimeDays?: number;
+            validUntil?: string;
+            notes?: string;
+            taxInclusive?: boolean;
+        },
+    ) => api.post<{ quote: RfqQuote; rfq: Rfq }>(`/procurement/rfqs/${id}/quotes`, data),
+
+    declineInvitation: (id: string, supplierId: string, reason: string) =>
+        api.post<Rfq>(`/procurement/rfqs/${id}/invitations/${supplierId}/decline`, { reason }),
+
+    issueRfq: (id: string) => api.post<Rfq>(`/procurement/rfqs/${id}/issue`),
+
+    /** Close the round without awarding it. No reason — no supplier is told. */
+    closeRfq: (id: string) => api.post<Rfq>(`/procurement/rfqs/${id}/close`),
+
+    reopenRfq: (id: string) => api.post<Rfq>(`/procurement/rfqs/${id}/reopen`),
+
+    awardQuote: (id: string, quoteId: string, note?: string) =>
+        api.post<Rfq>(`/procurement/rfqs/${id}/award`, { quoteId, note }),
+
+    cancelRfq: (id: string, reason: string) =>
+        api.post<Rfq>(`/procurement/rfqs/${id}/cancel`, { reason }),
+
+    setQuoteStatus: (id: string, quoteId: string, status: string) =>
+        api.patch<Rfq>(`/procurement/rfqs/${id}/quotes/${quoteId}/status`, { status }),
+
+    /** The rounds one supplier was invited to — their own view of the RFQ. */
+    supplierInvitations: (supplierId: string) =>
+        api.get<RfqInvitation[]>(`/procurement/rfqs/supplier/${supplierId}`),
+
+    // ── Purchase orders ─────────────────────────────────────────────────────
+    purchaseOrders: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<PurchaseOrder[]>('/procurement/purchase-orders', { params }),
+
+    purchaseOrder: (id: string) =>
+        api.get<PurchaseOrder>(`/procurement/purchase-orders/${id}`),
+
+    purchaseOrderStats: () =>
+        api.get<PurchaseOrderStats>('/procurement/purchase-orders/stats'),
+
+    purchaseOrdersExportUrl: (params?: {
+        status?: string;
+        supplierId?: string;
+        open?: string;
+        overdue?: string;
+        search?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/procurement/purchase-orders/export${search ? `?${search}` : ''}`;
+    },
+
+    /**
+     * Either `quoteId` (lines and category come from the awarded quotation) or
+     * `lines` with a `category`. The API refuses an order with neither, rather
+     * than writing an order nobody can compare against a quotation.
+     */
+    createPurchaseOrder: (data: {
+        supplierId: string;
+        category?: string;
+        lines?: {
+            description: string;
+            specification?: string;
+            quantity: number;
+            unitPrice: number;
+            purchaseRequestLineId?: string;
+        }[];
+        quoteId?: string;
+        purchaseRequestId?: string;
+        rfqId?: string;
+        currency?: string;
+        taxAmount?: number;
+        expectedDelivery?: string;
+        deliveryAddress?: string;
+        terms?: string;
+        notes?: string;
+    }) => api.post<PurchaseOrder>('/procurement/purchase-orders', data),
+
+    updatePurchaseOrder: (
+        id: string,
+        data: { expectedDelivery?: string | null; deliveryAddress?: string; terms?: string; notes?: string },
+    ) => api.patch<PurchaseOrder>(`/procurement/purchase-orders/${id}`, data),
+
+    replacePurchaseOrderLines: (
+        id: string,
+        lines: { description: string; quantity: number; unitPrice: number }[],
+    ) => api.put<PurchaseOrder>(`/procurement/purchase-orders/${id}/lines`, { lines }),
+
+    deletePurchaseOrder: (id: string) =>
+        api.delete<{ message: string }>(`/procurement/purchase-orders/${id}`),
+
+    sendPurchaseOrder: (id: string) =>
+        api.post<PurchaseOrder>(`/procurement/purchase-orders/${id}/send`),
+
+    acceptPurchaseOrder: (id: string) =>
+        api.post<PurchaseOrder>(`/procurement/purchase-orders/${id}/accept`),
+
+    /**
+     * Record goods arriving. The API decides whether this finishes the order or
+     * leaves it part-received, from the receipts — not the caller.
+     */
+    receivePurchaseOrder: (
+        id: string,
+        data: {
+            lines: { purchaseOrderLineId: string; quantity: number }[];
+            receivedAt?: string;
+            deliveryNote?: string;
+            conditionNote?: string;
+        },
+    ) =>
+        api.post<{ receipt: unknown; order: PurchaseOrder }>(
+            `/procurement/purchase-orders/${id}/receive`,
+            data,
+        ),
+
+    closePurchaseOrder: (id: string) =>
+        api.post<PurchaseOrder>(`/procurement/purchase-orders/${id}/close`),
+
+    cancelPurchaseOrder: (id: string, reason: string) =>
+        api.post<PurchaseOrder>(`/procurement/purchase-orders/${id}/cancel`, { reason }),
+
+    /**
+     * Hands the order to finance as a real supplier bill — priced by the tax
+     * engine, posted to the ledger. Needs `payables.create` as well.
+     */
+    createBillFromPurchaseOrder: (
+        id: string,
+        data?: { supplierReference?: string; billDate?: string; amount?: number },
+    ) =>
+        api.post<{ bill: SupplierBill; order: PurchaseOrder }>(
+            `/procurement/purchase-orders/${id}/create-bill`,
+            data ?? {},
+        ),
+
+    /** What has arrived and still needs stock-in, pending the Inventory module. */
+    pendingStockIn: (id: string) =>
+        api.get<PendingStockIn>(`/procurement/purchase-orders/${id}/stock-in`),
+
+    // ── Suppliers, from procurement's side ──────────────────────────────────
+    /** The same rows `payablesApi.suppliers` returns, plus performance figures. */
+    suppliers: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<ProcurementSupplier[]>('/procurement/suppliers', { params }),
+
+    supplier: (id: string) =>
+        api.get<ProcurementSupplier>(`/procurement/suppliers/${id}`),
+
+    /** Spend per supplier over a period — "who are we actually buying from". */
+    supplierSpend: (params?: { from?: string; to?: string }) =>
+        api.get<SupplierSpendRow[]>('/procurement/suppliers/spend', { params }),
+
+    /** Procurement fields only: category, rating, contract window, status. */
+    updateSupplierProcurement: (
+        id: string,
+        data: {
+            category?: string;
+            rating?: number;
+            contractStartDate?: string | null;
+            contractEndDate?: string | null;
+            contractReference?: string;
+            status?: string;
+        },
+    ) => api.patch<ProcurementSupplier>(`/procurement/suppliers/${id}`, data),
 };

@@ -72,6 +72,20 @@ export class WorkflowsController {
     );
   }
 
+  /**
+   * Record an approval decision.
+   *
+   * The role list has to include everybody an approval policy can name. It did
+   * not: `MAINTENANCE_MANAGER`, `TECHNICIAN` and `PROCUREMENT_OFFICER` were
+   * added to `UserRole` by Modules 9 and 10 (master doc issues 51/54/67) but
+   * never added here, so a policy naming one of them as the approver produced
+   * an approval nobody could ever act on — the same class of hole as a seeded
+   * role with no enum value.
+   *
+   * Widening the *role* list is not the same as widening who may decide: the
+   * engine still resolves the step's approvers and still refuses anybody who is
+   * not one of them, including the person who started the request.
+   */
   @Post('instances/:id/decision')
   @Roles(
     UserRole.SUPER_ADMIN,
@@ -79,6 +93,9 @@ export class WorkflowsController {
     UserRole.ACCOUNTANT,
     UserRole.PROPERTY_MANAGER,
     UserRole.LEASING_OFFICER,
+    UserRole.MAINTENANCE_MANAGER,
+    UserRole.PROCUREMENT_OFFICER,
+    UserRole.TECHNICIAN,
   )
   @Permissions('workflows.update')
   async decide(

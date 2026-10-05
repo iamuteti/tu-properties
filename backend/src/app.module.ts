@@ -36,6 +36,7 @@ import { TenantRequestsModule } from './modules/tenant-requests/tenant-requests.
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
+import { ProcurementModule } from './modules/procurement/procurement.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -74,6 +75,7 @@ import { SecurityModule } from './security/security.module';
 TenantRequestsModule,
     WorkflowModule,
     MaintenanceModule,
+    ProcurementModule,
   ],
   controllers: [AppController],
   providers: [

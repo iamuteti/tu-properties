@@ -32,6 +32,14 @@ import {
   WorkOrderPriority,
   WorkOrderSource,
   WorkOrderStatus,
+  PurchaseCategory,
+  PurchasePriority,
+  PurchaseRequestStatus,
+  PurchaseOrderStatus,
+  RfqStatus,
+  QuoteStatus,
+  SupplierStatus,
+  SupplierCategory,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -897,7 +905,8 @@ async function generateOwnerData(
       if (Math.random() > 0.3) {
         const period = periods[Math.floor(Math.random() * periods.length)];
         const spanDays = Math.floor(
-          (period.periodEnd.getTime() - period.periodStart.getTime()) / 86_400_000,
+          (period.periodEnd.getTime() - period.periodStart.getTime()) /
+            86_400_000,
         );
         chargeDate = new Date(period.periodStart);
         chargeDate.setDate(
@@ -2035,7 +2044,7 @@ async function generateMaintenanceData(
   }[] = [];
 
   for (const [index, property] of properties.entries()) {
-    const forProperty = plantPlan.slice(index % 3, index % 3 + 2);
+    const forProperty = plantPlan.slice(index % 3, (index % 3) + 2);
     for (const [offset, item] of forProperty.entries()) {
       const asset = await prisma.asset.create({
         data: {
@@ -2044,9 +2053,7 @@ async function generateMaintenanceData(
           type: item.type,
           name: item.name,
           // Tagged per property so two buildings never share an asset tag.
-          assetTag: `${item.assetTag}-${String.fromCharCode(
-            65 + index,
-          )}`,
+          assetTag: `${item.assetTag}-${String.fromCharCode(65 + index)}`,
           location: item.location,
           manufacturer: item.manufacturer ?? null,
           capacity: item.capacity ?? null,
@@ -2240,7 +2247,8 @@ async function generateMaintenanceData(
       source: WorkOrderSource.STAFF,
       reportedAt: new Date(now - 2 * day),
       scheduledFor: new Date(now + day),
-      inspectionNote: 'Likely a failed socket; will replace if the circuit is sound.',
+      inspectionNote:
+        'Likely a failed socket; will replace if the circuit is sound.',
       propertyId: second.propertyId,
       unitId: second.unitId,
       ...(second.tenantId ? { tenantId: second.tenantId } : {}),
@@ -2397,6 +2405,710 @@ async function generateMaintenanceData(
   );
 }
 
+/**
+ * Module 10 — the purchase cycle, seeded end to end.
+ *
+ * The point of this is that the demo shows the *whole* pipeline rather than four
+ * empty list pages: an approved request, an RFQ with three quotations waiting,
+ * one awarded round with an order part-delivered, and a completed order whose
+ * bill has not been raised yet (which is a legitimate state and the one
+ * `awaitingBill` counts).
+ *
+ * Suppliers are created with `PrismaService`-shaped writes rather than through
+ * `PayablesService`, because the seed runs outside Nest and the bill for a
+ * purchase order is deliberately *not* created here: posting a ledger entry
+ * from a seed would produce a bill with no journal entry behind it, which is
+ * worse than no bill.
+ */
+async function generateProcurementData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const procurementOfficer = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.PROCUREMENT_OFFICER },
+    select: { id: true },
+  });
+  const maintenanceManager = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.MAINTENANCE_MANAGER },
+    select: { id: true },
+  });
+  const requester = procurementOfficer?.id ?? maintenanceManager?.id;
+  if (!requester) return;
+
+  // `Supplier.code` is globally unique, not unique per organization, so the
+  // sequence is allocated across every supplier in the database and skips any
+  // code already taken. Counting only this organization's rows — the way
+  // `PayablesService.nextSupplierCode` does — collides the moment a second
+  // tenant has suppliers, which is exactly what the two-org demo does.
+  const existingCodes = new Set(
+    (await prisma.supplier.findMany({ select: { code: true } })).map(
+      (row) => row.code,
+    ),
+  );
+  let code = 1;
+  const nextCode = () => {
+    let candidate = `SUP-${String(code).padStart(4, '0')}`;
+    while (existingCodes.has(candidate)) {
+      code += 1;
+      candidate = `SUP-${String(code).padStart(4, '0')}`;
+    }
+    code += 1;
+    existingCodes.add(candidate);
+    return candidate;
+  };
+
+  const supplierPlan: {
+    name: string;
+    category: SupplierCategory;
+    email: string;
+    phone: string;
+    paymentTermsDays: number;
+    rating?: number;
+    underContract?: boolean;
+  }[] = [
+    {
+      name: 'Nairobi Lift Services Ltd',
+      category: SupplierCategory.MECHANICAL,
+      email: 'orders@nairobilift.example',
+      phone: '+254700200001',
+      paymentTermsDays: 30,
+      rating: 5,
+      underContract: true,
+    },
+    {
+      name: 'Hoist Kenya Engineering',
+      category: SupplierCategory.MECHANICAL,
+      email: 'quotes@hoistkenya.example',
+      phone: '+254700200002',
+      paymentTermsDays: 14,
+    },
+    {
+      name: 'Tamarind Plumbing Supplies',
+      category: SupplierCategory.PLUMBING,
+      email: 'sales@tamarindplumbing.example',
+      phone: '+254700200003',
+      paymentTermsDays: 7,
+      rating: 4,
+      underContract: true,
+    },
+    {
+      name: 'Eastleigh Electricals',
+      category: SupplierCategory.ELECTRICAL,
+      email: 'info@eastleighelectricals.example',
+      phone: '+254700200004',
+      paymentTermsDays: 30,
+    },
+    {
+      name: 'Acacia Office Furniture',
+      category: SupplierCategory.FURNITURE,
+      email: 'trade@acaciafurniture.example',
+      phone: '+254700200005',
+      paymentTermsDays: 45,
+    },
+    {
+      name: 'Cleanpro Services',
+      category: SupplierCategory.CLEANING,
+      email: 'hello@cleanpro.example',
+      phone: '+254700200006',
+      paymentTermsDays: 21,
+      rating: 3,
+    },
+  ];
+
+  const suppliers: { id: string; name: string }[] = [];
+  const day = 86_400_000;
+  const now = Date.now();
+
+  for (const plan of supplierPlan) {
+    const supplier = await prisma.supplier.create({
+      data: {
+        organizationId,
+        code: nextCode(),
+        name: plan.name,
+        status: SupplierStatus.ACTIVE,
+        email: plan.email,
+        phone: plan.phone,
+        city: 'Nairobi',
+        country: 'Kenya',
+        category: plan.category,
+        paymentTermsDays: plan.paymentTermsDays,
+        vatRegistered: true,
+        ...(plan.rating !== undefined ? { rating: plan.rating } : {}),
+        ...(plan.underContract
+          ? {
+              contractStartDate: new Date(now - 200 * day),
+              contractEndDate: new Date(now + 160 * day),
+              contractReference: `SVC-${new Date().getFullYear()}-${String(
+                supplierPlan.indexOf(plan) + 1,
+              ).padStart(2, '0')}`,
+            }
+          : {}),
+      },
+      select: { id: true, name: true },
+    });
+    suppliers.push(supplier);
+  }
+
+  const [lifts, hoist, plumbing, electrical, furniture, cleaning] = suppliers;
+
+  // ── 1. An approved request, quoted for, awarded, ordered part-delivered ──
+  const approvedRequest = await prisma.purchaseRequest.create({
+    data: {
+      organizationId,
+      reference: `PR-${new Date().getFullYear()}-0001`,
+      title: 'Lift ropes and seals for Tamarind Court',
+      description:
+        'The lift at Tamarind Court is within its service interval and the ropes show wire fatigue. Two sets, six metre, plus a seal kit.',
+      category: PurchaseCategory.MAINTENANCE_PARTS,
+      priority: PurchasePriority.HIGH,
+      status: PurchaseRequestStatus.APPROVED,
+      department: 'Maintenance',
+      neededBy: new Date(now + 45 * day),
+      estimatedAmount: 210000,
+      currency: 'KES',
+      approvalRequestedAt: new Date(now - 40 * day),
+      decidedAt: new Date(now - 39 * day),
+      decidedById: requester,
+      decisionNote: 'Agreed — the service report recommends it this quarter.',
+      requestedById: requester,
+      createdAt: new Date(now - 41 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Lift ropes, 6m, 8mm',
+            specification: 'Certified to the manufacturer’s specification.',
+            quantity: 2,
+            unitPrice: 90000,
+            estimatedAmount: 180000,
+            sortOrder: 0,
+          },
+          {
+            organizationId,
+            description: 'Seal kit for the lift door rollers',
+            quantity: 1,
+            unitPrice: 30000,
+            estimatedAmount: 30000,
+            sortOrder: 1,
+          },
+        ],
+      },
+    },
+    include: { lines: true },
+  });
+
+  const awardedRfq = await prisma.rfq.create({
+    data: {
+      organizationId,
+      reference: `RFQ-${new Date().getFullYear()}-0001`,
+      title: 'Lift ropes and door roller seals',
+      notes: 'Delivery to site; installation quoted separately.',
+      status: RfqStatus.AWARDED,
+      currency: 'KES',
+      quotesDueAt: new Date(now - 32 * day),
+      issuedAt: new Date(now - 38 * day),
+      closedAt: new Date(now - 30 * day),
+      awardedAt: new Date(now - 30 * day),
+      purchaseRequestId: approvedRequest.id,
+      raisedById: requester,
+      createdAt: new Date(now - 39 * day),
+    },
+  });
+
+  for (const supplier of [lifts, hoist, plumbing]) {
+    await prisma.rfqInvitation.create({
+      data: {
+        organizationId,
+        rfqId: awardedRfq.id,
+        supplierId: supplier.id,
+        status: 'QUOTED',
+        invitedAt: new Date(now - 38 * day),
+        respondedAt: new Date(now - 34 * day),
+      },
+    });
+  }
+
+  // Cheapest, but not the fastest — which is exactly the case the comparison
+  // view refuses to recommend, so the demo shows a judgement call rather than
+  // the module always pointing at a winner.
+  const winningQuote = await prisma.rfqQuote.create({
+    data: {
+      organizationId,
+      rfqId: awardedRfq.id,
+      supplierId: hoist.id,
+      status: QuoteStatus.AWARDED,
+      totalAmount: 196000,
+      currency: 'KES',
+      leadTimeDays: 10,
+      validUntil: new Date(now + 30 * day),
+      notes: 'Includes delivery; ropes certified.',
+      submittedAt: new Date(now - 33 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Lift ropes and door roller seals, delivered',
+            quantity: 1,
+            unitPrice: 196000,
+            amount: 196000,
+            purchaseRequestLineId: approvedRequest.lines[0].id,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.rfqQuote.create({
+    data: {
+      organizationId,
+      rfqId: awardedRfq.id,
+      supplierId: lifts.id,
+      status: QuoteStatus.REJECTED,
+      totalAmount: 188000,
+      currency: 'KES',
+      leadTimeDays: 35,
+      validUntil: new Date(now + 20 * day),
+      submittedAt: new Date(now - 34 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Lift ropes and door roller seals, delivered',
+            quantity: 1,
+            unitPrice: 188000,
+            amount: 188000,
+            purchaseRequestLineId: approvedRequest.lines[0].id,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  // A declined invitation, so the supplier's view shows why they were dropped
+  // rather than silently vanishing from the round.
+  await prisma.rfqInvitation.update({
+    where: {
+      rfqId_supplierId: { rfqId: awardedRfq.id, supplierId: plumbing.id },
+    },
+    data: {
+      status: 'DECLINED',
+      respondedAt: new Date(now - 34 * day),
+      declineReason:
+        'Ropes are not something we stock; try the lift specialists.',
+    },
+  });
+
+  await prisma.rfq.update({
+    where: { id: awardedRfq.id },
+    data: { awardedQuoteId: winningQuote.id },
+  });
+
+  const partDeliveredOrder = await prisma.purchaseOrder.create({
+    data: {
+      organizationId,
+      reference: `PO-${new Date().getFullYear()}-0001`,
+      supplierId: hoist.id,
+      status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
+      category: PurchaseCategory.MAINTENANCE_PARTS,
+      currency: 'KES',
+      subtotal: 196000,
+      taxAmount: 0,
+      totalAmount: 196000,
+      orderDate: new Date(now - 29 * day),
+      expectedDelivery: new Date(now - 9 * day),
+      deliveryAddress: 'Tamarind Court, Nairobi',
+      terms: '30 days from invoice.',
+      rfqId: awardedRfq.id,
+      quoteId: winningQuote.id,
+      purchaseRequestId: approvedRequest.id,
+      raisedById: requester,
+      sentAt: new Date(now - 29 * day),
+      acceptedAt: new Date(now - 28 * day),
+      createdAt: new Date(now - 29 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Lift ropes and door roller seals, delivered',
+            quantity: 1,
+            unitPrice: 196000,
+            amount: 196000,
+            // Half arrived. Deliberately not "received": the demo needs a
+            // part-delivered order so `awaitingBill` and the outstanding
+            // figures have something real in them.
+            receivedQuantity: 0.5,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+    include: { lines: true },
+  });
+
+  await prisma.goodsReceipt.create({
+    data: {
+      organizationId,
+      purchaseOrderId: partDeliveredOrder.id,
+      receivedAt: new Date(now - 9 * day),
+      deliveryNote: 'DN-44821',
+      conditionNote: 'One crate and one loose roller assembly.',
+      receivedById: maintenanceManager?.id ?? requester,
+      lines: {
+        create: [
+          {
+            organizationId,
+            purchaseOrderLineId: partDeliveredOrder.lines[0].id,
+            quantity: 0.5,
+          },
+        ],
+      },
+    },
+  });
+
+  // ── 2. A completed order whose bill has not been raised yet ──────────────
+  const secondRequest = await prisma.purchaseRequest.create({
+    data: {
+      organizationId,
+      reference: `PR-${new Date().getFullYear()}-0002`,
+      title: 'Reception chairs for Westgate',
+      description: 'Two of the four reception chairs have failed.',
+      category: PurchaseCategory.FURNITURE,
+      priority: PurchasePriority.NORMAL,
+      status: PurchaseRequestStatus.APPROVED,
+      department: 'Front Office',
+      currency: 'KES',
+      estimatedAmount: 60000,
+      decidedAt: new Date(now - 60 * day),
+      decidedById: requester,
+      requestedById: requester,
+      createdAt: new Date(now - 61 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Reception chair, contract grade',
+            quantity: 4,
+            unitPrice: 15000,
+            estimatedAmount: 60000,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  const deliveredOrder = await prisma.purchaseOrder.create({
+    data: {
+      organizationId,
+      reference: `PO-${new Date().getFullYear()}-0002`,
+      supplierId: furniture.id,
+      status: PurchaseOrderStatus.RECEIVED,
+      category: PurchaseCategory.FURNITURE,
+      currency: 'KES',
+      subtotal: 58000,
+      taxAmount: 0,
+      totalAmount: 58000,
+      orderDate: new Date(now - 55 * day),
+      expectedDelivery: new Date(now - 40 * day),
+      deliveryAddress: 'Westgate offices, Nairobi',
+      purchaseRequestId: secondRequest.id,
+      raisedById: requester,
+      sentAt: new Date(now - 55 * day),
+      acceptedAt: new Date(now - 54 * day),
+      receivedAt: new Date(now - 42 * day),
+      createdAt: new Date(now - 55 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Reception chair, contract grade',
+            quantity: 4,
+            unitPrice: 14500,
+            amount: 58000,
+            receivedQuantity: 4,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+    include: { lines: true },
+  });
+
+  await prisma.goodsReceipt.create({
+    data: {
+      organizationId,
+      purchaseOrderId: deliveredOrder.id,
+      receivedAt: new Date(now - 42 * day),
+      deliveryNote: 'DN-51002',
+      receivedById: maintenanceManager?.id ?? requester,
+      lines: {
+        create: [
+          {
+            organizationId,
+            purchaseOrderLineId: deliveredOrder.lines[0].id,
+            quantity: 4,
+          },
+        ],
+      },
+    },
+  });
+
+  // ── 3. An RFQ still collecting answers, including a decline ──────────────
+  const thirdRequest = await prisma.purchaseRequest.create({
+    data: {
+      organizationId,
+      reference: `PR-${new Date().getFullYear()}-0003`,
+      title: 'Quarterly deep clean, all common areas',
+      description:
+        'Twice-quarterly contract clean for the common areas of the managed buildings.',
+      category: PurchaseCategory.CLEANING,
+      priority: PurchasePriority.LOW,
+      status: PurchaseRequestStatus.APPROVED,
+      department: 'Operations',
+      currency: 'KES',
+      estimatedAmount: 240000,
+      decidedAt: new Date(now - 12 * day),
+      decidedById: requester,
+      requestedById: requester,
+      createdAt: new Date(now - 13 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Quarterly deep clean, per building',
+            quantity: 12,
+            unitPrice: 20000,
+            estimatedAmount: 240000,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+    include: { lines: true },
+  });
+
+  const openRfq = await prisma.rfq.create({
+    data: {
+      organizationId,
+      reference: `RFQ-${new Date().getFullYear()}-0002`,
+      title: 'Quarterly deep clean, 12 buildings',
+      notes: 'Quotes to include chemicals and a supervisor.',
+      status: RfqStatus.QUOTES_RECEIVED,
+      currency: 'KES',
+      quotesDueAt: new Date(now + 7 * day),
+      issuedAt: new Date(now - 10 * day),
+      purchaseRequestId: thirdRequest.id,
+      raisedById: requester,
+      createdAt: new Date(now - 11 * day),
+    },
+  });
+
+  for (const supplier of [cleaning, electrical]) {
+    await prisma.rfqInvitation.create({
+      data: {
+        organizationId,
+        rfqId: openRfq.id,
+        supplierId: supplier.id,
+        status: 'INVITED',
+        invitedAt: new Date(now - 10 * day),
+      },
+    });
+  }
+
+  await prisma.rfqQuote.create({
+    data: {
+      organizationId,
+      rfqId: openRfq.id,
+      supplierId: cleaning.id,
+      status: QuoteStatus.SUBMITTED,
+      totalAmount: 228000,
+      currency: 'KES',
+      leadTimeDays: 14,
+      validUntil: new Date(now + 45 * day),
+      submittedAt: new Date(now - 4 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description:
+              'Quarterly deep clean, 12 buildings, chemicals included',
+            quantity: 1,
+            unitPrice: 228000,
+            amount: 228000,
+            purchaseRequestLineId: thirdRequest.lines[0].id,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  // ── 4. The unhappy states, so the queues are not empty ───────────────────
+  await prisma.purchaseRequest.create({
+    data: {
+      organizationId,
+      reference: `PR-${new Date().getFullYear()}-0004`,
+      title: 'Borehole pump replacement parts',
+      description: 'Awaiting the contractor’s report before pricing.',
+      category: PurchaseCategory.MAINTENANCE_PARTS,
+      priority: PurchasePriority.URGENT,
+      status: PurchaseRequestStatus.PENDING,
+      department: 'Maintenance',
+      neededBy: new Date(now + 14 * day),
+      requestedById: maintenanceManager?.id ?? requester,
+      createdAt: new Date(now - 2 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Borehole pump seal and bearing kit',
+            quantity: 1,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.purchaseRequest.create({
+    data: {
+      organizationId,
+      reference: `PR-${new Date().getFullYear()}-0005`,
+      title: 'Air conditioners for the guard houses',
+      description: 'Two units, one per guard house.',
+      category: PurchaseCategory.EQUIPMENT,
+      priority: PurchasePriority.NORMAL,
+      status: PurchaseRequestStatus.REJECTED,
+      department: 'Maintenance',
+      currency: 'KES',
+      estimatedAmount: 180000,
+      rejectionReason:
+        'Deferred to next financial year — the guard houses have fans for now.',
+      decisionNote:
+        'Deferred to next financial year — the guard houses have fans for now.',
+      decidedAt: new Date(now - 20 * day),
+      decidedById: requester,
+      requestedById: maintenanceManager?.id ?? requester,
+      createdAt: new Date(now - 22 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Split unit, 12000 BTU',
+            quantity: 2,
+            unitPrice: 90000,
+            estimatedAmount: 180000,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.purchaseRequest.create({
+    data: {
+      organizationId,
+      reference: `PR-${new Date().getFullYear()}-0006`,
+      title: 'Bulk stationery order (draft)',
+      description:
+        'Started and not finished; the figures still need confirming.',
+      category: PurchaseCategory.STATIONERY,
+      priority: PurchasePriority.LOW,
+      status: PurchaseRequestStatus.DRAFT,
+      department: 'Administration',
+      currency: 'KES',
+      requestedById: requester,
+      createdAt: new Date(now - 1 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'A4 paper, carton',
+            quantity: 20,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  const sentOrder = await prisma.purchaseOrder.create({
+    data: {
+      organizationId,
+      reference: `PO-${new Date().getFullYear()}-0003`,
+      supplierId: electrical.id,
+      status: PurchaseOrderStatus.SENT,
+      category: PurchaseCategory.MAINTENANCE_PARTS,
+      currency: 'KES',
+      subtotal: 42000,
+      taxAmount: 0,
+      totalAmount: 42000,
+      orderDate: new Date(now - 6 * day),
+      expectedDelivery: new Date(now + 4 * day),
+      deliveryAddress: 'Tamarind Court, Nairobi',
+      raisedById: requester,
+      sentAt: new Date(now - 6 * day),
+      createdAt: new Date(now - 6 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Gate lamp fittings and drivers',
+            quantity: 6,
+            unitPrice: 7000,
+            amount: 42000,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  const overdueOrder = await prisma.purchaseOrder.create({
+    data: {
+      organizationId,
+      reference: `PO-${new Date().getFullYear()}-0004`,
+      supplierId: plumbing.id,
+      status: PurchaseOrderStatus.ACCEPTED,
+      category: PurchaseCategory.MAINTENANCE_PARTS,
+      currency: 'KES',
+      subtotal: 78000,
+      taxAmount: 0,
+      totalAmount: 78000,
+      orderDate: new Date(now - 40 * day),
+      // Promised three weeks ago and still nothing: the `overdue` figure the
+      // list derives from the date rather than stores.
+      expectedDelivery: new Date(now - 21 * day),
+      deliveryAddress: 'Tamarind Court, Nairobi',
+      raisedById: requester,
+      sentAt: new Date(now - 40 * day),
+      acceptedAt: new Date(now - 39 * day),
+      createdAt: new Date(now - 40 * day),
+      lines: {
+        create: [
+          {
+            organizationId,
+            description: 'Replacement booster pump set',
+            quantity: 1,
+            unitPrice: 78000,
+            amount: 78000,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  void sentOrder;
+  void overdueOrder;
+
+  console.log(
+    `  Procurement: ${suppliers.length} suppliers, 6 purchase requests, 2 RFQs, 4 purchase orders`,
+  );
+}
+
 // Main function to run demo data generation standalone
 export async function seedDemoData() {
   const connectionString = process.env.DATABASE_URL;
@@ -2440,6 +3152,20 @@ export async function seedDemoData() {
     await prisma.lead.deleteMany();
     await prisma.contact.deleteMany();
     await prisma.tenant.deleteMany();
+    // Module 10: procurement runs request → RFQ → quote → order → receipt, and
+    // every one of those tables points at the one before it, so they are cleared
+    // child-first. Suppliers themselves survive (nothing above clears them), which
+    // is why their codes keep counting up rather than restarting at SUP-0001.
+    await prisma.goodsReceiptLine.deleteMany();
+    await prisma.goodsReceipt.deleteMany();
+    await prisma.purchaseOrderLine.deleteMany();
+    await prisma.purchaseOrder.deleteMany();
+    await prisma.rfqQuoteLine.deleteMany();
+    await prisma.rfqQuote.deleteMany();
+    await prisma.rfqInvitation.deleteMany();
+    await prisma.rfq.deleteMany();
+    await prisma.purchaseRequestLine.deleteMany();
+    await prisma.purchaseRequest.deleteMany();
     // Module 9: work orders point at properties, units, tenants, assets and users,
     // and preventive schedules point at assets, so all of it is cleared before the
     // tables they hang off. The order here is the only thing keeping this seed
@@ -2625,6 +3351,27 @@ export async function seedDemoData() {
         role: UserRole.TECHNICIAN,
         organizationId: defaultOrg.id,
       },
+      // Procurement officers (Module 10). Same hole as above: the seeded
+      // Procurement Officer role had permissions nobody could hold, so there was
+      // no login that could raise an RFQ or award a quotation. Both organizations
+      // get one, because the RFQ supplier picker is tenant-scoped and a
+      // single-tenant demo cannot demonstrate a cross-tenant refusal.
+      {
+        email: 'procurement@rohi.co.ke',
+        firstName: 'Nia',
+        lastName: 'Wanjiru',
+        phone: '+254700000012',
+        role: UserRole.PROCUREMENT_OFFICER,
+        organizationId: rohiOrg.id,
+      },
+      {
+        email: 'procurement@westhill.co.ke',
+        firstName: 'Samuel',
+        lastName: 'Otieno',
+        phone: '+254700000013',
+        role: UserRole.PROCUREMENT_OFFICER,
+        organizationId: defaultOrg.id,
+      },
     ];
     for (const staff of maintenanceStaff) {
       await prisma.user.create({ data: { passwordHash, ...staff } });
@@ -2650,6 +3397,8 @@ export async function seedDemoData() {
       { email: 'technician@rohi.co.ke', roleName: 'Technician' },
       { email: 'maintenance@westhill.co.ke', roleName: 'Maintenance Manager' },
       { email: 'technician@westhill.co.ke', roleName: 'Technician' },
+      { email: 'procurement@rohi.co.ke', roleName: 'Procurement Officer' },
+      { email: 'procurement@westhill.co.ke', roleName: 'Procurement Officer' },
     ];
     for (const assignment of staffRoleAssignments) {
       const user = await prisma.user.findUnique({
@@ -2670,6 +3419,11 @@ export async function seedDemoData() {
 
     // Plant register, service intervals and a work-order queue (Module 9).
     await generateMaintenanceData(prisma, rohiOrg.id);
+
+    // Suppliers, purchase requests, quotation rounds and purchase orders
+    // (Module 10). After maintenance, because the seeded requests are raised by
+    // the maintenance team — the usual case for the parts purchases.
+    await generateProcurementData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.

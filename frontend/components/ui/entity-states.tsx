@@ -102,6 +102,29 @@ const STATUS_STYLES: Record<string, string> = {
     SERVICE_DUE: 'bg-amber-100 text-amber-800',
     OUT_OF_SERVICE: 'bg-red-100 text-red-700',
     RETIRED: 'bg-slate-100 text-slate-500',
+    // Module 10: procurement. Three pipelines that read left to right, so the
+    // colours go grey → amber (waiting on somebody) → violet → blue (agreed) →
+    // green (delivered) → near-black (closed), with one amber exception for
+    // "part of it arrived", which is the state that most needs to stand out.
+    DRAFT: 'bg-slate-100 text-slate-700',
+    PENDING: 'bg-amber-100 text-amber-800',
+    ISSUED: 'bg-amber-100 text-amber-800',
+    QUOTES_RECEIVED: 'bg-violet-100 text-violet-700',
+    REJECTED: 'bg-red-100 text-red-700',
+    // CANCELLED and CLOSED already carry the same styles from the work-order
+    // pipeline above — one terminal state, one look.
+    SENT: 'bg-cyan-100 text-cyan-700',
+    ACCEPTED: 'bg-blue-100 text-blue-700',
+    PARTIALLY_RECEIVED: 'bg-amber-100 text-amber-800',
+    RECEIVED: 'bg-emerald-100 text-emerald-700',
+    // Quotes, invitations and suppliers.
+    SUBMITTED: 'bg-blue-100 text-blue-700',
+    SHORTLISTED: 'bg-violet-100 text-violet-700',
+    AWARDED: 'bg-emerald-100 text-emerald-700',
+    WITHDRAWN: 'bg-slate-100 text-slate-500',
+    INVITED: 'bg-amber-100 text-amber-800',
+    QUOTED: 'bg-blue-100 text-blue-700',
+    DECLINED: 'bg-slate-100 text-slate-500',
 };
 
 /** Coloured status pill, shared by property and unit lists/details. */

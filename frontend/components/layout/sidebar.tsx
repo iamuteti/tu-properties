@@ -40,6 +40,11 @@ Receipt,
     KanbanSquare,
     CalendarClock,
     Settings2,
+    ShoppingCart,
+    FileStack,
+    ClipboardList,
+    Award,
+    Truck,
 } from "lucide-react";
 
 type UserRole =
@@ -49,6 +54,7 @@ type UserRole =
     | 'LEASING_OFFICER'
     | 'MAINTENANCE_MANAGER'
     | 'TECHNICIAN'
+    | 'PROCUREMENT_OFFICER'
     | 'ACCOUNTANT'
     | 'USER';
 
@@ -79,9 +85,25 @@ const navItems: NavItem[] = [
             { href: '/maintenance/schedules', label: 'Service schedule', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
         ],
     },
+{
+        // Module 10 — Procurement. The three documents in the order they happen:
+        // a department asks, suppliers quote, the company commits. The supplier
+        // list sits with the buyers, though the *bills* those suppliers send stay
+        // in Finance — that split is deliberate, and it is why a procurement
+        // officer has no `payables` permission.
+        label: 'Procurement',
+        icon: ShoppingCart,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'],
+        children: [
+            { href: '/procurement/purchase-requests', label: 'Purchase requests', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'] },
+            { href: '/procurement/rfqs', label: 'Quotations', icon: FileStack, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
+            { href: '/procurement/purchase-orders', label: 'Purchase orders', icon: Truck, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
+            { href: '/procurement/suppliers', label: 'Suppliers', icon: Award, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'] },
+        ],
+    },
     {
         label: 'Landlords',
-    icon: Landmark,
+        icon: Landmark,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
         children: [
             { href: "/landlords", label: "Owners", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
@@ -168,6 +190,9 @@ const roleLabels: Record<UserRole, string> = {
     // somebody to assign it to (master doc issues 51/54).
     MAINTENANCE_MANAGER: 'Maintenance Manager',
     TECHNICIAN: 'Technician',
+    // Module 10: same reason as the two above — the seeded Procurement Officer
+    // role had permissions nobody could hold until UserRole gained a value.
+    PROCUREMENT_OFFICER: 'Procurement Officer',
     ACCOUNTANT: 'Accountant',
     USER: 'User',
 };

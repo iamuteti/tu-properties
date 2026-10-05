@@ -1329,59 +1329,105 @@ model PreventiveMaintenanceSchedule {
 
 ---
 
-## Domain: Procurement (Module: Procurement) — 🆕 Not started
+## Domain: Procurement (Module: Procurement) — ✅ Built (Module 10)
+
+As built, with the reasons for each deviation from the sketch above recorded inline. The full
+model definitions live in `backend/src/prisma/schema.prisma`; this is the map of what changed
+and why, so the next reader does not have to diff it.
 
 ```prisma
-model Supplier {
-  id             String   @id @default(uuid())
-  organizationId String
-  name           String
-  contactEmail   String?
-  contactPhone   String?
-  @@index([organizationId])
+// The doc's `Supplier` had only a name and a phone. Module 7 (accounts payable) had
+// already built a real one — code, contacts, bank details, VAT status — so procurement
+// did NOT add a second vendor table. A bill and a purchase order pointing at two
+// different "supplier" records is how an AP total goes wrong. Instead the
+// procurement-only fields were added to the existing model:
+//
+//   category             SupplierCategory?  // what they supply, for the RFQ picker
+//   rating               Int?               // a buyer's judgement (1-5)
+//   contractStartDate / contractEndDate / contractReference
+//   rfqInvitations / rfqQuotes / purchaseOrders  // back-relations
+//
+// SupplierCategory is a third enum, distinct from both PurchaseCategory ("what is
+// being bought this time") and BillCategory ("which account does the invoice land
+// in"). A plumber is a PLUMBING supplier once and stays one.
+
+enum PurchaseCategory {
+  MAINTENANCE_PARTS EQUIPMENT FURNITURE IT_AND_TECH STATIONERY
+  CLEANING SECURITY UTILITIES PROFESSIONAL_SERVICES OTHER
 }
 
-model PurchaseRequest {
-  id             String   @id @default(uuid())
-  organizationId String
-  departmentId   String?
-  requestedById  String
-  status         PRStatus @default(PENDING)
-  createdAt      DateTime @default(now())
-  @@index([organizationId])
+enum PurchasePriority { LOW NORMAL HIGH URGENT }
+
+enum PurchaseRequestStatus {
+  DRAFT PENDING APPROVED REJECTED CANCELLED
 }
 
-enum PRStatus {
-  PENDING
-  APPROVED
-  REJECTED
+// PurchaseRequest: reference (unique per org, `PR-2026-0001`), title, category,
+// priority, department (free text — see note), neededBy, estimatedAmount (nullable:
+// a request is often raised before anyone knows the price, and a fabricated estimate
+// is worse than a blank), requestedById, approvalRequestedAt, decisionNote,
+// rejectionReason, decidedAt/decidedById.
+//   lines PurchaseRequestLine[]  — required, not a description blob: a request with no
+//     lines has nothing to compare quotations against, so the API refuses one.
+//   rfqs / orders back-relations.
+
+enum RfqStatus { DRAFT ISSUED QUOTES_RECEIVED CLOSED AWARDED CANCELLED }
+
+// Rfq: reference, title, status, currency, quotesDueAt, issuedAt/closedAt/awardedAt,
+// purchaseRequestId (nullable — re-quoting last year's contract is legitimate),
+// awardedQuoteId (unique — one winner per round, enforced in the database as well as
+// in the state machine), cancellationReason.
+//   invitations RfqInvitation[]  — NOT a `String[]` as the sketch had. The sketch's
+//     `suppliersInvited String[]` has nowhere to put "invited on Tuesday, never
+//     replied", and a supplier who is dropped without a record is how a single-source
+//     purchase happens without anybody deciding it. RfqInvitation carries status
+//     (INVITED/QUOTED/DECLINED), invitedAt, respondedAt and a required declineReason.
+//   quotes RfqQuote[]
+
+enum QuoteStatus { SUBMITTED SHORTLISTED REJECTED AWARDED WITHDRAWN }
+
+// RfqQuote: status, totalAmount, currency, leadTimeDays (the comparison's whole reason
+// for preferring one quote over another — the cheapest price for something needed next
+// week is not the cheapest), validUntil, notes, submittedAt. Unique per [rfqId, supplierId],
+// so a supplier who revises their answer replaces it rather than appearing twice.
+//   lines RfqQuoteLine[] — purchaseRequestLineId is optional, because a supplier may
+//     quote the whole job in one lump and forcing a match would make honest quotations
+//     impossible to enter.
+
+enum PurchaseOrderStatus {
+  DRAFT SENT ACCEPTED PARTIALLY_RECEIVED RECEIVED CLOSED CANCELLED
 }
 
-model RFQ {
-  id             String   @id @default(uuid())
-  organizationId String
-  purchaseRequestId String
-  suppliersInvited String[] // supplier IDs
-  @@index([organizationId])
-}
+// PurchaseOrder: reference, supplierId, status, category (copied from the request so an
+// order cannot disagree with the document it answers), currency, subtotal, taxAmount,
+// totalAmount (always summed from the lines), orderDate, expectedDelivery (the source of
+// "overdue", derived on read — never a stored flag), deliveryAddress, terms, notes,
+// rfqId/quoteId/purchaseRequestId, supplierBillId (nullable: the bill finance raised
+// against this order; the *bill* records the order so a paid bill can always say what it
+// settles, and the order points back for convenience. Not unique — a supplier may invoice
+// in instalments), sentAt/acceptedAt/receivedAt/closedAt/cancelledAt + cancellationReason.
+//   lines PurchaseOrderLine[]   quantity, unitPrice, amount, receivedQuantity (DERIVED from
+//     the receipts in the same transaction, never decremented — a correction must be able
+//     to move a quantity backwards and a counter that only goes up cannot).
+//   deliveries GoodsReceipt[]   goods arrive in instalments; rows rather than a boolean,
+//     because a partial delivery that overwrote the line would lose what came when.
 
-model PurchaseOrder {
-  id             String   @id @default(uuid())
-  organizationId String
-  supplierId     String
-  status         POStatus @default(DRAFT)
-  totalAmount    Decimal  @db.Decimal(14,2)
-  @@index([organizationId])
-}
-
-enum POStatus {
-  DRAFT
-  SENT
-  ACCEPTED
-  DELIVERED
-  CANCELLED
+model GoodsReceipt {
+  // receivedAt, deliveryNote, conditionNote, receivedById
+  //   lines GoodsReceiptLine[] — purchaseOrderLineId, quantity, and stockInRecordedAt.
+  //     Null until Inventory (Module 11) exists. Per master doc issue 70, no speculative
+  //     inventoryItemId was added pointing at a table that does not exist; the module
+  //     reports what is waiting instead of claiming stock has moved.
 }
 ```
+
+**Deviations from the sketch, in short:** `Supplier` reused rather than duplicated; `PRStatus` →
+`PurchaseRequestStatus` with DRAFT and CANCELLED added (DRAFT because nobody wants half-written
+requests in the approval inbox; CANCELLED because "we do not want this" and "we did not approve
+this" are different answers); `RFQ.suppliersInvited String[]` → `RfqInvitation[]`; `POStatus`
+gained PARTIALLY_RECEIVED and CLOSED (the sketch had no way to say "half of it arrived", which is
+the state everybody hits); `departmentId` → free-text `department`, because no departments table
+exists and inventing one is a second organization-wide concept for no reporting gain.
 
 ---
 
