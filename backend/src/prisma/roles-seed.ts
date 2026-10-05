@@ -63,6 +63,21 @@ export const PERMISSION_MODULES = [
   'inventory_items',
   'warehouses',
   'stock_movements',
+  // Module 12 — HR & Payroll. Seven modules rather than two, and the split is the
+  // security design of the module rather than tidiness:
+  //   `employees.view`          the staff directory, no money. Nearly every role.
+  //   `employees.compensation`  salaries, bank details, national IDs. Three roles.
+  //   `leave_requests.view`     who is off, and a balance.
+  //   `leave_requests.create`   file your own — granted to employees, grants nothing.
+  //   `leave_requests.approve`  sign off somebody else's time.
+  //   `payroll.view`            see payslips. `.manage` builds and posts a run.
+  //   `.approve` signs off the figures, `.pay` releases the money — two different
+  //   acts by two different people in a company that runs payroll properly.
+  'employees',
+  'leave_requests',
+  'leave_policies',
+  'holidays',
+  'payroll',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -72,6 +87,29 @@ export interface ModulePermissions {
   create?: boolean;
   update?: boolean;
   delete?: boolean;
+  /**
+   * Module 12. Four CRUD actions do not cover a payroll, which is approved by one
+   * person and released by another — and the whole reason those two are separate
+   * is that collapsing them is how a payroll gets approved by whoever built it.
+   *
+   * Optional and absent-means-denied, deliberately: adding these two keys does not
+   * grant them to any role that does not already name them, so the other eleven
+   * modules keep exactly the four actions they had.
+   */
+  approve?: boolean;
+  /** Release the money. Always narrower than `approve`. */
+  pay?: boolean;
+  /**
+   * Module 12. **My own record only.**
+   *
+   * A separate action rather than a narrower reading of `view`, because "view"
+   * means "the tenant's" everywhere else in this product and an employee holding
+   * it would be handed every payslip in the company. This is the one action that
+   * is resolved against the caller's own `User.employeeId` by the service rather
+   * than against a parameter, which is the whole point: there is no request shape
+   * in which an employee can name somebody else.
+   */
+  self?: boolean;
 }
 
 export interface PermissionSet {
@@ -91,6 +129,22 @@ const viewWrite = (): ModulePermissions => ({
   view: true,
   create: true,
   update: true,
+});
+
+/**
+ * Module 12's payroll, which needs the two actions `full()` deliberately omits.
+ *
+ * Not a generalisation of `full()`: giving every module `approve` and `pay` would
+ * hand those actions to eleven modules that have no such step, and a permission
+ * nobody has thought about is a permission nobody reviews.
+ */
+const payrollFull = (): ModulePermissions => ({
+  view: true,
+  create: true,
+  update: true,
+  delete: true,
+  approve: true,
+  pay: true,
 });
 
 function set(
@@ -172,6 +226,14 @@ export const SYSTEM_ROLES: {
       inventory_items: full(),
       warehouses: full(),
       stock_movements: full(),
+      // Module 12. Full HR: this role may have to fix a misconfigured
+      // statutory rule without waiting for an accountant. Salary visibility
+      // follows ADMIN throughout this product.
+      employees: full(),
+      leave_requests: full(),
+      leave_policies: full(),
+      holidays: full(),
+      payroll: payrollFull(),
     }),
   },
   {
@@ -216,6 +278,13 @@ export const SYSTEM_ROLES: {
       inventory_items: view(),
       warehouses: view(),
       stock_movements: viewWrite(),
+      // Module 12: they know who works on which building, so the directory
+      // and leave approval. NOT compensation and NOT payroll — a property
+      // manager reading a cleaner's salary is the leak this split prevents.
+      employees: view(),
+      leave_requests: viewWrite(),
+      leave_policies: view(),
+      holidays: view(),
     }),
   },
   {
@@ -257,6 +326,11 @@ export const SYSTEM_ROLES: {
       // that is the end of it.
       inventory_items: view(),
       warehouses: view(),
+      // Module 12: a leasing officer files their own leave and sees who works
+      // here. Not approval, and not compensation.
+      employees: view(),
+      leave_requests: viewWrite(),
+      holidays: view(),
     }),
   },
   {
@@ -315,6 +389,14 @@ export const SYSTEM_ROLES: {
       inventory_items: view(),
       warehouses: view(),
       stock_movements: view(),
+      // Module 12: the one role that legitimately reads salaries — it is
+      // their job — and they own the statutory rules, because a rule's figures
+      // are a legal matter and the person who posts the liability is better
+      // placed to enter them than a system administrator.
+      employees: full(),
+      leave_requests: view(),
+      holidays: view(),
+      payroll: payrollFull(),
     }),
   },
   {
@@ -343,6 +425,11 @@ export const SYSTEM_ROLES: {
       inventory_items: full(),
       warehouses: full(),
       stock_movements: full(),
+      // Module 12: runs the technicians, so they approve their leave. No
+      // compensation.
+      employees: view(),
+      leave_requests: full(),
+      holidays: view(),
     }),
   },
   {
@@ -361,6 +448,12 @@ export const SYSTEM_ROLES: {
       // the item master, the store list, or anything that could put stock back.
       inventory_items: view(),
       warehouses: view(),
+      // Module 12: files their own leave and sees the directory. `viewWrite`,
+      // not `full` — filing a request grants nothing beyond filing one, and a
+      // technician must not be able to approve somebody else's holiday.
+      employees: view(),
+      leave_requests: viewWrite(),
+      holidays: view(),
     }),
   },
   {
@@ -410,15 +503,48 @@ export const SYSTEM_ROLES: {
       inventory_items: view(),
       warehouses: view(),
       stock_movements: viewWrite(),
+      // Module 12: sees who exists (a purchase request may name a
+      // requester) but nothing else.
+      employees: view(),
     }),
   },
   {
     name: 'HR Manager',
     description:
-      'Read access to organization users for staffing administration.',
+      'Compensation, leave policy, holidays and the statutory payroll rules. Everything about payroll except releasing the money, which stays with whoever holds bank access.',
     permissions: set({
       users: view(),
       documents: view(),
+      // Module 12: this role existed as a stub holding only read access to
+      // organization users — the same hole as issues 51/54/67/75, where a seeded
+      // role has permissions nobody uses and nothing for the job it names. It is
+      // the role this module exists to give something to.
+      //
+      // `employees: full()` is compensation: salaries, bank details and national
+      // identifiers. That is correct for an HR manager and *only* for an HR
+      // manager among the operational roles, which is why the rest of this matrix
+      // stops at `employees: view()`.
+      employees: full(),
+      leave_requests: full(),
+      leave_policies: full(),
+      holidays: full(),
+      payroll: payrollFull(),
+    }),
+  },
+  {
+    name: 'Staff Self-Service',
+    description:
+      'Your own payslips, your own leave balance, and filing your own leave. Nothing about anybody else.',
+    permissions: set({
+      // **Only the three `self` actions.** This role deliberately does not hold
+      // `employees.view` — that means "the tenant's staff", and an employee
+      // holding it would be handed every salary in the company. `self` is a
+      // different action precisely so the two cannot be confused, and it is
+      // resolved by the service against the caller's own `User.employeeId` rather
+      // than against anything in the request.
+      employees: { self: true },
+      leave_requests: { self: true },
+      payroll: { self: true },
     }),
   },
 ];
@@ -443,6 +569,24 @@ export const LEGACY_ROLE_TO_SYSTEM_ROLE: Record<string, string> = {
   // granted but never held.
   PROCUREMENT_OFFICER: 'Procurement Officer',
   ACCOUNTANT: 'Accountant',
+  // Module 12: `HR_MANAGER` was added to the enum with the seeded HR Manager role
+  // and was missing from this map, so an HR manager with no `RoleAssignment`
+  // silently fell through to the old `?? 'Tenant'` default — tenant-level read
+  // access, which is not what an HR manager's absence should look like.
+  HR_MANAGER: 'HR Manager',
+  // `UserRole.EMPLOYEE` is deliberately **absent**, and its absence is the design.
+  //
+  // This map resolves an enum to a `Role.name` by exact string, so it can only
+  // reach roles whose name matches their code. Self-service is deliberately named
+  // 'Staff Self-Service' rather than 'EMPLOYEE' or 'Employee' — it describes a
+  // capability, not a job title, and none of the other twelve seeded roles is a
+  // job title either. So the mapping cannot reach it, and requiring an explicit
+  // `RoleAssignment` is exactly right: the employee role is the one place where
+  // being *granted* something matters more than the fallback.
+  //
+  // A login with `UserRole.EMPLOYEE` and no assignment therefore resolves to
+  // nothing. `PermissionsService` now warns when that happens, because "the user
+  // has no permissions" and "this map entry is a typo" look identical otherwise.
   USER: 'Tenant',
 };
 

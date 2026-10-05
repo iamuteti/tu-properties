@@ -1527,7 +1527,30 @@ because the module's stated scope included stock valuation.
 
 ---
 
-## Domain: HR & Payroll (Module: HR & Payroll) — 🆕 Not started
+## Domain: HR & Payroll (Module: HR & Payroll) — ✅ landed 2026-10-05, wider than the sketch below
+
+The sketch in `13-MODULE-hr-payroll.md`'s source (this domain's target) was three
+tables: `Employee`, `LeaveRequest`, `Payslip`. What was built keeps all three and
+adds seven more, because each of them answers a question the three cannot:
+
+| Model | Why the sketch could not carry it |
+|---|---|
+| `Employee` | as sketched, plus `employeeNumber`, `department` (free text, like `PurchaseRequest.department`), `jobTitle`, `employmentType`, `terminationDate`, `isActive`, `basicSalary`, `salaryCurrency`, `payFrequency`/`periodsPerYear`, `preferredLocale`, bank and statutory-identifier fields, `leavePolicyId`, and a **one-to-one `userId`** so an employee can log in without becoming staff-with-company-wide-visibility |
+| `EmployeeComponent` | a pension the employee contributes 5% to and the employer 10% of is two figures from one arrangement, so the standing amount is a row per employee per component rather than a column on `Employee`. An employee with no row for a component is simply not on it. |
+| `LeavePolicy` | entitlement, carryover cap, minimum notice, whether unpaid is allowed, maximum consecutive days, and which weekend pattern applies — per organization and per jurisdiction, so Kenya's rules and the UK's are both configuration |
+| `Holiday` | a public holiday is a working-day fact, not a decoration. `isRecurring` for the fixed-date ones |
+| `LeaveRequest` | as sketched, plus `leaveType`, `reason`, `decidedById`/`decidedAt`/`decisionNote`, and `workflowInstanceId` — set when approval ran through Module 18's engine, so the approval history is the engine's record and not a second copy of it here. `CANCELLED` exists as well as `REJECTED` because the employee may withdraw their own request and only an approver may reject it: those are different facts and the audit trail has to be able to tell them apart |
+| `PayrollRule` | the whole statutory configuration: country + optional region, one of three arithmetic shapes, the base it reads, which side bears it, period mode, ledger accounts, and a `validFrom..validTo` window. Shaped like `TaxRule` on purpose — payroll and tax change on the same kind of cycle, and a second shape for the same idea is a second thing to learn |
+| `PayrollRun` | the run is the document. A payroll is approved and posted **as a unit**, so calculating twelve payslips that can then be approved one at a time is how a company pays a quarter of its staff and not the rest |
+| `Payslip` | as sketched, plus `payrollRunId`, `payDate`, `currency`, `basicSalary`, `locale`. **`grossSalary`/`deductions`/`netSalary` as columns were deliberately dropped** — they are the sum of this payslip's own `PayslipLine` rows, computed on read, for the same reason `Invoice.paidAmount` and `InventoryItem.quantityOnHand` are not counters: a stored net that can disagree with gross minus deductions is precisely the bug nobody catches until a tax audit |
+| `PayslipLine` | one line per earning, deduction and employer contribution, with the `payrollRuleId` that produced it — so a payslip can be traced back to the rows that decided it rather than to whoever typed it |
+| `PayComponent` | the catalogue of allowances and deductions an organization offers, which `EmployeeComponent` points at and which `PayrollRule` amounts post through |
+
+**The absence that is not an oversight:** there is no `Attendance` model. The
+module's scope names "check-in/out" and nothing implements it, because a clock is a
+product decision (terminal, rounding, overtime) rather than a schema, and leave
+already carries the `OFF_DUTY`/`COMPENSATORY` types a time-off-in-lieu arrangement
+needs. See issue 91 in `13-MODULE-hr-payroll.md`.
 
 ```prisma
 model Employee {

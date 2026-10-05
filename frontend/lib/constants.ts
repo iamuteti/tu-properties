@@ -98,11 +98,59 @@ export const TRANSACTION_CLASSES = [
   { value: "WATER", label: "Water" },
 ];
 
+/**
+ * Currencies an organization can transact in.
+ *
+ * Widened from a Kenya-only list when Module 12 landed. That original four were
+ * not a deliberate scoping decision — they were an assumption, and an ISO-4217
+ * field with a closed dropdown makes an assumption out of a usability
+ * convenience: a group paying a remote contractor in euros could not enter it.
+ * Anything outside this list is still accepted as free text; the backend validates
+ * the three-letter code either way.
+ */
 export const CURRENCIES = [
   { value: "KES", label: "Kenyan Shilling [KES]" },
   { value: "USD", label: "US Dollar [USD]" },
   { value: "EUR", label: "Euro [EUR]" },
   { value: "GBP", label: "British Pound [GBP]" },
+  { value: "ZAR", label: "South African Rand [ZAR]" },
+  { value: "NGN", label: "Nigerian Naira [NGN]" },
+  { value: "EGP", label: "Egyptian Pound [EGP]" },
+  { value: "TZS", label: "Tanzanian Shilling [TZS]" },
+  { value: "UGX", label: "Ugandan Shilling [UGX]" },
+  { value: "RWF", label: "Rwandan Franc [RWF]" },
+  { value: "BWP", label: "Botswana Pula [BWP]" },
+  { value: "ZMW", label: "Zambian Kwacha [ZMW]" },
+  { value: "MWK", label: "Malawian Kwacha [MWK]" },
+  { value: "ETB", label: "Ethiopian Birr [ETB]" },
+  { value: "XOF", label: "West African CFA Franc [XOF]" },
+  { value: "CDF", label: "Congolese Franc [CDF]" },
+  { value: "AED", label: "UAE Dirham [AED]" },
+  { value: "SAR", label: "Saudi Riyal [SAR]" },
+  { value: "QAR", label: "Qatari Riyal [QAR]" },
+  { value: "INR", label: "Indian Rupee [INR]" },
+  { value: "PKR", label: "Pakistani Rupee [PKR]" },
+  { value: "BDT", label: "Bangladeshi Taka [BDT]" },
+  { value: "JPY", label: "Japanese Yen [JPY]" },
+  { value: "CNY", label: "Chinese Yuan [CNY]" },
+  { value: "AUD", label: "Australian Dollar [AUD]" },
+  { value: "NZD", label: "New Zealand Dollar [NZD]" },
+  { value: "CAD", label: "Canadian Dollar [CAD]" },
+  { value: "CHF", label: "Swiss Franc [CHF]" },
+  { value: "SEK", label: "Swedish Krona [SEK]" },
+  { value: "NOK", label: "Norwegian Krone [NOK]" },
+  { value: "DKK", label: "Danish Krone [DKK]" },
+  { value: "PLN", label: "Polish Zloty [PLN]" },
+  { value: "CZK", label: "Czech Koruna [CZK]" },
+  { value: "HUF", label: "Hungarian Forint [HUF]" },
+  { value: "RON", label: "Romanian Leu [RON]" },
+  { value: "BGN", label: "Bulgarian Lev [BGN]" },
+  { value: "BRL", label: "Brazilian Real [BRL]" },
+  { value: "MXN", label: "Mexican Peso [MXN]" },
+  { value: "ARS", label: "Argentine Peso [ARS]" },
+  { value: "CLP", label: "Chilean Peso [CLP]" },
+  { value: "COP", label: "Colombian Peso [COP]" },
+  { value: "PEN", label: "Peruvian Sol [PEN]" },
 ];
 
 export const ACCOUNTS_RECEIVABLE = [
@@ -904,3 +952,269 @@ export const STOCK_UNITS: string[] = [
     'sheet',
 ];
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 12 — HR & Payroll
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Every list here is **data a screen can render**, never something the engine
+// decides. Which rules apply, which base a percentage reads, whether a pay period
+// is annualised — all of that is resolved server-side from the organization's
+// jurisdiction, and none of it is safe to infer in a browser.
+
+export const EMPLOYMENT_TYPES: Array<{ value: string; label: string; hint: string }> = [
+    { value: 'FULL_TIME', label: 'Full time', hint: 'The ordinary arrangement' },
+    { value: 'PART_TIME', label: 'Part time', hint: 'Fewer hours than a full week' },
+    { value: 'CONTRACT', label: 'Contract', hint: 'Fixed term or project' },
+    { value: 'INTERN', label: 'Intern', hint: 'Temporary, usually unpaid or minimal' },
+    { value: 'TEMPORARY', label: 'Temporary', hint: 'Covering somebody who is away' },
+];
+
+export const PAY_FREQUENCIES: Array<{ value: string; label: string; hint: string }> = [
+    {
+        value: 'MONTHLY',
+        label: 'Monthly',
+        hint: '12 periods a year. The common case, and the only one most systems model',
+    },
+    {
+        value: 'WEEKLY',
+        label: 'Weekly',
+        hint: '52 periods. Annual income tax on 52 weeks is not 12 months of it',
+    },
+    {
+        value: 'FORTNIGHTLY',
+        label: 'Fortnightly',
+        hint: '26 periods a year',
+    },
+    { value: 'QUARTERLY', label: 'Quarterly', hint: '4 periods a year' },
+    { value: 'ANNUAL', label: 'Annual', hint: 'One payment a year' },
+];
+
+/**
+ * Currencies offered when adding an employee.
+ *
+ * A short list plus free text, because the honest answer for "what currencies do
+ * you pay in" is whatever this group pays in, and the field is a three-letter
+ * ISO-4217 code the backend validates either way. A closed list would be a
+ * statement about which countries this product works in, and it works in more
+ * than four.
+ */
+
+/**
+ * Locales offered for a payslip.
+ *
+ * The *format* only — this product's interface is English and translating it is
+ * app-wide work that is not this module's job. What is this module's job is that
+ * a payslip is a document which may be contractually owed in somebody's own
+ * language, so the payslip carries the locale it was rendered in and the date and
+ * number formatting follows it rather than a hardcoded `en-KE`.
+ */
+export const PAYSLIP_LOCALES: Array<{ value: string; label: string }> = [
+    { value: '', label: "The organization's default" },
+    { value: 'en-KE', label: 'English (Kenya)' },
+    { value: 'en-GB', label: 'English (UK)' },
+    { value: 'en-US', label: 'English (US)' },
+    { value: 'sw-KE', label: 'Kiswahili (Kenya)' },
+    { value: 'fr-FR', label: 'Français (France)' },
+    { value: 'de-DE', label: 'Deutsch (Deutschland)' },
+    { value: 'es-ES', label: 'Español (España)' },
+    { value: 'pt-BR', label: 'Português (Brasil)' },
+    { value: 'ar-EG', label: 'العربية (مصر)' },
+    { value: 'hi-IN', label: 'हिन्दी (भारत)' },
+];
+
+export const LEAVE_TYPES: Array<{ value: string; label: string; hint: string }> = [
+    { value: 'ANNUAL', label: 'Annual leave', hint: 'The entitlement, and the one with a balance' },
+    { value: 'SICK', label: 'Sick leave', hint: 'Usually a separate entitlement' },
+    { value: 'UNPAID', label: 'Unpaid leave', hint: 'Not a balance — a deduction instead' },
+    { value: 'MATERNITY', label: 'Maternity leave', hint: 'Statutory in most jurisdictions' },
+    { value: 'PATERNITY', label: 'Paternity leave', hint: 'Statutory in some, not all' },
+    { value: 'ADOPTION', label: 'Adoption leave', hint: 'Statutory in some, not all' },
+    { value: 'BEREAVEMENT', label: 'Bereavement leave', hint: 'Usually a fixed number of days' },
+    {
+        value: 'COMPENSATORY',
+        label: 'Time off in lieu',
+        hint: 'Owed for work done outside normal hours, and frequently time-limited by law',
+    },
+    { value: 'OFFICIAL', label: 'Official duty', hint: 'Business elsewhere, not annual leave' },
+    { value: 'OFF_DUTY', label: 'Off duty', hint: 'Paid time the policy already covers' },
+];
+
+export const LEAVE_STATUS_LABELS: Record<string, { label: string; className: string }> = {
+    PENDING: { label: 'Waiting', className: 'bg-amber-100 text-amber-800' },
+    APPROVED: { label: 'Approved', className: 'bg-emerald-100 text-emerald-700' },
+    REJECTED: { label: 'Declined', className: 'bg-red-100 text-red-700' },
+    CANCELLED: { label: 'Withdrawn', className: 'bg-slate-100 text-slate-600' },
+};
+
+/**
+ * The three arithmetic shapes a rule can have.
+ *
+ * Each `hint` says what the type is *for*, because the difference matters legally
+ * rather than technically: a percentage of a base is a contribution, a ladder is
+ * an income tax, and a fixed amount is neither.
+ */
+export const PAYROLL_RULE_TYPES: Array<{ value: string; label: string; hint: string }> = [
+    {
+        value: 'PERCENTAGE',
+        label: 'Percentage of a base',
+        hint: 'Social insurance, health funds, levies. Usually one rate, possibly capped.',
+    },
+    {
+        value: 'PROGRESSIVE_BANDS',
+        label: 'Progressive bands',
+        hint: 'Income tax. Each slice is taxed at its own rate, so the ladder must increase.',
+    },
+    {
+        value: 'FIXED',
+        label: 'A fixed amount',
+        hint: 'A flat deduction or allowance, independent of the base.',
+    },
+];
+
+/**
+ * What a rule's percentage reads.
+ *
+ * `TAXABLE` exists because "taxable pay" is a statutory concept frequently **not**
+ * equal to gross pay — a housing benefit is commonly taxable but not pensionable,
+ * or the reverse — so a rule that only knew about GROSS could not be correct in
+ * those places.
+ */
+export const PAYROLL_CALCULATION_BASES: Array<{ value: string; label: string; hint: string }> = [
+    { value: 'GROSS', label: 'Gross pay', hint: 'Everything paid before any deduction' },
+    { value: 'BASIC', label: 'Basic salary', hint: 'The contracted base, excluding allowances' },
+    {
+        value: 'TAXABLE',
+        label: 'Taxable pay',
+        hint: 'Gross less the non-taxable components this jurisdiction excludes',
+    },
+];
+
+export const PAYROLL_BEARERS: Array<{ value: string; label: string; hint: string }> = [
+    { value: 'EMPLOYEE', label: 'The employee', hint: 'Withheld. Reduces what they are paid.' },
+    {
+        value: 'EMPLOYER',
+        label: 'The employer',
+        hint: 'Never reduces net pay. Appears because employees are entitled to see the cost of employing them.',
+    },
+    {
+        value: 'BOTH',
+        label: 'Both, matched',
+        hint: 'The same rate on each side — two figures, one rule.',
+    },
+];
+
+/**
+ * Annualised versus per-period.
+ *
+ * **This is the difference between a correct income tax and a wrong one.** Almost
+ * every country sets its bands annually and computes the tax on annual income
+ * before dividing by the number of periods. Walking the same bands once per month
+ * on monthly pay consumes the whole year's relief by January and gives a
+ * different — and wrong — answer. The hint on `ANNUALISED` says so, because it is
+ * the field most likely to be set wrong by somebody who does not know why.
+ */
+export const PAYROLL_PERIOD_MODES: Array<{ value: string; label: string; hint: string }> = [
+    {
+        value: 'ANNUALISED',
+        label: 'On annual income, divided back down',
+        hint: 'Correct for income tax. The bands are set annually, so scale up, tax, then divide by the number of periods.',
+    },
+    {
+        value: 'PERIOD',
+        label: 'On each period as it stands',
+        hint: 'Correct for social contributions, which are charged on the month.',
+    },
+];
+
+export const PAYROLL_LINE_DIRECTIONS: Record<
+    string,
+    { label: string; className: string; hint: string }
+> = {
+    EARNING: {
+        label: 'Earning',
+        className: 'bg-slate-100 text-slate-700',
+        hint: 'Adds to gross',
+    },
+    EMPLOYEE_DEDUCTION: {
+        label: 'Deducted',
+        className: 'bg-amber-100 text-amber-800',
+        hint: 'Comes off what they are paid',
+    },
+    EMPLOYER_CONTRIBUTION: {
+        label: 'Employer cost',
+        className: 'bg-sky-100 text-sky-800',
+        hint: 'What it costs to employ them. Never reduces net pay.',
+    },
+};
+
+/**
+ * The payroll run states, with what each one *means*.
+ *
+ * `hint` is on every entry rather than only the surprising ones, because the
+ * surprising part is that `APPROVED` is not the end: the run still has to be
+ * posted to the ledger and the money still has to be released, and a screen that
+ * showed four states in a row without saying that would invite somebody to treat
+ * approval as payment.
+ */
+export const PAYROLL_RUN_STATUS_LABELS: Record<
+    string,
+    { label: string; className: string; hint: string }
+> = {
+    DRAFT: {
+        label: 'Draft',
+        className: 'bg-slate-100 text-slate-600',
+        hint: 'A period and a date, nothing calculated yet',
+    },
+    CALCULATED: {
+        label: 'Calculated',
+        className: 'bg-sky-100 text-sky-800',
+        hint: 'Payslips exist but nobody has signed off the figures',
+    },
+    APPROVED: {
+        label: 'Approved',
+        className: 'bg-violet-100 text-violet-800',
+        hint: 'Signed off — not yet on the ledger and not yet paid',
+    },
+    PAID: {
+        label: 'Paid',
+        className: 'bg-emerald-100 text-emerald-700',
+        hint: 'Posted to the ledger and the money released',
+    },
+    VOID: {
+        label: 'Voided',
+        className: 'bg-red-100 text-red-700',
+        hint: 'Superseded. Its payslips are kept as the record of what happened',
+    },
+};
+
+/**
+ * The order a payroll run moves in, and the one rule about it.
+ *
+ * **Posting comes before paying**, and that is the whole point of the sequence:
+ * paying staff before the cost of employing them is on the books makes the trial
+ * balance a work of fiction. The backend refuses `pay` on an unposted run; this
+ * list exists so the buttons are disabled in the same order rather than letting
+ * somebody click and read a 409.
+ */
+export const PAYROLL_RUN_SEQUENCE: Array<{
+    status: string;
+    action: string | null;
+    label: string;
+}> = [
+    { status: 'DRAFT', action: 'calculate', label: 'Calculate' },
+    { status: 'CALCULATED', action: 'approve', label: 'Approve the figures' },
+    { status: 'APPROVED', action: 'post', label: 'Post to the ledger' },
+    { status: 'APPROVED', action: 'pay', label: 'Release the money' },
+];
+
+export const PAYROLL_WARNING_LABELS: Record<string, string> = {
+    NO_RULES_RESOLVED:
+        'No statutory rules for this jurisdiction — nothing has been withheld.',
+    NET_NEGATIVE: 'Deductions exceed gross, so net pay is not a positive amount.',
+    ZERO_GROSS: 'Gross pay is zero, so every percentage rule is zero too.',
+    BASE_ABOVE_CAP:
+        'The base is above a statutory ceiling, so this payslip is not the whole picture.',
+    BASE_BELOW_FLOOR: 'The base is below a statutory minimum contributory wage.',
+    MISSING_PERIODS: 'Periods per year is wrong, so an annualised rule fell back to 12.',
+};

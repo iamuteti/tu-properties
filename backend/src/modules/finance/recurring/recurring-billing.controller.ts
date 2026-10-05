@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { Permissions } from '@/common/decorators/permissions.decorator';
@@ -10,7 +18,9 @@ import { RecurringBillingService } from './recurring-billing.service';
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
 @Controller('finance/recurring-billing')
 export class RecurringBillingController {
-  constructor(private readonly recurringBillingService: RecurringBillingService) {}
+  constructor(
+    private readonly recurringBillingService: RecurringBillingService,
+  ) {}
 
   /**
    * Run the billing cycle for this organization, for an optional date.

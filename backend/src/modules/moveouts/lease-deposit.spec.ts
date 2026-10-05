@@ -114,9 +114,9 @@ describe('deposit calculation', () => {
 
 describe('validateDeduction', () => {
   it('accepts a described, positive deduction', () => {
-    expect(validateDeduction({ description: 'Broken window', amount: 5_000 }).valid).toBe(
-      true,
-    );
+    expect(
+      validateDeduction({ description: 'Broken window', amount: 5_000 }).valid,
+    ).toBe(true);
   });
 
   it('rejects a blank description', () => {
@@ -126,7 +126,11 @@ describe('validateDeduction', () => {
   });
 
   it('rejects a zero or negative amount', () => {
-    expect(validateDeduction({ description: 'x', amount: 0 }).valid).toBe(false);
-    expect(validateDeduction({ description: 'x', amount: -1 }).valid).toBe(false);
+    expect(validateDeduction({ description: 'x', amount: 0 }).valid).toBe(
+      false,
+    );
+    expect(validateDeduction({ description: 'x', amount: -1 }).valid).toBe(
+      false,
+    );
   });
 });

@@ -1,14 +1,16 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { AssetStatus, AssetType, Prisma, WorkOrderStatus } from '@prisma/client';
+import {
+  AssetStatus,
+  AssetType,
+  Prisma,
+  WorkOrderStatus,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import { AuditService } from '@/modules/audit/audit.service';
 import { checkAssetStatusTransition } from './work-order-lifecycle';
-import type {
-  CreateAssetDto,
-  UpdateAssetDto,
-} from './dto/maintenance.dto';
+import type { CreateAssetDto, UpdateAssetDto } from './dto/maintenance.dto';
 
 export interface AssetFilters {
   type?: string;
@@ -40,7 +42,9 @@ const ASSET_INCLUDE = {
   // loading every historical work order for the asset. `_count.workOrders` is
   // therefore the *open* count; `totalWorkOrders` comes from the detail view.
   _count: {
-    select: { workOrders: { where: { status: { in: OPEN_WORK_ORDER_STATUSES } } } },
+    select: {
+      workOrders: { where: { status: { in: OPEN_WORK_ORDER_STATUSES } } },
+    },
   },
 } as const;
 
@@ -82,7 +86,10 @@ export class AssetsService {
     private audit: AuditService,
   ) {}
 
-  async findAll(organizationId: string | undefined, filters: AssetFilters = {}) {
+  async findAll(
+    organizationId: string | undefined,
+    filters: AssetFilters = {},
+  ) {
     return this.prisma.asset.findMany({
       where: this.buildWhere(organizationId, filters),
       include: ASSET_INCLUDE,
@@ -200,7 +207,9 @@ export class AssetsService {
     const asset = await this.prisma.asset.update({
       where: { id },
       data: {
-        ...(dto.propertyId ? { property: { connect: { id: dto.propertyId } } } : {}),
+        ...(dto.propertyId
+          ? { property: { connect: { id: dto.propertyId } } }
+          : {}),
         ...(dto.unitId !== undefined
           ? dto.unitId
             ? { unit: { connect: { id: dto.unitId } } }
@@ -217,7 +226,9 @@ export class AssetsService {
         ...(dto.manufacturer !== undefined
           ? { manufacturer: dto.manufacturer?.trim() || null }
           : {}),
-        ...(dto.model !== undefined ? { model: dto.model?.trim() || null } : {}),
+        ...(dto.model !== undefined
+          ? { model: dto.model?.trim() || null }
+          : {}),
         ...(dto.location !== undefined
           ? { location: dto.location?.trim() || null }
           : {}),
@@ -234,7 +245,9 @@ export class AssetsService {
                 : null,
             }
           : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+        ...(dto.notes !== undefined
+          ? { notes: dto.notes?.trim() || null }
+          : {}),
       },
       include: ASSET_INCLUDE,
     });
@@ -269,7 +282,15 @@ export class AssetsService {
       const openFaults = await this.prisma.workOrder.count({
         where: {
           assetId: id,
-          status: { in: ['REQUESTED', 'INSPECTION', 'APPROVED', 'ASSIGNED', 'IN_PROGRESS'] },
+          status: {
+            in: [
+              'REQUESTED',
+              'INSPECTION',
+              'APPROVED',
+              'ASSIGNED',
+              'IN_PROGRESS',
+            ],
+          },
         },
       });
       if (openFaults > 0) {
@@ -304,7 +325,9 @@ export class AssetsService {
     const existing = await this.record(id, organizationId);
 
     const [schedules, workOrders] = await Promise.all([
-      this.prisma.preventiveMaintenanceSchedule.count({ where: { assetId: id } }),
+      this.prisma.preventiveMaintenanceSchedule.count({
+        where: { assetId: id },
+      }),
       this.prisma.workOrder.count({ where: { assetId: id } }),
     ]);
 
@@ -430,7 +453,10 @@ export class AssetsService {
     if (refs.propertyId) {
       await requireRecord(
         this.prisma.property.findFirst({
-          where: { id: refs.propertyId, ...(org ? { organizationId: org } : {}) },
+          where: {
+            id: refs.propertyId,
+            ...(org ? { organizationId: org } : {}),
+          },
           select: { id: true },
         }),
         'Property',
@@ -465,8 +491,12 @@ export class AssetsService {
         details: JSON.stringify({ name: asset.name, ...extra }),
         ipAddress: null,
         userAgent: null,
-        ...(extra.userId ? { user: { connect: { id: extra.userId as string } } } : {}),
-        organization: { connect: { id: asset.organizationId ?? organizationId } },
+        ...(extra.userId
+          ? { user: { connect: { id: extra.userId as string } } }
+          : {}),
+        organization: {
+          connect: { id: asset.organizationId ?? organizationId },
+        },
       });
     } catch {
       // Best-effort, like the rest of the codebase's audit calls.

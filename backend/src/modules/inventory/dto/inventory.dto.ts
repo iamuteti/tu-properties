@@ -273,7 +273,9 @@ export class TransferStockDto {
   toWarehouseId!: string;
 
   @IsArray()
-  @ArrayMaxSize(200, { message: 'A transfer of 200 lines is a data-entry error, not a delivery.' })
+  @ArrayMaxSize(200, {
+    message: 'A transfer of 200 lines is a data-entry error, not a delivery.',
+  })
   @ValidateNested({ each: true })
   @Type(() => TransferLineDto)
   lines!: TransferLineDto[];
@@ -476,7 +478,9 @@ export class IssueStockLineDto {
 /** Issue material against a work order — the other half of a goods receipt. */
 export class IssueStockDto {
   @IsArray()
-  @ArrayMaxSize(200, { message: 'A job consuming 200 lines is a data-entry error, not a repair.' })
+  @ArrayMaxSize(200, {
+    message: 'A job consuming 200 lines is a data-entry error, not a repair.',
+  })
   @ValidateNested({ each: true })
   @Type(() => IssueStockLineDto)
   lines!: IssueStockLineDto[];

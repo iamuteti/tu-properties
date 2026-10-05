@@ -166,7 +166,7 @@ export function checkWorkOrderAction(
         return {
           allowed: false,
           reason:
-            'That technician\'s account is inactive. Pick somebody who still works here.',
+            "That technician's account is inactive. Pick somebody who still works here.",
         };
       }
       return { allowed: true };
@@ -210,7 +210,10 @@ export function checkWorkOrderAction(
     }
 
     default:
-      return { allowed: false, reason: `Unknown work order action "${action}".` };
+      return {
+        allowed: false,
+        reason: `Unknown work order action "${action}".`,
+      };
   }
 }
 
@@ -227,8 +230,8 @@ export function availableWorkOrderActions(
       : []),
   ]);
 
-  return [...candidates].filter((action) =>
-    checkWorkOrderAction(status, action, context).allowed,
+  return [...candidates].filter(
+    (action) => checkWorkOrderAction(status, action, context).allowed,
   );
 }
 

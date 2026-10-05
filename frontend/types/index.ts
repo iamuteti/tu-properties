@@ -2719,3 +2719,539 @@ export interface WorkOrderMaterials {
     totalEstimatedCost: number;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 12 — HR & Payroll
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Two things to understand before using these.
+//
+// **A payslip has no `netSalary` field on the type.** `PayslipTotals` is
+// computed by the backend from the payslip's own lines and arrives alongside
+// them, so `gross - employeeDeductions === net` holds by construction rather than
+// by agreement between a stored total and its own detail. Nothing on the frontend
+// needs to recompute it, and nothing should try.
+//
+// **A rule's figures are jurisdiction-resolved on the server.** A `PayrollRule`
+// carries `countryCode`/`regionCode`/`periodMode`/`bands` because those are what
+// make it correct in one country and inapplicable in another; the frontend renders
+// what came back and never decides which rules apply.
+
+export type EmploymentType =
+    | 'FULL_TIME'
+    | 'PART_TIME'
+    | 'CONTRACT'
+    | 'INTERN'
+    | 'TEMPORARY';
+
+export type PayFrequency =
+    | 'WEEKLY'
+    | 'FORTNIGHTLY'
+    | 'MONTHLY'
+    | 'QUARTERLY'
+    | 'ANNUAL';
+
+export type LeaveType =
+    | 'ANNUAL'
+    | 'SICK'
+    | 'UNPAID'
+    | 'MATERNITY'
+    | 'PATERNITY'
+    | 'ADOPTION'
+    | 'BEREAVEMENT'
+    | 'COMPENSATORY'
+    | 'OFFICIAL'
+    | 'OFF_DUTY';
+
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export type PayrollRuleType = 'PROGRESSIVE_BANDS' | 'PERCENTAGE' | 'FIXED';
+
+export type PayrollCalculationBase = 'GROSS' | 'BASIC' | 'TAXABLE';
+
+export type PayrollBearer = 'EMPLOYEE' | 'EMPLOYER' | 'BOTH';
+
+export type PayrollPeriodMode = 'PERIOD' | 'ANNUALISED';
+
+export type PayrollLineDirection =
+    | 'EARNING'
+    | 'EMPLOYEE_DEDUCTION'
+    | 'EMPLOYER_CONTRIBUTION';
+
+export type PayrollDeductionKind = 'STATUTORY' | 'COMPANY' | 'OTHER';
+
+export type PayrollRunStatus =
+    | 'DRAFT'
+    | 'CALCULATED'
+    | 'APPROVED'
+    | 'PAID'
+    | 'VOID';
+
+/** Where the organization pays people, and whether it said so or inherited it. */
+export interface PayrollJurisdiction {
+    countryCode: string | null;
+    regionCode: string | null;
+    currency: string;
+    label: string;
+    /** True when `payrollCountryCode` was unset and the tax country was used. */
+    inherited: boolean;
+}
+
+/**
+ * The derived figures of a payslip. Present on the payslip itself and recomputed
+ * from its lines on every read — never stored.
+ */
+export interface PayrollTotals {
+    gross: number;
+    employeeDeductions: number;
+    employerContributions: number;
+    net: number;
+    applied: {
+        code: string;
+        name: string;
+        ruleId: string;
+        amount: number;
+        bearer: PayrollBearer;
+    }[];
+}
+
+export interface PayrollBand {
+    /** Cumulative upper bound. `null` on the last band, and it must be last. */
+    upTo?: number | null;
+    ratePercent?: number;
+    amount?: number;
+}
+
+export interface PayrollRuleRow {
+    id: string;
+    code: string;
+    name: string;
+    description?: string | null;
+    countryCode?: string | null;
+    regionCode?: string | null;
+    type: PayrollRuleType;
+    base: PayrollCalculationBase;
+    bearer: PayrollBearer;
+    ratePercent?: string | number | null;
+    amount?: string | number | null;
+    minimumBaseAmount?: string | number | null;
+    maximumBaseAmount?: string | number | null;
+    exemptBelowBaseAmount?: string | number | null;
+    bands?: PayrollBand[] | null;
+    periodMode: PayrollPeriodMode;
+    periodsPerYear: number;
+    sortOrder: number;
+    ledgerAccountCode?: string | null;
+    expenseAccountCode?: string | null;
+    validFrom: string;
+    validTo?: string | null;
+    isActive: boolean;
+    organizationId?: string | null;
+}
+
+/**
+ * Is this jurisdiction actually configured?
+ *
+ * The `warning` field is the reason this endpoint exists rather than the UI
+ * counting rules itself. A jurisdiction with no rules pays everybody and
+ * withholds nothing, and the run reports **success** — which is the specific
+ * outcome this module exists to make impossible, and the only thing standing
+ * between it and a plausible-looking payroll is somebody reading this string.
+ */
+export interface PayrollRuleCoverage {
+    jurisdiction: PayrollJurisdiction;
+    configured: boolean;
+    ruleCount: number;
+    codes: string[];
+    missingAccounts: string[];
+    unknownAccounts: string[];
+    /** Rule codes sharing one ledger account with another rule. */
+    sharedAccounts?: string[];
+    warning: string | null;
+}
+
+export interface PayrollRulePreview {
+    jurisdiction: PayrollJurisdiction;
+    ruleCount: number;
+    lines: {
+        direction: PayrollLineDirection;
+        code: string;
+        name: string;
+        amount: number;
+        kind: PayrollDeductionKind;
+        explanation?: string;
+    }[];
+    totals: PayrollTotals;
+    warnings: { code: string; message: string }[];
+}
+
+export interface PayslipLineRow {
+    id: string;
+    direction: PayrollLineDirection;
+    code: string;
+    name: string;
+    amount: number;
+    kind: PayrollDeductionKind;
+    payrollRuleId?: string | null;
+    accountCode?: string | null;
+    sortOrder: number;
+    /** Present on the engine's output, not persisted — explains a figure. */
+    explanation?: string;
+}
+
+export interface PayslipRow {
+    id: string;
+    employeeId: string;
+    payrollRunId: string;
+    periodStart: string;
+    periodEnd: string;
+    payDate: string;
+    currency: string;
+    basicSalary: number;
+    locale?: string | null;
+    lines: PayslipLineRow[];
+    /** Derived from `lines` on every read. */
+    totals: PayrollTotals;
+    employeeName?: string;
+    runReference?: string;
+    runStatus?: PayrollRunStatus;
+    /** Present on the self-service reads, which scope by the caller's own
+     *  employment record and therefore have no `employeeName` to show. */
+    payrollRun?: {
+        id: string;
+        reference: string;
+        status: PayrollRunStatus;
+        periodStart: string;
+        periodEnd: string;
+        payDate: string;
+    };
+    /** Self-service only: posted to the ledger is not the same as paid. */
+    paymentState?: 'paid' | 'approved-not-released' | 'not-yet-paid';
+}
+
+export interface PayrollRunSummary {
+    payslips: number;
+    currencies: {
+        currency: string;
+        payslips: number;
+        gross: number;
+        employeeDeductions: number;
+        employerContributions: number;
+        totalCost: number;
+        net: number;
+    }[];
+    /** True only if a run somehow holds more than one currency. */
+    mixedCurrency: boolean;
+    /** Null rather than a sum when `mixedCurrency` — an unattributable number
+     *  is worse than no number. */
+    gross: number | null;
+    employeeDeductions: number | null;
+    employerContributions: number | null;
+    totalCost: number | null;
+    net: number | null;
+    posted: boolean;
+}
+
+export interface PayrollRunRow {
+    id: string;
+    reference: string;
+    periodStart: string;
+    periodEnd: string;
+    payDate: string;
+    currency: string;
+    status: PayrollRunStatus;
+    journalEntryId?: string | null;
+    calculatedAt?: string | null;
+    approvedAt?: string | null;
+    paidAt?: string | null;
+    voidReason?: string | null;
+    summary: PayrollRunSummary;
+}
+
+export interface PayrollRunDetail extends PayrollRunRow {
+    payslips: (PayslipRow & { employee?: PayslipEmployee })[];
+    coverage: PayrollRuleCoverage;
+    rulesApplied?: unknown;
+}
+
+/** The employment details a payslip detail read attaches. */
+export interface PayslipEmployee {
+    id: string;
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+    preferredName?: string | null;
+    jobTitle?: string | null;
+    department?: string | null;
+    nationalId?: string | null;
+    taxNumber?: string | null;
+    socialSecurityNumber?: string | null;
+    bankAccount?: string | null;
+    bankName?: string | null;
+    bankBranch?: string | null;
+    salaryCurrency?: string | null;
+}
+
+/**
+ * One payslip with its context.
+ *
+ * `employee` is **optional** because the self-service read (`GET /hr/me/payslips/:id`)
+ * does not attach it — the caller already knows whose it is, and attaching the whole
+ * employment record to your own payslip would be a wider response for no reason.
+ */
+export interface PayslipDetail extends PayslipRow {
+    employee?: PayslipEmployee;
+    payrollRun: {
+        id: string;
+        reference: string;
+        status: PayrollRunStatus;
+        periodStart: string;
+        periodEnd: string;
+        payDate: string;
+        currency: string;
+    };
+    applied: { ruleId: string; code: string; name: string }[];
+}
+
+/**
+ * The staff directory. **There is no salary field on this type, and that is
+ * deliberate** — the backend selects the columns, so a compensation field added to
+ * the model later cannot appear here by accident. `basicSalary` is on
+ * `EmployeeDetail`, which requires `employees.compensation`.
+ */
+/**
+ * The scalars every employee response carries.
+ *
+ * Split out because the backend reads employees at three different levels and
+ * the *types* have to say so: the directory (`EmployeeRow`) selects a fixed
+ * column list that cannot include compensation, while the single-record reads
+ * spread the whole row. `periodsPerYear` is deliberately absent from this
+ * interface because the directory does not select it — see `EmployeeRow`.
+ */
+export interface EmployeeCore {
+    id: string;
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+    preferredName?: string | null;
+    department?: string | null;
+    jobTitle?: string | null;
+    employmentType: EmploymentType;
+    hireDate: string;
+    terminationDate?: string | null;
+    isActive: boolean;
+    userId?: string | null;
+    /** Present, and *not* compensation — an employee is paid in something. */
+    salaryCurrency: string;
+    payFrequency: PayFrequency;
+}
+
+export interface EmployeeRow extends EmployeeCore {
+    /** What they go by — printed on a payslip rather than a legal name. */
+    displayName: string;
+    legalName: string;
+    hasLogin: boolean;
+    tenureYears: number;
+}
+
+export interface LeaveBalance {
+    entitlement: number;
+    taken: number;
+    /** Approved and dated ahead — counted, so December cannot be approved twice. */
+    booked: number;
+    /** Entitlement plus carryover, less both. Never `entitlement - taken`. */
+    remaining: number;
+    carriedIn: number;
+    /** Anything above the carryover cap that no longer exists. */
+    expired: number;
+}
+
+export interface EmployeeComponentRow {
+    id: string;
+    percentage?: string | number | null;
+    amount?: string | number | null;
+    currency: string;
+    effectiveFrom: string;
+    effectiveTo?: string | null;
+    payComponent: {
+        id: string;
+        code: string;
+        name: string;
+        kind: PayrollDeductionKind;
+        direction: PayrollLineDirection;
+        isTaxable: boolean;
+        isPensionable: boolean;
+    };
+}
+
+/**
+ * One employee in full. `GET /hr/employees/:id`, behind `employees.compensation`.
+ *
+ * Extends `EmployeeCore` and **not** `EmployeeRow`: the directory's derived
+ * fields (`displayName`, `hasLogin`, `tenureYears`) are computed by the backend's
+ * `directoryView`, and a detail read never runs it — so claiming them here would
+ * let a page render `undefined` as a real value.
+ */
+export interface EmployeeDetail extends EmployeeCore {
+    /** Requires `employees.compensation`. Absent from the directory on purpose. */
+    basicSalary: number;
+    periodsPerYear: number;
+    nationalId?: string | null;
+    taxNumber?: string | null;
+    socialSecurityNumber?: string | null;
+    bankAccount?: string | null;
+    bankName?: string | null;
+    bankBranch?: string | null;
+    bankCode?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    preferredLocale?: string | null;
+    user?: {
+        id: string;
+        email: string;
+        firstName?: string | null;
+        lastName?: string | null;
+        role?: string | null;
+    } | null;
+    leavePolicy?: { id: string; code: string; name: string } | null;
+    leaveBalance: LeaveBalance;
+    payslips: {
+        id: string;
+        /** The payroll run's reference — a payslip has no reference of its own. */
+        reference: string;
+        runId: string;
+        runStatus: PayrollRunStatus;
+        periodStart: string;
+        periodEnd: string;
+        payDate: string;
+        currency: string;
+        basicSalary: number;
+    }[];
+    components: EmployeeComponentRow[];
+}
+
+/**
+ * Somebody's own employment record, `GET /hr/me`.
+ *
+ * A **different shape from `EmployeeDetail`**: the backend resolves it from the
+ * login and does not attach payslips or components (they arrive on their own
+ * routes). Modelling it as `EmployeeDetail` is how a self-service page ends up
+ * reading `undefined.map(...)`.
+ */
+export interface EmployeeSelf extends EmployeeCore {
+    basicSalary: number;
+    periodsPerYear: number;
+    preferredLocale?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    leaveBalance: LeaveBalance;
+}
+
+export interface EmployeeStats {
+    total: number;
+    active: number;
+    inactive: number;
+    byDepartment: { department: string; count: number }[];
+    byEmploymentType: Partial<Record<EmploymentType, number>>;
+    byPayFrequency: Partial<Record<PayFrequency, number>>;
+    currencies: { currency: string; count: number }[];
+    /** More than one currency in one organization is normal for a group, not a
+     *  data error, so it is reported rather than flagged. */
+    multiCurrency: boolean;
+    /** Staff the organization pays but cannot reach. */
+    withLogin: number;
+}
+
+export interface LeaveRequestRow {
+    id: string;
+    employeeId: string;
+    leaveType: LeaveType;
+    startDate: string;
+    endDate: string;
+    status: LeaveStatus;
+    reason?: string | null;
+    decisionNote?: string | null;
+    decidedAt?: string | null;
+    createdAt: string;
+    /** **Derived** from the dates, the weekend pattern and the public holidays —
+     *  never accepted from the caller. Five days of leave is five *working* days. */
+    workingDays: number;
+    employeeName?: string;
+    employee?: {
+        id: string;
+        employeeNumber: string;
+        firstName: string;
+        lastName: string;
+        preferredName?: string | null;
+        department?: string | null;
+        leavePolicy?: {
+            id: string;
+            code: string;
+            name: string;
+            annualEntitlementDays: string | number;
+            carryoverLimitDays?: string | number | null;
+        } | null;
+    };
+    balance?: LeaveBalance & {
+        policy: { code: string; name: string };
+        calendar: { weekendDays: number[] };
+    };
+    /** Other approved leave overlapping these dates — who else would be away. */
+    clashesWith?: { requestId: string; employeeId: string; workingDays: number }[];
+}
+
+export interface LeaveBalanceRow {
+    employeeId: string;
+    employeeNumber: string;
+    name: string;
+    department?: string | null;
+    balance: LeaveBalance & {
+        policy: { code: string; name: string };
+        calendar: { weekendDays: number[] };
+    };
+}
+
+export interface LeaveCalendar {
+    weekendDays: number[];
+    holidays: {
+        date: string;
+        name: string;
+        isRecurring: boolean;
+        jurisdictionWide: boolean;
+    }[];
+    days: {
+        date: string;
+        isoDay: number;
+        isWorkingDay: boolean;
+        /** 'weekend' | 'public holiday' | null. Why the day is unavailable. */
+        reason: string | null;
+        holiday: string | null;
+    }[];
+}
+
+export interface LeavePolicyRow {
+    id: string;
+    code: string;
+    name: string;
+    countryCode?: string | null;
+    regionCode?: string | null;
+    annualEntitlementDays: string | number;
+    carryoverLimitDays?: string | number | null;
+    minNoticeDays: number;
+    minNoticeWaivedDays: number;
+    unpaidAllowed: boolean;
+    maxConsecutiveDays?: number | null;
+    isDefault: boolean;
+    isActive: boolean;
+}
+
+export interface HolidayRow {
+    id: string;
+    date: string;
+    name: string;
+    countryCode?: string | null;
+    regionCode?: string | null;
+    isRecurring: boolean;
+}

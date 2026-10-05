@@ -70,7 +70,9 @@ const PORTAL_INCLUDE = {
 
 const STAFF_INCLUDE = {
   property: { select: { id: true, name: true } },
-  unit: { select: { id: true, name: true, property: { select: { name: true } } } },
+  unit: {
+    select: { id: true, name: true, property: { select: { name: true } } },
+  },
   tenant: {
     select: {
       id: true,
@@ -128,7 +130,10 @@ export class WorkOrdersService {
 
   // ==================================================================== reads
 
-  async findAll(organizationId: string | undefined, filters: WorkOrderFilters = {}) {
+  async findAll(
+    organizationId: string | undefined,
+    filters: WorkOrderFilters = {},
+  ) {
     const rows = await this.prisma.workOrder.findMany({
       where: this.buildWhere(organizationId, filters),
       include: STAFF_INCLUDE,
@@ -197,8 +202,9 @@ export class WorkOrdersService {
         byCategory.map((row) => [row.category, row._count._all]),
       ) as Partial<Record<MaintenanceCategory, number>>,
       overdue: all.filter((row) => isOverdue(row, now)).length,
-      emergency: all.filter((row) => row.priority === WorkOrderPriority.EMERGENCY)
-        .length,
+      emergency: all.filter(
+        (row) => row.priority === WorkOrderPriority.EMERGENCY,
+      ).length,
       unassigned: all.filter((row) => !row.assignedTechnicianId).length,
       scheduledThisWeek: all.filter(
         (row) =>
@@ -207,8 +213,9 @@ export class WorkOrdersService {
           row.scheduledFor >= now &&
           row.scheduledFor <= week,
       ).length,
-      awaitingApproval: all.filter((row) => row.status === WorkOrderStatus.INSPECTION)
-        .length,
+      awaitingApproval: all.filter(
+        (row) => row.status === WorkOrderStatus.INSPECTION,
+      ).length,
     };
   }
 
@@ -233,8 +240,14 @@ export class WorkOrdersService {
           actualCost: unknown;
           property?: { name?: string | null } | null;
           unit?: { name?: string | null } | null;
-          tenant?: { surname?: string | null; otherNames?: string | null } | null;
-          assignedTechnician?: { firstName?: string | null; lastName?: string | null } | null;
+          tenant?: {
+            surname?: string | null;
+            otherNames?: string | null;
+          } | null;
+          assignedTechnician?: {
+            firstName?: string | null;
+            lastName?: string | null;
+          } | null;
           source: string;
         };
         return {
@@ -306,7 +319,9 @@ export class WorkOrdersService {
       status: WorkOrderStatus.REQUESTED,
       source: WorkOrderSource.STAFF,
       reportedAt: new Date(),
-      ...(dto.propertyId ? { property: { connect: { id: dto.propertyId } } } : {}),
+      ...(dto.propertyId
+        ? { property: { connect: { id: dto.propertyId } } }
+        : {}),
       ...(dto.unitId ? { unit: { connect: { id: dto.unitId } } } : {}),
       ...(dto.tenantId ? { tenant: { connect: { id: dto.tenantId } } } : {}),
       ...(dto.assetId ? { asset: { connect: { id: dto.assetId } } } : {}),
@@ -319,9 +334,7 @@ export class WorkOrdersService {
       ...(dto.estimatedCost !== undefined
         ? { estimatedCost: new Prisma.Decimal(dto.estimatedCost) }
         : {}),
-      ...(dto.scheduledFor
-        ? { scheduledFor: new Date(dto.scheduledFor) }
-        : {}),
+      ...(dto.scheduledFor ? { scheduledFor: new Date(dto.scheduledFor) } : {}),
       ...(userId ? { raisedBy: { connect: { id: userId } } } : {}),
     } satisfies Omit<Prisma.WorkOrderCreateInput, 'reference'>;
 
@@ -419,7 +432,8 @@ export class WorkOrdersService {
       description: args.description.trim(),
       category,
       priority:
-        toEnum(WorkOrderPriority, args.payload?.priority) ?? WorkOrderPriority.NORMAL,
+        toEnum(WorkOrderPriority, args.payload?.priority) ??
+        WorkOrderPriority.NORMAL,
       status: WorkOrderStatus.REQUESTED,
       source: WorkOrderSource.TENANT_REQUEST,
       reportedAt: new Date(),
@@ -478,7 +492,11 @@ export class WorkOrdersService {
           ? { estimatedCost: new Prisma.Decimal(dto.estimatedCost) }
           : {}),
         ...(dto.scheduledFor !== undefined
-          ? { scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null }
+          ? {
+              scheduledFor: dto.scheduledFor
+                ? new Date(dto.scheduledFor)
+                : null,
+            }
           : {}),
         ...(dto.propertyId !== undefined
           ? dto.propertyId
@@ -581,7 +599,10 @@ export class WorkOrdersService {
     userId?: string,
   ) {
     const existing = await this.record(id, organizationId);
-    const technician = await this.assertTechnician(dto.technicianId, organizationId);
+    const technician = await this.assertTechnician(
+      dto.technicianId,
+      organizationId,
+    );
 
     // Only the APPROVE gate: this action *is* the assignment, so running ASSIGN
     // from INSPECTION would be asking the matrix a question about a state this
@@ -599,7 +620,10 @@ export class WorkOrdersService {
           ? { scheduledFor: new Date(dto.scheduledFor) }
           : {}),
         ...(dto.note?.trim()
-          ? { inspectionNote: `${existing.inspectionNote ?? ''}\n\nApproved: ${dto.note.trim()}`.trim() }
+          ? {
+              inspectionNote:
+                `${existing.inspectionNote ?? ''}\n\nApproved: ${dto.note.trim()}`.trim(),
+            }
           : {}),
       },
       include: STAFF_INCLUDE,
@@ -617,7 +641,10 @@ export class WorkOrdersService {
   /** Send it back out: either a different technician or a new date. */
   async assign(id: string, dto: AssignWorkOrderDto, organizationId: string) {
     const existing = await this.record(id, organizationId);
-    const technician = await this.assertTechnician(dto.technicianId, organizationId);
+    const technician = await this.assertTechnician(
+      dto.technicianId,
+      organizationId,
+    );
 
     this.assertCanAct(existing, 'ASSIGN', {
       priority: existing.priority,
@@ -771,7 +798,8 @@ export class WorkOrdersService {
         approvalRequestedAt: new Date(),
         ...(meta.note?.trim()
           ? {
-              inspectionNote: `${existing.inspectionNote ?? ''}\n\nApproved: ${meta.note.trim()}`.trim(),
+              inspectionNote:
+                `${existing.inspectionNote ?? ''}\n\nApproved: ${meta.note.trim()}`.trim(),
             }
           : {}),
       },
@@ -789,7 +817,10 @@ export class WorkOrdersService {
     userId?: string,
   ) {
     const existing = await this.record(id, organizationId);
-    const technician = await this.assertTechnician(technicianId, organizationId);
+    const technician = await this.assertTechnician(
+      technicianId,
+      organizationId,
+    );
 
     if (existing.status === WorkOrderStatus.CLOSED) {
       throw new ConflictException(
@@ -827,7 +858,10 @@ export class WorkOrdersService {
     organizationId: string,
     userId?: string,
   ) {
-    const technician = await this.assertTechnician(dto.technicianId, organizationId);
+    const technician = await this.assertTechnician(
+      dto.technicianId,
+      organizationId,
+    );
 
     const results: { id: string; ok: boolean; reason?: string }[] = [];
     for (const id of dto.workOrderIds) {
@@ -1007,17 +1041,19 @@ export class WorkOrdersService {
             estimatedCost:
               item?.unitCost == null
                 ? null
-                : Math.round(Math.abs(quantity) * Number(item.unitCost) * 100) / 100,
+                : Math.round(Math.abs(quantity) * Number(item.unitCost) * 100) /
+                  100,
           };
         })
         .filter((row) => row.quantity !== 0),
-      totalEstimatedCost: Math.round(
-        [...net.entries()].reduce((sum, [itemId, quantity]) => {
-          const item = itemById.get(itemId);
-          if (!item?.unitCost) return sum;
-          return sum + Math.abs(quantity) * Number(item.unitCost);
-        }, 0) * 100,
-      ) / 100,
+      totalEstimatedCost:
+        Math.round(
+          [...net.entries()].reduce((sum, [itemId, quantity]) => {
+            const item = itemById.get(itemId);
+            if (!item?.unitCost) return sum;
+            return sum + Math.abs(quantity) * Number(item.unitCost);
+          }, 0) * 100,
+        ) / 100,
     };
   }
 
@@ -1196,7 +1232,11 @@ export class WorkOrdersService {
 
   /** Throw the gate's own reason — it is written for the person who pressed it. */
   private assertCanAct(
-    workOrder: { id: string; status: WorkOrderStatus; priority: WorkOrderPriority },
+    workOrder: {
+      id: string;
+      status: WorkOrderStatus;
+      priority: WorkOrderPriority;
+    },
     action: WorkOrderAction,
     context: Partial<WorkOrderGateContext>,
   ) {
@@ -1219,8 +1259,10 @@ export class WorkOrdersService {
 
     if (organizationId) where.organizationId = organizationId;
     if (filters.status) where.status = filters.status as WorkOrderStatus;
-    if (filters.category) where.category = filters.category as MaintenanceCategory;
-    if (filters.priority) where.priority = filters.priority as WorkOrderPriority;
+    if (filters.category)
+      where.category = filters.category as MaintenanceCategory;
+    if (filters.priority)
+      where.priority = filters.priority as WorkOrderPriority;
     if (filters.source) where.source = filters.source as WorkOrderSource;
     if (filters.propertyId) where.propertyId = filters.propertyId;
     if (filters.unitId) where.unitId = filters.unitId;
@@ -1266,7 +1308,10 @@ export class WorkOrdersService {
     if (refs.propertyId) {
       await requireRecord(
         this.prisma.property.findFirst({
-          where: { id: refs.propertyId, ...(org ? { organizationId: org } : {}) },
+          where: {
+            id: refs.propertyId,
+            ...(org ? { organizationId: org } : {}),
+          },
           select: { id: true },
         }),
         'Property',
@@ -1322,7 +1367,10 @@ export class WorkOrdersService {
   }
 
   /** A technician must be a real, active member of this organization. */
-  private async assertTechnician(id: string, organizationId: string | undefined) {
+  private async assertTechnician(
+    id: string,
+    organizationId: string | undefined,
+  ) {
     const technician = await requireRecord(
       this.prisma.user.findFirst({
         where: {
@@ -1362,7 +1410,9 @@ export class WorkOrdersService {
    * staff raising a fault in the same second; without it one of them gets a
    * unique-constraint 500 for no reason a user could understand.
    */
-  private async createWithReference(input: Omit<Prisma.WorkOrderCreateInput, 'reference'>) {
+  private async createWithReference(
+    input: Omit<Prisma.WorkOrderCreateInput, 'reference'>,
+  ) {
     const organizationId =
       typeof input.organization === 'object' && 'connect' in input.organization
         ? (input.organization.connect as { id: string }).id
@@ -1401,15 +1451,17 @@ export class WorkOrdersService {
   }
 
   /** Derived, never stored: overdue, hours left, open checklist, legal actions. */
-  private decorate<T extends {
-    status: WorkOrderStatus;
-    priority: WorkOrderPriority;
-    reportedAt: Date;
-    assignedTechnicianId: string | null;
-    inspectionNote?: string | null;
-    resolutionNote?: string | null;
-    tasks?: { isDone: boolean }[];
-  }>(row: T) {
+  private decorate<
+    T extends {
+      status: WorkOrderStatus;
+      priority: WorkOrderPriority;
+      reportedAt: Date;
+      assignedTechnicianId: string | null;
+      inspectionNote?: string | null;
+      resolutionNote?: string | null;
+      tasks?: { isDone: boolean }[];
+    },
+  >(row: T) {
     const now = new Date();
     const openTasks = (row.tasks ?? []).filter((task) => !task.isDone).length;
 
@@ -1433,9 +1485,7 @@ export class WorkOrdersService {
   private portalView<T extends object>(row: T) {
     return {
       ...row,
-      statusLabel: statusLabel(
-        (row as { status: WorkOrderStatus }).status,
-      ),
+      statusLabel: statusLabel((row as { status: WorkOrderStatus }).status),
     };
   }
 
@@ -1473,9 +1523,7 @@ function toEnum<T extends Record<string, string>>(
   value: string | undefined,
 ): T[keyof T] | null {
   if (!value) return null;
-  return Object.values(values).includes(value)
-    ? (value as T[keyof T])
-    : null;
+  return Object.values(values).includes(value) ? (value as T[keyof T]) : null;
 }
 
 function defaultTitle(category: MaintenanceCategory): string {

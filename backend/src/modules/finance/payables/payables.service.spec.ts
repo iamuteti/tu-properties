@@ -53,7 +53,9 @@ describe('PayablesService', () => {
       })),
       findFirst: jest.fn().mockResolvedValue(bill),
       findMany: jest.fn().mockResolvedValue([bill]),
-      update: jest.fn().mockImplementation(({ data }: any) => ({ ...bill, ...data })),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }: any) => ({ ...bill, ...data })),
       count: jest.fn().mockResolvedValue(0),
     };
 
@@ -68,16 +70,22 @@ describe('PayablesService', () => {
         paymentTermsDays: 14,
       }),
       findMany: jest.fn().mockResolvedValue([]),
-      update: jest.fn().mockImplementation(({ data }: any) => ({ id: 'sup-1', ...data })),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }: any) => ({ id: 'sup-1', ...data })),
       delete: jest.fn().mockResolvedValue({}),
       count: jest.fn().mockResolvedValue(0),
     };
 
     const billPayment = {
-      create: jest.fn().mockImplementation(({ data }: any) => ({ id: 'pay-new', ...data })),
-      findFirst: jest
+      create: jest
         .fn()
-        .mockResolvedValue({ ...bill, billPaymentAmount: 0, isReversed: false }),
+        .mockImplementation(({ data }: any) => ({ id: 'pay-new', ...data })),
+      findFirst: jest.fn().mockResolvedValue({
+        ...bill,
+        billPaymentAmount: 0,
+        isReversed: false,
+      }),
       findMany: jest.fn().mockResolvedValue([]),
       aggregate: jest.fn().mockResolvedValue({ _sum: { appliedAmount: 0 } }),
       update: jest
@@ -91,7 +99,9 @@ describe('PayablesService', () => {
         .mockImplementation(({ data }: any) => ({ id: 'cr-new', ...data })),
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
-      update: jest.fn().mockImplementation(({ data }: any) => ({ id: 'cr-1', ...data })),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }: any) => ({ id: 'cr-1', ...data })),
     };
 
     const models = {
@@ -165,7 +175,9 @@ describe('PayablesService', () => {
         taxAmount: 4_800,
         subtotal: 30_000,
         totalAmount: 34_800,
-        lines: [{ description: 'Shower valves', quantity: 2, unitPrice: 15_000 }],
+        lines: [
+          { description: 'Shower valves', quantity: 2, unitPrice: 15_000 },
+        ],
       },
       'org-1',
     );
@@ -253,9 +265,27 @@ describe('PayablesService', () => {
   it('buckets what we owe by days past due', async () => {
     const asOf = new Date('2026-10-20');
     prisma.supplierBill.findMany.mockResolvedValue([
-      { ...bill, balanceAmount: 1_000, dueDate: new Date('2026-10-25'), supplierId: 'sup-1', supplier: { id: 'sup-1', name: 'A' } },
-      { ...bill, balanceAmount: 2_000, dueDate: new Date('2026-10-05'), supplierId: 'sup-1', supplier: { id: 'sup-1', name: 'A' } },
-      { ...bill, balanceAmount: 4_000, dueDate: new Date('2026-07-01'), supplierId: 'sup-2', supplier: { id: 'sup-2', name: 'B' } },
+      {
+        ...bill,
+        balanceAmount: 1_000,
+        dueDate: new Date('2026-10-25'),
+        supplierId: 'sup-1',
+        supplier: { id: 'sup-1', name: 'A' },
+      },
+      {
+        ...bill,
+        balanceAmount: 2_000,
+        dueDate: new Date('2026-10-05'),
+        supplierId: 'sup-1',
+        supplier: { id: 'sup-1', name: 'A' },
+      },
+      {
+        ...bill,
+        balanceAmount: 4_000,
+        dueDate: new Date('2026-07-01'),
+        supplierId: 'sup-2',
+        supplier: { id: 'sup-2', name: 'B' },
+      },
     ]);
 
     const aging = await service.aging('org-1', asOf);

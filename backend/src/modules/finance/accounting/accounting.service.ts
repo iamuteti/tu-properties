@@ -868,21 +868,21 @@ export class AccountingService {
     );
   }
 
-/**
- * Accounts payable: a supplier bill is accepted.
- *
- * The mirror of `postInvoiceIssued`, and deliberately not a copy-paste of it —
- * the direction reverses. We receive goods or services, so the expense and the
- * recoverable tax are debited and the supplier is credited:
- *
- *   Dr Expense (per line, by category or an explicit account)
- *   Dr VAT recoverable   (input tax we will reclaim)
- *   Cr Accounts payable  (the bill total)
- *
- * Input tax goes to a recoverable asset rather than into expense, because it is
- * not a cost — folding it into the expense line would understate both the
- * expense and the reclaim.
- */
+  /**
+   * Accounts payable: a supplier bill is accepted.
+   *
+   * The mirror of `postInvoiceIssued`, and deliberately not a copy-paste of it —
+   * the direction reverses. We receive goods or services, so the expense and the
+   * recoverable tax are debited and the supplier is credited:
+   *
+   *   Dr Expense (per line, by category or an explicit account)
+   *   Dr VAT recoverable   (input tax we will reclaim)
+   *   Cr Accounts payable  (the bill total)
+   *
+   * Input tax goes to a recoverable asset rather than into expense, because it is
+   * not a cost — folding it into the expense line would understate both the
+   * expense and the reclaim.
+   */
   async postBillAccepted(
     args: {
       billId: string;
@@ -912,7 +912,8 @@ export class AccountingService {
       lines.push({
         accountCode: expense.accountCode,
         debit: amount,
-        description: expense.description ?? `Expense on bill ${args.billNumber}`,
+        description:
+          expense.description ?? `Expense on bill ${args.billNumber}`,
       });
     }
 
@@ -946,7 +947,11 @@ export class AccountingService {
         memo: args.memo ?? `Supplier bill ${args.billNumber} accepted`,
         reference: args.billNumber,
         source: JournalEntrySource.BILL,
-        sourceRef: { type: 'SUPPLIER_BILL', id: args.billId, number: args.billNumber },
+        sourceRef: {
+          type: 'SUPPLIER_BILL',
+          id: args.billId,
+          number: args.billNumber,
+        },
         lines,
       },
       tenantId,
@@ -982,7 +987,8 @@ export class AccountingService {
     const creditAccount = args.relievedByCredit
       ? ACCOUNT_CODES.SUPPLIER_CREDIT
       : (PAYMENT_METHOD_ACCOUNT[args.paymentMethod] ?? '1010');
-    const description = args.description ?? `Payment to supplier for ${args.billNumber}`;
+    const description =
+      args.description ?? `Payment to supplier for ${args.billNumber}`;
 
     return this.postEntry(
       {
@@ -996,7 +1002,11 @@ export class AccountingService {
           number: args.billNumber,
         },
         lines: [
-          { accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE, debit: amount, description },
+          {
+            accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE,
+            debit: amount,
+            description,
+          },
           { accountCode: creditAccount, credit: amount, description },
         ],
       },

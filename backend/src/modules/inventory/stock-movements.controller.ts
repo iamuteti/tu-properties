@@ -175,7 +175,11 @@ export class StockMovementsController {
   @Roles(...WRITE_ROLES)
   @Permissions('stock_movements.create')
   stockTake(@Body() dto: RecordStockTakeDto, @Request() req) {
-    return this.movements.recordStockTake(dto, requireTenantId(req), getUserId(req));
+    return this.movements.recordStockTake(
+      dto,
+      requireTenantId(req),
+      getUserId(req),
+    );
   }
 
   /**
@@ -210,6 +214,9 @@ export class StockMovementsController {
   @Roles(...WRITE_ROLES)
   @Permissions('stock_movements.create', 'purchase_orders.view')
   markNotStock(@Body() dto: MarkNotStockDto, @Request() req) {
-    return this.stockIn.markNotStock(dto.goodsReceiptLineId, requireTenantId(req));
+    return this.stockIn.markNotStock(
+      dto.goodsReceiptLineId,
+      requireTenantId(req),
+    );
   }
 }

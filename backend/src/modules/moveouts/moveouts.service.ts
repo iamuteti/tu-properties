@@ -300,7 +300,10 @@ export class MoveoutsService {
           sum +
           Math.max(
             Number(invoice.amount) -
-              invoice.payments.reduce((p, payment) => p + Number(payment.amount), 0),
+              invoice.payments.reduce(
+                (p, payment) => p + Number(payment.amount),
+                0,
+              ),
             0,
           ),
         0,

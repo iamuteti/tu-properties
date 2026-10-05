@@ -62,12 +62,14 @@ describe('RentalAgreementsService (lifecycle)', () => {
       })),
       findMany: jest.fn().mockResolvedValue([activeLease]),
       count: jest.fn().mockResolvedValue(1),
-      findFirst: jest.fn().mockImplementation(({ where }: any) =>
-        Promise.resolve('status' in where ? state.openLease : state.lease),
-      ),
-      findUniqueOrThrow: jest.fn().mockImplementation(() =>
-        Promise.resolve(state.units),
-      ),
+      findFirst: jest
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve('status' in where ? state.openLease : state.lease),
+        ),
+      findUniqueOrThrow: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(state.units)),
       update: jest.fn().mockImplementation(({ data }: any) => ({
         ...activeLease,
         ...data,
@@ -87,9 +89,9 @@ describe('RentalAgreementsService (lifecycle)', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       moveOutRequest: {
-        findFirst: jest.fn().mockImplementation(() =>
-          Promise.resolve(state.moveOut),
-        ),
+        findFirst: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve(state.moveOut)),
       },
       invoice: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -104,7 +106,9 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
   beforeEach(async () => {
     prisma = mockPrisma();
-    units = { syncOccupancyStatus: jest.fn().mockResolvedValue({ changed: true }) };
+    units = {
+      syncOccupancyStatus: jest.fn().mockResolvedValue({ changed: true }),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -118,7 +122,10 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
   describe('create', () => {
     it('refuses a second live lease on the same unit', async () => {
-      prisma.state.openLease = { code: 'RA-000009', status: AgreementStatus.ACTIVE };
+      prisma.state.openLease = {
+        code: 'RA-000009',
+        status: AgreementStatus.ACTIVE,
+      };
 
       await expect(
         service.create(
@@ -193,8 +200,6 @@ describe('RentalAgreementsService (lifecycle)', () => {
   });
 
   describe('renew', () => {
-
-
     it('creates the successor, links the chain and keeps the unit occupied', async () => {
       const result = await service.renew(
         'lease-1',
@@ -474,9 +479,9 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
     it('404s for a unit in another organization', async () => {
       prisma.unit.findFirst.mockResolvedValue(null);
-      await expect(
-        service.occupancyHistory('unit-x', 'org-2'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.occupancyHistory('unit-x', 'org-2')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

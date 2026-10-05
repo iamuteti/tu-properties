@@ -54,6 +54,38 @@ model Organization {
   // requires it. Separate from `taxId`, which is the company registration.
   taxRegistrationNumber String?
 
+  // ── Payroll jurisdiction (Module 12) ───────────────────────────────────
+  // Deliberately separate from `taxCountryCode`/`taxRegionCode` above. They are
+  // usually the same and are usually worth inheriting, but they are not
+  // *always* the same: a group registered for tax in one country routinely
+  // employs staff in another, and statutory payroll in Kenya says almost nothing
+  // about how those staff must be treated. Falling back to the tax jurisdiction
+  // keeps the common case to zero fields while letting the divergent case be said
+  // out loud. ISO-3166-1 alpha-2 plus the optional sub-national level, exactly as
+  // above, for exactly the same reason.
+  payrollCountryCode String? @db.Char(2)
+  payrollRegionCode  String?
+
+  /// BCP-47 tag (`en-KE`, `de-DE`, `fr-FR`) used to format payslips, payslip
+  /// dates and any number this organization shows its staff.
+  ///
+  /// Stored, not assumed: 47 call sites across the frontend hardcode `en-KE`,
+  /// which is a pre-existing flaw this module does not copy and, for payslips,
+  /// actively fixes — an employee's payslip is the one document they may be
+  /// contractually entitled to receive in their own language. `null` means "let
+  /// the runtime decide", which is the correct behaviour and not an omission.
+  /// Full UI translation is app-wide work and is NOT in this module's scope; see
+  /// master doc issue 88.
+  defaultLocale String? @db.VarChar(35)
+
+  /// Which weekdays are non-working, as ISO day-of-week numbers where Monday is
+  /// 1 and Sunday is 7 (so the ISO week reads left-to-right). Empty means
+  /// Monday-to-Friday. Stored rather than assumed because "Saturday" is not a
+  /// universal non-working day — it is a non-working day in much of the Gulf and
+  /// India and a working day in much of Europe — and a weekend day silently
+  /// changes how many days of annual leave a request costs.
+  weekendDays Int[] @default([6, 7])
+
   // Regional defaults (System Settings) — money amounts still carry their
   // own currency per record; these are the org-level defaults.
   currency String @default("KES")
@@ -90,6 +122,15 @@ model Organization {
   paymentRefunds             PaymentRefund[]
   creditNotes                CreditNote[]
   taxRules                   TaxRule[]
+  // Module 12 — HR & Payroll
+  employees                  Employee[]
+  payrollRules               PayrollRule[]
+  payComponents              PayComponent[]
+  leavePolicies              LeavePolicy[]
+  holidays                   Holiday[]
+  leaveRequests              LeaveRequest[]
+  payrollRuns                PayrollRun[]
+  payslips                   Payslip[]
   suppliers                  Supplier[]
   supplierBills              SupplierBill[]
   billPayments               BillPayment[]
@@ -217,6 +258,13 @@ model User {
   // Every one of those is a fact about a person, not about the item.
   recordedStockMovements StockMovement[] @relation("UserRecordedStockMovements")
 
+  // Module 12 — HR. Exactly one direction, enforced by `Employee.userId`'s
+  // unique constraint: a login and an employment record are separate things (a
+  // caretaker may have no login at all; a property manager may be an employee
+  // *and* hold a role that grants far more than self-service), and joining them
+  // one-to-many would let one person be two employees.
+  employeeRecord Employee?
+
   // Status
   @@index([portalTenantId])
   @@index([email])
@@ -243,6 +291,20 @@ enum UserRole {
   // Leasing Officer and the two maintenance roles — permissions nobody could
   // hold, and a purchase request with nobody who is allowed to raise the RFQ.
   PROCUREMENT_OFFICER
+  // Module 12: the seeded HR Manager role had exactly this problem — permissions
+  // nobody could hold, and a role with no job behind it. Same hole as
+  // LEASING_OFFICER (issue 48), the two maintenance roles (issue 67) and
+  // PROCUREMENT_OFFICER (issue 75), now four instances deep.
+  HR_MANAGER
+  // Module 12: an employee is a person on the payroll who has a login to see
+  // their OWN payslips and file their OWN leave request — and nothing else. The
+  // seeded "Employee" role held permissions nobody could hold, which is the same
+  // hole as LEASING_OFFICER (issue 48), the two maintenance roles (issue 67) and
+  // PROCUREMENT_OFFICER (issue 75). Granting it anything wider than self-service
+  // would be the mistake here: it is the one role guaranteed to be handed to
+  // everybody eventually, and "everybody" is how salary data ends up readable by
+  // the whole company.
+  EMPLOYEE
   USER
 }
 
@@ -2212,6 +2274,11 @@ enum JournalEntrySource {
   REFUND
   BILL
   BILL_PAYMENT
+  // Module 12 — HR & Payroll. Distinct from `MANUAL` on purpose: a payroll entry
+  // posted by hand and a payroll entry the engine produced look identical in the
+  // ledger, and the difference matters when somebody asks who paid this month's
+  // salaries and whether the totals reconcile to the bank.
+  PAYROLL
   OPENING_BALANCE
 }
 
@@ -2596,7 +2663,7 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   // Module 11 — Inventory: the vendor an item is normally bought from, so the
   // reorder suggestion can name one instead of asking a buyer to remember.
-  suppliedItems InventoryItem[] @relation("InventoryItemPreferredSupplier")
+  suppliedItems  InventoryItem[] @relation("InventoryItemPreferredSupplier")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -4286,14 +4353,14 @@ model InventoryItem {
   sku String
 
   name        String
-  description String?          @db.Text
+  description String?           @db.Text
   category    InventoryCategory @default(OTHER)
 
   /// The unit the quantity is counted in — "litre", "roll", "box", "metre". The
   /// label rather than a conversion table on purpose: a property manager buying
   /// paint does not think in millilitres, and a conversion-factor engine is a
   /// second source of truth nobody will maintain.
-  unitOfMeasure String           @default("unit")
+  unitOfMeasure String @default("unit")
 
   /// Last known buying price per unit, in the organization's default currency.
   /// Used to estimate a reorder's cost and to value stock whose movements carry
@@ -4322,7 +4389,7 @@ model InventoryItem {
   /// fact worth keeping.
   isActive Boolean @default(true)
 
-  movements       StockMovement[]
+  movements         StockMovement[]
   goodsReceiptLines GoodsReceiptLine[]
 
   createdAt DateTime @default(now())
@@ -4404,7 +4471,7 @@ model StockMovement {
   /// booking the same receipt line in twice raises the same constraint error
   /// that `dedupeKey` raises for a reminder, which is the reason the column
   /// exists rather than a boolean the caller could set twice.
-  goodsReceiptLineId String? @unique
+  goodsReceiptLineId String?           @unique
   goodsReceiptLine   GoodsReceiptLine? @relation(fields: [goodsReceiptLineId], references: [id], onDelete: Restrict)
 
   /// Set for `WORK_ORDER_ISSUE`.
@@ -4434,4 +4501,718 @@ model StockMovement {
   @@index([workOrderId])
   @@index([type])
   @@map("stock_movements")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 12 — HR & Payroll
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// This domain is **country-agnostic by construction**, and that is a requirement
+// rather than a nicety: the same code has to pay a Nairobi cleaner and a Berlin
+// engineer, in their own currencies, under two different statutory regimes.
+//
+// So nothing below names a country, a currency, or a rate. Every number that
+// differs between jurisdictions is a **row**, reached through the same resolution
+// path Module 7 uses for `TaxRule`:
+//
+//   Organization.payrollCountryCode / payrollRegionCode  → the jurisdiction
+//   PayrollRule.countryCode / regionCode / organizationId → candidate rules
+//   PayrollRuleService.specificity()                     → the closest match wins
+//
+// Two consequences, and both are the point:
+//
+// 1. **A statutory rate change is data.** A new `PayrollRule` row with a later
+//    `validFrom`, not an edit. A payslip dated inside the old window keeps the old
+//    rate forever, which is what makes a payroll defensible in an audit two years
+//    later.
+// 2. **A jurisdiction nobody has configured is a visible gap, not a silent
+//    zero.** No rules resolves to no deduction and a warning on the run, never a
+//    quietly wrong payslip.
+//
+// Kenya, Brazil, Germany and the UK are shipped as *seeded sample configuration*
+// marked as a dated snapshot — so the feature demonstrably works out of the box
+// while remaining obvious that a real deployment must check the figures against
+// current law. Nothing in the code knows those figures exist.
+
+/// What shape the rule's arithmetic takes.
+///
+/// Three is enough for every statutory scheme in common use, and the alternative
+/// — a general expression language on the row — is a formula-injection surface
+/// with a payroll attached, so it is not offered.
+enum PayrollRuleType {
+  /// Progressive ladder: `bands` = `[{ upTo, ratePercent }]`, each slice taxed
+  /// at its own rate. Income tax in most countries.
+  PROGRESSIVE_BANDS
+
+  /// Flat percentage of a chosen base, with an optional floor and cap. Social
+  /// security, health funds, housing levies, union dues.
+  PERCENTAGE
+
+  /// A fixed amount per period, optionally banded by the same base. A fixed
+  /// deduction, a fixed allowance.
+  FIXED
+}
+
+/// What the rule's percentage is applied to.
+///
+/// The distinction is not cosmetic. "Taxable pay" is a statutory concept that is
+/// frequently **not** gross pay — in several jurisdictions a housing benefit or a
+/// vehicle allowance is taxed but not pensionable, or the reverse — so a rule that
+/// only knew about GROSS could not be correct in those places.
+enum PayrollCalculationBase {
+  /// Everything the employee is paid before any deduction.
+  GROSS
+
+  /// The employee's contracted base salary only, excluding allowances.
+  BASIC
+
+  /// GROSS minus a jurisdiction's list of non-taxable components. Resolved from
+  /// the payslip's own earning lines, so which lines qualify is data on the
+  /// component, not a hardcoded list here.
+  TAXABLE
+}
+
+/// Which side of the payroll the money comes off.
+///
+/// Not a percentage split, because that is the wrong shape: PAYE is withheld from
+/// the employee and never touches the employer, while a social fund is typically
+/// matched on both sides and a housing levy is often employer-only. `BOTH` means
+/// the rule's rate applies twice, once to each side.
+enum PayrollBearer {
+  /// Withheld from the employee. Reduces what they are paid.
+  EMPLOYEE
+
+  /// The employer's own cost. Never reduces what the employee is paid, and does
+  /// belong in the employer's salary expense.
+  EMPLOYER
+
+  /// Matched: the same rate on each side. Two figures, one rule, which is how
+  /// the legislation actually expresses it.
+  BOTH
+}
+
+/// Whether the rule sees one period or an annualised base.
+///
+/// This is the difference between a *correct* progressive income tax and a wrong
+/// one. Almost every country computes income tax on annual income and then divides
+/// by the number of periods, because bands are set annually. Walking the bands
+/// once per month on monthly pay over-charges a low earner and under-charges a
+/// high one — the month-by-month order of the slices is not the year-by-year
+/// order — so a naive implementation is not a differently-rounded answer, it is
+/// the wrong answer. `PERIOD` exists for the genuine monthly schemes (social
+/// contributions, usually), and for them it is the correct mode.
+enum PayrollPeriodMode {
+  /// Apply the rule to the period's own figures, as they stand.
+  PERIOD
+
+  /// Annualise the base by `periodsPerYear`, apply the rule, divide the result.
+  ANNUALISED
+}
+
+/// What kind of deduction this is.
+///
+/// The split matters for reporting and for the ledger: statutory deductions are
+/// money the company holds on someone else's behalf and owes to an authority,
+/// while a company deduction is a benefit the employer chose to provide. Blending
+/// them is how a "statutory liability" total ends up containing parking charges.
+enum PayrollDeductionKind {
+  STATUTORY
+  COMPANY
+  OTHER
+}
+
+/// One configured statutory or company rule.
+///
+/// A deliberate near-twin of `TaxRule`: same jurisdiction columns, same effective
+/// window, same identity constraint. Payroll rules change on the same kind of
+/// cycle and for the same reason, and a second shape for the same idea would be a
+/// second thing to learn.
+model PayrollRule {
+  id          String  @id @default(cuid())
+  code        String
+  name        String
+  description String? @db.Text
+
+  /// Free-text and never translated by the application. A Brazilian
+  /// administrator names the INSS rule "INSS Trabalhista" and a French one
+  /// "Cotisations salariales" — the system stores what was typed. Anything that
+  /// tried to machine-translate a statutory name would produce a document that
+  /// misnames the law it is complying with.
+  countryCode String? @db.Char(2)
+  regionCode  String?
+
+  type   PayrollRuleType        @default(PERCENTAGE)
+  base   PayrollCalculationBase @default(GROSS)
+  bearer PayrollBearer          @default(EMPLOYEE)
+
+  /// Stored as a percentage, not a fraction: 1.5 means 1.5%. Four decimals so a
+  /// 0.2475% contribution is exact rather than 0.25%.
+  ratePercent Decimal? @db.Decimal(7, 4)
+
+  /// The flat amount a `FIXED` rule charges per period. Null on every other type.
+  amount Decimal? @db.Decimal(14, 2)
+
+  /// Statutory floor and cap on the **base**, not on the result. A social fund
+  /// with a minimum contribution is really a minimum *contributory wage*: below it
+  /// everyone pays the same minimum, which is why expressing this as a base floor
+  /// reproduces the legislation rather than approximating it.
+  minimumBaseAmount Decimal? @db.Decimal(14, 2)
+  maximumBaseAmount Decimal? @db.Decimal(14, 2)
+
+  /// The ladder, for `PROGRESSIVE_BANDS` and banded `FIXED`:
+  /// `[{ "upTo": 6000, "ratePercent": 0 }, { "upTo": 16000, "ratePercent": 10 }]`.
+  ///
+  /// A list, so no column shape would improve on it. `upTo` is cumulative and the
+  /// last entry has `upTo: null`, meaning "and everything above the one before".
+  bands Json?
+
+periodMode     PayrollPeriodMode @default(PERIOD)
+  periodsPerYear Int                @default(12)
+
+  /// Order the lines appear on a payslip, which is the order a person reads them
+  /// in. Income tax belongs above the social contributions on almost every
+  /// payslip layout in the world, and "above" is a number on the rule rather than
+  /// a hardcoded list the engine would have to be taught to override.
+  sortOrder Int @default(100)
+
+  /// Exempt below this amount of base — some schemes have a threshold below which
+  /// nobody contributes at all, which is different from a minimum contribution.
+  exemptBelowBaseAmount Decimal? @db.Decimal(14, 2)
+
+  /// Where the withheld money lands in the ledger. Without it every rule would
+  /// post to one account and the liabilities would silently merge, which is the
+  /// same failure `TaxRule.ledgerAccountCode` already guards against.
+  ledgerAccountCode String?
+
+  /// What the employer bears also lands in the employer's salary expense. This
+  /// names that expense account so a rule cannot invent one.
+  expenseAccountCode String? @default("5090")
+
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  isActive Boolean @default(true)
+
+  /// Null = a jurisdiction-wide template anybody operating there inherits.
+  /// Set = this organization's own override, which always wins over a template.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  payslipLines PayslipLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code, countryCode, regionCode, validFrom])
+  @@index([organizationId])
+  @@index([countryCode])
+  @@index([code])
+  @@map("payroll_rules")
+}
+
+/// An allowance or deduction component an employee can carry.
+///
+/// A payslip line is not a hardcoded list of a few things. A country has its own
+/// mandatory components, an industry has its own, and an individual employment
+/// contract has its own — so what counts as a non-taxable transport benefit or an
+/// obligatory pension contribution has to be data, and `isTaxable` /
+/// `isPensionable` are per jurisdiction and per component rather than global
+/// truth.
+model PayComponent {
+  id          String  @id @default(cuid())
+  code        String
+  name        String
+  description String? @db.Text
+
+  kind PayrollDeductionKind @default(STATUTORY)
+
+  /// Shown as an addition to gross (`house`, `transport`, `medical`) or taken off
+  /// it (`pension`, `union`, `garnishee`). Defaults to a deduction because the
+  /// component table exists mostly for the things that come off a payslip.
+  direction PayrollLineDirection @default(EMPLOYEE_DEDUCTION)
+
+  /// Whether this component is part of taxable pay, of contributable pay, or of
+  /// neither, in the jurisdiction this row belongs to. The three answers genuinely
+  /// differ — a housing benefit is commonly taxable but not contributable — which
+  /// is why one boolean cannot express it.
+  isTaxable     Boolean @default(true)
+  isPensionable Boolean @default(true)
+
+  countryCode String? @db.Char(2)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  employees    EmployeeComponent[]
+  payslipLines PayslipLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code, countryCode])
+  @@index([organizationId])
+  @@map("pay_components")
+}
+
+/// Which side of the payslip a line sits on.
+enum PayrollLineDirection {
+  /// Adds to gross (an allowance).
+  EARNING
+
+  /// Taken off gross, borne by the employee (PAYE, a pension contribution).
+  EMPLOYEE_DEDUCTION
+
+  /// The employer's own cost. Never affects net pay — it appears on the payslip
+  /// because employees are entitled to see the total cost of employing them, and
+  /// because it is what the journal entry debits.
+  EMPLOYER_CONTRIBUTION
+}
+
+/// An employment record, and optionally the person who logs in.
+///
+/// `userId` is optional and the relation is one-to-one, which handles the two
+/// cases the model has to survive: a caretaker on the payroll with no login at
+/// all, and a property manager who is both an employee and holds a role granting
+/// far more than self-service.
+model Employee {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Unique per organization, and human-quotable — it goes on a payslip.
+  employeeNumber String
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  firstName       String
+  lastName        String
+  /// What they actually go by. Printed on a payslip instead of a legal name that
+  /// they do not use, because a payslip is read by the person it pays.
+  preferredName   String?
+  preferredLocale String? @db.VarChar(35)
+
+  /// Free text, exactly like `PurchaseRequest.department`: there is no
+  /// departments table and inventing one for a label is a second org-wide concept
+  /// for no reporting gain. Free-text reporting across departments is a reporting
+  /// problem with a real answer, and it is not a schema problem.
+  department String?
+  jobTitle   String?
+
+  employmentType  EmploymentType @default(FULL_TIME)
+  hireDate        DateTime
+  /// Set rather than deleting on departure, for the same reason inventory items are
+  /// retired: payslips and leave history reference this row, and "no longer
+  /// employed here" is a fact worth keeping.
+  terminationDate DateTime?
+
+  // ── Compensation ────────────────────────────────────────────────────────
+  //
+  // The most sensitive fields in this schema. Read them only under
+  // `employees.compensation`, never under the plain `employees.view` that a
+  // directory listing needs, and never include them in an export that a
+  // lower-privileged role can request. A salary leak is not recoverable by
+  // apologising.
+  basicSalary    Decimal @db.Decimal(14, 2)
+  /// ISO-4217. Per employee, not per organization, because a Nairobi group paying
+  /// a remote contractor in euros needs it and a single org currency would force
+  /// one of the two to be wrong.
+  salaryCurrency String  @default("KES")
+
+  payFrequency   PayFrequency @default(MONTHLY)
+  /// How many pay periods a year. Overridden by the rule when the rule is
+  /// ANNUALISED, so a weekly-paid employee on annual income tax is taxed on
+  /// 52 weeks, not 12 months — the two are materially different amounts.
+  periodsPerYear Int          @default(12)
+
+  // ── Statutory identifiers ───────────────────────────────────────────────
+  //
+  // Jurisdiction-specific and therefore free-text. "National ID", "NIN", "SIN",
+  // "National Insurance Number" and "CPF" are the same field with five names, and
+  // a two-letter enum of them would mean a migration every time the company hires
+  /// in a new country.
+  nationalId           String?
+  taxNumber            String?
+  socialSecurityNumber String?
+
+  bankAccount String?
+  bankName    String?
+  bankBranch  String?
+  bankCode    String?
+
+  address String? @db.Text
+  phone   String?
+  email   String?
+
+  leavePolicyId String?
+  leavePolicy   LeavePolicy? @relation(fields: [leavePolicyId], references: [id], onDelete: SetNull)
+
+  isActive Boolean @default(true)
+
+  components    EmployeeComponent[]
+  leaveRequests LeaveRequest[]
+  payslips      Payslip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, employeeNumber])
+  @@index([organizationId])
+  @@index([department])
+  @@index([userId])
+  @@map("employees")
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  TEMPORARY
+}
+
+enum PayFrequency {
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+/// One employee's standing amount for one component.
+///
+/// An employee's pension contribution is 5% *of their own salary* but the
+/// employer's 10% is capped at a statutory ceiling, and neither rate is
+/// universal — so the standing arrangement is a row per employee per component,
+/// not a column on `Employee`. An employee with no row for a component is simply
+/// not on that component.
+model EmployeeComponent {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  payComponentId String
+  payComponent   PayComponent @relation(fields: [payComponentId], references: [id], onDelete: Cascade)
+
+  /// Percent of the base for a percentage component, or the amount for a fixed
+  /// one. Null means "whatever the component's default is", which keeps the
+  /// common case to one row per component.
+  percentage Decimal? @db.Decimal(7, 4)
+  amount     Decimal? @db.Decimal(14, 2)
+
+  currency String @default("KES")
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, payComponentId, effectiveFrom])
+  @@index([employeeId])
+  @@map("employee_components")
+}
+
+/// How much leave somebody gets, and the rules around using it.
+///
+/// Statutory entitlement varies enormously between countries — some have no
+/// federal minimum at all, some mandate 20 days, one East African country
+/// mandates 21 and rises to 28 after five years — so it is configuration reached
+/// by jurisdiction, with an organization override. Hardcoding 21 would be
+/// hardcoding one country into a product that is explicitly not about one country.
+model LeavePolicy {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  code String
+  name String
+
+  countryCode String? @db.Char(2)
+  regionCode  String?
+
+  /// Working days per year. Fractional so an employer granting 22.5 covers the
+  /// half-day that half the workforce will take.
+  annualEntitlementDays Decimal @db.Decimal(5, 2)
+
+  /// How much unused entitlement may carry into next year. Statutory caps are
+  /// usually lower than the entitlement and sometimes zero, and a policy that
+  /// models one without the other lets leave accumulate without limit.
+  carryoverLimitDays Decimal? @db.Decimal(5, 2)
+
+  /// Notice required in working days, and whether it is waived for short absence.
+  minNoticeDays       Int @default(0)
+  minNoticeWaivedDays Int @default(1)
+
+  /// Whether an absence may be taken as unpaid. Most jurisdictions distinguish
+  /// this, and refusing unpaid leave outright is not something an employer
+  /// decides for itself.
+  unpaidAllowed Boolean @default(true)
+
+  /// Whether a request longer than this needs a different approval. Null = no
+  /// longer-request rule.
+  maxConsecutiveDays Int?
+
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  employees Employee[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([countryCode])
+  @@map("leave_policies")
+}
+
+/// A public holiday for a jurisdiction, or an organization's own closure.
+model Holiday {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Null = an organization's own day (a founder's funeral, a shutdown).
+  /// Set = the public holidays of a jurisdiction, inherited by everybody operating
+  /// there — which is why the same row serves many organizations and why an
+  /// organization's own entry can override it by matching the date.
+  countryCode String? @db.Char(2)
+  regionCode  String? @db.VarChar(10)
+
+  date DateTime
+  name String
+
+  /// Whether it repeats on the same day each year. A country's New Year does; a
+  /// one-off public holiday does not, and treating the recurring kind as recurring
+  /// is why "public holidays" tables go wrong two years in.
+  isRecurring Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([date])
+  @@index([countryCode])
+  @@map("holidays")
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  MATERNITY
+  PATERNITY
+  ADOPTION
+  BEREAVEMENT
+  COMPENSATORY
+  OFFICIAL
+
+  /// Time owed to the employee for work done outside normal hours. A distinct
+  /// type because it is earned rather than granted, and it is frequently
+  /// time-limited by law.
+  OFF_DUTY
+}
+
+/// A request to be away.
+///
+/// `workingDays` is **derived**, never stored as a number the caller typed: it is
+/// the working days between the two dates given the organization's weekend days
+/// and the public holidays in force, and a hand-typed 5 that disagrees with the
+/// dates is a rejected request with no obvious reason.
+model LeaveRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  leaveType LeaveType @default(ANNUAL)
+
+  startDate DateTime
+  endDate   DateTime
+
+  reason String? @db.Text
+
+  status       LeaveStatus @default(PENDING)
+  /// The employee may withdraw their own request; only an approver can reject it.
+  /// "Cancelled" and "Rejected" are different facts and the audit trail has to be
+  /// able to tell them apart.
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?     @db.Text
+
+  /// Set when approval ran through Module 18's engine, so the approval history is
+  /// the engine's record and not a second copy of it here.
+  workflowInstanceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate])
+  @@map("leave_requests")
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// One payroll run: a group of payslips for one period, one approval and one
+/// journal entry.
+///
+/// The run exists because a payroll is approved and posted as a unit. Calculating
+/// twelve payslips that can then be approved one at a time is how a company ends
+/// up paying a quarter of its staff and not the rest.
+model PayrollRun {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// A stable human reference like `PR-2026-03`, so a payslip in a dispute can be
+  /// quoted without exposing an id.
+  reference String
+
+  periodStart DateTime
+  periodEnd   DateTime
+  payDate     DateTime
+
+  currency String @default("KES")
+
+  status PayrollRunStatus @default(DRAFT)
+
+  /// Snapshotted at calculation time so a payslip explains itself years later
+  /// without re-running a rule that has since been superseded.
+  rulesApplied Json?
+
+  /// The journal entry this run posted, so it can be reversed by reference.
+  journalEntryId String?
+
+  calculatedAt   DateTime?
+  calculatedById String?
+  approvedAt     DateTime?
+  approvedById   String?
+  paidAt         DateTime?
+  paidById       String?
+
+  /// Why a run was voided. A voided run keeps its payslips: it happened, it was
+  /// wrong, and replacing it silently would make the two indistinguishable.
+  voidedAt   DateTime?
+  voidedById String?
+  voidReason String?   @db.Text
+
+  payslips Payslip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
+  @@index([status])
+  @@map("payroll_runs")
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  PAID
+
+  /// Superseded before payment, or after. Not deletable — see `voidReason`.
+  VOID
+}
+
+/// One employee's payslip within a run.
+///
+/// **The gross, deduction and net figures are not columns.** They are the sum of
+/// this payslip's own `PayslipLine` rows, computed on read by
+/// `payroll-calc.ts`, for the same reason Module 11 stores no stock level: a stored
+/// net that can disagree with gross minus deductions is precisely the bug, and it
+/// is the one nobody catches until a tax audit.
+///
+/// What *is* stored is the evidence — the input salary and the frozen line rows —
+/// and `rulesApplied` on the run records which rules produced it, so a payslip
+/// three years old still explains itself without re-running a rule that has since
+/// been replaced.
+model Payslip {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  payrollRunId String
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+  payDate     DateTime
+
+  currency String @default("KES")
+
+  /// The contractual base for the period, before anything else. An input, not a
+  /// total.
+  basicSalary Decimal @db.Decimal(14, 2)
+
+  /// The jurisdiction's rules in force when this was calculated, and the locale
+  /// the payslip was rendered in. The locale is snapshotted because a payslip is a
+  /// document and its format has to stay the format it was issued in.
+  rulesApplied Json?
+  locale       String? @db.VarChar(35)
+
+  lines PayslipLine[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([payrollRunId, employeeId])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("payslips")
+}
+
+/// One line of a payslip: an earning, an employee deduction, or an employer cost.
+///
+/// Rows, not a single `deductions` figure. A payslip that says "gross 100,000,
+/// deductions 25,000, net 75,000" cannot be explained to the employee who asks
+/// why, cannot be split into statutory and voluntary for the ledger, and cannot
+/// be reconciled against a remittance advice line by line.
+model PayslipLine {
+  id        String  @id @default(cuid())
+  payslipId String
+  payslip   Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  direction PayrollLineDirection
+
+  code String
+  name String
+
+  amount Decimal @db.Decimal(14, 2)
+
+  kind PayrollDeductionKind @default(STATUTORY)
+
+  /// The rule that produced it, when a rule did. Null for a line that is simply
+  /// the employee's salary or a hand-entered component.
+  payrollRuleId String?
+  payrollRule   PayrollRule? @relation(fields: [payrollRuleId], references: [id], onDelete: SetNull)
+
+  payComponentId String?
+  payComponent   PayComponent? @relation(fields: [payComponentId], references: [id], onDelete: SetNull)
+
+  /// Where this line goes in the ledger. Copied from the rule at calculation time
+  /// so the entry does not have to re-resolve rules that may since have changed.
+  accountCode String?
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([payslipId])
+  @@index([payrollRuleId])
+  @@map("payslip_lines")
 }

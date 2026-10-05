@@ -1,4 +1,8 @@
-import { AssetStatus, WorkOrderPriority, WorkOrderStatus } from '@prisma/client';
+import {
+  AssetStatus,
+  WorkOrderPriority,
+  WorkOrderStatus,
+} from '@prisma/client';
 import {
   ACTIONS_BY_STATUS,
   ASSET_STATUS_TRANSITIONS,
@@ -91,28 +95,40 @@ describe('work order lifecycle', () => {
     });
 
     it('refuses a completion with no resolution note', () => {
-      const result = checkWorkOrderAction(WorkOrderStatus.IN_PROGRESS, 'COMPLETE', {
-        ...ready,
-        resolutionNote: '   ',
-      });
+      const result = checkWorkOrderAction(
+        WorkOrderStatus.IN_PROGRESS,
+        'COMPLETE',
+        {
+          ...ready,
+          resolutionNote: '   ',
+        },
+      );
       expect(result.allowed).toBe(false);
       expect(result.reason).toMatch(/what was done/i);
     });
 
     it('refuses a completion while checklist items are open', () => {
-      const result = checkWorkOrderAction(WorkOrderStatus.IN_PROGRESS, 'COMPLETE', {
-        ...ready,
-        openTasks: 2,
-      });
+      const result = checkWorkOrderAction(
+        WorkOrderStatus.IN_PROGRESS,
+        'COMPLETE',
+        {
+          ...ready,
+          openTasks: 2,
+        },
+      );
       expect(result.allowed).toBe(false);
       expect(result.reason).toMatch(/2 checklist items are still open/i);
     });
 
     it('uses the singular for one open checklist item', () => {
-      const result = checkWorkOrderAction(WorkOrderStatus.IN_PROGRESS, 'COMPLETE', {
-        ...ready,
-        openTasks: 1,
-      });
+      const result = checkWorkOrderAction(
+        WorkOrderStatus.IN_PROGRESS,
+        'COMPLETE',
+        {
+          ...ready,
+          openTasks: 1,
+        },
+      );
       expect(result.reason).toMatch(/1 checklist item is still open/i);
     });
 
@@ -181,11 +197,10 @@ describe('work order lifecycle', () => {
 
   describe('the emergency fast-track', () => {
     it('lets an EMERGENCY job be assigned before it is inspected or approved', () => {
-      const result = checkWorkOrderAction(
-        WorkOrderStatus.REQUESTED,
-        'ASSIGN',
-        { ...ready, priority: WorkOrderPriority.EMERGENCY },
-      );
+      const result = checkWorkOrderAction(WorkOrderStatus.REQUESTED, 'ASSIGN', {
+        ...ready,
+        priority: WorkOrderPriority.EMERGENCY,
+      });
       expect(result.allowed).toBe(true);
       expect(
         nextStatus(WorkOrderStatus.REQUESTED, 'ASSIGN', {
@@ -197,17 +212,17 @@ describe('work order lifecycle', () => {
 
     it('does not let a NORMAL job skip the gates', () => {
       expect(
-        checkWorkOrderAction(
-          WorkOrderStatus.REQUESTED,
-          'ASSIGN',
-          { ...ready, priority: WorkOrderPriority.NORMAL },
-        ).allowed,
+        checkWorkOrderAction(WorkOrderStatus.REQUESTED, 'ASSIGN', {
+          ...ready,
+          priority: WorkOrderPriority.NORMAL,
+        }).allowed,
       ).toBe(false);
     });
 
     it('never skips the start step once assigned', () => {
       expect(
-        checkWorkOrderAction(WorkOrderStatus.ASSIGNED, 'COMPLETE', ready).allowed,
+        checkWorkOrderAction(WorkOrderStatus.ASSIGNED, 'COMPLETE', ready)
+          .allowed,
       ).toBe(false);
     });
   });
@@ -226,10 +241,12 @@ describe('work order lifecycle', () => {
     });
 
     it('never offers a terminal state any action', () => {
-      expect(availableWorkOrderActions(WorkOrderStatus.CLOSED, ready)).toEqual([]);
-      expect(availableWorkOrderActions(WorkOrderStatus.CANCELLED, ready)).toEqual(
+      expect(availableWorkOrderActions(WorkOrderStatus.CLOSED, ready)).toEqual(
         [],
       );
+      expect(
+        availableWorkOrderActions(WorkOrderStatus.CANCELLED, ready),
+      ).toEqual([]);
     });
 
     it('offers an emergency request both its fast-track and its gates', () => {
@@ -307,13 +324,21 @@ describe('work order lifecycle', () => {
       const old = new Date('2026-01-01T00:00:00.000Z');
       expect(
         isOverdue(
-          { priority: WorkOrderPriority.EMERGENCY, reportedAt: old, status: WorkOrderStatus.COMPLETED },
+          {
+            priority: WorkOrderPriority.EMERGENCY,
+            reportedAt: old,
+            status: WorkOrderStatus.COMPLETED,
+          },
           now,
         ),
       ).toBe(false);
       expect(
         isOverdue(
-          { priority: WorkOrderPriority.EMERGENCY, reportedAt: old, status: WorkOrderStatus.CANCELLED },
+          {
+            priority: WorkOrderPriority.EMERGENCY,
+            reportedAt: old,
+            status: WorkOrderStatus.CANCELLED,
+          },
           now,
         ),
       ).toBe(false);

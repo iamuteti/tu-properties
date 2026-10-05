@@ -100,20 +100,31 @@ export class WarehousesService {
 
     const [stock, itemCount, recent, lowHere] = await Promise.all([
       this.prisma.stockMovement.aggregate({
-        where: { warehouseId: id, ...(organizationId ? { organizationId } : {}) },
+        where: {
+          warehouseId: id,
+          ...(organizationId ? { organizationId } : {}),
+        },
         _sum: { quantity: true },
       }),
       this.prisma.stockMovement.groupBy({
         by: ['itemId'],
-        where: { warehouseId: id, ...(organizationId ? { organizationId } : {}) },
+        where: {
+          warehouseId: id,
+          ...(organizationId ? { organizationId } : {}),
+        },
       }),
       // `warehouse` is included even though every row is this store. The ledger's
       // row shape is the same on every endpoint, and a client rendering one of
       // them should not have to special-case the other to avoid a column of `—`.
       this.prisma.stockMovement.findMany({
-        where: { warehouseId: id, ...(organizationId ? { organizationId } : {}) },
+        where: {
+          warehouseId: id,
+          ...(organizationId ? { organizationId } : {}),
+        },
         include: {
-          item: { select: { id: true, sku: true, name: true, unitOfMeasure: true } },
+          item: {
+            select: { id: true, sku: true, name: true, unitOfMeasure: true },
+          },
           warehouse: { select: { id: true, name: true, code: true } },
           workOrder: {
             select: { id: true, reference: true, title: true, status: true },
@@ -141,7 +152,10 @@ export class WarehousesService {
       // which.
       this.prisma.stockMovement.groupBy({
         by: ['itemId'],
-        where: { warehouseId: id, ...(organizationId ? { organizationId } : {}) },
+        where: {
+          warehouseId: id,
+          ...(organizationId ? { organizationId } : {}),
+        },
         _sum: { quantity: true },
       }),
     ]);
@@ -201,7 +215,9 @@ export class WarehousesService {
       select: { id: true },
     });
     if (existing) {
-      throw new ConflictException(`A store with the code ${code} already exists.`);
+      throw new ConflictException(
+        `A store with the code ${code} already exists.`,
+      );
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -220,7 +236,12 @@ export class WarehousesService {
       // The first store in an organization becomes the default whether or not
       // anybody asked: with exactly one, "book it in without saying where" has
       // exactly one right answer.
-      await this.applyDefault(tx, organizationId, warehouse.id, dto.isDefault ?? false);
+      await this.applyDefault(
+        tx,
+        organizationId,
+        warehouse.id,
+        dto.isDefault ?? false,
+      );
 
       return warehouse;
     });
@@ -238,7 +259,9 @@ export class WarehousesService {
         select: { id: true },
       });
       if (clash) {
-        throw new ConflictException(`A store with the code ${code} already exists.`);
+        throw new ConflictException(
+          `A store with the code ${code} already exists.`,
+        );
       }
     }
 
@@ -246,11 +269,19 @@ export class WarehousesService {
       await tx.warehouse.update({
         where: { id },
         data: {
-          ...(dto.code !== undefined ? { code: dto.code.trim().toUpperCase() } : {}),
+          ...(dto.code !== undefined
+            ? { code: dto.code.trim().toUpperCase() }
+            : {}),
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-          ...(dto.address !== undefined ? { address: dto.address?.trim() || null } : {}),
-          ...(dto.phone !== undefined ? { phone: dto.phone?.trim() || null } : {}),
-          ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+          ...(dto.address !== undefined
+            ? { address: dto.address?.trim() || null }
+            : {}),
+          ...(dto.phone !== undefined
+            ? { phone: dto.phone?.trim() || null }
+            : {}),
+          ...(dto.notes !== undefined
+            ? { notes: dto.notes?.trim() || null }
+            : {}),
           ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         },
       });
@@ -368,6 +399,9 @@ export class WarehousesService {
       where: { organizationId, id: { not: warehouseId }, isDefault: true },
       data: { isDefault: false },
     });
-    await tx.warehouse.update({ where: { id: warehouseId }, data: { isDefault: true } });
+    await tx.warehouse.update({
+      where: { id: warehouseId },
+      data: { isDefault: true },
+    });
   }
 }

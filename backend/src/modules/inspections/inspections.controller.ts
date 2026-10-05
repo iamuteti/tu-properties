@@ -91,11 +91,7 @@ export class InspectionsController {
   @Roles(...INSPECTION_ROLES)
   @Permissions('leases.update')
   complete(@Param('id') id: string, @Request() req) {
-    return this.inspections.complete(
-      id,
-      requireTenantId(req),
-      getUserId(req),
-    );
+    return this.inspections.complete(id, requireTenantId(req), getUserId(req));
   }
 
   @Delete(':id')

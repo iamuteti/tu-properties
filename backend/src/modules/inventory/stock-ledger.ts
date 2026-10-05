@@ -244,9 +244,10 @@ export function reorderSuggestion(input: ReorderInput): ReorderSuggestion {
   // With no explicit quantity, top up to twice the level — the smallest order
   // that does not immediately re-trip the alert.
   const target = round2(level * 2);
-  const explicit = input.reorderQuantity == null || input.reorderQuantity === ''
-    ? null
-    : round2(num(input.reorderQuantity));
+  const explicit =
+    input.reorderQuantity == null || input.reorderQuantity === ''
+      ? null
+      : round2(num(input.reorderQuantity));
   const suggested =
     explicit !== null
       ? // An explicit quantity wins outright, even when it is smaller than the
@@ -256,7 +257,10 @@ export function reorderSuggestion(input: ReorderInput): ReorderSuggestion {
         Math.max(explicit, 0.01)
       : round2(Math.max(target - onHand, 0.01));
 
-  const cost = input.unitCost == null || input.unitCost === '' ? null : num(input.unitCost);
+  const cost =
+    input.unitCost == null || input.unitCost === ''
+      ? null
+      : num(input.unitCost);
   const estimatedCost = cost === null ? null : round2(suggested * cost);
 
   const reason =
@@ -299,7 +303,8 @@ export function checkMovement(
   if (amount === 0) {
     return {
       allowed: false,
-      reason: 'A stock movement needs a quantity — zero would be a row that changes nothing.',
+      reason:
+        'A stock movement needs a quantity — zero would be a row that changes nothing.',
     };
   }
 

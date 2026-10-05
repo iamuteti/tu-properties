@@ -184,15 +184,18 @@ export class MaintenanceNotificationsService {
           channels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
           dedupeKey: `work-order-status:${workOrder.id}:${workOrder.status}`,
         },
-        portalUser ? { userId: portalUser.id } : { tenantId: workOrder.tenantId },
+        portalUser
+          ? { userId: portalUser.id }
+          : { tenantId: workOrder.tenantId },
       );
     });
   }
 
   private place(workOrder: WorkOrderNotificationSubject): string {
     return (
-      [workOrder.property?.name, workOrder.unit?.name].filter(Boolean).join(' · ') ||
-      'No location given'
+      [workOrder.property?.name, workOrder.unit?.name]
+        .filter(Boolean)
+        .join(' · ') || 'No location given'
     );
   }
 

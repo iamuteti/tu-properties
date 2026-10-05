@@ -9,10 +9,7 @@ import {
   NotificationsService,
   SmsChannelProvider,
 } from './notifications.service';
-import {
-  EmailChannelProvider,
-  SMTP_TRANSPORT_FACTORY,
-} from './email-provider';
+import { EmailChannelProvider, SMTP_TRANSPORT_FACTORY } from './email-provider';
 import { NotificationTriggersService } from './notification-triggers.service';
 import { NotificationConfigService } from './notification-config.service';
 import { SmsProviderRegistry } from './sms-provider-registry';

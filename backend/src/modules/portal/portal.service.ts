@@ -55,7 +55,13 @@ export class PortalService {
             bathrooms: true,
             areaSqFt: true,
             property: {
-              select: { id: true, name: true, code: true, roadStreet: true, estateArea: true },
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                roadStreet: true,
+                estateArea: true,
+              },
             },
           },
         },
@@ -83,7 +89,8 @@ export class PortalService {
         endDate: lease.endDate,
         termMonths: lease.termMonths,
         paymentDay: lease.paymentDay,
-        securityDeposit: lease.securityDeposit != null ? Number(lease.securityDeposit) : null,
+        securityDeposit:
+          lease.securityDeposit != null ? Number(lease.securityDeposit) : null,
         noticePeriodDays: lease.noticePeriodDays,
         unit: lease.unit,
       },
@@ -96,9 +103,15 @@ export class PortalService {
           dueDate: invoice.dueDate,
           status: invoice.status,
           amount: Number(invoice.amount),
-          paid: invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
+          paid: invoice.payments.reduce(
+            (sum, payment) => sum + Number(payment.amount),
+            0,
+          ),
         }))
-        .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()),
+        .sort(
+          (a, b) =>
+            new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime(),
+        ),
     };
   }
 
@@ -148,7 +161,13 @@ export class PortalService {
         // `Receipt` has no `invoice` relation (only payment/receipt-line links),
         // so the portal shows the receipt itself rather than a joined invoice.
         receiptLines: {
-          select: { id: true, particular: true, invNo: true, amtDue: true, payment: true },
+          select: {
+            id: true,
+            particular: true,
+            invNo: true,
+            amtDue: true,
+            payment: true,
+          },
         },
       },
     });
@@ -174,7 +193,9 @@ export class PortalService {
         unit: {
           select: {
             name: true,
-            property: { select: { name: true, roadStreet: true, estateArea: true } },
+            property: {
+              select: { name: true, roadStreet: true, estateArea: true },
+            },
           },
         },
       },
@@ -198,7 +219,9 @@ export class PortalService {
 
     const outstanding = invoices
       .filter((invoice) => invoice.status !== 'PAID')
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+      .sort(
+        (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+      )[0];
 
     return {
       hasLease: true,
@@ -222,7 +245,9 @@ export class PortalService {
           }
         : null,
       daysRemaining: lease.endDate
-        ? Math.ceil((new Date(lease.endDate).getTime() - Date.now()) / 86_400_000)
+        ? Math.ceil(
+            (new Date(lease.endDate).getTime() - Date.now()) / 86_400_000,
+          )
         : null,
     };
   }

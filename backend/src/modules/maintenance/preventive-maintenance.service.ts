@@ -196,7 +196,9 @@ export class PreventiveMaintenanceService {
           ? { checklist: dto.checklist as unknown as Prisma.InputJsonValue }
           : {}),
         ...(dto.assignedTechnicianId
-          ? { assignedTechnician: { connect: { id: dto.assignedTechnicianId } } }
+          ? {
+              assignedTechnician: { connect: { id: dto.assignedTechnicianId } },
+            }
           : {}),
         nextDueAt,
         ...(dto.notes ? { notes: dto.notes.trim() } : {}),
@@ -208,11 +210,7 @@ export class PreventiveMaintenanceService {
     return schedule;
   }
 
-  async update(
-    id: string,
-    dto: UpdatePmScheduleDto,
-    organizationId: string,
-  ) {
+  async update(id: string, dto: UpdatePmScheduleDto, organizationId: string) {
     await this.record(id, organizationId);
     await this.assertTechnician(dto.assignedTechnicianId, organizationId);
 
@@ -237,14 +235,18 @@ export class PreventiveMaintenanceService {
                   : Prisma.DbNull,
             }
           : {}),
-        ...(dto.nextDueAt
-          ? { nextDueAt: dayOf(new Date(dto.nextDueAt)) }
-          : {}),
+        ...(dto.nextDueAt ? { nextDueAt: dayOf(new Date(dto.nextDueAt)) } : {}),
         ...(dto.active !== undefined ? { active: dto.active } : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+        ...(dto.notes !== undefined
+          ? { notes: dto.notes?.trim() || null }
+          : {}),
         ...(dto.assignedTechnicianId !== undefined
           ? dto.assignedTechnicianId
-            ? { assignedTechnician: { connect: { id: dto.assignedTechnicianId } } }
+            ? {
+                assignedTechnician: {
+                  connect: { id: dto.assignedTechnicianId },
+                },
+              }
             : { assignedTechnician: { disconnect: true } }
           : {}),
       },
@@ -261,7 +263,15 @@ export class PreventiveMaintenanceService {
     const open = await this.prisma.workOrder.count({
       where: {
         pmScheduleId: id,
-        status: { in: ['REQUESTED', 'INSPECTION', 'APPROVED', 'ASSIGNED', 'IN_PROGRESS'] },
+        status: {
+          in: [
+            'REQUESTED',
+            'INSPECTION',
+            'APPROVED',
+            'ASSIGNED',
+            'IN_PROGRESS',
+          ],
+        },
       },
     });
 
@@ -291,7 +301,10 @@ export class PreventiveMaintenanceService {
    * without raising everybody's work twice (the unique constraint makes that
    * safe).
    */
-  async runForAllOrganizations(onDate: Date = new Date(), triggeredBy?: string) {
+  async runForAllOrganizations(
+    onDate: Date = new Date(),
+    triggeredBy?: string,
+  ) {
     const organizations = await this.prisma.organization.findMany({
       where: { isActive: true },
       select: { id: true },
@@ -301,7 +314,9 @@ export class PreventiveMaintenanceService {
       ReturnType<PreventiveMaintenanceService['runForOrganization']>
     >[] = [];
     for (const organization of organizations) {
-      results.push(await this.runForOrganization(organization.id, onDate, triggeredBy));
+      results.push(
+        await this.runForOrganization(organization.id, onDate, triggeredBy),
+      );
     }
 
     this.logger.log(
@@ -411,8 +426,7 @@ export class PreventiveMaintenanceService {
         schedulesSkipped: skipped,
         schedulesFailed: failed,
         details: details as Prisma.InputJsonObject,
-        status:
-          failed > 0 ? PmRunStatus.FAILED : PmRunStatus.COMPLETED,
+        status: failed > 0 ? PmRunStatus.FAILED : PmRunStatus.COMPLETED,
         finishedAt: new Date(),
         ...(failed > 0 ? { errorMessage: `${failed} schedule(s) failed` } : {}),
       },
@@ -460,7 +474,10 @@ export class PreventiveMaintenanceService {
       throw new ConflictException(
         `This service is not due until ${windowOpened
           .toISOString()
-          .slice(0, 10)}. It opens ${schedule.leadTimeDays} day(s) early on that date.`,
+          .slice(
+            0,
+            10,
+          )}. It opens ${schedule.leadTimeDays} day(s) early on that date.`,
       );
     }
 
@@ -551,10 +568,7 @@ export class PreventiveMaintenanceService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const reference = await this.nextReference(
-          schedule.organizationId,
-          tx,
-        );
+        const reference = await this.nextReference(schedule.organizationId, tx);
 
         const workOrder = await tx.workOrder.create({
           data: {
@@ -566,7 +580,9 @@ export class PreventiveMaintenanceService {
               `Scheduled preventive maintenance for ${schedule.asset.name}. Due ${dueOn
                 .toISOString()
                 .slice(0, 10)}.`,
-            category: CATEGORY_FOR_ASSET[schedule.asset.type] ?? MaintenanceCategory.OTHER,
+            category:
+              CATEGORY_FOR_ASSET[schedule.asset.type] ??
+              MaintenanceCategory.OTHER,
             // Preventive work is planned, not urgent: raising it as HIGH would
             // train the team to ignore priorities.
             priority: WorkOrderPriority.NORMAL,
@@ -585,7 +601,11 @@ export class PreventiveMaintenanceService {
               },
             },
             ...(schedule.assignedTechnicianId
-              ? { assignedTechnician: { connect: { id: schedule.assignedTechnicianId } } }
+              ? {
+                  assignedTechnician: {
+                    connect: { id: schedule.assignedTechnicianId },
+                  },
+                }
               : {}),
             pmSchedule: { connect: { id: schedule.id } },
             pmDueOn: dueOn,
@@ -617,7 +637,11 @@ export class PreventiveMaintenanceService {
           });
         }
 
-        return { created: true, id: workOrder.id, reference: workOrder.reference };
+        return {
+          created: true,
+          id: workOrder.id,
+          reference: workOrder.reference,
+        };
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -657,7 +681,10 @@ export class PreventiveMaintenanceService {
     );
   }
 
-  private async assertAsset(assetId: string, organizationId: string | undefined) {
+  private async assertAsset(
+    assetId: string,
+    organizationId: string | undefined,
+  ) {
     return requireRecord(
       this.prisma.asset.findFirst({
         where: {
@@ -670,7 +697,10 @@ export class PreventiveMaintenanceService {
     );
   }
 
-  private async assertTechnician(id: string | undefined, organizationId: string | undefined) {
+  private async assertTechnician(
+    id: string | undefined,
+    organizationId: string | undefined,
+  ) {
     if (!id) return;
 
     const technician = await this.prisma.user.findFirst({

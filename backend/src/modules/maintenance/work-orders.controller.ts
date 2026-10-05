@@ -52,7 +52,11 @@ const MAINTENANCE_ROLES = [
   UserRole.TECHNICIAN,
 ];
 
-const VIEW_ROLES = [...MAINTENANCE_ROLES, UserRole.LEASING_OFFICER, UserRole.ACCOUNTANT];
+const VIEW_ROLES = [
+  ...MAINTENANCE_ROLES,
+  UserRole.LEASING_OFFICER,
+  UserRole.ACCOUNTANT,
+];
 
 /**
  * Module 9 — the staff side of maintenance.
@@ -173,11 +177,7 @@ export class WorkOrdersController {
   @Roles(...MAINTENANCE_ROLES)
   @Permissions('work_orders.create')
   create(@Body() dto: CreateWorkOrderDto, @Request() req) {
-    return this.workOrders.create(
-      dto,
-      requireTenantId(req),
-      getUserId(req),
-    );
+    return this.workOrders.create(dto, requireTenantId(req), getUserId(req));
   }
 
   @Patch(':id')

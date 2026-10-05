@@ -1,10 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import {
-  AgreementStatus,
-  Prisma,
-  RecurringRunStatus,
-} from '@prisma/client';
+import { AgreementStatus, Prisma, RecurringRunStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { round2 } from '../invoice-allocation';
@@ -33,7 +29,10 @@ interface LeaseToBill {
   unit?: {
     name: string | null;
     property?: { name: string } | null;
-    serviceCharges?: { serviceUtilityAmenity: string; totalCost: Prisma.Decimal }[];
+    serviceCharges?: {
+      serviceUtilityAmenity: string;
+      totalCost: Prisma.Decimal;
+    }[];
   } | null;
 }
 
@@ -79,9 +78,13 @@ export class RecurringBillingService {
       select: { id: true },
     });
 
-    const results: Awaited<ReturnType<RecurringBillingService['runForOrganization']>>[] = [];
+    const results: Awaited<
+      ReturnType<RecurringBillingService['runForOrganization']>
+    >[] = [];
     for (const organization of organizations) {
-      results.push(await this.runForOrganization(organization.id, onDate, triggeredBy));
+      results.push(
+        await this.runForOrganization(organization.id, onDate, triggeredBy),
+      );
     }
     return results;
   }
@@ -100,7 +103,9 @@ export class RecurringBillingService {
     triggeredBy?: string,
   ) {
     if (!organizationId) {
-      throw new BadRequestException('A tenant scope is required to bill leases');
+      throw new BadRequestException(
+        'A tenant scope is required to bill leases',
+      );
     }
     const billingDate = startOfDay(onDate);
     const billingPeriod = billingPeriodOf(billingDate);
@@ -233,7 +238,8 @@ export class RecurringBillingService {
     if (lease.startDate > periodStart && startOfDay(lease.startDate) > onDate) {
       return 'lease has not started yet';
     }
-    if (lease.endDate && lease.endDate < periodStart) return 'lease had already ended';
+    if (lease.endDate && lease.endDate < periodStart)
+      return 'lease had already ended';
     if (lease.status === AgreementStatus.EXPIRED) return 'lease expired';
     if (Number(lease.rentAmount) <= 0) return 'no rent on the lease';
     return null;
@@ -280,10 +286,7 @@ export class RecurringBillingService {
         // Rent falls due on the day it bills, which is the lease's payment day.
         dueDate: billingDate,
         currency: lease.currency,
-        billTo: [
-          lease.tenant?.surname,
-          lease.tenant?.otherNames,
-        ]
+        billTo: [lease.tenant?.surname, lease.tenant?.otherNames]
           .filter(Boolean)
           .join(' '),
         amount: subtotal,
@@ -311,7 +314,11 @@ export class RecurringBillingService {
     const rate = Number(lease.escalationRate ?? 0);
     const month = billingDate.getMonth() + 1;
 
-    if (rate <= 0 || !lease.escalationMonth || lease.escalationMonth !== month) {
+    if (
+      rate <= 0 ||
+      !lease.escalationMonth ||
+      lease.escalationMonth !== month
+    ) {
       return base;
     }
 
@@ -337,4 +344,3 @@ function startOfDay(date: Date): Date {
   result.setHours(0, 0, 0, 0);
   return result;
 }
-

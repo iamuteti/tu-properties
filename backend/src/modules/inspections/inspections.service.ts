@@ -4,7 +4,11 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { ConditionRating, InspectionStatus, InspectionType } from '@prisma/client';
+import {
+  ConditionRating,
+  InspectionStatus,
+  InspectionType,
+} from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import type {
   CreateInspectionDto,
@@ -94,7 +98,11 @@ export class InspectionsService {
     // deposit dispute decidable: "the walls were marked POOR at move-in".
     const previous = await this.findPrevious(report);
 
-    return { ...report, previous, comparison: compareReports(previous, report) };
+    return {
+      ...report,
+      previous,
+      comparison: compareReports(previous, report),
+    };
   }
 
   async updateItem(
@@ -115,7 +123,9 @@ export class InspectionsService {
     return this.prisma.inspectionItem.update({
       where: { id: item.id },
       data: {
-        ...(dto.condition ? { condition: dto.condition as ConditionRating } : {}),
+        ...(dto.condition
+          ? { condition: dto.condition as ConditionRating }
+          : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
         ...(dto.estimatedCost !== undefined
           ? { estimatedCost: dto.estimatedCost }
@@ -129,7 +139,13 @@ export class InspectionsService {
 
   addItem(
     id: string,
-    item: { area: string; item: string; condition?: string; notes?: string; estimatedCost?: number },
+    item: {
+      area: string;
+      item: string;
+      condition?: string;
+      notes?: string;
+      estimatedCost?: number;
+    },
     tenantId: string,
   ) {
     return this.assertDraft(id, tenantId).then(() =>
@@ -221,9 +237,10 @@ export class InspectionsService {
     return this.prisma.inspectionReport.findFirst({
       where: {
         unitId: report.unitId,
-        type: report.type === InspectionType.MOVE_OUT
-          ? InspectionType.MOVE_IN
-          : report.type,
+        type:
+          report.type === InspectionType.MOVE_OUT
+            ? InspectionType.MOVE_IN
+            : report.type,
         status: InspectionStatus.COMPLETED,
         scheduledDate: { lt: report.scheduledDate },
       },
@@ -235,7 +252,13 @@ export class InspectionsService {
   private include() {
     return {
       items: { orderBy: { area: 'asc' } },
-      unit: { select: { id: true, name: true, property: { select: { id: true, name: true } } } },
+      unit: {
+        select: {
+          id: true,
+          name: true,
+          property: { select: { id: true, name: true } },
+        },
+      },
       rentalAgreement: {
         select: {
           id: true,
@@ -294,7 +317,10 @@ export function compareReports(
 
   const before = new Map<string, ConditionRating>();
   for (const item of previous.items) {
-    before.set(`${item.area.toLowerCase()}|${item.item.toLowerCase()}`, item.condition);
+    before.set(
+      `${item.area.toLowerCase()}|${item.item.toLowerCase()}`,
+      item.condition,
+    );
   }
 
   return current.items
@@ -302,7 +328,8 @@ export function compareReports(
       const key = `${item.area.toLowerCase()}|${item.item.toLowerCase()}`;
       const from = before.get(key) ?? null;
       const worse =
-        from === null || CONDITION_ORDER[item.condition] > CONDITION_ORDER[from];
+        from === null ||
+        CONDITION_ORDER[item.condition] > CONDITION_ORDER[from];
       return {
         area: item.area,
         item: item.item,

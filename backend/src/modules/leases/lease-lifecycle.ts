@@ -61,8 +61,8 @@ export function availableLeaseActions(
   context: LeaseGateContext,
   now: Date = new Date(),
 ): LeaseAction[] {
-  return ACTIONS_BY_STATUS[status].filter((action) =>
-    checkLeaseAction(status, action, context, now).allowed,
+  return ACTIONS_BY_STATUS[status].filter(
+    (action) => checkLeaseAction(status, action, context, now).allowed,
   );
 }
 
@@ -121,7 +121,8 @@ export function checkLeaseAction(
       if (context.moveOutRequested) {
         return {
           allowed: false,
-          reason: 'There is a move-out request on this tenancy — it cannot be renewed.',
+          reason:
+            'There is a move-out request on this tenancy — it cannot be renewed.',
         };
       }
       return { allowed: true };

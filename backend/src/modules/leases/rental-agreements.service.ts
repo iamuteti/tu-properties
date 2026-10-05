@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AgreementStatus, AgreementType, Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
@@ -71,9 +75,19 @@ interface LeaseListRow {
   securityDeposit?: number | string | null;
   startDate: Date;
   endDate?: Date | null;
-  tenant?: { surname?: string | null; otherNames?: string | null; code?: string | null } | null;
-  unit?: { name?: string | null; property?: { name?: string | null } | null } | null;
-  invoices?: Array<{ balanceAmount: number | string; dueDate?: Date | string | null }>;
+  tenant?: {
+    surname?: string | null;
+    otherNames?: string | null;
+    code?: string | null;
+  } | null;
+  unit?: {
+    name?: string | null;
+    property?: { name?: string | null } | null;
+  } | null;
+  invoices?: Array<{
+    balanceAmount: number | string;
+    dueDate?: Date | string | null;
+  }>;
 }
 
 @Injectable()
@@ -103,7 +117,9 @@ export class RentalAgreementsService {
       where: {
         unitId,
         status: { in: [AgreementStatus.DRAFT, AgreementStatus.ACTIVE] },
-        ...(tenantId ? { OR: [{ organizationId: tenantId }, { organizationId: null }] } : {}),
+        ...(tenantId
+          ? { OR: [{ organizationId: tenantId }, { organizationId: null }] }
+          : {}),
       },
       select: { code: true, status: true },
     });
@@ -113,11 +129,15 @@ export class RentalAgreementsService {
       );
     }
 
-    const startDate = scalars.startDate ? new Date(scalars.startDate) : new Date();
+    const startDate = scalars.startDate
+      ? new Date(scalars.startDate)
+      : new Date();
     const endDate = scalars.endDate ? new Date(scalars.endDate) : null;
 
     if (endDate && endDate <= startDate) {
-      throw new BadRequestException('The lease end date must be after its start date.');
+      throw new BadRequestException(
+        'The lease end date must be after its start date.',
+      );
     }
 
     return this.prisma.rentalAgreement.create({
@@ -263,10 +283,15 @@ export class RentalAgreementsService {
   async findOne(id: string, tenantId: string) {
     const lease = await requireRecord(
       this.prisma.rentalAgreement.findFirst({
-        where: { id, OR: [{ organizationId: tenantId }, { organizationId: null }] },
+        where: {
+          id,
+          OR: [{ organizationId: tenantId }, { organizationId: null }],
+        },
         include: {
           ...this.listInclude(),
-          renewedTo: { select: { id: true, code: true, status: true, endDate: true } },
+          renewedTo: {
+            select: { id: true, code: true, status: true, endDate: true },
+          },
           renewedFrom: {
             select: { id: true, code: true, status: true, endDate: true },
           },
@@ -311,7 +336,9 @@ export class RentalAgreementsService {
     const { startDate, endDate, ...scalars } = dto;
 
     if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
-      throw new BadRequestException('The lease end date must be after its start date.');
+      throw new BadRequestException(
+        'The lease end date must be after its start date.',
+      );
     }
 
     return this.prisma.rentalAgreement.update({
@@ -355,7 +382,11 @@ export class RentalAgreementsService {
   /** Activate a drafted lease and hand the unit over to the tenant. */
   async activate(id: string, tenantId: string) {
     const lease = await this.loadForAction(id, tenantId);
-    this.assertAction(lease, 'ACTIVATE', await this.gateContext(lease, tenantId));
+    this.assertAction(
+      lease,
+      'ACTIVATE',
+      await this.gateContext(lease, tenantId),
+    );
 
     const updated = await this.prisma.rentalAgreement.update({
       where: { id },
@@ -503,7 +534,9 @@ export class RentalAgreementsService {
         unitId: lease.unitId,
         status: { in: [AgreementStatus.DRAFT, AgreementStatus.ACTIVE] },
         id: { not: lease.id },
-        ...(tenantId ? { OR: [{ organizationId: tenantId }, { organizationId: null }] } : {}),
+        ...(tenantId
+          ? { OR: [{ organizationId: tenantId }, { organizationId: null }] }
+          : {}),
       },
       select: { id: true },
     });
@@ -616,7 +649,12 @@ export class RentalAgreementsService {
             orderBy: { startDate: 'asc' },
             include: {
               tenant: {
-                select: { id: true, surname: true, otherNames: true, code: true },
+                select: {
+                  id: true,
+                  surname: true,
+                  otherNames: true,
+                  code: true,
+                },
               },
             },
           },
@@ -668,7 +706,8 @@ export class RentalAgreementsService {
           start: previous.end,
           end: current.start,
           vacantDays: Math.round(
-            (current.start.getTime() - previous.end.getTime()) / (24 * 60 * 60 * 1000),
+            (current.start.getTime() - previous.end.getTime()) /
+              (24 * 60 * 60 * 1000),
           ),
         });
       }
@@ -688,8 +727,9 @@ export class RentalAgreementsService {
         ),
         totalVacantDays: gaps.reduce((sum, gap) => sum + gap.vacantDays, 0),
         currentTenant:
-          periods.find((period) => period.agreementStatus === AgreementStatus.ACTIVE)
-            ?.tenant ?? null,
+          periods.find(
+            (period) => period.agreementStatus === AgreementStatus.ACTIVE,
+          )?.tenant ?? null,
       },
     };
   }
@@ -697,7 +737,11 @@ export class RentalAgreementsService {
   // ------------------------------------------------------------------ export
 
   async exportCsv(tenantId: string, filters?: LeaseFilters, search?: string) {
-    const { data } = await this.findAll(tenantId, { limit: 10000, search }, filters);
+    const { data } = await this.findAll(
+      tenantId,
+      { limit: 10000, search },
+      filters,
+    );
 
     const rows = (data as unknown as LeaseListRow[]).map((lease) => {
       const money = this.leaseMoney(lease as never);
@@ -756,7 +800,10 @@ export class RentalAgreementsService {
   private async loadForAction(id: string, tenantId: string) {
     return requireRecord(
       this.prisma.rentalAgreement.findFirst({
-        where: { id, OR: [{ organizationId: tenantId }, { organizationId: null }] },
+        where: {
+          id,
+          OR: [{ organizationId: tenantId }, { organizationId: null }],
+        },
         include: { unit: true, tenant: true },
       }),
       'Lease',
@@ -764,7 +811,13 @@ export class RentalAgreementsService {
   }
 
   private assertAction(
-    lease: { status: AgreementStatus; unitId: string; tenantId: string; startDate: Date; endDate: Date | null },
+    lease: {
+      status: AgreementStatus;
+      unitId: string;
+      tenantId: string;
+      startDate: Date;
+      endDate: Date | null;
+    },
     action: LeaseAction,
     context: LeaseGateContext,
   ) {
@@ -789,7 +842,9 @@ export class RentalAgreementsService {
         unitId: lease.unitId,
         id: { not: (lease as { id?: string }).id ?? '' },
         status: { in: [AgreementStatus.DRAFT, AgreementStatus.ACTIVE] },
-        ...(tenantId ? { OR: [{ organizationId: tenantId }, { organizationId: null }] } : {}),
+        ...(tenantId
+          ? { OR: [{ organizationId: tenantId }, { organizationId: null }] }
+          : {}),
       },
       select: { id: true },
     });
@@ -851,21 +906,37 @@ export class RentalAgreementsService {
 
   /** Advisory notices the detail page shows above the action buttons. */
   private leaseNotices(
-    lease: { status: AgreementStatus; endDate: Date | null; terminatedReason?: string | null },
+    lease: {
+      status: AgreementStatus;
+      endDate: Date | null;
+      terminatedReason?: string | null;
+    },
     context: LeaseGateContext,
   ): string[] {
     const notices: string[] = [];
     const remaining = daysUntilEnd(lease.endDate);
 
-    if (lease.endDate && remaining !== null && remaining <= 0 && lease.status === AgreementStatus.ACTIVE) {
-      notices.push('This lease has passed its end date — expire it to free the unit.');
-    } else if (remaining !== null && remaining <= RENEWAL_WINDOW_DAYS && lease.status === AgreementStatus.ACTIVE) {
+    if (
+      lease.endDate &&
+      remaining !== null &&
+      remaining <= 0 &&
+      lease.status === AgreementStatus.ACTIVE
+    ) {
       notices.push(
-        `Ends in ${remaining} day(s) — renewal is open.`,
+        'This lease has passed its end date — expire it to free the unit.',
       );
+    } else if (
+      remaining !== null &&
+      remaining <= RENEWAL_WINDOW_DAYS &&
+      lease.status === AgreementStatus.ACTIVE
+    ) {
+      notices.push(`Ends in ${remaining} day(s) — renewal is open.`);
     }
 
-    if (context.hasOtherActiveAgreement && lease.status !== AgreementStatus.RENEWED) {
+    if (
+      context.hasOtherActiveAgreement &&
+      lease.status !== AgreementStatus.RENEWED
+    ) {
       notices.push('Another lease is already open on this unit.');
     }
     if (context.moveOutRequested) {

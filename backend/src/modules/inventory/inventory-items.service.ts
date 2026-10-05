@@ -118,7 +118,9 @@ export class InventoryItemsService {
 
     const rows = await this.ledgerRows(items.map((item) => item.id));
 
-    return this.decorate(items, rows).filter((row) => this.matchesStatus(row, filters.status));
+    return this.decorate(items, rows).filter((row) =>
+      this.matchesStatus(row, filters.status),
+    );
   }
 
   async findOne(id: string, organizationId: string | undefined) {
@@ -169,7 +171,8 @@ export class InventoryItemsService {
       movements: movements.map((movement) => ({
         ...movement,
         quantity: num(movement.quantity),
-        unitCost: movement.unitCost == null ? null : round4(num(movement.unitCost)),
+        unitCost:
+          movement.unitCost == null ? null : round4(num(movement.unitCost)),
         balanceAfter: balances.get(movement.id) ?? null,
       })),
       consumedBy: await this.consumingWorkOrders(id, organizationId),
@@ -261,7 +264,8 @@ export class InventoryItemsService {
       belowReorder,
       outOfStock,
       needsReorder: belowReorder + outOfStock,
-      negativeBalances: [...quantities.values()].filter((value) => value < 0).length,
+      negativeBalances: [...quantities.values()].filter((value) => value < 0)
+        .length,
       totalMovements: [...movements.values()].reduce((sum, n) => sum + n, 0),
       /**
        * What the shelf is worth at last known prices. Null when no item has a
@@ -295,7 +299,8 @@ export class InventoryItemsService {
     const rows = items
       .filter((row) => row.reorder.needsReorder)
       .sort((a, b) => {
-        const byShortfall = (b.reorder.shortfall ?? 0) - (a.reorder.shortfall ?? 0);
+        const byShortfall =
+          (b.reorder.shortfall ?? 0) - (a.reorder.shortfall ?? 0);
         if (byShortfall !== 0) return byShortfall;
         return a.name.localeCompare(b.name);
       });
@@ -379,13 +384,18 @@ export class InventoryItemsService {
           description: dto.description?.trim(),
           category: dto.category,
           unitOfMeasure: dto.unitOfMeasure?.trim() || 'unit',
-          unitCost: dto.unitCost == null ? undefined : new Prisma.Decimal(dto.unitCost),
+          unitCost:
+            dto.unitCost == null ? undefined : new Prisma.Decimal(dto.unitCost),
           reorderLevel: new Prisma.Decimal(dto.reorderLevel ?? 0),
           reorderQuantity:
-            dto.reorderQuantity == null ? undefined : new Prisma.Decimal(dto.reorderQuantity),
+            dto.reorderQuantity == null
+              ? undefined
+              : new Prisma.Decimal(dto.reorderQuantity),
           notes: dto.notes?.trim(),
           ...(dto.preferredSupplierId
-            ? { preferredSupplier: { connect: { id: dto.preferredSupplierId } } }
+            ? {
+                preferredSupplier: { connect: { id: dto.preferredSupplierId } },
+              }
             : {}),
         },
       });
@@ -434,7 +444,10 @@ export class InventoryItemsService {
           ? { unitOfMeasure: dto.unitOfMeasure?.trim() || 'unit' }
           : {}),
         ...(dto.unitCost !== undefined
-          ? { unitCost: dto.unitCost == null ? null : new Prisma.Decimal(dto.unitCost) }
+          ? {
+              unitCost:
+                dto.unitCost == null ? null : new Prisma.Decimal(dto.unitCost),
+            }
           : {}),
         ...(dto.reorderLevel !== undefined
           ? { reorderLevel: new Prisma.Decimal(dto.reorderLevel) }
@@ -442,7 +455,9 @@ export class InventoryItemsService {
         ...(dto.reorderQuantity !== undefined
           ? {
               reorderQuantity:
-                dto.reorderQuantity == null ? null : new Prisma.Decimal(dto.reorderQuantity),
+                dto.reorderQuantity == null
+                  ? null
+                  : new Prisma.Decimal(dto.reorderQuantity),
             }
           : {}),
         ...(dto.preferredSupplierId !== undefined
@@ -452,7 +467,9 @@ export class InventoryItemsService {
                 : { disconnect: true },
             }
           : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
+        ...(dto.notes !== undefined
+          ? { notes: dto.notes?.trim() || null }
+          : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
     });
@@ -590,13 +607,13 @@ export class InventoryItemsService {
   }
 
   /**
- * The balance *after* each movement, keyed by id.
- *
- * Reuses `runningBalances` rather than open-coding the accumulation: the
- * `(createdAt, id)` tie-break that makes a same-millisecond pair stable lives in
- * exactly one place, and this is the second reader that needs it.
- */
-private balancesFor(
+   * The balance *after* each movement, keyed by id.
+   *
+   * Reuses `runningBalances` rather than open-coding the accumulation: the
+   * `(createdAt, id)` tie-break that makes a same-millisecond pair stable lives in
+   * exactly one place, and this is the second reader that needs it.
+   */
+  private balancesFor(
     movements: { id: string; quantity: Numeric; createdAt: Date }[],
   ) {
     const balances = new Map<string, number>();

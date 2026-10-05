@@ -174,8 +174,19 @@ describe('lease lifecycle', () => {
     });
 
     it('refuses everything on a closed lease', () => {
-      for (const action of ['RENEW', 'EXTEND', 'TERMINATE', 'EXPIRE', 'ACTIVATE'] as const) {
-        const result = checkLeaseAction(AgreementStatus.RENEWED, action, base, now);
+      for (const action of [
+        'RENEW',
+        'EXTEND',
+        'TERMINATE',
+        'EXPIRE',
+        'ACTIVATE',
+      ] as const) {
+        const result = checkLeaseAction(
+          AgreementStatus.RENEWED,
+          action,
+          base,
+          now,
+        );
         expect(result.allowed).toBe(false);
         expect(result.reason).toMatch(/cannot be/i);
       }
@@ -183,7 +194,8 @@ describe('lease lifecycle', () => {
 
     it('refuses to terminate a renewed or terminated lease', () => {
       expect(
-        checkLeaseAction(AgreementStatus.RENEWED, 'TERMINATE', base, now).allowed,
+        checkLeaseAction(AgreementStatus.RENEWED, 'TERMINATE', base, now)
+          .allowed,
       ).toBe(false);
       expect(
         checkLeaseAction(AgreementStatus.TERMINATED, 'TERMINATE', base, now)
@@ -216,12 +228,18 @@ describe('lease lifecycle', () => {
     });
 
     it('offers nothing on a closed lease', () => {
-      expect(availableLeaseActions(AgreementStatus.TERMINATED, base, now)).toEqual([]);
-      expect(availableLeaseActions(AgreementStatus.RENEWED, base, now)).toEqual([]);
+      expect(
+        availableLeaseActions(AgreementStatus.TERMINATED, base, now),
+      ).toEqual([]);
+      expect(availableLeaseActions(AgreementStatus.RENEWED, base, now)).toEqual(
+        [],
+      );
     });
 
     it('agrees with checkLeaseAction for every status and action', () => {
-      const actions = Object.values(ACTIONS_BY_STATUS[AgreementStatus.DRAFT]).concat(
+      const actions = Object.values(
+        ACTIONS_BY_STATUS[AgreementStatus.DRAFT],
+      ).concat(
         ACTIONS_BY_STATUS[AgreementStatus.ACTIVE],
         ACTIONS_BY_STATUS[AgreementStatus.EXPIRED],
       );

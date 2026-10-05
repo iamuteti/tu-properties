@@ -69,7 +69,10 @@ describe('WorkOrdersService', () => {
     // rules here are "only while it is still X" — a mock that ignores the filter
     // would happily let a withdrawn request be withdrawn twice.
     const rows: any[] = [workOrder()];
-    const matches = (row: Record<string, any>, where: Record<string, any> = {}) =>
+    const matches = (
+      row: Record<string, any>,
+      where: Record<string, any> = {},
+    ) =>
       Object.entries(where).every(([key, value]) => {
         if (value === undefined) return true;
         if (key === 'status' && typeof value === 'object') {
@@ -100,12 +103,13 @@ describe('WorkOrdersService', () => {
           tasks: data.tasks?.create ?? [],
           organizationId: 'org-1',
         };
-        delete (row as any).tasks?.create;
+        delete row.tasks?.create;
         rows.push(row);
         return Promise.resolve(row);
       }),
       update: jest.fn().mockImplementation(({ where, data }: any) => {
-        const row = rows.find((candidate) => candidate.id === where.id) ?? workOrder();
+        const row =
+          rows.find((candidate) => candidate.id === where.id) ?? workOrder();
         Object.assign(row, data);
         return Promise.resolve({ ...row });
       }),
@@ -246,11 +250,7 @@ describe('WorkOrdersService', () => {
     prisma.user.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.assign(
-        'wo-1',
-        { technicianId: 'someone-else' },
-        'org-1',
-      ),
+      service.assign('wo-1', { technicianId: 'someone-else' }, 'org-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -375,9 +375,7 @@ describe('WorkOrdersService', () => {
     );
 
     expect(result.status).toBe(WorkOrderStatus.INSPECTION);
-    expect(result.inspectionNote).toBe(
-      'Failed fill valve, needs replacing.',
-    );
+    expect(result.inspectionNote).toBe('Failed fill valve, needs replacing.');
   });
 
   it('refuses to complete while checklist items are open', async () => {
@@ -401,11 +399,7 @@ describe('WorkOrdersService', () => {
     );
 
     await expect(
-      service.complete(
-        'wo-1',
-        { resolutionNote: '   ' },
-        'org-1',
-      ),
+      service.complete('wo-1', { resolutionNote: '   ' }, 'org-1'),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -477,7 +471,9 @@ describe('WorkOrdersService', () => {
 
   it('reports per-row outcomes when a bulk assign hits an illegal row', async () => {
     prisma.workOrder.findFirst
-      .mockResolvedValueOnce(workOrder({ id: 'wo-1', status: WorkOrderStatus.APPROVED }))
+      .mockResolvedValueOnce(
+        workOrder({ id: 'wo-1', status: WorkOrderStatus.APPROVED }),
+      )
       .mockResolvedValueOnce(
         workOrder({ id: 'wo-2', status: WorkOrderStatus.COMPLETED }),
       );
@@ -529,7 +525,10 @@ describe('WorkOrdersService', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           role: expect.objectContaining({
-            in: expect.arrayContaining([UserRole.TECHNICIAN, UserRole.MAINTENANCE_MANAGER]),
+            in: expect.arrayContaining([
+              UserRole.TECHNICIAN,
+              UserRole.MAINTENANCE_MANAGER,
+            ]),
           }),
         }),
       }),

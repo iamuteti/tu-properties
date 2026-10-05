@@ -126,10 +126,14 @@ export class WorkOrderApprovalsService {
       );
     }
 
-    const workOrder = await this.workOrders.markApproved(context.workOrderId, tx, {
-      actorId: args.decidedById,
-      note: args.comment,
-    });
+    const workOrder = await this.workOrders.markApproved(
+      context.workOrderId,
+      tx,
+      {
+        actorId: args.decidedById,
+        note: args.comment,
+      },
+    );
 
     return {
       workOrderId: workOrder.id,

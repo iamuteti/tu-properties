@@ -32,7 +32,11 @@ const ASSET_ROLES = [
   UserRole.MAINTENANCE_MANAGER,
 ];
 
-const ASSET_VIEW_ROLES = [...ASSET_ROLES, UserRole.TECHNICIAN, UserRole.ACCOUNTANT];
+const ASSET_VIEW_ROLES = [
+  ...ASSET_ROLES,
+  UserRole.TECHNICIAN,
+  UserRole.ACCOUNTANT,
+];
 
 /**
  * The asset register.
@@ -114,11 +118,7 @@ export class AssetsController {
   @Patch(':id')
   @Roles(...ASSET_ROLES)
   @Permissions('assets.update')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateAssetDto,
-    @Request() req,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateAssetDto, @Request() req) {
     return this.assets.update(id, dto, requireTenantId(req));
   }
 
@@ -132,7 +132,7 @@ export class AssetsController {
   ) {
     return this.assets.changeStatus(
       id,
-      dto.status as AssetStatus,
+      dto.status,
       requireTenantId(req),
       getUserId(req),
     );

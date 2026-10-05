@@ -22,10 +22,7 @@ import {
   INVENTORY_WRITE_ROLES as WRITE_ROLES,
 } from './inventory-roles';
 import { WarehousesService } from './warehouses.service';
-import {
-  CreateWarehouseDto,
-  UpdateWarehouseDto,
-} from './dto/inventory.dto';
+import { CreateWarehouseDto, UpdateWarehouseDto } from './dto/inventory.dto';
 
 /**
  * Module 11 — warehouses.

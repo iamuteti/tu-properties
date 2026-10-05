@@ -33,12 +33,7 @@ import { WorkOrdersService } from './work-orders.service';
  * reference. Same one-directional shape as the tenant-request delegation above.
  */
 @Module({
-  imports: [
-    AuditModule,
-    NotificationsModule,
-    WorkflowModule,
-    InventoryModule,
-  ],
+  imports: [AuditModule, NotificationsModule, WorkflowModule, InventoryModule],
   controllers: [
     WorkOrdersController,
     AssetsController,

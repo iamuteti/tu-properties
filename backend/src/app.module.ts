@@ -38,6 +38,7 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { HrModule } from './modules/hr/hr.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -73,13 +74,15 @@ import { SecurityModule } from './security/security.module';
     SalesModule,
     InspectionsModule,
     PortalModule,
-TenantRequestsModule,
+    TenantRequestsModule,
     WorkflowModule,
     MaintenanceModule,
     ProcurementModule,
     // Module 11 — Inventory. Also imported by Procurement and Maintenance, which
     // is the one direction the dependency runs in (see inventory.module.ts).
     InventoryModule,
+    // Module 12 — HR & Payroll. Imports Workflow and Finance; neither imports it.
+    HrModule,
   ],
   controllers: [AppController],
   providers: [

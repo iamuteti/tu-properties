@@ -58,9 +58,11 @@ describe('PreventiveMaintenanceService', () => {
     const models = {
       preventiveMaintenanceSchedule: {
         findMany: jest.fn().mockResolvedValue(rows),
-        findFirst: jest.fn().mockImplementation(({ where }: any) =>
-          Promise.resolve(rows.find((row) => row.id === where.id) ?? null),
-        ),
+        findFirst: jest
+          .fn()
+          .mockImplementation(({ where }: any) =>
+            Promise.resolve(rows.find((row) => row.id === where.id) ?? null),
+          ),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
@@ -88,13 +90,17 @@ describe('PreventiveMaintenanceService', () => {
       },
       workOrderTask: { count: jest.fn().mockResolvedValue(0) },
       asset: {
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ propertyId: 'prop-1' }),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValue({ propertyId: 'prop-1' }),
         update: jest.fn().mockResolvedValue({}),
         groupBy: jest.fn().mockResolvedValue([]),
         findMany: jest.fn().mockResolvedValue([]),
       },
       user: { findFirst: jest.fn().mockResolvedValue({ id: 'tech-1' }) },
-      organization: { findMany: jest.fn().mockResolvedValue([{ id: 'org-1' }]) },
+      organization: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'org-1' }]),
+      },
     };
 
     return {
@@ -176,14 +182,23 @@ describe('PreventiveMaintenanceService', () => {
 
   it('never services a retired asset', async () => {
     await build([
-      schedule({ asset: { id: 'asset-1', name: 'Old lift', type: AssetType.ELEVATOR, status: AssetStatus.RETIRED } }),
+      schedule({
+        asset: {
+          id: 'asset-1',
+          name: 'Old lift',
+          type: AssetType.ELEVATOR,
+          status: AssetStatus.RETIRED,
+        },
+      }),
     ]);
 
     const run = await service.runForOrganization('org-1', today);
 
     expect(prisma.workOrder.create).not.toHaveBeenCalled();
     expect(run.schedulesSkipped).toBe(1);
-    expect(run.details).toMatchObject({ 'pm-1': expect.stringContaining('retired') });
+    expect(run.details).toMatchObject({
+      'pm-1': expect.stringContaining('retired'),
+    });
   });
 
   it('marks the asset as due for service when the work is raised', async () => {
@@ -201,7 +216,9 @@ describe('PreventiveMaintenanceService', () => {
     // The unique (pmScheduleId, pmDueOn) constraint is what actually prevents the
     // second service; the sweep's job is to recognise it and say so.
     prisma.workOrder.create.mockRejectedValueOnce(
-      new Error('Unique constraint failed on the fields: (`pmScheduleId`,`pmDueOn`)'),
+      new Error(
+        'Unique constraint failed on the fields: (`pmScheduleId`,`pmDueOn`)',
+      ),
     );
 
     const run = await service.runForOrganization('org-1', today);

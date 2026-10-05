@@ -11,6 +11,12 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { requireRecord } from '@/common/utils';
+import {
+  bestPerCode,
+  isInForceAt,
+  ruleSpecificity,
+  type Jurisdiction,
+} from '@/common/jurisdiction';
 import { AccountingService } from '../accounting/accounting.service';
 import {
   ApplicableTax,
@@ -148,24 +154,17 @@ export class TaxService {
       include: { compoundsOn: { select: { code: true } } },
     });
 
-    const matching = candidates.filter(
-      (rule) =>
-        rule.validFrom <= at && (rule.validTo === null || rule.validTo > at),
-    );
+    const inForce = candidates.filter((rule) => isInForceAt(rule, at));
 
     // Most specific wins per tax code: org+region beats org+country beats the
-    // shared fallback.
-    const bestByCode = new Map<string, ResolvedRule>();
-    for (const rule of matching) {
-      const score = this.specificity(rule, jurisdiction);
-      const current = bestByCode.get(rule.code);
-      if (!current || score > this.specificity(current, jurisdiction)) {
-        bestByCode.set(rule.code, rule);
-      }
-    }
-
+    // shared fallback. The scoring itself lives in `common/jurisdiction.ts`
+    // because Module 12's payroll engine answers the identical question and two
+    // copies of it would be free to drift — and a wrong score does not throw, it
+    // quietly applies the wrong rate.
     return orderTaxRules(
-      [...bestByCode.values()].map((rule) => this.toApplicable(rule)),
+      bestPerCode(inForce, jurisdiction).map((rule) =>
+        this.toApplicable(rule as ResolvedRule),
+      ),
     );
   }
 
@@ -173,17 +172,7 @@ export class TaxService {
     rule: TaxRuleModel,
     jurisdiction: { countryCode: string | null; regionCode: string | null },
   ): number {
-    let score = 0;
-    if (rule.countryCode && rule.countryCode === jurisdiction.countryCode)
-      score += 2;
-    if (rule.countryCode === null) score -= 1;
-    if (rule.regionCode && rule.regionCode === jurisdiction.regionCode)
-      score += 4;
-    if (rule.regionCode && rule.regionCode !== jurisdiction.regionCode)
-      return -1;
-    // An org-specific rule beats the shared one at the same specificity.
-    if (rule.organizationId) score += 1;
-    return score;
+    return ruleSpecificity(rule, jurisdiction);
   }
 
   private toApplicable(rule: ResolvedRule): ApplicableTax {

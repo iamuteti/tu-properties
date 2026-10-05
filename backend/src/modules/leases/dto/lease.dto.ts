@@ -13,7 +13,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AgreementStatus, AgreementType, DeductionCategory } from '@prisma/client';
+import {
+  AgreementStatus,
+  AgreementType,
+  DeductionCategory,
+} from '@prisma/client';
 import { CleanOptional, ToBoolean, ToNumber } from '@/common/dto/transforms';
 
 /**

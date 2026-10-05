@@ -4,7 +4,11 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { AgreementStatus, TenantRequestStatus, TenantRequestType } from '@prisma/client';
+import {
+  AgreementStatus,
+  TenantRequestStatus,
+  TenantRequestType,
+} from '@prisma/client';
 import { getPortalTenantId, requireRecord } from '@/common/utils';
 import { NotificationTriggersService } from '../notifications/notification-triggers.service';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -66,7 +70,9 @@ export class TenantRequestsService {
       );
     }
 
-    const preferredDate = dto.preferredDate ? new Date(dto.preferredDate) : null;
+    const preferredDate = dto.preferredDate
+      ? new Date(dto.preferredDate)
+      : null;
     const noticeDays = lease.noticePeriodDays ?? 0;
 
     // A flag, not a refusal: the resident may ask to leave early, staff decide.
@@ -158,10 +164,7 @@ export class TenantRequestsService {
       organizationId: string;
       decisionNote: string | null;
     },
-    outcome:
-      | 'REQUEST_APPROVED'
-      | 'REQUEST_REJECTED'
-      | 'REQUEST_WITHDRAWN',
+    outcome: 'REQUEST_APPROVED' | 'REQUEST_REJECTED' | 'REQUEST_WITHDRAWN',
   ) {
     try {
       await this.notificationTriggers.notifyRequestDecision({
@@ -172,7 +175,6 @@ export class TenantRequestsService {
         decisionNote: request.decisionNote,
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.warn(
         `Could not notify tenant ${request.tenantId} about ${outcome}:`,
         error instanceof Error ? error.message : error,
@@ -244,11 +246,8 @@ export class TenantRequestsService {
       );
     }
 
-
     const result =
-      dto.decision === 'APPROVE'
-        ? await this.execute(existing, userId)
-        : null;
+      dto.decision === 'APPROVE' ? await this.execute(existing, userId) : null;
 
     const updated = await this.prisma.tenantRequest.update({
       where: { id },

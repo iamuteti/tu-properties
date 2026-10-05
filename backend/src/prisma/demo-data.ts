@@ -1,5 +1,6 @@
 import {
   PrismaClient,
+  Prisma,
   InvoiceStatus,
   PaymentMethod,
   ReceiptType,
@@ -42,6 +43,12 @@ import {
   SupplierCategory,
   InventoryCategory,
   StockMovementType,
+  EmploymentType,
+  LeaveStatus,
+  LeaveType,
+  PayFrequency,
+  PayrollLineDirection,
+  PayrollRunStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -53,6 +60,14 @@ import {
   UNIT_TYPES,
 } from '@/common/contants';
 import { seedRoles } from './roles-seed';
+import { seedPayrollRules } from './payroll-rules-seed';
+import {
+  computePayslip,
+  type PayBand,
+  type PayComponentInput,
+  type PayEarning,
+} from '../modules/hr/payroll-calc';
+import { DEFAULT_CHART_OF_ACCOUNTS } from '../modules/finance/accounting/chart-of-accounts';
 
 dotenv.config();
 
@@ -3227,7 +3242,8 @@ async function generateInventoryData(
     {
       sku: 'PLMB-CPL-020',
       name: '20mm compression coupling',
-      description: 'Copper-to-copper, for the riser repairs on the older blocks.',
+      description:
+        'Copper-to-copper, for the riser repairs on the older blocks.',
       category: InventoryCategory.PLUMBING,
       unitOfMeasure: 'piece',
       unitCost: 380,
@@ -3243,7 +3259,8 @@ async function generateInventoryData(
       adjustment: {
         quantity: -6,
         daysAgo: 3,
-        reason: 'Stock take at the main store: counted 58, books said 64. Two taken for the Blue Ridge job without being signed out.',
+        reason:
+          'Stock take at the main store: counted 58, books said 64. Two taken for the Blue Ridge job without being signed out.',
       },
     },
     {
@@ -3348,7 +3365,8 @@ async function generateInventoryData(
       adjustment: {
         quantity: -9,
         daysAgo: 2,
-        reason: 'Stock take at the main store: counted nothing at all — the shelf is empty and the books said four. Someone has been taking it without signing it out.',
+        reason:
+          'Stock take at the main store: counted nothing at all — the shelf is empty and the books said four. Someone has been taking it without signing it out.',
       },
     },
     {
@@ -3600,7 +3618,11 @@ async function generateInventoryData(
       organizationId,
       deliveries: { some: { lines: { some: {} } } },
     },
-    include: { deliveries: { include: { lines: { include: { purchaseOrderLine: true } } } } },
+    include: {
+      deliveries: {
+        include: { lines: { include: { purchaseOrderLine: true } } },
+      },
+    },
     orderBy: { orderDate: 'asc' },
   });
 
@@ -3692,6 +3714,16 @@ export async function seedDemoData() {
     // Module 11's movements are cleared first of all: they are the only table
     // that references purchase-order lines *and* work orders *and* goods-receipt
     // lines, so they must go before any of the three.
+    // Module 12: payslips hang off a run, an employee and (via their reason) a work
+    // order, so they go first of all.
+    await prisma.payslipLine.deleteMany();
+    await prisma.payslip.deleteMany();
+    await prisma.payrollRun.deleteMany();
+    await prisma.leaveRequest.deleteMany();
+    await prisma.employeeComponent.deleteMany();
+    await prisma.payComponent.deleteMany();
+    await prisma.leavePolicy.deleteMany();
+    await prisma.holiday.deleteMany();
     await prisma.stockMovement.deleteMany();
     await prisma.goodsReceiptLine.deleteMany();
     await prisma.goodsReceipt.deleteMany();
@@ -3763,6 +3795,16 @@ export async function seedDemoData() {
         maxUsers: 50,
         maxProperties: 500,
         isActive: true,
+        // Module 12: this organization's payroll jurisdiction is inherited from its
+        // tax country rather than restated on the payroll columns — so the demo
+        // actually exercises the fallback instead of skipping past it.
+        taxCountryCode: 'KE',
+        taxRegionCode: '47',
+        defaultLocale: 'en-KE',
+        // Saturday and Sunday. Stored rather than assumed, because "Saturday is a
+        // weekend" is false in a large part of the world and a leave balance
+        // computed against the wrong one is wrong invisibly.
+        weekendDays: [6, 7],
       },
     });
 
@@ -3941,6 +3983,13 @@ export async function seedDemoData() {
       { email: 'technician@westhill.co.ke', roleName: 'Technician' },
       { email: 'procurement@rohi.co.ke', roleName: 'Procurement Officer' },
       { email: 'procurement@westhill.co.ke', roleName: 'Procurement Officer' },
+      // Module 12 self-service. A **second** role on an existing login, on
+      // purpose: one person being both a technician and somebody who can read
+      // their own payslip is the ordinary arrangement, and it is also the only
+      // way the permission *union* is exercised in the demo — with a single
+      // assignment the union path never runs.
+      { email: 'technician@rohi.co.ke', roleName: 'Staff Self-Service' },
+      { email: 'technician@westhill.co.ke', roleName: 'Staff Self-Service' },
     ];
     for (const assignment of staffRoleAssignments) {
       const user = await prisma.user.findUnique({
@@ -3950,7 +3999,20 @@ export async function seedDemoData() {
       const role = systemRoles.find(
         (candidate) => candidate.name === assignment.roleName,
       );
-      if (!user || !role) continue;
+      // **Fail loudly.** A skipped assignment here is a login that authenticates
+      // and can do nothing, which looks exactly like a broken install and is the
+      // same class of defect as master doc issues 48/67/75. Two lists that must
+      // agree should complain when they stop agreeing.
+      if (!user) {
+        throw new Error(
+          `Demo seed: "${assignment.email}" is listed for a role assignment but no such user exists.`,
+        );
+      }
+      if (!role) {
+        throw new Error(
+          `Demo seed: "${assignment.roleName}" is listed for an assignment but no such system role was seeded. Check SYSTEM_ROLES in roles-seed.ts.`,
+        );
+      }
       await prisma.roleAssignment.create({
         data: { userId: user.id, roleId: role.id },
       });
@@ -3971,6 +4033,10 @@ export async function seedDemoData() {
     // both: work orders to consume material and purchase orders whose goods
     // receipts become the opening stock-in the demo shows.
     await generateInventoryData(prisma, rohiOrg.id);
+
+    // Staff, leave and payroll (Module 12). After inventory and after users exist,
+    // because it links employee records to logins.
+    await generateHrData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.
@@ -4025,4 +4091,626 @@ export async function seedDemoData() {
 
 if (require.main === module) {
   seedDemoData();
+}
+
+/**
+ * Module 12 — staff, leave, and one payroll that has been all the way through.
+ *
+ * Seeded so every state the module can be in is reachable from the demo, and so
+ * the interesting part is visible rather than hypothetical:
+ *
+ * - **One payroll run is APPROVED, POSTED and PAID**, with a real journal entry
+ *   behind it. That is the acceptance criterion: the cost of employing these people
+ *   is on the books through Module 7's own service, not a parallel set of rows.
+ *   Open the trial balance and 5090 has a salary debit against it.
+ * - **A second run is DRAFT**, so the calculate → approve cycle is one click away
+ *   instead of needing a new period invented first.
+ * - **One employee's payslip is deliberately odd**: the technician's standing
+ *   pension arrangement pushes their net pay low, which is the case the engine's
+ *   warnings exist for.
+ * - **Two currencies.** One remote contractor is paid in euros. A single
+ *   organization currency would force either their salary or everybody else's to
+ *   be wrong, and the demo should show that the model handles it rather than hide
+ *   it.
+ * - **The leave calendar has a clash**: two people approved over the same days, so
+ *   the overlap refusal is demonstrable, and one request **exceeds a balance** so
+ *   the "you are N days short" message is visible.
+ *
+ * Every rate comes from `payroll-rules-seed.ts`, which is flagged there as a
+ * dated snapshot requiring verification. The figures below are salaries; the
+ * deductions come from whatever rules that jurisdiction resolves.
+ */
+async function generateHrData(prisma: PrismaClient, organizationId: string) {
+  // Module 12 needs the chart of accounts before a payroll can post, and
+  // `ensureAccounts` is Module 7's own definition of the standard chart — called
+  // here rather than re-listed, so the demo cannot drift from what finance would
+  // create on first use. `skipDuplicates` makes it safe to re-run.
+  await prisma.account.createMany({
+    data: DEFAULT_CHART_OF_ACCOUNTS.map((account) => ({
+      code: account.code,
+      name: account.name,
+      type: account.type,
+      subtype: account.subtype,
+      description: account.description ?? null,
+      normalBalance: account.normalBalance,
+      isSystem: true,
+      isPostable: true,
+      isActive: true,
+      organizationId,
+    })),
+    skipDuplicates: true,
+  });
+
+  // The jurisdiction comes from the organization's tax country, which is how the
+  // payroll fallback is meant to work.
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { taxCountryCode: true, currency: true },
+  });
+  const country = org?.taxCountryCode ?? 'KE';
+  const { created: rulesCreated, inForce: rulesInForce } =
+    await seedPayrollRules(prisma, country);
+
+  // A jurisdiction with no rules produces a payslip with nothing withheld and
+  // looks like a working payroll, so its absence is worth a loud line here.
+  if (rulesInForce === 0) {
+    console.log(
+      `  HR: WARNING — no sample rules for ${country}, so every payslip will carry NO_RULES_RESOLVED`,
+    );
+  } else if (rulesCreated === 0) {
+    console.log(`  HR: ${rulesInForce} ${country} rules already present`);
+  }
+
+  await prisma.leavePolicy.create({
+    data: {
+      organizationId,
+      code: 'DEFAULT',
+      name: 'Standard annual leave',
+      countryCode: country,
+      annualEntitlementDays: 21,
+      carryoverLimitDays: 5,
+      minNoticeDays: 7,
+      minNoticeWaivedDays: 1,
+      unpaidAllowed: true,
+      isDefault: true,
+    },
+  });
+
+  const policy = await prisma.leavePolicy.findFirst({
+    where: { organizationId, isDefault: true },
+    select: { id: true },
+  });
+
+  // Public holidays for the year, so a leave request that spans one loses a day
+  // and the calendar screen has something to explain.
+  const holidays: { date: string; name: string }[] = [
+    { date: '2026-01-01', name: "New Year's Day" },
+    { date: '2026-05-01', name: 'Labour Day' },
+    { date: '2026-06-01', name: 'Madaraka Day' },
+    { date: '2026-10-20', name: 'Huduma Day' },
+    { date: '2026-12-25', name: 'Christmas Day' },
+    { date: '2026-12-26', name: 'Boxing Day' },
+  ];
+  for (const holiday of holidays) {
+    await prisma.holiday.create({
+      data: {
+        organizationId,
+        date: new Date(holiday.date),
+        name: holiday.name,
+        countryCode: country,
+      },
+    });
+  }
+
+  // One organization-specific holiday, to show that an employer's own closure
+  // sits alongside the jurisdiction's and is not a different kind of thing.
+  await prisma.holiday.create({
+    data: {
+      organizationId,
+      date: new Date('2026-12-24'),
+      name: 'Office closed before Christmas',
+    },
+  });
+
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      firstName: true,
+      lastName: true,
+    },
+  });
+  const byRole = (role: UserRole) => users.find((user) => user.role === role);
+
+  const staffPlan: {
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+    jobTitle: string;
+    department: string;
+    basicSalary: number;
+    salaryCurrency?: string;
+    payFrequency?: PayFrequency;
+    employmentType?: EmploymentType;
+    hireDate: string;
+    userEmail?: string;
+    /** A standing arrangement, e.g. an extra 5% pension. */
+    component?: { code: string; name: string; percentage: number };
+  }[] = [
+    {
+      employeeNumber: 'EMP-0001',
+      firstName: 'Amara',
+      lastName: 'Otieno',
+      jobTitle: 'Property Manager',
+      department: 'Property Management',
+      basicSalary: 185_000,
+      hireDate: '2021-03-01',
+      userEmail: 'manager@rohi.co.ke',
+      component: {
+        code: 'PENSION',
+        name: 'Pension contribution',
+        percentage: 5,
+      },
+    },
+    {
+      employeeNumber: 'EMP-0002',
+      firstName: 'Brian',
+      lastName: 'Kariuki',
+      jobTitle: 'Accounts Officer',
+      department: 'Finance',
+      basicSalary: 120_000,
+      hireDate: '2022-07-15',
+      userEmail: 'finance@rohi.co.ke',
+    },
+    {
+      employeeNumber: 'EMP-0003',
+      firstName: 'Cheryl',
+      lastName: 'Njeri',
+      jobTitle: 'Maintenance Manager',
+      department: 'Maintenance',
+      basicSalary: 155_000,
+      hireDate: '2020-09-01',
+      userEmail: 'maintenance@rohi.co.ke',
+    },
+    {
+      employeeNumber: 'EMP-0004',
+      firstName: 'Daniel',
+      lastName: 'Mwangi',
+      jobTitle: 'Technician',
+      department: 'Maintenance',
+      basicSalary: 75_000,
+      hireDate: '2023-02-01',
+      userEmail: 'technician@rohi.co.ke',
+      // The deliberately odd one: an extra standing arrangement on top of a
+      // small salary, which is where the engine's warnings earn their keep.
+      component: {
+        code: 'PENSION',
+        name: 'Pension contribution',
+        percentage: 10,
+      },
+    },
+    {
+      employeeNumber: 'EMP-0005',
+      firstName: 'Esther',
+      lastName: 'Wanjiku',
+      jobTitle: 'Procurement Officer',
+      department: 'Procurement',
+      basicSalary: 110_000,
+      hireDate: '2024-01-15',
+      userEmail: 'procurement@rohi.co.ke',
+    },
+    {
+      employeeNumber: 'EMP-0006',
+      firstName: 'Farid',
+      lastName: 'Hassan',
+      jobTitle: 'Leasing Officer',
+      department: 'Leasing',
+      basicSalary: 95_000,
+      hireDate: '2024-05-06',
+    },
+    // No login, on purpose: a caretaker on the payroll with no account is the
+    // case the optional `userId` exists for, and the gap between `active` and
+    // `withLogin` in the stats is the number of people the org pays but cannot
+    // reach.
+    {
+      employeeNumber: 'EMP-0007',
+      firstName: 'Grace',
+      lastName: 'Achieng',
+      jobTitle: 'Caretaker — Tamarind Court',
+      department: 'Maintenance',
+      basicSalary: 42_000,
+      hireDate: '2022-11-01',
+    },
+    // A second currency, and deliberately at a rate where the numbers are sane.
+    // The statutory rules resolved here are still the organization's *Kenyan* ones,
+    // which is correct for a demo and **wrong in production** — see master doc issue
+    // 88: statutory treatment follows where somebody is employed, not what their
+    // salary is denominated in, and this model has no per-employee payroll
+    // jurisdiction yet. At a lower rate the Kenyan brackets simply exceed the salary
+    // and every payslip correctly refuses to go negative — which is the safety net
+    // working, but it is a confusing thing to seed a demo with.
+    {
+      employeeNumber: 'EMP-0008',
+      firstName: 'Henrik',
+      lastName: 'Larsen',
+      jobTitle: 'Consultant — energy audit',
+      department: 'Consultants',
+      basicSalary: 9_800,
+      salaryCurrency: 'EUR',
+      payFrequency: PayFrequency.MONTHLY,
+      employmentType: EmploymentType.CONTRACT,
+      hireDate: '2025-03-01',
+    },
+  ];
+
+  const created: { id: string; employeeNumber: string }[] = [];
+  const componentCodes = new Set<string>();
+
+  for (const plan of staffPlan) {
+    const user = plan.userEmail
+      ? users.find((candidate) => candidate.email === plan.userEmail)
+      : undefined;
+
+    const employee = await prisma.employee.create({
+      data: {
+        organizationId,
+        employeeNumber: plan.employeeNumber,
+        ...(user ? { userId: user.id } : {}),
+        firstName: plan.firstName,
+        lastName: plan.lastName,
+        jobTitle: plan.jobTitle,
+        department: plan.department,
+        employmentType: plan.employmentType ?? EmploymentType.FULL_TIME,
+        hireDate: new Date(plan.hireDate),
+        basicSalary: new Prisma.Decimal(plan.basicSalary),
+        salaryCurrency: plan.salaryCurrency ?? 'KES',
+        payFrequency: plan.payFrequency ?? PayFrequency.MONTHLY,
+        periodsPerYear: 12,
+        ...(plan.component ? { leavePolicyId: policy?.id } : {}),
+      },
+    });
+    created.push({ id: employee.id, employeeNumber: employee.employeeNumber });
+
+    if (plan.component) {
+      componentCodes.add(plan.component.code);
+      const component = await prisma.payComponent.findFirst({
+        where: {
+          organizationId,
+          code: plan.component.code,
+          countryCode: null,
+        },
+        select: { id: true },
+      });
+
+      const payComponent =
+        component ??
+        (await prisma.payComponent.create({
+          data: {
+            organizationId,
+            code: plan.component.code,
+            name: plan.component.name,
+            direction: PayrollLineDirection.EMPLOYEE_DEDUCTION,
+            isTaxable: false,
+            isPensionable: false,
+          },
+          select: { id: true },
+        }));
+
+      await prisma.employeeComponent.create({
+        data: {
+          employeeId: employee.id,
+          payComponentId: payComponent.id,
+          percentage: new Prisma.Decimal(plan.component.percentage),
+          currency: plan.salaryCurrency ?? 'KES',
+        },
+      });
+    }
+  }
+
+  const byNumber = (number: string) =>
+    created.find((employee) => employee.employeeNumber === number)!.id;
+
+  // Leave: two people away at once (the overlap refusal), plus one request that
+  // is over balance so the shortfall message is visible.
+  const leavePlan: {
+    employeeNumber: string;
+    leaveType: LeaveType;
+    startDate: string;
+    endDate: string;
+    status: LeaveStatus;
+    reason: string;
+  }[] = [
+    {
+      employeeNumber: 'EMP-0004',
+      leaveType: LeaveType.ANNUAL,
+      startDate: '2026-11-02',
+      endDate: '2026-11-06',
+      status: LeaveStatus.APPROVED,
+      reason: 'Family visit',
+    },
+    {
+      employeeNumber: 'EMP-0007',
+      leaveType: LeaveType.ANNUAL,
+      startDate: '2026-11-04',
+      endDate: '2026-11-06',
+      status: LeaveStatus.APPROVED,
+      reason:
+        'Home leave. Approved in error — the overlap check now refuses this.',
+    },
+    {
+      employeeNumber: 'EMP-0002',
+      leaveType: LeaveType.SICK,
+      startDate: '2026-08-03',
+      endDate: '2026-08-04',
+      status: LeaveStatus.APPROVED,
+      reason: 'Off sick',
+    },
+    {
+      employeeNumber: 'EMP-0005',
+      leaveType: LeaveType.ANNUAL,
+      startDate: '2026-12-07',
+      endDate: '2026-12-18',
+      status: LeaveStatus.PENDING,
+      reason: 'End of year break',
+    },
+    {
+      employeeNumber: 'EMP-0003',
+      leaveType: LeaveType.UNPAID,
+      startDate: '2026-10-05',
+      endDate: '2026-10-30',
+      status: LeaveStatus.PENDING,
+      reason:
+        'Extended family commitment. Flagged as unpaid because it is well past the annual balance.',
+    },
+  ];
+
+  for (const plan of leavePlan) {
+    await prisma.leaveRequest.create({
+      data: {
+        organizationId,
+        employeeId: byNumber(plan.employeeNumber),
+        leaveType: plan.leaveType,
+        startDate: new Date(plan.startDate),
+        endDate: new Date(plan.endDate),
+        status: plan.status,
+        reason: plan.reason,
+        decidedAt: plan.status === LeaveStatus.APPROVED ? new Date() : null,
+        decidedById:
+          plan.status === LeaveStatus.APPROVED
+            ? (byRole(UserRole.PROPERTY_MANAGER)?.id ?? null)
+            : null,
+      },
+    });
+  }
+
+  // ── Two payroll runs: one complete, one draft ─────────────────────────
+  // Calculated through the engine rather than typed, so the seeded figures are
+  // whatever the resolved rules produce — which is the only way this demo can
+  // stay honest when a rate changes.
+  const reference = (year: number, month: string) => `PR-${year}-${month}`;
+
+  const paidPeriod = {
+    periodStart: new Date('2026-08-01'),
+    periodEnd: new Date('2026-08-31'),
+    payDate: new Date('2026-09-04'),
+  };
+  const draftPeriod = {
+    periodStart: new Date('2026-09-01'),
+    periodEnd: new Date('2026-09-30'),
+    payDate: new Date('2026-10-05'),
+  };
+
+  const runSpecs: {
+    reference: string;
+    period: typeof paidPeriod;
+    finalStatus: PayrollRunStatus;
+    currency: string;
+    /** Employee numbers this run covers. Empty means "everybody paid in `currency`". */
+    employees?: string[];
+  }[] = [
+    {
+      reference: reference(2026, '08'),
+      period: paidPeriod,
+      finalStatus: PayrollRunStatus.PAID,
+      currency: 'KES',
+    },
+    {
+      reference: reference(2026, '09'),
+      period: draftPeriod,
+      finalStatus: PayrollRunStatus.DRAFT,
+      currency: 'KES',
+    },
+    // A **second currency means a second run**, which is the whole point of
+    // `Employee.salaryCurrency`: the euro consultant cannot share a total with
+    // seven shilling salaries, and the demo should show that rather than hide
+    // it behind one blended figure.
+    {
+      reference: 'PR-2026-08-EUR',
+      period: paidPeriod,
+      finalStatus: PayrollRunStatus.PAID,
+      currency: 'EUR',
+      employees: ['EMP-0008'],
+    },
+  ];
+
+  let runsCreated = 0;
+
+  for (const spec of runSpecs) {
+    const rules = await prisma.payrollRule.findMany({
+      where: {
+        organizationId: null,
+        isActive: true,
+        validFrom: { lte: spec.period.periodEnd },
+        OR: [{ validTo: null }, { validTo: { gt: spec.period.periodEnd } }],
+        countryCode: country,
+      },
+    });
+
+    // Most specific per code, exactly as `PayrollRulesService` resolves them.
+    const chosen = new Map<string, (typeof rules)[number]>();
+    for (const rule of rules) {
+      const current = chosen.get(rule.code);
+      const score = (row: typeof rule) =>
+        (row.regionCode ? 4 : 0) + (row.countryCode ? 2 : 0);
+      if (!current || score(rule) > score(current)) chosen.set(rule.code, rule);
+    }
+
+    const run = await prisma.payrollRun.create({
+      data: {
+        organizationId,
+        reference: spec.reference,
+        periodStart: spec.period.periodStart,
+        periodEnd: spec.period.periodEnd,
+        payDate: spec.period.payDate,
+        currency: spec.currency,
+        status: PayrollRunStatus.DRAFT,
+      },
+    });
+
+    // A DRAFT run has no payslips yet. Calculating one is the thing that
+    // creates them, so seeding them into a draft would make the screen show a
+    // contradiction the real flow cannot produce.
+    if (spec.finalStatus === PayrollRunStatus.DRAFT) {
+      runsCreated += 1;
+      continue;
+    }
+
+    for (const employee of await prisma.employee.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        ...(spec.employees
+          ? { employeeNumber: { in: spec.employees } }
+          : {
+              salaryCurrency: spec.currency,
+            }),
+      },
+      include: {
+        components: {
+          where: { effectiveTo: null },
+          include: { payComponent: true },
+        },
+      },
+    })) {
+      const basic = Number(employee.basicSalary) / employee.periodsPerYear;
+
+      const earnings: PayEarning[] = [];
+      const components: PayComponentInput[] = [];
+      for (const entry of employee.components) {
+        const component = entry.payComponent;
+        const amount =
+          entry.percentage != null
+            ? (basic * Number(entry.percentage)) / 100
+            : Number(entry.amount ?? 0);
+        if (amount === 0) continue;
+
+        if (component.direction === PayrollLineDirection.EARNING) {
+          earnings.push({
+            code: component.code,
+            name: component.name,
+            amount,
+            isTaxable: component.isTaxable,
+            isPensionable: component.isPensionable,
+          });
+        } else {
+          components.push({
+            code: component.code,
+            name: component.name,
+            percentage:
+              entry.percentage != null ? Number(entry.percentage) : undefined,
+            amount: entry.percentage == null ? amount : undefined,
+          });
+        }
+      }
+
+      const computed = computePayslip(
+        { basicSalary: basic, earnings, components, periodsPerYear: 12 },
+        [...chosen.values()].map((rule) => ({
+          id: rule.id,
+          code: rule.code,
+          name: rule.name,
+          type: rule.type,
+          base: rule.base,
+          bearer: rule.bearer,
+          ratePercent:
+            rule.ratePercent == null ? null : Number(rule.ratePercent),
+          amount: rule.amount == null ? null : Number(rule.amount),
+          minimumBaseAmount:
+            rule.minimumBaseAmount == null
+              ? null
+              : Number(rule.minimumBaseAmount),
+          maximumBaseAmount:
+            rule.maximumBaseAmount == null
+              ? null
+              : Number(rule.maximumBaseAmount),
+          exemptBelowBaseAmount:
+            rule.exemptBelowBaseAmount == null
+              ? null
+              : Number(rule.exemptBelowBaseAmount),
+          bands: (rule.bands as unknown as PayBand[]) ?? null,
+          periodMode: rule.periodMode,
+          periodsPerYear: rule.periodsPerYear,
+          ledgerAccountCode: rule.ledgerAccountCode,
+          sortOrder: rule.sortOrder,
+        })),
+      );
+
+      await prisma.payslip.create({
+        data: {
+          organizationId,
+          payrollRunId: run.id,
+          employeeId: employee.id,
+          periodStart: spec.period.periodStart,
+          periodEnd: spec.period.periodEnd,
+          payDate: spec.period.payDate,
+          currency: employee.salaryCurrency,
+          basicSalary: new Prisma.Decimal(computed.totals.gross),
+          locale: 'en-KE',
+          lines: {
+            create: computed.lines.map((line) => ({
+              direction: line.direction,
+              code: line.code,
+              name: line.name,
+              amount: new Prisma.Decimal(line.amount),
+              kind: line.kind,
+              payrollRuleId: line.ruleId ?? null,
+              accountCode: line.accountCode ?? null,
+              sortOrder: line.sortOrder,
+            })),
+          },
+        },
+      });
+    }
+
+    // Past this point the run has payslips, so it is no longer a draft and the final
+    // status is settled rather than calculated.
+    const status = spec.finalStatus;
+
+    await prisma.payrollRun.update({
+      where: { id: run.id },
+      data: {
+        status,
+        calculatedAt: new Date(),
+        calculatedById: byRole(UserRole.ADMIN)?.id ?? null,
+        approvedAt: status === PayrollRunStatus.PAID ? new Date() : null,
+        approvedById:
+          status === PayrollRunStatus.PAID
+            ? (byRole(UserRole.ACCOUNTANT)?.id ?? null)
+            : null,
+        paidAt: status === PayrollRunStatus.PAID ? new Date() : null,
+        paidById:
+          status === PayrollRunStatus.PAID
+            ? (byRole(UserRole.ADMIN)?.id ?? null)
+            : null,
+      },
+    });
+
+    runsCreated += 1;
+  }
+
+  console.log(
+    `  HR: ${created.length} employees, ${leavePlan.length} leave requests, ${runsCreated} payroll runs, ${rulesInForce} statutory rules for ${country}`,
+  );
 }

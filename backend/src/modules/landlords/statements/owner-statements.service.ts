@@ -491,7 +491,8 @@ export class OwnerStatementsService {
           netPayout: preview.netPayout,
           notes: dto.notes ?? null,
           incomeLines: preview.incomeLines as unknown as Prisma.InputJsonValue,
-          expenseLines: preview.expenseLines as unknown as Prisma.InputJsonValue,
+          expenseLines:
+            preview.expenseLines as unknown as Prisma.InputJsonValue,
           generatedBy: userId ?? null,
         },
       });

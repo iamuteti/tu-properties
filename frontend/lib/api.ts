@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -2571,4 +2571,377 @@ export const inventoryApi = {
         api.post<{ organizations: number; sent: number }>(
             '/inventory/stock-movements/run-reorder-sweep',
         ),
+};
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 12 — HR & Payroll
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Two permission tiers, and the split is the security design rather than
+ * tidiness — so it is worth knowing before wiring buttons:
+ *
+ * - `employees.view` is the **directory**: names, departments, job titles, start
+ *   dates, and the fact that somebody is paid *in something*. Almost every role.
+ * - `employees.compensation` is salaries, bank details and national identifiers.
+ *   Three roles.
+ *
+ * The backend's `findAll` selects a fixed column list for the directory, so a
+ * salary field cannot leak into it by accident. The UI's job is only to not
+ * offer a compensation control to somebody who will get a 403.
+ */
+/**
+ * Payloads named rather than derived.
+ *
+ * `Parameters<typeof hrApi.createEmployee>[0]` inside the object would make
+ * `hrApi` reference its own initializer, which TypeScript resolves as `any` — and
+ * a client typed `any` defeats the point of typing it at all.
+ */
+type EmployeePayload = {
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+    preferredName?: string;
+    preferredLocale?: string;
+    department?: string;
+    jobTitle?: string;
+    employmentType?: string;
+    hireDate: string;
+    terminationDate?: string;
+    basicSalary: number;
+    salaryCurrency?: string;
+    payFrequency?: string;
+    periodsPerYear?: number;
+    nationalId?: string;
+    taxNumber?: string;
+    socialSecurityNumber?: string;
+    bankAccount?: string;
+    bankName?: string;
+    bankBranch?: string;
+    bankCode?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    leavePolicyId?: string;
+    userId?: string;
+};
+
+type EmployeeComponentPayload = {
+    payComponentId: string;
+    percentage?: number;
+    amount?: number;
+    currency?: string;
+};
+
+type PayrollRulePayload = {
+    code: string;
+    name: string;
+    description?: string;
+    countryCode?: string;
+    regionCode?: string;
+    type?: string;
+    base?: string;
+    bearer?: string;
+    ratePercent?: number;
+    amount?: number;
+    minimumBaseAmount?: number;
+    maximumBaseAmount?: number;
+    exemptBelowBaseAmount?: number;
+    bands?: { upTo?: number | null; ratePercent?: number; amount?: number }[];
+    periodMode?: string;
+    periodsPerYear?: number;
+    sortOrder?: number;
+    ledgerAccountCode?: string;
+    expenseAccountCode?: string;
+    validFrom?: string;
+    validTo?: string;
+};
+
+export const hrApi = {
+    // ── Employees ──────────────────────────────────────────────────────────
+    /**
+     * The directory. Never includes a salary — that is a property of the
+     * backend's query, not of this client.
+     */
+    employees: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<EmployeeRow[]>('/hr/employees', { params }),
+
+    employee: (id: string) => api.get<EmployeeDetail>(`/hr/employees/${id}`),
+
+    /** No salary aggregates on purpose: a dashboard total payroll cost is read by
+     *  people with no business knowing it. */
+    employeeStats: () => api.get<EmployeeStats>('/hr/employees/stats'),
+
+    /** The directory, not the full record — an export leaves the building. */
+    employeesExportUrl: () => `${API_BASE_URL}/hr/employees/export`,
+
+    createEmployee: (data: EmployeePayload) =>
+        api.post<EmployeeDetail>('/hr/employees', data),
+
+    updateEmployee: (
+        id: string,
+        data: Partial<EmployeePayload> & { isActive?: boolean },
+    ) => api.patch<EmployeeDetail>(`/hr/employees/${id}`, data),
+
+    /**
+     * Leaving is a date, not a delete. Payslips reference the employee row and a
+     * payslip is a document somebody may need years later.
+     */
+    terminateEmployee: (id: string, terminationDate: string) =>
+        api.post<{
+            message: string;
+            employeeId: string;
+            terminationDate: string;
+            /** Non-null when a payroll run is open over the leaving date. */
+            openRun: { reference: string; periodEnd: string } | null;
+        }>(`/hr/employees/${id}/terminate`, { terminationDate }),
+
+    /** One-to-one: without it one person could be two employees, paid twice. */
+    linkEmployeeUser: (id: string, userId: string | null) =>
+        api.post<EmployeeDetail>(`/hr/employees/${id}/link-user`, { userId }),
+
+    setEmployeeComponents: (
+        id: string,
+        components: EmployeeComponentPayload[],
+    ) =>
+        api.post<EmployeeDetail>(`/hr/employees/${id}/components`, { components }),
+
+    /**
+     * Would this leave request be granted? Read-only, and it takes an employee id
+     * because this is the *manager* view — the self-service path below has no such
+     * parameter at all.
+     */
+    previewLeave: (
+        employeeId: string,
+        params: { startDate: string; endDate: string; leaveType?: string },
+    ) =>
+        api.get<{
+            allowed: boolean;
+            workingDays: number;
+            totalInYear: number;
+            remaining: number;
+            reason?: string;
+        }>(`/hr/employees/${employeeId}/leave-preview`, { params }),
+
+    // ── Leave ──────────────────────────────────────────────────────────────
+    leaveRequests: (
+        params?: Record<string, string | number | boolean | undefined>,
+    ) => api.get<LeaveRequestRow[]>('/hr/leave', { params }),
+
+    leaveRequest: (id: string) => api.get<LeaveRequestRow>(`/hr/leave/${id}`),
+
+    /**
+     * The working calendar, day by day, each non-working day saying whether it is
+     * a weekend or a named public holiday. This is what answers "why does my
+     * five-day request show as three?" without a support ticket.
+     */
+    leaveCalendar: (params?: { from?: string; to?: string }) =>
+        api.get<LeaveCalendar>('/hr/leave/calendar', { params }),
+
+    leaveBalances: () => api.get<LeaveBalanceRow[]>('/hr/leave/balances'),
+
+    leavePolicies: () => api.get<LeavePolicyRow[]>('/hr/leave/policies'),
+
+    holidays: () => api.get<HolidayRow[]>('/hr/leave/holidays'),
+
+    leaveExportUrl: (params?: Record<string, string | undefined>) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/hr/leave/export${search ? `?${search}` : ''}`;
+    },
+
+    /**
+     * File leave for somebody. `employeeId` is required *here* and is **ignored**
+     * by `createSelfLeave` — which is why there are two methods and not one with an
+     * optional id.
+     */
+    createLeave: (data: {
+        employeeId: string;
+        leaveType?: string;
+        startDate: string;
+        endDate: string;
+        reason?: string;
+    }) => api.post<LeaveRequestRow>('/hr/leave', data),
+
+    /** By hand, for an organization with no approval workflow configured. */
+    approveLeave: (id: string, note?: string) =>
+        api.post<LeaveRequestRow>(`/hr/leave/${id}/approve`, { note }),
+
+    rejectLeave: (id: string, note?: string) =>
+        api.post<LeaveRequestRow>(`/hr/leave/${id}/reject`, { note }),
+
+    /** The employee's own action. A rejected request cannot be cancelled. */
+    cancelLeave: (id: string, note?: string) =>
+        api.post<LeaveRequestRow>(`/hr/leave/${id}/cancel`, { note }),
+
+    // ── Payroll rules ──────────────────────────────────────────────────────
+    /**
+     * Rules in force. Readable by anyone who can see a payslip — configuring a
+     * rule you cannot see is not a thing anybody should have to do.
+     */
+    payrollRules: (params?: Record<string, string | undefined>) =>
+        api.get<PayrollRuleRow[]>('/hr/payroll-rules', { params }),
+
+    /**
+     * Is this jurisdiction configured? Read this before running payroll: a
+     * jurisdiction with no rules pays everybody, withholds nothing, and the run
+     * reports success.
+     */
+    payrollRuleCoverage: () =>
+        api.get<PayrollRuleCoverage>('/hr/payroll-rules/coverage'),
+
+    payrollJurisdiction: () =>
+        api.get<PayrollJurisdiction>('/hr/payroll-rules/jurisdiction'),
+
+    payrollRule: (id: string) => api.get<PayrollRuleRow>(`/hr/payroll-rules/${id}`),
+
+    /**
+     * Run the engine over a hypothetical salary. Read-only, writes nothing, and
+     * works for a jurisdiction the organization does not yet operate in — which is
+     * how you plan a new country.
+     */
+    previewPayroll: (data: {
+        gross: number;
+        basic?: number;
+        periodsPerYear?: number;
+        countryCode?: string;
+        regionCode?: string;
+        at?: string;
+    }) => api.post<PayrollRulePreview>('/hr/payroll-rules/preview', data),
+
+    payrollRulesExportUrl: () => `${API_BASE_URL}/hr/payroll-rules/export`,
+
+    /**
+     * No `amount` for a percentage rule and no `ratePercent` for a fixed one —
+     * the service refuses both, because a rule that computes to zero silently is
+     * the failure this module most needs to prevent.
+     */
+    createPayrollRule: (data: PayrollRulePayload) =>
+        api.post<PayrollRuleRow>('/hr/payroll-rules', data),
+
+    /** Descriptive fields are free; money-moving fields are refused in force. */
+    updatePayrollRule: (
+        id: string,
+        data: Partial<PayrollRulePayload> & { isActive?: boolean },
+    ) => api.patch<PayrollRuleRow>(`/hr/payroll-rules/${id}`, data),
+
+    /** Close a rule off, keeping the payslips that reference it. */
+    retirePayrollRule: (id: string) =>
+        api.post<PayrollRuleRow>(`/hr/payroll-rules/${id}/retire`),
+
+    // ── Payroll runs ───────────────────────────────────────────────────────
+    payrollRuns: (params?: Record<string, string | undefined>) =>
+        api.get<PayrollRunRow[]>('/hr/payroll-runs', { params }),
+
+    payrollRun: (id: string) =>
+        api.get<PayrollRunDetail>(`/hr/payroll-runs/${id}`),
+
+    payslip: (id: string) =>
+        api.get<PayslipDetail>(`/hr/payroll-runs/payslips/${id}`),
+
+    payrollRunsExportUrl: () => `${API_BASE_URL}/hr/payroll-runs/export`,
+
+    /** `employeeIds` narrows the run; omit for every active employee. */
+    createPayrollRun: (data: {
+        reference: string;
+        periodStart: string;
+        periodEnd: string;
+        payDate: string;
+        currency?: string;
+        employeeIds?: string[];
+    }) => api.post<PayrollRunRow & { message: string }>('/hr/payroll-runs', data),
+
+    /**
+     * Replaces any previous calculation rather than adding to it — otherwise a
+     * recalculation pays the difference twice.
+     */
+    calculatePayrollRun: (id: string) =>
+        api.post<{
+            run: PayrollRunRow;
+            coverage: PayrollRuleCoverage;
+            payslips: {
+                employeeId: string;
+                employeeNumber: string;
+                name: string;
+                totals: PayrollTotals;
+                lines: PayslipLineRow[];
+            }[];
+            /** Not employed during the period, or paid in another currency. */
+            skipped: {
+                employeeId: string;
+                employeeNumber: string;
+                reason: string;
+            }[];
+            summary: {
+                payslips: number;
+                currency: string;
+                gross: number;
+                employeeDeductions: number;
+                employerContributions: number;
+                net: number;
+            };
+            warnings: { code: string; message: string }[];
+            skippedWarning: string | null;
+        }>(`/hr/payroll-runs/${id}/calculate`),
+
+    /** Refuses while any payslip would pay nothing or less than nothing. */
+    approvePayrollRun: (id: string) =>
+        api.post<PayrollRunRow & { message: string }>(
+            `/hr/payroll-runs/${id}/approve`,
+        ),
+
+    /** One journal entry for the whole run, through Module 7's service. */
+    postPayrollRun: (id: string) =>
+        api.post<PayrollRunRow & { entryNumber: string; message: string }>(
+            `/hr/payroll-runs/${id}/post`,
+        ),
+
+    /** Requires the run to be posted first. */
+    payPayrollRun: (id: string, paymentReference?: string) =>
+        api.post<PayrollRunRow & { message: string }>(
+            `/hr/payroll-runs/${id}/pay`,
+            { paymentReference },
+        ),
+
+    voidPayrollRun: (id: string, reason: string) =>
+        api.post<PayrollRunRow & { message: string }>(
+            `/hr/payroll-runs/${id}/void`,
+            { reason },
+        ),
+
+    /** A draft has nothing worth keeping; anything calculated is a document. */
+    deletePayrollRun: (id: string) => api.delete<void>(`/hr/payroll-runs/${id}`),
+
+    // ── Self-service ───────────────────────────────────────────────────────
+    //
+    // Every method below resolves the employee from the login. **There is no
+    // employee id on any of them, and that is the feature** — there is no request
+    // this client can make that names somebody else.
+    //
+    // `createSelfLeave` does accept the `employeeId` the shared DTO carries, and
+    // the backend discards it. It is omitted from the type here so a developer
+    // cannot wire a form field to it by accident.
+    me: () => api.get<EmployeeSelf>('/hr/me'),
+
+    myPayslips: () => api.get<PayslipRow[]>('/hr/me/payslips'),
+
+    myPayslip: (id: string) => api.get<PayslipDetail>(`/hr/me/payslips/${id}`),
+
+    myLeave: (params?: Record<string, string | undefined>) =>
+        api.get<LeaveRequestRow[]>('/hr/me/leave', { params }),
+
+    myLeaveBalance: () =>
+        api.get<NonNullable<LeaveRequestRow['balance']>>('/hr/me/leave-balance'),
+
+    createSelfLeave: (data: {
+        leaveType?: string;
+        startDate: string;
+        endDate: string;
+        reason?: string;
+    }) => api.post<LeaveRequestRow & { note?: string }>('/hr/me/leave', data),
+
+    cancelSelfLeave: (id: string, note?: string) =>
+        api.post<LeaveRequestRow>(`/hr/me/leave/${id}/cancel`, { note }),
 };

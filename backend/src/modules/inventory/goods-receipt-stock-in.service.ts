@@ -53,7 +53,10 @@ export class GoodsReceiptStockInService {
   ) {
     const order = await requireRecord(
       this.prisma.purchaseOrder.findFirst({
-        where: { id: purchaseOrderId, ...(organizationId ? { organizationId } : {}) },
+        where: {
+          id: purchaseOrderId,
+          ...(organizationId ? { organizationId } : {}),
+        },
         include: {
           deliveries: {
             include: {
@@ -70,7 +73,12 @@ export class GoodsReceiptStockInService {
                     },
                   },
                   inventoryItem: {
-                    select: { id: true, sku: true, name: true, unitOfMeasure: true },
+                    select: {
+                      id: true,
+                      sku: true,
+                      name: true,
+                      unitOfMeasure: true,
+                    },
                   },
                   stockMovement: {
                     select: { id: true, createdAt: true, warehouseId: true },
@@ -213,7 +221,13 @@ export class GoodsReceiptStockInService {
       const item = await requireRecord(
         this.prisma.inventoryItem.findFirst({
           where: { id: requested.inventoryItemId, organizationId },
-          select: { id: true, sku: true, name: true, isActive: true, unitOfMeasure: true },
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            isActive: true,
+            unitOfMeasure: true,
+          },
         }),
         'Inventory item',
       );
@@ -314,10 +328,7 @@ export class GoodsReceiptStockInService {
    * phone, a printer. Recording it as "not stock" is honest, and it stops the same
    * line being raised as a question every morning for the life of the order.
    */
-  async markNotStock(
-    goodsReceiptLineId: string,
-    organizationId: string,
-  ) {
+  async markNotStock(goodsReceiptLineId: string, organizationId: string) {
     const line = await requireRecord(
       this.prisma.goodsReceiptLine.findFirst({
         where: { id: goodsReceiptLineId, organizationId },

@@ -132,31 +132,34 @@ export class InventoryNotificationsService {
       if (!suggestion.needsReorder) continue;
 
       for (const recipient of recipients) {
-        const results = await this.safely(
-          `reorder sweep for ${item.sku}`,
-          () =>
-            this.notifications.notify(
-              {
-                organizationId,
-                type: NotificationType.STOCK_LOW,
-                priority:
-                  suggestion.status === 'OUT_OF_STOCK'
-                    ? NotificationPriority.HIGH
-                    : NotificationPriority.NORMAL,
-                title:
-                  suggestion.status === 'OUT_OF_STOCK'
-                    ? `Out of stock: ${item.name}`
-                    : `Below reorder level: ${item.name}`,
-                body: this.body(item.sku, item.name, suggestion, item.preferredSupplier?.name),
-                entityType: 'InventoryItem',
-                entityId: item.id,
-                actionUrl: '/inventory/items',
-                channels: [NotificationChannel.IN_APP],
-                // Once a day per item per recipient, and only while it is low.
-                dedupeKey: `stock-low:${item.id}:${day}:${recipient.id}`,
-              },
-              { userId: recipient.id },
-            ),
+        const results = await this.safely(`reorder sweep for ${item.sku}`, () =>
+          this.notifications.notify(
+            {
+              organizationId,
+              type: NotificationType.STOCK_LOW,
+              priority:
+                suggestion.status === 'OUT_OF_STOCK'
+                  ? NotificationPriority.HIGH
+                  : NotificationPriority.NORMAL,
+              title:
+                suggestion.status === 'OUT_OF_STOCK'
+                  ? `Out of stock: ${item.name}`
+                  : `Below reorder level: ${item.name}`,
+              body: this.body(
+                item.sku,
+                item.name,
+                suggestion,
+                item.preferredSupplier?.name,
+              ),
+              entityType: 'InventoryItem',
+              entityId: item.id,
+              actionUrl: '/inventory/items',
+              channels: [NotificationChannel.IN_APP],
+              // Once a day per item per recipient, and only while it is low.
+              dedupeKey: `stock-low:${item.id}:${day}:${recipient.id}`,
+            },
+            { userId: recipient.id },
+          ),
         );
 
         if (results?.some((result) => result.status === 'SENT')) sent += 1;
@@ -216,39 +219,37 @@ export class InventoryNotificationsService {
     if (recipients.length === 0) return;
 
     for (const recipient of recipients) {
-      await this.safely(
-        `post-movement reorder alert for ${item.sku}`,
-        () =>
-          this.notifications.notify(
-            {
-              organizationId: movement.organizationId,
-              type: NotificationType.STOCK_LOW,
-              priority:
-                suggestion.status === 'OUT_OF_STOCK'
-                  ? NotificationPriority.HIGH
-                  : NotificationPriority.NORMAL,
-              title:
-                suggestion.status === 'OUT_OF_STOCK'
-                  ? `Out of stock: ${item.name}`
-                  : `Below reorder level: ${item.name}`,
-              body: this.body(
-                item.sku,
-                item.name,
-                suggestion,
-                item.preferredSupplier?.name,
-              ),
-              entityType: 'InventoryItem',
-              entityId: item.id,
-              actionUrl: '/inventory/items',
-              channels: [NotificationChannel.IN_APP],
-              // Keyed by the *day*, not the movement: twenty issues of the same
-              // item in one afternoon is one fact ("we are low"), not twenty.
-              dedupeKey: `stock-low:${item.id}:${new Date()
-                .toISOString()
-                .slice(0, 10)}:${recipient.id}`,
-            },
-            { userId: recipient.id },
-          ),
+      await this.safely(`post-movement reorder alert for ${item.sku}`, () =>
+        this.notifications.notify(
+          {
+            organizationId: movement.organizationId,
+            type: NotificationType.STOCK_LOW,
+            priority:
+              suggestion.status === 'OUT_OF_STOCK'
+                ? NotificationPriority.HIGH
+                : NotificationPriority.NORMAL,
+            title:
+              suggestion.status === 'OUT_OF_STOCK'
+                ? `Out of stock: ${item.name}`
+                : `Below reorder level: ${item.name}`,
+            body: this.body(
+              item.sku,
+              item.name,
+              suggestion,
+              item.preferredSupplier?.name,
+            ),
+            entityType: 'InventoryItem',
+            entityId: item.id,
+            actionUrl: '/inventory/items',
+            channels: [NotificationChannel.IN_APP],
+            // Keyed by the *day*, not the movement: twenty issues of the same
+            // item in one afternoon is one fact ("we are low"), not twenty.
+            dedupeKey: `stock-low:${item.id}:${new Date()
+              .toISOString()
+              .slice(0, 10)}:${recipient.id}`,
+          },
+          { userId: recipient.id },
+        ),
       );
     }
   }
@@ -345,7 +346,10 @@ export class InventoryNotificationsService {
    * swallowed silently: a run of failures is a broken provider, and that is worth
    * seeing in the logs.
    */
-  private async safely<T>(what: string, action: () => Promise<T>): Promise<T | null> {
+  private async safely<T>(
+    what: string,
+    action: () => Promise<T>,
+  ): Promise<T | null> {
     try {
       return await action();
     } catch (error) {

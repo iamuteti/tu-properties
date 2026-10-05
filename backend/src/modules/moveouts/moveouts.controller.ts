@@ -89,7 +89,10 @@ export class MoveoutsController {
   ) {
     return this.moveoutsService.update(
       id,
-      { ...dto, ...(dto.moveoutDate ? { moveoutDate: new Date(dto.moveoutDate) } : {}) },
+      {
+        ...dto,
+        ...(dto.moveoutDate ? { moveoutDate: new Date(dto.moveoutDate) } : {}),
+      },
       requireTenantId(req),
     );
   }
@@ -97,11 +100,17 @@ export class MoveoutsController {
   @Post(':id/approve')
   @Roles(...MOVE_OUT_ROLES)
   @Permissions('leases.update')
-  approve(@Param('id') id: string, @Body() dto: ApproveMoveOutDto, @Request() req) {
+  approve(
+    @Param('id') id: string,
+    @Body() dto: ApproveMoveOutDto,
+    @Request() req,
+  ) {
     return this.moveoutsService.approve(
       id,
       {
-        ...(dto.approvedDate ? { approvedDate: new Date(dto.approvedDate) } : {}),
+        ...(dto.approvedDate
+          ? { approvedDate: new Date(dto.approvedDate) }
+          : {}),
         ...(dto.notes ? { notes: dto.notes } : {}),
       },
       requireTenantId(req),

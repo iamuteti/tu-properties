@@ -90,7 +90,10 @@ export class PortalRequestsController {
   }
 
   @Post()
-  create(@Body() dto: import('./dto/tenant-request.dto').CreateTenantRequestDto, @Request() req) {
+  create(
+    @Body() dto: import('./dto/tenant-request.dto').CreateTenantRequestDto,
+    @Request() req,
+  ) {
     return this.requests.createFromPortal(dto, req);
   }
 

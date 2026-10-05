@@ -45,10 +45,7 @@ export class PayablesController {
   @Post('suppliers')
   @Permissions('payables.create')
   createSupplier(@Body() body: Record<string, never>, @Request() req) {
-    return this.payablesService.createSupplier(
-      body as never,
-      getTenantId(req),
-    );
+    return this.payablesService.createSupplier(body as never, getTenantId(req));
   }
 
   @Patch('suppliers/:id')

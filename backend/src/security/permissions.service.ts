@@ -51,14 +51,7 @@ export class PermissionsService {
           assignments.map((a) => this.parse(a.role.permissions)),
         );
       } else {
-        const systemRoleName =
-          LEGACY_ROLE_TO_SYSTEM_ROLE[legacyRole ?? ''] ?? 'Tenant';
-        const role = await this.prisma.role.findFirst({
-          where: { name: systemRoleName, organizationId: null },
-        });
-        perms = role
-          ? this.parse(role.permissions)
-          : { all: false, modules: {} };
+        perms = await this.permissionsFromLegacyEnum(legacyRole, userId);
       }
     } catch (err) {
       // Fail closed: on a lookup error treat the user as having no
@@ -97,6 +90,65 @@ export class PermissionsService {
   /** Drop the cached permission set (call after changing a user's roles). */
   invalidate(userId: string) {
     this.cache.delete(userId);
+  }
+
+  /**
+   * Fall back to the legacy `UserRole` enum when a user has no `RoleAssignment`.
+   *
+   * This existed to keep pre-structured-role data working, and it is the only place
+   * a permission set can arrive as a silent empty object for a reason nobody
+   * wrote down. Three distinct outcomes, all of which used to look identical from
+   * the outside:
+   *
+   * 1. The enum maps to a role that exists — normal.
+   * 2. The enum has **no mapping at all**. Legitimate and expected: `EMPLOYEE` is
+   *    deliberately unmapped, because the self-service role is named 'Staff
+   *    Self-Service' rather than after the enum, and self-service must be granted
+   *    explicitly. Logged at `log` so the log stays worth reading.
+   * 3. The enum **maps to a role that does not exist** — a typo, or a role that was
+   *    renamed or deleted. That is a real defect and gets a `warn` naming both
+   *    halves, because "this user can do nothing" is otherwise indistinguishable
+   *    from a broken install.
+   *
+   * Note what this no longer does: it used to default to the `Tenant` role for an
+   * unrecognised enum. That default handed tenant-level read access to anyone whose
+   * role was merely unknown — including a user carrying `HR_MANAGER`, which is a
+   * real seeded role that had no map entry. Unknown now means denied.
+   */
+  private async permissionsFromLegacyEnum(
+    legacyRole: string | null | undefined,
+    userId: string,
+  ): Promise<PermissionSet> {
+    if (!legacyRole) {
+      return { all: false, modules: {} };
+    }
+
+    const mapped = LEGACY_ROLE_TO_SYSTEM_ROLE[legacyRole];
+
+    if (!mapped) {
+      this.logger.log(
+        `User ${userId} carries UserRole.${legacyRole}, which has no entry in ` +
+          `LEGACY_ROLE_TO_SYSTEM_ROLE. Denied until a RoleAssignment is created for ` +
+          `them. If that is wrong, assign the role directly rather than adding a map entry.`,
+      );
+      return { all: false, modules: {} };
+    }
+
+    const role = await this.prisma.role.findFirst({
+      where: { name: mapped, organizationId: null },
+      select: { permissions: true },
+    });
+
+    if (!role) {
+      this.logger.warn(
+        `UserRole.${legacyRole} maps to the system role "${mapped}", which does not ` +
+          `exist. User ${userId} has been denied everything — check ` +
+          `LEGACY_ROLE_TO_SYSTEM_ROLE in roles-seed.ts, or assign them a role directly.`,
+      );
+      return { all: false, modules: {} };
+    }
+
+    return this.parse(role.permissions);
   }
 
   private parse(value: unknown): PermissionSet {

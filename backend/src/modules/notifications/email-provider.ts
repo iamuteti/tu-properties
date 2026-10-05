@@ -144,7 +144,9 @@ export class EmailChannelProvider implements NotificationChannelProvider {
 
     const credentials = active.credentials as unknown as SmtpCredentials;
     try {
-      const transport = (this.createTransport ?? defaultTransportFactory)(credentials);
+      const transport = (this.createTransport ?? defaultTransportFactory)(
+        credentials,
+      );
       await transport.sendMail({
         from: credentials.from,
         to: target,
@@ -192,7 +194,9 @@ export class EmailChannelProvider implements NotificationChannelProvider {
 
     const credentials = config as unknown as SmtpCredentials;
     try {
-      const transport = (this.createTransport ?? defaultTransportFactory)(credentials);
+      const transport = (this.createTransport ?? defaultTransportFactory)(
+        credentials,
+      );
       await transport.sendMail({
         from: credentials.from,
         to,

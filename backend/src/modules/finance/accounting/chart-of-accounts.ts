@@ -137,6 +137,51 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
     type: AccountType.LIABILITY,
     subtype: 'Current Liability',
     normalBalance: BalanceSide.CREDIT,
+    description:
+      'Income tax withheld from employees and owed to the authority. Named for the instrument most jurisdictions know it by; see 2310 for the country-neutral version.',
+  },
+  {
+    code: '2310',
+    name: 'Statutory Contributions Payable',
+    type: AccountType.LIABILITY,
+    subtype: 'Current Liability',
+    normalBalance: BalanceSide.CREDIT,
+    description:
+      "Employee and employer statutory contributions held for an authority — social insurance, health funds, pension. Deliberately named generically rather than after one country's scheme: a payroll configured for Kenya and one configured for Kenya and Germany both post here, and a rule picks its own account code if it needs to be more specific.",
+  },
+  {
+    code: '2320',
+    name: 'Social Insurance Payable',
+    type: AccountType.LIABILITY,
+    subtype: 'Current Liability',
+    normalBalance: BalanceSide.CREDIT,
+    description:
+      'Health and social-insurance contributions, where they need separating from pension liabilities on a remittance advice.',
+  },
+  {
+    code: '2330',
+    name: 'Payroll Levy Payable',
+    type: AccountType.LIABILITY,
+    subtype: 'Current Liability',
+    normalBalance: BalanceSide.CREDIT,
+    description:
+      'Employer-only payroll levies that are not a contribution — a housing or development levy, for instance. Kept apart from 2310 because nothing is ever withheld from an employee for it, and merging the two would make a remittance advice unreadable.',
+  },
+  {
+    code: '2340',
+    name: 'Net Pay Payable',
+    type: AccountType.LIABILITY,
+    subtype: 'Current Liability',
+    normalBalance: BalanceSide.CREDIT,
+    description:
+      'What the organization owes its own staff after everything has been ' +
+      'withheld — the amount still to be paid out of the payroll run. Kept ' +
+      'separate from 2310/2320/2330 because that money belongs to an ' +
+      'authority and this does not: an employee debit is ours, a statutory ' +
+      'liability is not, and a remittance that cannot tell them apart is ' +
+      'worth nothing. Module 12 originally pointed net pay at 2310, where the ' +
+      'NSSF rule also posts, so the two merged into one account and the credit ' +
+      'for net pay vanished into the middle of the social fund.',
   },
   {
     code: '2400',
@@ -376,6 +421,14 @@ export const ACCOUNT_CODES = {
   WHT_PAYABLE: '2200',
   SECURITY_DEPOSITS_HELD: '2400',
   RENT_HELD_FOR_LANDLORDS: '2500',
+  // Module 12 — HR & Payroll. See `2310`/`2320`/`2330` for why these three are
+  // named generically rather than after one country's scheme, and `2340` for why
+  // the organization's own debt to its staff cannot share an account with money
+  // owed to an authority.
+  STATUTORY_CONTRIBUTIONS_PAYABLE: '2310',
+  SOCIAL_INSURANCE_PAYABLE: '2320',
+  PAYROLL_LEVY_PAYABLE: '2330',
+  NET_PAY_PAYABLE: '2340',
   RENT_INCOME: '4000',
   SALE_OF_PROPERTY_INCOME: '4100',
   SERVICE_CHARGE_INCOME: '4010',

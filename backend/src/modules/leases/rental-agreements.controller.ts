@@ -82,7 +82,13 @@ export class RentalAgreementsController {
       sortBy,
       sortOrder,
     };
-    const filters: LeaseFilters = { status, agreementType, unitId, tenantId, propertyId };
+    const filters: LeaseFilters = {
+      status,
+      agreementType,
+      unitId,
+      tenantId,
+      propertyId,
+    };
     return this.leasesService.findAll(requireTenantId(req), params, filters);
   }
 
@@ -173,7 +179,11 @@ export class RentalAgreementsController {
   @Post(':id/terminate')
   @Roles(...LEASE_WRITE_ROLES)
   @Permissions('leases.update')
-  terminate(@Param('id') id: string, @Body() dto: TerminateLeaseDto, @Request() req) {
+  terminate(
+    @Param('id') id: string,
+    @Body() dto: TerminateLeaseDto,
+    @Request() req,
+  ) {
     return this.leasesService.terminate(id, dto, requireTenantId(req));
   }
 
@@ -235,4 +245,3 @@ export class LeaseTemplatesController {
     return this.templates.remove(id, requireTenantId(req));
   }
 }
-

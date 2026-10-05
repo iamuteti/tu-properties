@@ -1,15 +1,11 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Req,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { TenantPortalGuard } from '@/security/guards/tenant-portal.guard';
-import { FILE_STORAGE, FileStorage } from '@/modules/documents/storage/file-storage.interface';
+import {
+  FILE_STORAGE,
+  FileStorage,
+} from '@/modules/documents/storage/file-storage.interface';
 import { Inject } from '@nestjs/common';
 import { PortalService } from './portal.service';
 

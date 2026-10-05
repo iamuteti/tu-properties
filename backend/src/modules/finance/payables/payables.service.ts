@@ -101,8 +101,7 @@ export class PayablesService {
     }
     return this.prisma.$transaction(async (tx) => {
       const code =
-        data.code?.trim() ||
-        (await this.nextSupplierCode(tenantId, tx));
+        data.code?.trim() || (await this.nextSupplierCode(tenantId, tx));
       return tx.supplier.create({
         data: {
           ...data,
@@ -231,7 +230,9 @@ export class PayablesService {
       throw new BadRequestException('A bill needs at least one line');
     }
     if (!tenantId) {
-      throw new BadRequestException('A tenant scope is required to record a bill');
+      throw new BadRequestException(
+        'A tenant scope is required to record a bill',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -259,7 +260,9 @@ export class PayablesService {
         description: line.description?.trim() || 'Undescribed charge',
         quantity: line.quantity ?? 1,
         unitPrice: round2(Number(line.unitPrice)),
-        amount: round2(line.amount ?? Number(line.quantity ?? 1) * Number(line.unitPrice)),
+        amount: round2(
+          line.amount ?? Number(line.quantity ?? 1) * Number(line.unitPrice),
+        ),
         taxRate: line.taxRate ?? null,
         taxAmount: line.taxAmount ?? null,
         expenseAccountCode: line.expenseAccountCode ?? null,
@@ -273,9 +276,7 @@ export class PayablesService {
       const shouldPrice =
         (data.calculateTax ?? true) && data.taxAmount === undefined;
 
-      let priced:
-        | Awaited<ReturnType<TaxService['computeFor']>>
-        | undefined;
+      let priced: Awaited<ReturnType<TaxService['computeFor']>> | undefined;
       if (shouldPrice) {
         priced = await this.taxService.computeFor(
           tenantId,
@@ -399,7 +400,10 @@ export class PayablesService {
       include: {
         supplier: true,
         lines: true,
-        payments: { where: { isReversed: false }, orderBy: { paymentDate: 'desc' } },
+        payments: {
+          where: { isReversed: false },
+          orderBy: { paymentDate: 'desc' },
+        },
       },
       orderBy: [{ billDate: 'desc' }],
       take: Math.min(filters?.limit ?? 100, 500),
@@ -429,7 +433,9 @@ export class PayablesService {
    */
   async voidBill(id: string, tenantId?: string, voidedBy?: string) {
     if (!tenantId) {
-      throw new BadRequestException('A tenant scope is required to void a bill');
+      throw new BadRequestException(
+        'A tenant scope is required to void a bill',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -441,7 +447,9 @@ export class PayablesService {
         'Bill',
       );
       if (bill.status === BillStatus.VOID) {
-        throw new BadRequestException(`Bill ${bill.billNumber} is already void`);
+        throw new BadRequestException(
+          `Bill ${bill.billNumber} is already void`,
+        );
       }
       if (bill.payments.length > 0) {
         throw new BadRequestException(
@@ -648,7 +656,9 @@ export class PayablesService {
         Number(payment.amount) - Number(payment.appliedAmount),
       );
       if (remaining <= 0) {
-        throw new BadRequestException('This payment is already fully allocated');
+        throw new BadRequestException(
+          'This payment is already fully allocated',
+        );
       }
 
       const bills = options?.billIds?.length
@@ -939,13 +949,19 @@ export class PayablesService {
     };
     const bySupplier = new Map<
       string,
-      { supplierId: string; supplierName: string; total: number; overdue: number }
+      {
+        supplierId: string;
+        supplierName: string;
+        total: number;
+        overdue: number;
+      }
     >();
 
     for (const bill of bills) {
       const balance = round2(Number(bill.balanceAmount));
       const daysOverdue = Math.floor(
-        (asOf.getTime() - new Date(bill.dueDate).getTime()) / (24 * 60 * 60 * 1000),
+        (asOf.getTime() - new Date(bill.dueDate).getTime()) /
+          (24 * 60 * 60 * 1000),
       );
       if (daysOverdue <= 0) buckets.current = round2(buckets.current + balance);
       else if (daysOverdue <= 30)

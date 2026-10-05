@@ -51,6 +51,12 @@ Receipt,
     Package,
     Warehouse,
     ArrowLeftRight,
+    // Module 12 — HR & Payroll. `Calendar` for leave, `Wallet` for the run, and
+    // `Calculator` for the statutory rules, which is the screen where somebody
+    // works out what a rule does rather than looking at a record of it.
+    Calendar,
+    Wallet,
+    Calculator,
 } from "lucide-react";
 
 type UserRole =
@@ -62,7 +68,9 @@ type UserRole =
     | 'TECHNICIAN'
     | 'PROCUREMENT_OFFICER'
     | 'ACCOUNTANT'
-    | 'USER';
+    | 'USER'
+    | 'HR_MANAGER'
+    | 'EMPLOYEE';
 
 interface NavItem {
     href?: string;
@@ -190,6 +198,33 @@ const navItems: NavItem[] = [
         ]
     },
 
+    /**
+     * Module 12. Every role list here is the backend's, copied rather than guessed —
+     * `HR_VIEW_ROLES`, `HR_APPROVER_ROLES` and `HR_PAYROLL_ROLES` in
+     * `backend/src/modules/hr/hr-roles.ts` — and they are deliberately **not** the
+     * same list:
+     *
+     * - the directory and the leave queue are readable by nine roles;
+     * - payroll runs and statutory rules by four, because `HR_PAYROLL_ROLES`
+     *   excludes the property manager: in a company that runs payroll properly the
+     *   person who approves the figures and the person who releases the money are
+     *   two people, and a nav that offered it to everybody would be a promise the
+     *   API refuses;
+     * - `/hr/me` to every staff login, since self-service is the whole point of the
+     *   `self` permission and an employee has no directory access at all.
+     */
+    {
+        label: 'HR & Payroll',
+        icon: UserRound,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'],
+        children: [
+            { href: '/hr/employees', label: 'Employees', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'] },
+            { href: '/hr/leave', label: 'Leave', icon: Calendar, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'] },
+            { href: '/hr/payroll', label: 'Payroll runs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'] },
+            { href: '/hr/settings/payroll-rules', label: 'Statutory rules', icon: Calculator, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'] },
+            { href: '/hr/me', label: 'My account', icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'] },
+        ],
+    },
     { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
@@ -214,8 +249,10 @@ const roleLabels: Record<UserRole, string> = {
     // Module 10: same reason as the two above — the seeded Procurement Officer
     // role had permissions nobody could hold until UserRole gained a value.
     PROCUREMENT_OFFICER: 'Procurement Officer',
+    HR_MANAGER: 'HR Manager',
     ACCOUNTANT: 'Accountant',
     USER: 'User',
+    EMPLOYEE: 'Employee',
 };
 
 export function Sidebar() {
@@ -264,8 +301,10 @@ export function Sidebar() {
         const isActive = item.href
             ? (pathname === item.href || pathname.startsWith(item.href + '/'))
             : false;
-        const children = item.children;
-        const hasChildren = children && children.length > 0;
+        const children = (item.children ?? []).filter(
+            (child) => user && child.roles.includes(user.role),
+        );
+        const hasChildren = children.length > 0;
         const isExpanded = expandedItems.includes(item.label);
         const badgeCount =
             item.badge === 'approvals' ? pendingApprovals : null;
@@ -307,7 +346,7 @@ export function Sidebar() {
                     </button>
                     {isExpanded && (
                         <div className="ml-4 space-y-1 border-l border-muted pl-3">
-                            {item.children?.map(child => renderNavItem(child))}
+                            {children.map((child) => renderNavItem(child))}
                         </div>
                     )}
                 </div>

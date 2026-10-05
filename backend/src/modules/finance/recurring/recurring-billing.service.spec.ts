@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { AgreementStatus, RecurringRunStatus } from '@prisma/client';
-import { RecurringBillingService, billingPeriodOf } from './recurring-billing.service';
+import {
+  RecurringBillingService,
+  billingPeriodOf,
+} from './recurring-billing.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -29,7 +32,11 @@ describe('RecurringBillingService', () => {
     organizationId: 'org-1',
     tenantId: 'ten-1',
     tenant: { surname: 'Otieno', otherNames: 'Grace' },
-    unit: { name: 'A1', property: { name: 'Acacia Court' }, serviceCharges: [] },
+    unit: {
+      name: 'A1',
+      property: { name: 'Acacia Court' },
+      serviceCharges: [],
+    },
   };
 
   function mockPrisma() {
@@ -86,7 +93,10 @@ describe('RecurringBillingService', () => {
   });
 
   it('bills a due lease and tags the invoice with the period', async () => {
-    const run = await service.runForOrganization('org-1', new Date('2026-10-01'));
+    const run = await service.runForOrganization(
+      'org-1',
+      new Date('2026-10-01'),
+    );
 
     expect(invoices.create).toHaveBeenCalledTimes(1);
     const payload = invoices.create.mock.calls[0][0];
@@ -139,7 +149,10 @@ describe('RecurringBillingService', () => {
       ),
     );
 
-    const run = await service.runForOrganization('org-1', new Date('2026-10-01'));
+    const run = await service.runForOrganization(
+      'org-1',
+      new Date('2026-10-01'),
+    );
     expect(run).toMatchObject({
       invoicesCreated: 0,
       leasesSkipped: 1,
@@ -155,15 +168,25 @@ describe('RecurringBillingService', () => {
       new Error('Unique constraint failed on the fields: (`invoiceNumber`)'),
     );
 
-    const run = await service.runForOrganization('org-1', new Date('2026-10-01'));
-    expect(run).toMatchObject({ invoicesCreated: 0, leasesSkipped: 0, leasesFailed: 1 });
+    const run = await service.runForOrganization(
+      'org-1',
+      new Date('2026-10-01'),
+    );
+    expect(run).toMatchObject({
+      invoicesCreated: 0,
+      leasesSkipped: 0,
+      leasesFailed: 1,
+    });
   });
 
   it('keeps going when one lease fails, and says so', async () => {
     prisma.rentalAgreement.findMany.mockResolvedValue([lease]);
     invoices.create.mockRejectedValueOnce(new Error('rent is not a number'));
 
-    const run = await service.runForOrganization('org-1', new Date('2026-10-01'));
+    const run = await service.runForOrganization(
+      'org-1',
+      new Date('2026-10-01'),
+    );
     expect(run).toMatchObject({
       invoicesCreated: 0,
       leasesFailed: 1,
@@ -177,7 +200,10 @@ describe('RecurringBillingService', () => {
       { ...lease, startDate: new Date('2026-11-01') },
     ]);
 
-    const run = await service.runForOrganization('org-1', new Date('2026-10-01'));
+    const run = await service.runForOrganization(
+      'org-1',
+      new Date('2026-10-01'),
+    );
     expect(invoices.create).not.toHaveBeenCalled();
     expect(run.leasesSkipped).toBe(1);
   });
@@ -186,7 +212,10 @@ describe('RecurringBillingService', () => {
     prisma.rentalAgreement.findMany.mockResolvedValue([
       { ...lease, endDate: new Date('2026-06-30') },
     ]);
-    const run = await service.runForOrganization('org-1', new Date('2026-10-01'));
+    const run = await service.runForOrganization(
+      'org-1',
+      new Date('2026-10-01'),
+    );
     expect(run.leasesSkipped).toBe(1);
   });
 
@@ -201,7 +230,9 @@ describe('RecurringBillingService', () => {
       },
     ]);
     await service.runForOrganization('org-1', new Date('2026-10-01'));
-    expect(invoices.create.mock.calls[0][0].invoiceItems[0].lineTotal).toBe(20_000);
+    expect(invoices.create.mock.calls[0][0].invoiceItems[0].lineTotal).toBe(
+      20_000,
+    );
 
     // A year in: 10% on.
     invoices.create.mockClear();
@@ -209,11 +240,15 @@ describe('RecurringBillingService', () => {
       { ...lease, escalationRate: 10, escalationMonth: 10 },
     ]);
     await service.runForOrganization('org-1', new Date('2026-10-01'));
-    expect(invoices.create.mock.calls[0][0].invoiceItems[0].lineTotal).toBe(22_000);
+    expect(invoices.create.mock.calls[0][0].invoiceItems[0].lineTotal).toBe(
+      22_000,
+    );
 
     // Wrong month: untouched.
     invoices.create.mockClear();
     await service.runForOrganization('org-1', new Date('2026-11-01'));
-    expect(invoices.create.mock.calls[0][0].invoiceItems[0].lineTotal).toBe(20_000);
+    expect(invoices.create.mock.calls[0][0].invoiceItems[0].lineTotal).toBe(
+      20_000,
+    );
   });
 });

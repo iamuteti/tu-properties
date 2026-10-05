@@ -100,7 +100,10 @@ export class StockMovementsService {
 
   // ==================================================================== reads
 
-  async findAll(organizationId: string | undefined, filters: StockMovementFilters = {}) {
+  async findAll(
+    organizationId: string | undefined,
+    filters: StockMovementFilters = {},
+  ) {
     const rows = await this.prisma.stockMovement.findMany({
       where: this.buildWhere(organizationId, filters),
       include: MOVEMENT_INCLUDE,
@@ -132,16 +135,16 @@ export class StockMovementsService {
       'Stock movement',
     );
 
-    const balances = await this.balancesFor(
-      organizationId,
-      [{ itemId: row.itemId, warehouseId: row.warehouseId }],
-    );
+    const balances = await this.balancesFor(organizationId, [
+      { itemId: row.itemId, warehouseId: row.warehouseId },
+    ]);
 
     return {
       ...row,
       quantity: num(row.quantity),
       unitCost: row.unitCost == null ? null : round4(num(row.unitCost)),
-      balanceAfter: balances.get(`${row.itemId}:${row.warehouseId}:${row.id}`) ?? null,
+      balanceAfter:
+        balances.get(`${row.itemId}:${row.warehouseId}:${row.id}`) ?? null,
     };
   }
 
@@ -157,7 +160,10 @@ export class StockMovementsService {
       }),
       this.prisma.stockMovement.count({ where: base }),
       this.prisma.stockMovement.count({
-        where: { ...base, createdAt: { gte: new Date(Date.now() - 30 * 86400000) } },
+        where: {
+          ...base,
+          createdAt: { gte: new Date(Date.now() - 30 * 86400000) },
+        },
       }),
     ]);
 
@@ -192,7 +198,9 @@ export class StockMovementsService {
           unitCost: number | null;
           reason: string | null;
           workOrder?: { reference?: string } | null;
-          goodsReceiptLine?: { goodsReceipt?: { purchaseOrder?: { reference?: string } } } | null;
+          goodsReceiptLine?: {
+            goodsReceipt?: { purchaseOrder?: { reference?: string } };
+          } | null;
           createdBy?: { firstName?: string; lastName?: string } | null;
         };
         return {
@@ -234,7 +242,10 @@ export class StockMovementsService {
     userId?: string,
   ) {
     const item = await this.assertItem(dto.itemId, organizationId);
-    const warehouse = await this.assertWarehouse(dto.warehouseId, organizationId);
+    const warehouse = await this.assertWarehouse(
+      dto.warehouseId,
+      organizationId,
+    );
 
     if (!item.isActive) {
       throw new ConflictException(
@@ -248,7 +259,8 @@ export class StockMovementsService {
     // loud in the DTO would mean every "add these 20 boxes" form posts a field
     // nobody thinks about.
     const defaultIn =
-      dto.type === ManualMovementType.OPENING || dto.type === ManualMovementType.RETURN;
+      dto.type === ManualMovementType.OPENING ||
+      dto.type === ManualMovementType.RETURN;
     const direction = dto.direction ?? (defaultIn ? 'IN' : 'OUT');
     const quantity = direction === 'IN' ? amount : -amount;
 
@@ -272,7 +284,9 @@ export class StockMovementsService {
       balanceBefore,
     );
     if (!check.allowed) {
-      throw new ConflictException(check.reason ?? 'That movement is not allowed.');
+      throw new ConflictException(
+        check.reason ?? 'That movement is not allowed.',
+      );
     }
 
     const created = await this.prisma.stockMovement.create({
@@ -318,8 +332,14 @@ export class StockMovementsService {
       throw new BadRequestException('A transfer needs at least one line.');
     }
 
-    const source = await this.assertWarehouse(dto.fromWarehouseId, organizationId);
-    const destination = await this.assertWarehouse(dto.toWarehouseId, organizationId);
+    const source = await this.assertWarehouse(
+      dto.fromWarehouseId,
+      organizationId,
+    );
+    const destination = await this.assertWarehouse(
+      dto.toWarehouseId,
+      organizationId,
+    );
 
     const seen = new Set<string>();
     for (const line of dto.lines) {
@@ -360,7 +380,9 @@ export class StockMovementsService {
         onHandAtSource: onHand,
       });
       if (!check.allowed) {
-        throw new ConflictException(check.reason ?? 'That transfer is not allowed.');
+        throw new ConflictException(
+          check.reason ?? 'That transfer is not allowed.',
+        );
       }
 
       planned.push({
@@ -418,7 +440,11 @@ export class StockMovementsService {
     return {
       transferGroup,
       from: { id: source.id, name: source.name, code: source.code },
-      to: { id: destination.id, name: destination.name, code: destination.code },
+      to: {
+        id: destination.id,
+        name: destination.name,
+        code: destination.code,
+      },
       lines: planned.map((line) => ({
         itemId: line.itemId,
         description: line.label,
@@ -455,7 +481,8 @@ export class StockMovementsService {
       throw new BadRequestException('A stock take needs at least one line.');
     }
 
-    const defaultWarehouse = await this.warehouses.resolveDefault(organizationId);
+    const defaultWarehouse =
+      await this.warehouses.resolveDefault(organizationId);
 
     const variances: {
       itemId: string;
@@ -572,7 +599,9 @@ export class StockMovementsService {
     userId?: string,
   ) {
     if (!dto.lines?.length) {
-      throw new BadRequestException('Record what the job used, or nothing at all.');
+      throw new BadRequestException(
+        'Record what the job used, or nothing at all.',
+      );
     }
 
     // Re-read the work order rather than trusting the id: this is the one writer
@@ -590,7 +619,11 @@ export class StockMovementsService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const line of dto.lines) {
-        const item = await this.assertItem(line.inventoryItemId, organizationId, tx);
+        const item = await this.assertItem(
+          line.inventoryItemId,
+          organizationId,
+          tx,
+        );
         if (!item.isActive) {
           throw new ConflictException(
             `${item.sku} is retired, so it cannot be issued to a job.`,
@@ -612,7 +645,9 @@ export class StockMovementsService {
           balanceBefore,
         );
         if (!check.allowed) {
-          throw new ConflictException(check.reason ?? 'That issue is not allowed.');
+          throw new ConflictException(
+            check.reason ?? 'That issue is not allowed.',
+          );
         }
 
         const row = await tx.stockMovement.create({
@@ -637,7 +672,9 @@ export class StockMovementsService {
     // Consumption is the signal a buyer actually wants, so the alert fires after
     // the whole issue is committed rather than per line — a job that takes six
     // items should say so once.
-    for (const itemId of new Set(dto.lines.map((line) => line.inventoryItemId))) {
+    for (const itemId of new Set(
+      dto.lines.map((line) => line.inventoryItemId),
+    )) {
       await this.alerts.announceAfterMovement({ itemId, organizationId });
     }
 
@@ -725,7 +762,9 @@ export class StockMovementsService {
         ...(organizationId ? { organizationId } : {}),
       },
       include: {
-        item: { select: { id: true, sku: true, name: true, unitOfMeasure: true } },
+        item: {
+          select: { id: true, sku: true, name: true, unitOfMeasure: true },
+        },
         warehouse: { select: { id: true, name: true, code: true } },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -741,7 +780,8 @@ export class StockMovementsService {
       ...row,
       quantity: num(row.quantity),
       unitCost: row.unitCost == null ? null : round4(num(row.unitCost)),
-      balanceAfter: balances.get(`${row.itemId}:${row.warehouseId}:${row.id}`) ?? null,
+      balanceAfter:
+        balances.get(`${row.itemId}:${row.warehouseId}:${row.id}`) ?? null,
       isNew: highlightIds.includes(row.id),
     }));
   }
@@ -765,7 +805,13 @@ export class StockMovementsService {
         warehouseId,
         ...(organizationId ? { organizationId } : {}),
       },
-      select: { id: true, quantity: true, unitCost: true, type: true, createdAt: true },
+      select: {
+        id: true,
+        quantity: true,
+        unitCost: true,
+        type: true,
+        createdAt: true,
+      },
       take: 50_000,
     });
     return stockOnHand(rows as unknown as LedgerMovement[]);
@@ -806,7 +852,13 @@ export class StockMovementsService {
 
     const grouped = new Map<
       string,
-      { id: string; quantity: unknown; unitCost: unknown; type: string; createdAt: Date }[]
+      {
+        id: string;
+        quantity: unknown;
+        unitCost: unknown;
+        type: string;
+        createdAt: Date;
+      }[]
     >();
 
     for (const row of rows) {
@@ -820,7 +872,9 @@ export class StockMovementsService {
     for (const [key, group] of grouped) {
       // `chronological` owns the tie-break, so a pair written in the same
       // millisecond still produces the same balance on every read.
-      for (const step of runningBalances(group as unknown as LedgerMovement[])) {
+      for (const step of runningBalances(
+        group as unknown as LedgerMovement[],
+      )) {
         result.set(`${key}:${step.id}`, step.balance);
       }
     }
@@ -872,7 +926,8 @@ export class StockMovementsService {
 
     if (filters.direction === 'in') where.quantity = { gt: 0 };
     else if (filters.direction === 'out') where.quantity = { lt: 0 };
-    else if (filters.direction === 'transfer') where.type = StockMovementType.TRANSFER;
+    else if (filters.direction === 'transfer')
+      where.type = StockMovementType.TRANSFER;
     else if (filters.direction === 'adjustment') {
       where.type = StockMovementType.ADJUSTMENT;
     }
@@ -915,9 +970,7 @@ function randomSuffix(): string {
 function startOfDay(value: string): Date {
   const parsed = new Date(value);
   if (!isNaN(parsed.getTime()) && /T|\d:\d/.test(value)) return parsed;
-  return new Date(
-    parsed.getTime() - parsed.getTimezoneOffset() * 60_000,
-  );
+  return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
 }
 
 function endOfDay(value: string): Date {

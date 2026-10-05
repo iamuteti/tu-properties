@@ -15,7 +15,11 @@ describe('PortalService', () => {
   let service: PortalService;
 
   const portalSession = (tenantId = 'tenant-1') => ({
-    user: { userId: 'user-1', email: 'resident@example.com', portalTenantId: tenantId },
+    user: {
+      userId: 'user-1',
+      email: 'resident@example.com',
+      portalTenantId: tenantId,
+    },
   });
   const staffSession = { user: { userId: 'admin-1', email: 'a@x.co' } };
 
@@ -68,7 +72,13 @@ describe('PortalService', () => {
             bedrooms: 2,
             bathrooms: 2,
             areaSqFt: 900,
-            property: { id: 'prop-1', name: 'Karen', code: 'PR-1', roadStreet: null, estateArea: null },
+            property: {
+              id: 'prop-1',
+              name: 'Karen',
+              code: 'PR-1',
+              roadStreet: null,
+              estateArea: null,
+            },
           },
         }),
       },
@@ -102,7 +112,9 @@ describe('PortalService', () => {
 
   describe('scope', () => {
     it('refuses a staff session outright', async () => {
-      await expect(service.me(staffSession)).rejects.toThrow(ForbiddenException);
+      await expect(service.me(staffSession)).rejects.toThrow(
+        ForbiddenException,
+      );
       await expect(service.invoices(staffSession)).rejects.toThrow(
         /tenant portal account/i,
       );
@@ -115,7 +127,9 @@ describe('PortalService', () => {
       });
 
       expect(prisma.invoice.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { rentalAgreement: { tenantId: 'tenant-1' } } }),
+        expect.objectContaining({
+          where: { rentalAgreement: { tenantId: 'tenant-1' } },
+        }),
       );
     });
 
@@ -145,7 +159,11 @@ describe('PortalService', () => {
 
       expect(result.lease.code).toBe('RA-000001');
       expect(result.lease.unit.name).toBe('Flat 12');
-      expect(result.money).toMatchObject({ invoiced: 45_000, paid: 0, outstanding: 45_000 });
+      expect(result.money).toMatchObject({
+        invoiced: 45_000,
+        paid: 0,
+        outstanding: 45_000,
+      });
     });
 
     it('tells a resident with no active lease that they have none', async () => {
@@ -170,7 +188,11 @@ describe('PortalService', () => {
 
       const result = await service.summary(portalSession());
 
-      expect(result.money).toMatchObject({ paid: 45_000, outstanding: 0, arrears: 0 });
+      expect(result.money).toMatchObject({
+        paid: 45_000,
+        outstanding: 0,
+        arrears: 0,
+      });
     });
 
     it('counts only overdue invoices as arrears', async () => {
@@ -191,7 +213,10 @@ describe('PortalService', () => {
       expect(result.money.arrears).toBe(10_000);
       expect(result.money.outstanding).toBe(30_000);
       // The next thing to pay is the overdue one, and it is flagged as overdue.
-      expect(result.nextDue).toMatchObject({ invoiceNumber: 'INV-1', isOverdue: true });
+      expect(result.nextDue).toMatchObject({
+        invoiceNumber: 'INV-1',
+        isOverdue: true,
+      });
     });
 
     it('reports days remaining on a fixed term', async () => {
@@ -206,7 +231,12 @@ describe('PortalService', () => {
       const result = await service.summary(portalSession());
 
       expect(result.hasLease).toBe(false);
-      expect(result.money).toEqual({ invoiced: 0, paid: 0, outstanding: 0, arrears: 0 });
+      expect(result.money).toEqual({
+        invoiced: 0,
+        paid: 0,
+        outstanding: 0,
+        arrears: 0,
+      });
       expect(result.nextDue).toBeNull();
     });
   });

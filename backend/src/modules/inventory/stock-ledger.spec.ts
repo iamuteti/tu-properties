@@ -66,8 +66,18 @@ describe('chronological', () => {
 
   it('accepts an ISO string as well as a Date, since JSON has no Date', () => {
     const rows: LedgerMovement[] = [
-      { id: 'b', quantity: 1, type: 'ADJUSTMENT', createdAt: '2026-01-02T00:00:00.000Z' },
-      { id: 'a', quantity: 1, type: 'ADJUSTMENT', createdAt: '2026-01-01T00:00:00.000Z' },
+      {
+        id: 'b',
+        quantity: 1,
+        type: 'ADJUSTMENT',
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+      {
+        id: 'a',
+        quantity: 1,
+        type: 'ADJUSTMENT',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
     ];
 
     expect(chronological(rows).map((row) => row.id)).toEqual(['a', 'b']);
@@ -94,7 +104,9 @@ describe('stockOnHand', () => {
   });
 
   it('reads a Prisma Decimal string as a number rather than NaN', () => {
-    expect(stockOnHand([{ ...movement('1', 0, 'OPENING', 1), quantity: '12.50' }])).toBe(12.5);
+    expect(
+      stockOnHand([{ ...movement('1', 0, 'OPENING', 1), quantity: '12.50' }]),
+    ).toBe(12.5);
   });
 });
 
@@ -114,7 +126,10 @@ describe('runningBalances', () => {
   });
 
   it('ends on the level on hand', () => {
-    const rows = [movement('1', 20, 'OPENING', 1), movement('2', -6, 'WORK_ORDER_ISSUE', 2)];
+    const rows = [
+      movement('1', 20, 'OPENING', 1),
+      movement('2', -6, 'WORK_ORDER_ISSUE', 2),
+    ];
     const balances = runningBalances(rows);
 
     expect(balances[balances.length - 1].balance).toBe(stockOnHand(rows));
@@ -162,7 +177,11 @@ describe('stockStatus', () => {
 
 describe('reorderSuggestion', () => {
   it('suggests nothing while the item is in stock', () => {
-    const result = reorderSuggestion({ onHand: 20, reorderLevel: 5, unitCost: 100 });
+    const result = reorderSuggestion({
+      onHand: 20,
+      reorderLevel: 5,
+      unitCost: 100,
+    });
 
     expect(result).toMatchObject({
       needsReorder: false,
@@ -177,7 +196,11 @@ describe('reorderSuggestion', () => {
   it('tops up to twice the level when no quantity is set', () => {
     // Level 10, holding 3: two of the level is 20, so 17 gets bought. A top-up
     // to the level alone would re-trip the alert on the next movement.
-    const result = reorderSuggestion({ onHand: 3, reorderLevel: 10, unitCost: 250 });
+    const result = reorderSuggestion({
+      onHand: 3,
+      reorderLevel: 10,
+      unitCost: 250,
+    });
 
     expect(result.needsReorder).toBe(true);
     expect(result.status).toBe('REORDER');
@@ -218,7 +241,11 @@ describe('reorderSuggestion', () => {
   });
 
   it('says plainly when nothing is left', () => {
-    const result = reorderSuggestion({ onHand: 0, reorderLevel: 4, unitCost: 90 });
+    const result = reorderSuggestion({
+      onHand: 0,
+      reorderLevel: 4,
+      unitCost: 90,
+    });
 
     expect(result.status).toBe('OUT_OF_STOCK');
     expect(result.reason).toContain('Nothing left');
@@ -242,7 +269,9 @@ describe('reorderSuggestion', () => {
   });
 
   it('falls back to a generic unit when none was given', () => {
-    expect(reorderSuggestion({ onHand: 0, reorderLevel: 1 }).unitOfMeasure).toBe('unit');
+    expect(
+      reorderSuggestion({ onHand: 0, reorderLevel: 1 }).unitOfMeasure,
+    ).toBe('unit');
   });
 });
 
@@ -259,7 +288,9 @@ describe('checkMovement', () => {
   });
 
   it('refuses a positive work-order issue', () => {
-    expect(checkMovement('WORK_ORDER_ISSUE', 5)).toMatchObject({ allowed: false });
+    expect(checkMovement('WORK_ORDER_ISSUE', 5)).toMatchObject({
+      allowed: false,
+    });
   });
 
   it('allows an opening balance in, and an issue out', () => {
@@ -305,13 +336,15 @@ describe('balanceAfter', () => {
 
 describe('valuation', () => {
   it('values an untouched opening balance at its own snapshot cost', () => {
-    const result = valuation([movement('1', 20, 'OPENING', 1, { unitCost: 1000 })]);
+    const result = valuation([
+      movement('1', 20, 'OPENING', 1, { unitCost: 1000 }),
+    ]);
 
     expect(result).toMatchObject({ quantity: 20, value: 20000 });
     expect(result.averageUnitCost).toBe(1000);
   });
 
-  it('carries a rising price rather than revaluing the shelf at today\'s price', () => {
+  it("carries a rising price rather than revaluing the shelf at today's price", () => {
     // 10 at 1,000, then 10 at 1,450. Reading today's unitCost for both would
     // report 29,000; the weighted average is 27,500.
     const result = valuation([
@@ -369,7 +402,11 @@ describe('valuation', () => {
   it('has no average for an empty shelf rather than dividing by zero', () => {
     const result = valuation([]);
 
-    expect(result).toMatchObject({ quantity: 0, value: 0, averageUnitCost: null });
+    expect(result).toMatchObject({
+      quantity: 0,
+      value: 0,
+      averageUnitCost: null,
+    });
   });
 
   it('is independent of the order the rows arrive in', () => {
