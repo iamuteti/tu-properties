@@ -37,6 +37,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -76,6 +77,9 @@ TenantRequestsModule,
     WorkflowModule,
     MaintenanceModule,
     ProcurementModule,
+    // Module 11 — Inventory. Also imported by Procurement and Maintenance, which
+    // is the one direction the dependency runs in (see inventory.module.ts).
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [

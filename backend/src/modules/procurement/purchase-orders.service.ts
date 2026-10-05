@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PayablesService } from '@/modules/finance/payables/payables.service';
+import { GoodsReceiptStockInService } from '@/modules/inventory/goods-receipt-stock-in.service';
 import { requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import { receiveOutcome, round2 } from './procurement-comparison';
@@ -106,6 +107,7 @@ export class PurchaseOrdersService {
   constructor(
     private prisma: PrismaService,
     private payables: PayablesService,
+    private stockIn: GoodsReceiptStockInService,
   ) {}
 
   // ==================================================================== reads
@@ -840,32 +842,17 @@ export class PurchaseOrdersService {
   }
 
   /**
-   * Stock-in for what was received.
+   * What has arrived and still needs stock-in.
    *
-   * Module 11 (Inventory) does not exist yet, and this is deliberately a no-op
-   * that says so rather than a flag that implies something happened: a receipt
-   * line's `stockInRecordedAt` stays null until the inventory module can really
-   * move stock, and the order's detail page reports the lines that are waiting.
-   * See master doc issue 70 — the alternative was adding a speculative
-   * `inventoryItemId` pointing at a table that does not exist.
+   * Delegates to `GoodsReceiptStockInService` (Module 11) rather than reporting on
+   * the receipt rows itself. This method used to answer "the inventory module does
+   * not exist yet" — the honest answer at the time, and the reason Module 10 could
+   * not meet its own acceptance criterion (master doc issue 81). Now the question
+   * has a real answer: which receipt lines still need somebody to say which item
+   * they are and which store they went to.
    */
   async pendingStockIn(id: string, organizationId: string | undefined) {
-    const order = await this.record(id, organizationId);
-
-    return {
-      inventoryModuleAvailable: false,
-      note: 'Stock-in is recorded by the Inventory module, which is not built yet. The receipts below are what it will consume.',
-      pendingLines: order.deliveries.flatMap((delivery) =>
-        delivery.lines
-          .filter((line) => !line.stockInRecordedAt)
-          .map((line) => ({
-            receiptId: delivery.id,
-            receivedAt: delivery.receivedAt,
-            purchaseOrderLineId: line.purchaseOrderLineId,
-            quantity: line.quantity,
-          })),
-      ),
-    };
+    return this.stockIn.pendingForOrder(id, organizationId);
   }
 
   // ================================================================== helpers

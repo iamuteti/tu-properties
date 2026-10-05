@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState, LoadingState, StatusBadge } from '@/components/ui/entity-states';
 import { Input } from '@/components/ui/input';
 import { WorkOrderActionDialog } from '@/components/maintenance/work-order-action-dialog';
+import { WorkOrderMaterialsPanel } from '@/components/inventory/work-order-materials-panel';
 import { useWorkOrder } from '@/hooks/use-maintenance';
 import type { WorkOrderAction } from '@/types';
 
@@ -327,6 +328,14 @@ export default function WorkOrderDetailPage({
                                 )}
                         </CardContent>
                     </Card>
+
+                    {/* Module 11. Placed after the checklist because what the job
+                        *did* is the natural next question after what it had to do —
+                        * and before the inspection findings, since material comes
+                        * off the shelf during the work rather than at the sign-off. */}
+                    {workOrder.status !== 'CANCELLED' && (
+                        <WorkOrderMaterialsPanel workOrderId={workOrder.id} />
+                    )}
 
                     {workOrder.inspectionNote && (
                         <Card>

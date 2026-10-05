@@ -15,6 +15,8 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { getPortalTenantId, requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import { AuditService } from '@/modules/audit/audit.service';
+import { StockMovementsService } from '@/modules/inventory/stock-movements.service';
+import type { IssueStockDto } from '@/modules/inventory/dto/inventory.dto';
 import { MaintenanceNotificationsService } from './maintenance-notifications.service';
 import {
   checkWorkOrderAction,
@@ -121,6 +123,7 @@ export class WorkOrdersService {
     private prisma: PrismaService,
     private audit: AuditService,
     private notifications: MaintenanceNotificationsService,
+    private stock: StockMovementsService,
   ) {}
 
   // ==================================================================== reads
@@ -940,6 +943,128 @@ export class WorkOrdersService {
       where: { id: taskId, workOrderId: id, organizationId },
     });
     return { message: 'Checklist item removed.' };
+  }
+
+  // ============================================================= materials
+
+  /**
+   * What this job consumed from the store, and what is left on the shelf.
+   *
+   * Reads Module 11's ledger rather than keeping a parallel materials list, so
+   * "what did the job use" and "what went down" are the same number and cannot
+   * disagree.
+   */
+  async materials(id: string, organizationId: string | undefined) {
+    await this.record(id, organizationId);
+
+    const movements = await this.stock.movementsForWorkOrder(
+      id,
+      organizationId,
+    );
+
+    const net = new Map<string, number>();
+    for (const movement of movements) {
+      net.set(
+        movement.itemId,
+        (net.get(movement.itemId) ?? 0) + movement.quantity,
+      );
+    }
+
+    const ids = [...net.keys()];
+    const itemRows =
+      ids.length === 0
+        ? []
+        : await this.prisma.inventoryItem.findMany({
+            where: {
+              id: { in: ids },
+              ...(organizationId ? { organizationId } : {}),
+            },
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              unitOfMeasure: true,
+              unitCost: true,
+            },
+          });
+    const itemById = new Map(itemRows.map((item) => [item.id, item]));
+
+    return {
+      workOrderId: id,
+      movements,
+      /** One line per item, net of everything issued and put back. */
+      consumed: [...net.entries()]
+        .map(([itemId, quantity]) => {
+          const item = itemById.get(itemId);
+          return {
+            inventoryItemId: itemId,
+            sku: item?.sku ?? '',
+            name: item?.name ?? '',
+            unitOfMeasure: item?.unitOfMeasure ?? 'unit',
+            /** Net of issues and returns, so a part-used-and-returned job reads
+             *  as the part it actually kept. */
+            quantity: Math.round(quantity * 100) / 100,
+            estimatedCost:
+              item?.unitCost == null
+                ? null
+                : Math.round(Math.abs(quantity) * Number(item.unitCost) * 100) / 100,
+          };
+        })
+        .filter((row) => row.quantity !== 0),
+      totalEstimatedCost: Math.round(
+        [...net.entries()].reduce((sum, [itemId, quantity]) => {
+          const item = itemById.get(itemId);
+          if (!item?.unitCost) return sum;
+          return sum + Math.abs(quantity) * Number(item.unitCost);
+        }, 0) * 100,
+      ) / 100,
+    };
+  }
+
+  /**
+   * Issue material against this job.
+   *
+   * Delegates the ledger write to Module 11 — this module owns the work order,
+   * inventory owns the shelf, and the movement that links them is written by
+   * whichever knows the balance. The reference on each row (`WO-2026-0007:
+   * <title>`) is what makes "what did this job consume" answerable from the
+   * item's own page.
+   */
+  async issueMaterials(
+    id: string,
+    dto: IssueStockDto,
+    organizationId: string,
+    userId?: string,
+  ) {
+    await this.record(id, organizationId);
+
+    const movements = await this.stock.issueForWorkOrder(
+      id,
+      dto,
+      organizationId,
+      userId,
+    );
+
+    return { workOrderId: id, issued: movements.length, movements };
+  }
+
+  /** Put material back — the honest inverse, not a delete. See Module 11. */
+  async returnMaterials(
+    id: string,
+    movementIds: string[],
+    organizationId: string,
+    userId?: string,
+  ) {
+    await this.record(id, organizationId);
+
+    const movements = await this.stock.reverseForWorkOrder(
+      id,
+      movementIds,
+      organizationId,
+      userId,
+    );
+
+    return { workOrderId: id, returned: movements.length, movements };
   }
 
   // =================================================================== portal

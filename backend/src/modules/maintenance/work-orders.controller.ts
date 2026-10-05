@@ -19,6 +19,14 @@ import { TenantPortalGuard } from '@/security/guards/tenant-portal.guard';
 import { getTenantId, getUserId, requireTenantId } from '@/common/utils';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
+// Imported as **values**, not `import type`. This is master doc issue 52 exactly:
+// a type-only import erases the class from `design:paramtypes`, Nest then sees
+// `Object` as the metatype, decides there is nothing to validate, and hands the
+// service a body whose nested `lines` were never transformed or checked.
+import {
+  IssueStockDto,
+  ReturnStockDto,
+} from '@/modules/inventory/dto/inventory.dto';
 import { WorkOrdersService } from './work-orders.service';
 import { WorkOrderApprovalsService } from './work-order-approvals.service';
 import {
@@ -386,6 +394,68 @@ export class WorkOrdersController {
     @Request() req,
   ) {
     return this.workOrders.removeTask(id, taskId, requireTenantId(req));
+  }
+
+  // ============================================================= materials
+
+  /**
+   * What this job consumed from the store.
+   *
+   * Readable by anybody who can read the queue — a technician asking "is there
+   * another one of these?" should not need a permission this module invented.
+   */
+  @Get(':id/materials')
+  @Roles(...MAINTENANCE_ROLES)
+  @Permissions('work_orders.view', 'stock_movements.view')
+  materials(@Param('id') id: string, @Request() req) {
+    return this.workOrders.materials(id, getTenantId(req));
+  }
+
+  /**
+   * Issue material against the job.
+   *
+   * Both permissions on purpose: `work_orders.update` because this changes what
+   * the job consumed, and `stock_movements.create` because it moves stock off a
+   * shelf. A technician may hold the first and not the second, and the store's
+   * staff the reverse.
+   */
+  @Post(':id/materials')
+  @Roles(...MAINTENANCE_ROLES)
+  @Permissions('work_orders.update', 'stock_movements.create')
+  issueMaterials(
+    @Param('id') id: string,
+    @Body() dto: IssueStockDto,
+    @Request() req,
+  ) {
+    return this.workOrders.issueMaterials(
+      id,
+      dto,
+      requireTenantId(req),
+      getUserId(req),
+    );
+  }
+
+  /**
+   * Put material back.
+   *
+   * A return row, never a delete: "the technician used the wrong size and put it
+   * back" is a fact, and a ledger that cannot say so disagrees with the shelf
+   * within a week.
+   */
+  @Post(':id/materials/return')
+  @Roles(...MAINTENANCE_ROLES)
+  @Permissions('work_orders.update', 'stock_movements.create')
+  returnMaterials(
+    @Param('id') id: string,
+    @Body() dto: ReturnStockDto,
+    @Request() req,
+  ) {
+    return this.workOrders.returnMaterials(
+      id,
+      dto.movementIds,
+      requireTenantId(req),
+      getUserId(req),
+    );
   }
 }
 

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '@/modules/audit/audit.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { WorkflowModule } from '@/modules/workflow/workflow.module';
+import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
 import { MaintenanceNotificationsService } from './maintenance-notifications.service';
@@ -25,9 +26,19 @@ import { WorkOrdersService } from './work-orders.service';
  * Imports `WorkflowModule` for the same reason refunds does: the approval gate on
  * an inspected work order is the engine's job, and the engine never imports the
  * module it approves.
+ *
+ * Imports `InventoryModule` (Module 11) so a job can consume stock from the
+ * store. The movement is written by *inventory*, which owns the balance and the
+ * rules about what may be issued; this module owns the work order and passes the
+ * reference. Same one-directional shape as the tenant-request delegation above.
  */
 @Module({
-  imports: [AuditModule, NotificationsModule, WorkflowModule],
+  imports: [
+    AuditModule,
+    NotificationsModule,
+    WorkflowModule,
+    InventoryModule,
+  ],
   controllers: [
     WorkOrdersController,
     AssetsController,

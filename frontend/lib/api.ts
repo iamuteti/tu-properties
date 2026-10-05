@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, PendingStockIn } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -1883,8 +1883,50 @@ export const maintenanceApi = {
     setWorkOrderTaskDone: (id: string, taskId: string, isDone: boolean) =>
         api.patch<WorkOrderTask>(`/maintenance/work-orders/${id}/tasks/${taskId}`, { isDone }),
 
-    deleteWorkOrderTask: (id: string, taskId: string) =>
+deleteWorkOrderTask: (id: string, taskId: string) =>
         api.delete<{ message: string }>(`/maintenance/work-orders/${id}/tasks/${taskId}`),
+
+    // ── Material, Module 11 ────────────────────────────────────────────────
+    /**
+     * What this job consumed, net of anything put back, plus every movement.
+     *
+     * On the maintenance route rather than under `/inventory` because that is
+     * where the endpoint lives — maintenance owns the work order, inventory owns
+     * the shelf, and this call asks the module that owns the job to report against
+     * the ledger it does not own.
+     */
+    workOrderMaterials: (id: string) =>
+        api.get<WorkOrderMaterials>(`/maintenance/work-orders/${id}/materials`),
+
+    /** Refused by the backend when the store cannot cover the quantity. */
+    issueWorkOrderStock: (
+        id: string,
+        data: {
+            lines: {
+                inventoryItemId: string;
+                warehouseId: string;
+                quantity: number;
+                notes?: string;
+            }[];
+            notes?: string;
+        },
+    ) =>
+        api.post<{ workOrderId: string; issued: number; movements: StockMovementRow[] }>(
+            `/maintenance/work-orders/${id}/materials`,
+            data,
+        ),
+
+    /**
+     * Put material back, by naming the **original issue** being undone — so the
+     * ledger keeps both rows and a reader can see what went out and what came
+     * back. A reverse entered as fresh numbers would leave the original issue on
+     * the record as though it were still true.
+     */
+    returnWorkOrderStock: (id: string, data: { movementIds: string[] }) =>
+        api.post<{ workOrderId: string; returned: number; movements: StockMovementRow[] }>(
+            `/maintenance/work-orders/${id}/materials/return`,
+            data,
+        ),
 
     // ── Asset register ─────────────────────────────────────────────────────
     assets: (params?: Record<string, string | number | boolean | undefined>) =>
@@ -2245,9 +2287,11 @@ export const procurementApi = {
             data ?? {},
         ),
 
-    /** What has arrived and still needs stock-in, pending the Inventory module. */
+    /** What has arrived and still needs booking onto a shelf. Module 11 answers
+     *  this properly now, so the answer is a list of decisions rather than an
+     *  apology — see the `StockInNotice` on the purchase order's page. */
     pendingStockIn: (id: string) =>
-        api.get<PendingStockIn>(`/procurement/purchase-orders/${id}/stock-in`),
+        api.get<StockInStatus>(`/procurement/purchase-orders/${id}/stock-in`),
 
     // ── Suppliers, from procurement's side ──────────────────────────────────
     /** The same rows `payablesApi.suppliers` returns, plus performance figures. */
@@ -2273,4 +2317,258 @@ export const procurementApi = {
             status?: string;
         },
     ) => api.patch<ProcurementSupplier>(`/procurement/suppliers/${id}`, data),
+};
+
+/**
+ * Module 11 — Inventory.
+ *
+ * Note what is *not* in here, because the absence is the design: there is no
+ * "set the quantity" call. A stock level is the sum of the movements, so the only
+ * way to change one is to record a movement — opening, adjustment, transfer,
+ * stock take, goods received or an issue to a job. Anything else would be a
+ * second writer for a number that must agree with the ledger.
+ */
+export const inventoryApi = {
+    // ── Items ────────────────────────────────────────────────────────────────
+    /** Rows arrive with `totalQuantity`, `status` and `reorder` already derived. */
+    items: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<InventoryItemRow[]>('/inventory/items', { params }),
+
+    item: (id: string) => api.get<InventoryItemDetail>(`/inventory/items/${id}`),
+
+    itemStats: () => api.get<InventoryStats>('/inventory/items/stats'),
+
+    /** What to order, worst first. Ordered by shortfall, not by name. */
+    reorderList: () => api.get<InventoryItemRow[]>('/inventory/items/reorder-list'),
+
+    itemsExportUrl: (params?: { category?: string; status?: string; search?: string }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/inventory/items/export${search ? `?${search}` : ''}`;
+    },
+
+    /**
+     * Note there is no `quantity` here. An item is created empty; stock is put on
+     * it with an `OPENING` movement, which keeps one writer for the balance.
+     */
+    createItem: (data: {
+        sku: string;
+        name: string;
+        description?: string;
+        category?: string;
+        unitOfMeasure?: string;
+        unitCost?: number;
+        reorderLevel?: number;
+        reorderQuantity?: number;
+        preferredSupplierId?: string;
+        notes?: string;
+    }) => api.post<InventoryItemDetail>('/inventory/items', data),
+
+    updateItem: (
+        id: string,
+        data: {
+            sku?: string;
+            name?: string;
+            description?: string;
+            category?: string;
+            unitOfMeasure?: string;
+            unitCost?: number | null;
+            reorderLevel?: number;
+            reorderQuantity?: number | null;
+            preferredSupplierId?: string | null;
+            notes?: string;
+            /** Retiring keeps the movements; deleting would take the balance with
+             *  them, so the API refuses once there are any. */
+            isActive?: boolean;
+        },
+    ) => api.patch<InventoryItemDetail>(`/inventory/items/${id}`, data),
+
+    /** 409s once the item has any movements against it. */
+    deleteItem: (id: string) =>
+        api.delete<{ message: string }>(`/inventory/items/${id}`),
+
+    // ── Stores ───────────────────────────────────────────────────────────────
+    warehouses: (params?: { includeInactive?: string }) =>
+        api.get<WarehouseRow[]>('/inventory/warehouses', { params }),
+
+    warehouse: (id: string) => api.get<WarehouseDetail>(`/inventory/warehouses/${id}`),
+
+    warehousesExportUrl: () => `${API_BASE_URL}/inventory/warehouses/export`,
+
+    createWarehouse: (data: {
+        code: string;
+        name: string;
+        address?: string;
+        phone?: string;
+        isDefault?: boolean;
+        notes?: string;
+    }) => api.post<WarehouseDetail>('/inventory/warehouses', data),
+
+    /** Setting `isDefault` demotes the previous one rather than refusing. */
+    updateWarehouse: (
+        id: string,
+        data: {
+            code?: string;
+            name?: string;
+            address?: string;
+            phone?: string;
+            isDefault?: boolean;
+            notes?: string;
+            isActive?: boolean;
+        },
+    ) => api.patch<WarehouseDetail>(`/inventory/warehouses/${id}`, data),
+
+    /** 409s once the store has any movements against it. */
+    deleteWarehouse: (id: string) =>
+        api.delete<{ message: string }>(`/inventory/warehouses/${id}`),
+
+    // ── The ledger ───────────────────────────────────────────────────────────
+    /** Rows carry `balanceAfter`: the level as of that movement, not today's. */
+    movements: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<StockMovementRow[]>('/inventory/stock-movements', { params }),
+
+    movement: (id: string) => api.get<StockMovementRow>(`/inventory/stock-movements/${id}`),
+
+    movementStats: () => api.get<StockMovementStats>('/inventory/stock-movements/stats'),
+
+    movementsExportUrl: (params?: {
+        itemId?: string;
+        warehouseId?: string;
+        type?: string;
+        direction?: string;
+        from?: string;
+        to?: string;
+        search?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/inventory/stock-movements/export${search ? `?${search}` : ''}`;
+    },
+
+    /**
+     * A movement a person records by hand.
+     *
+     * `quantity` is **positive** and `direction` says which way it goes. The sign
+     * is never taken from the client: a goods receipt booked as -5 is not a
+     * refund, it is a goods receipt that quietly subtracts from the shelf.
+     */
+    recordMovement: (data: {
+        itemId: string;
+        warehouseId: string;
+        type: 'OPENING' | 'ADJUSTMENT' | 'RETURN';
+        quantity: number;
+        direction?: 'IN' | 'OUT';
+        reason?: string;
+        unitCost?: number;
+        notes?: string;
+    }) => api.post<StockMovementRow>('/inventory/stock-movements', data),
+
+    /**
+     * Two rows, one transfer group. Never one — the service writes the negative
+     * half out of the source and the positive half into the destination, in one
+     * transaction, or refuses the whole thing.
+     */
+    transferStock: (data: {
+        fromWarehouseId: string;
+        toWarehouseId: string;
+        lines: { itemId: string; quantity: number }[];
+        notes?: string;
+    }) =>
+        api.post<{
+            transferGroup: string;
+            from: { id: string; name: string; code: string };
+            to: { id: string; name: string; code: string };
+            lines: {
+                itemId: string;
+                description: string;
+                quantity: number;
+                balanceBefore: number;
+                balanceAfter: number;
+            }[];
+            movements: StockMovementRow[];
+        }>('/inventory/stock-movements/transfer', data),
+
+    /**
+     * The caller states what it **counted**, and the service derives the variance.
+     * That is the whole reason a stock take is worth more than an adjustment: it
+     * is repeatable by somebody else, because it is a measurement rather than a
+     * subtraction somebody had to get right.
+     */
+    recordStockTake: (data: {
+        lines: { itemId: string; warehouseId?: string; quantity: number; reason?: string }[];
+        notes?: string;
+    }) =>
+        api.post<{
+            counted: number;
+            variances: number;
+            matched: number;
+            adjustments: {
+                itemId: string;
+                itemLabel: string;
+                warehouseId: string;
+                warehouseLabel: string;
+                counted: number;
+                expected: number;
+                difference: number;
+            }[];
+            movements: StockMovementRow[];
+        }>('/inventory/stock-movements/stock-take', data),
+
+    /**
+     * Book goods received against a purchase order onto a shelf.
+     *
+     * The `{ goodsReceiptLineId, inventoryItemId, warehouseId }` triple is
+     * explicit per line rather than guessed from a description: "6 × 20mm
+     * compression coupling" only becomes SKU `PLMB-0042` when somebody holding
+     * both documents says so.
+     */
+    bookStockIn: (data: {
+        purchaseOrderId: string;
+        lines: { goodsReceiptLineId: string; inventoryItemId: string; warehouseId: string }[];
+        notes?: string;
+    }) =>
+        api.post<{
+            purchaseOrderId: string;
+            reference: string;
+            booked: number;
+            movements: number;
+            lines: {
+                goodsReceiptLineId: string;
+                sku: string;
+                itemName: string;
+                warehouseName: string;
+                quantity: number;
+                unitCost: number;
+                description: string;
+            }[];
+            pending: StockInStatus;
+        }>('/inventory/stock-movements/book-in', data),
+
+    /**
+     * A receipt line that will never go on a shelf — a laptop, a printer, a desk.
+     * Without this the pending list never empties, and the same line is raised as
+     * a question every morning for the life of the order.
+     */
+    markNotStock: (goodsReceiptLineId: string) =>
+        api.post<{ message: string; goodsReceiptLineId: string }>(
+            '/inventory/stock-movements/not-stock',
+            { goodsReceiptLineId },
+        ),
+
+    /**
+     * The daily reorder sweep, on demand.
+     *
+     * Idempotent through the notification `dedupeKey`, so running it twice sends
+     * nothing twice — which is what makes exposing it at all safe.
+     */
+    runReorderSweep: () =>
+        api.post<{ organizations: number; sent: number }>(
+            '/inventory/stock-movements/run-reorder-sweep',
+        ),
 };

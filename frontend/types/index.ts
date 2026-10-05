@@ -2352,9 +2352,16 @@ export interface PurchaseOrderStats {
     bySupplier: { supplierId: string; orders: number; value: number }[];
 }
 
-/** What has arrived and still needs stock-in, pending the Inventory module. */
+/**
+ * @deprecated Superseded by `StockInStatus` (Module 11).
+ *
+ * This is the shape the endpoint returned while there was no inventory module to
+ * book goods into: it reported that it could not help, which was honest and was
+ * also why Module 10 could not meet its own acceptance criterion. Kept only so a
+ * stale caller fails to compile rather than silently rendering `undefined`.
+ */
 export interface PendingStockIn {
-    inventoryModuleAvailable: boolean;
+    inventoryModuleAvailable: false;
     note: string;
     pendingLines: {
         receiptId: string;
@@ -2449,3 +2456,266 @@ export interface SupplierSpendRow {
     received: number;
     open: number;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 11 — Inventory
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The one thing to understand about these types: **there is no stock level
+// field anywhere.** `InventoryItemRow.totalQuantity` and `Warehouse.unitsHeld`
+// are computed by the backend on every read, from the sum of the movements, and
+// they arrive on the object rather than being fetched separately. That is why
+// `quantityByWarehouse` ships with every row — the frontend never has to join
+// anything, because the join already happened on the server where the movements
+// live.
+
+/** Derived on the server. Never stored, never settable. */
+export type StockStatus = 'OUT_OF_STOCK' | 'REORDER' | 'OK';
+
+export type InventoryCategory =
+    | 'PAINT'
+    | 'PLUMBING'
+    | 'ELECTRICAL'
+    | 'TILES_FLOORING'
+    | 'BUILDING_MATERIALS'
+    | 'HARDWARE'
+    | 'CLEANING'
+    | 'SAFETY'
+    | 'GARDENING'
+    | 'FURNITURE'
+    | 'APPLIANCES'
+    | 'OTHER';
+
+export type StockMovementType =
+    | 'GOODS_RECEIPT'
+    | 'WORK_ORDER_ISSUE'
+    | 'ADJUSTMENT'
+    | 'OPENING'
+    | 'TRANSFER'
+    | 'RETURN';
+
+/**
+ * What to order, and why.
+ *
+ * `shortfall` is null when the item is in stock — "how far below" of nothing is
+ * a question with no answer, and returning 0 would suggest it is exactly on its
+ * level.
+ */
+export interface ReorderSuggestion {
+    needsReorder: boolean;
+    status: StockStatus;
+    shortfall: number | null;
+    suggestedQuantity: number;
+    /** Null when no price is on file — an unknown cost is not a zero cost. */
+    estimatedCost: number | null;
+    unitOfMeasure: string;
+    reason: string | null;
+}
+
+export interface InventoryItemRow {
+    id: string;
+    sku: string;
+    name: string;
+    description?: string | null;
+    category: InventoryCategory;
+    unitOfMeasure: string;
+    unitCost?: string | number | null;
+    reorderLevel: string | number;
+    reorderQuantity?: string | number | null;
+    notes?: string | null;
+    isActive: boolean;
+    preferredSupplierId?: string | null;
+    preferredSupplier?: {
+        id: string;
+        code: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+    } | null;
+    createdAt: string;
+    updatedAt: string;
+    /** The derived level, summed across every store. */
+    totalQuantity: number;
+    /** Warehouse id → balance. A store with no movements is simply absent. */
+    quantityByWarehouse: Record<string, number>;
+    warehouses: number;
+    movementCount: number;
+    lastMovementAt: string | null;
+    status: StockStatus;
+    statusLabel: string;
+    /** Quantity × last known unit cost. Cheap; the detail page's `valuation` is
+     *  the true weighted average and the two are deliberately different. */
+    valuationValue: number;
+    reorder: ReorderSuggestion;
+}
+
+export interface StockValuation {
+    quantity: number;
+    value: number;
+    averageUnitCost: number | null;
+    /** Movements that carried no cost, so the average is partly assumed. */
+    movementsWithoutCost: number;
+}
+
+export interface StockMovementRow {
+    id: string;
+    itemId: string;
+    warehouseId: string;
+    quantity: number;
+    type: StockMovementType;
+    unitCost: string | number | null;
+    goodsReceiptLineId?: string | null;
+    workOrderId?: string | null;
+    transferGroup?: string | null;
+    reason?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    /** The level as of this movement, not today's level. */
+    balanceAfter: number | null;
+    direction: 'in' | 'out';
+    item: { id: string; sku: string; name: string; unitOfMeasure: string };
+    warehouse: { id: string; name: string; code: string };
+    workOrder?: { id: string; reference: string; title: string; status?: string } | null;
+    goodsReceiptLine?: {
+        id: string;
+        goodsReceipt: {
+            id: string;
+            receivedAt: string;
+            deliveryNote?: string | null;
+            purchaseOrder: { id: string; reference: string };
+        };
+    } | null;
+    createdBy?: { id: string; firstName: string; lastName: string } | null;
+    /** Set on the rows a call just created, so a form can highlight them. */
+    isNew?: boolean;
+}
+
+export interface InventoryItemDetail extends InventoryItemRow {
+    valuation: StockValuation;
+    movements: StockMovementRow[];
+    consumedBy: {
+        movementId: string;
+        quantity: number;
+        issuedAt: string;
+        workOrder: { id: string; reference: string; title: string; status?: string };
+    }[];
+}
+
+export interface WarehouseRow {
+    id: string;
+    code: string;
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    isDefault: boolean;
+    isActive: boolean;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    unitsHeld: number;
+    distinctItems: number;
+    hasStock: boolean;
+}
+
+export interface WarehouseDetail extends WarehouseRow {
+    belowReorder: {
+        id: string;
+        sku: string;
+        name: string;
+        onHand: number;
+        reorderLevel: number;
+        unitOfMeasure: string;
+        unitCost: number | null;
+    }[];
+    recentMovements: StockMovementRow[];
+}
+
+export interface InventoryStats {
+    items: number;
+    warehouses: number;
+    /** Sum of every signed movement. */
+    totalUnits: number;
+    belowReorder: number;
+    outOfStock: number;
+    needsReorder: number;
+    /** Items whose books say less than nothing is there. Needs a stock take. */
+    negativeBalances: number;
+    totalMovements: number;
+    /** Null when no item has a price on file — not the same as zero. */
+    stockValueAtUnitCost: number | null;
+    pricedItems: number;
+    itemsWithoutPrice: number;
+    reorderSuggestions: {
+        itemId: string;
+        quantity: number;
+        unitCost: number | null;
+        unitOfMeasure: string;
+    }[];
+}
+
+export interface StockMovementStats {
+    total: number;
+    last30Days: number;
+    byType: Partial<Record<StockMovementType, number>>;
+    netUnitsByType: Partial<Record<StockMovementType, number>>;
+}
+
+/** One line of Module 10's stock-in, still waiting for a decision. */
+export interface PendingStockInLine {
+    goodsReceiptId: string;
+    goodsReceiptLineId: string;
+    receivedAt: string;
+    deliveryNote: string | null;
+    purchaseOrderLineId: string;
+    description: string;
+    specification: string | null;
+    quantity: number;
+    unitPrice: number;
+    /** True when somebody already said which item it is, but not which store. */
+    itemChosen: boolean;
+    inventoryItem?: {
+        id: string;
+        sku: string;
+        name: string;
+        unitOfMeasure: string;
+    } | null;
+}
+
+/**
+ * Module 11 replaced this shape. It used to be
+ * `{ inventoryModuleAvailable: false, note, pendingLines }` — the honest answer
+ * while there was no inventory module to book goods into, and the reason Module 10
+ * could not meet its own acceptance criterion.
+ */
+export interface StockInStatus {
+    purchaseOrderId: string;
+    reference: string;
+    stockInModuleAvailable: boolean;
+    note: string;
+    pending: PendingStockInLine[];
+    booked: {
+        goodsReceiptLineId: string;
+        inventoryItem: { id: string; sku: string; name: string; unitOfMeasure: string } | null;
+        movementId: string | null;
+        warehouseId: string | null;
+        recordedAt: string | null;
+    }[];
+}
+
+/** What one maintenance job consumed from the store. */
+export interface WorkOrderMaterials {
+    workOrderId: string;
+    movements: StockMovementRow[];
+    /** Net of issues and returns, so a part-used-and-returned job reads as the
+     *  part it actually kept. */
+    consumed: {
+        inventoryItemId: string;
+        sku: string;
+        name: string;
+        unitOfMeasure: string;
+        quantity: number;
+        estimatedCost: number | null;
+    }[];
+    totalEstimatedCost: number;
+}
+

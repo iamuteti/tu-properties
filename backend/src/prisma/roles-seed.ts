@@ -56,6 +56,13 @@ export const PERMISSION_MODULES = [
   'suppliers',
   'rfqs',
   'purchase_orders',
+  // Module 11 — Inventory. Three modules because three different questions: what
+  // do we stock, where is it kept, and what has moved. `warehouses` is separate
+  // from `inventory_items` on purpose — a technician needs to know a store
+  // exists, and only somebody who runs the store renames it.
+  'inventory_items',
+  'warehouses',
+  'stock_movements',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -160,6 +167,11 @@ export const SYSTEM_ROLES: {
       suppliers: full(),
       rfqs: full(),
       purchase_orders: full(),
+      // Module 11: running the store is company work, so the administrator has
+      // the whole of it.
+      inventory_items: full(),
+      warehouses: full(),
+      stock_movements: full(),
     }),
   },
   {
@@ -198,6 +210,12 @@ export const SYSTEM_ROLES: {
       suppliers: view(),
       rfqs: view(),
       purchase_orders: view(),
+      // Module 11: they know what a building needs and where the spare is, so
+      // they can move stock and read the shelf — but the item master and the
+      // store list belong to whoever runs the store.
+      inventory_items: view(),
+      warehouses: view(),
+      stock_movements: viewWrite(),
     }),
   },
   {
@@ -234,6 +252,11 @@ export const SYSTEM_ROLES: {
       // Module 9: a leasing officer gets told about a broken door, not the asset
       // register behind it.
       work_orders: view(),
+      // Module 11: a leasing officer runs a vacancy, not a store. They can see
+      // what stock exists because a tenant asks "is there another bucket?", and
+      // that is the end of it.
+      inventory_items: view(),
+      warehouses: view(),
     }),
   },
   {
@@ -286,6 +309,12 @@ export const SYSTEM_ROLES: {
       suppliers: full(),
       rfqs: view(),
       purchase_orders: full(),
+      // Module 11: the accountant needs the valuation to agree with the ledger,
+      // and a stock movement is what explains a maintenance cost. Reading it is
+      // finance's job; writing it is the store's.
+      inventory_items: view(),
+      warehouses: view(),
+      stock_movements: view(),
     }),
   },
   {
@@ -309,6 +338,11 @@ export const SYSTEM_ROLES: {
       suppliers: view(),
       rfqs: view(),
       purchase_orders: view(),
+      // Module 11: this is the role that owns the store. Maintenance managers run
+      // the plant register, so they run the shelf that feeds it.
+      inventory_items: full(),
+      warehouses: full(),
+      stock_movements: full(),
     }),
   },
   {
@@ -322,6 +356,11 @@ export const SYSTEM_ROLES: {
       // They do not get the register, the calendar or the delete rights.
       work_orders: viewWrite(),
       assets: view(),
+      // Module 11: a technician needs to read the shelf to do the job — "do we
+      // have a 13A plug?" — and needs to record what they took. They do not get
+      // the item master, the store list, or anything that could put stock back.
+      inventory_items: view(),
+      warehouses: view(),
     }),
   },
   {
@@ -363,6 +402,14 @@ export const SYSTEM_ROLES: {
       suppliers: full(),
       rfqs: full(),
       purchase_orders: full(),
+      // Module 11: the reorder decision is a buying decision, so this role can see
+      // the shelf and the reorder list — and book goods in, because the person
+      // signing for a delivery is the person who knows what came. They do not get
+      // the item master: what counts as a store item and what its reorder level
+      // is belongs to whoever runs the store.
+      inventory_items: view(),
+      warehouses: view(),
+      stock_movements: viewWrite(),
     }),
   },
   {

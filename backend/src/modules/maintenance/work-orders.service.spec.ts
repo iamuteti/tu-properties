@@ -15,6 +15,7 @@ import { WorkOrdersService } from './work-orders.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { MaintenanceNotificationsService } from './maintenance-notifications.service';
+import { StockMovementsService } from '@/modules/inventory/stock-movements.service';
 
 /**
  * The parts of the work-order service that are rules rather than plumbing:
@@ -29,6 +30,11 @@ describe('WorkOrdersService', () => {
     announceNewWorkOrder: jest.Mock;
     announceAssigned: jest.Mock;
     announceStatusToTenant: jest.Mock;
+  };
+  let stock: {
+    issueForWorkOrder: jest.Mock;
+    reverseForWorkOrder: jest.Mock;
+    movementsForWorkOrder: jest.Mock;
   };
 
   const technician = {
@@ -168,6 +174,11 @@ describe('WorkOrdersService', () => {
       announceAssigned: jest.fn().mockResolvedValue(undefined),
       announceStatusToTenant: jest.fn().mockResolvedValue(undefined),
     };
+    stock = {
+      issueForWorkOrder: jest.fn().mockResolvedValue([]),
+      reverseForWorkOrder: jest.fn().mockResolvedValue([]),
+      movementsForWorkOrder: jest.fn().mockResolvedValue([]),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -178,6 +189,9 @@ describe('WorkOrdersService', () => {
           provide: MaintenanceNotificationsService,
           useValue: notifications,
         },
+        // Module 11 owns the ledger and the balance rules; this module only
+        // passes the work order reference. The stock module has its own tests.
+        { provide: StockMovementsService, useValue: stock },
       ],
     }).compile();
 

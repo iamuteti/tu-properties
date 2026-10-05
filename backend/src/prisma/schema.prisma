@@ -119,6 +119,10 @@ model Organization {
   purchaseOrderLines         PurchaseOrderLine[]
   goodsReceipts              GoodsReceipt[]
   goodsReceiptLines          GoodsReceiptLine[]
+  // Module 11 — Inventory
+  inventoryItems             InventoryItem[]
+  warehouses                 Warehouse[]
+  stockMovements             StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -208,6 +212,10 @@ model User {
   raisedRfqs                Rfq[]             @relation("UserRaisedRfqs")
   raisedPurchaseOrders      PurchaseOrder[]   @relation("UserRaisedPurchaseOrders")
   receivedPurchaseOrders    GoodsReceipt[]    @relation("UserReceivedPurchaseOrders")
+
+  // Module 11 — Inventory: who booked stock in, out, adjusted or moved it.
+  // Every one of those is a fact about a person, not about the item.
+  recordedStockMovements StockMovement[] @relation("UserRecordedStockMovements")
 
   // Status
   @@index([portalTenantId])
@@ -2586,6 +2594,9 @@ model Supplier {
   rfqInvitations RfqInvitation[]
   rfqQuotes      RfqQuote[]
   purchaseOrders PurchaseOrder[]
+  // Module 11 — Inventory: the vendor an item is normally bought from, so the
+  // reorder suggestion can name one instead of asking a buyer to remember.
+  suppliedItems InventoryItem[] @relation("InventoryItemPreferredSupplier")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2912,6 +2923,10 @@ enum NotificationType {
   APPROVAL_ESCALATED
   OWNER_STATEMENT_READY
   PAYOUT_PAID
+  // Module 11 — Inventory: an item has fallen to (or below) its reorder level.
+  // Distinct from anything else because the recipient is staff deciding to
+  // spend money, not a resident waiting on the office.
+  STOCK_LOW
   CUSTOM
 }
 
@@ -3460,6 +3475,12 @@ model WorkOrder {
   raisedBy   User?   @relation("UserRaisedWorkOrders", fields: [raisedById], references: [id], onDelete: SetNull)
 
   tasks WorkOrderTask[]
+
+  // Module 11 — Inventory: what this job consumed from the store. The rows are
+  // ordinary `StockMovement`s with a `workOrderId`, deliberately NOT a separate
+  // "materials used" table — a second record of the same consumption is a second
+  // number that can disagree with the stock balance.
+  stockMovements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4160,15 +4181,257 @@ model GoodsReceiptLine {
 
   quantity Decimal @db.Decimal(10, 2)
 
-  /// Stock-in is Module 11's job. Until that module exists this column is
-  /// deliberately null rather than a fake flag: the receipt records that goods
-  /// arrived, and Module 11 fills in what happened to the stock. See master doc
-  /// issue 70 for why no speculative link was added instead.
+  /// Module 11 — Inventory. Filled in by `InventoryService.bookGoodsReceipt`
+  /// when the received goods are booked into a warehouse, and it is the reason
+  /// `pendingStockIn` can name exactly what is still waiting. Null means "the
+  /// goods arrived but nobody has decided what store they went into" — which is
+  /// a genuine state, not a failure: a laptop bought for the office has no
+  /// shelf. See master doc issue 70 for why this was left null rather than
+  /// given a speculative link before the table existed.
   inventoryItemId   String?
+  inventoryItem     InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
   stockInRecordedAt DateTime?
+
+  /// The stock movement this receipt line became, when it was booked in.
+  /// `StockMovement.goodsReceiptLineId` is the unique side; one receipt line
+  /// becomes at most one movement.
+  stockMovement StockMovement?
 
   @@index([organizationId])
   @@index([goodsReceiptId])
   @@index([purchaseOrderLineId])
+  @@index([inventoryItemId])
   @@map("goods_receipt_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 11 — Inventory
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The one rule this domain is built around: **a stock level is the sum of the
+// movements, never a stored counter.** Every other module in this schema that
+// has a "quantity" already learned that lesson — `Invoice.paidAmount`,
+// `PurchaseOrderLine.receivedQuantity`, `OwnerStatement` — because a derived
+// number can always be recomputed from the rows that justify it, while a
+// counter has to be kept in step by every writer and drifts the first time one
+// of them forgets. So `InventoryItem` has no `quantityOnHand` column, and
+// `GET /inventory/items` groups the movements and adds them up.
+
+/// What a thing is bought and tracked as. Free text would be useless here: the
+/// whole point of the category is the question "what do we spend on plumbing a
+/// year", and that question needs a bucket rather than a string anybody typed.
+enum InventoryCategory {
+  PAINT
+  PLUMBING
+  ELECTRICAL
+  TILES_FLOORING
+  BUILDING_MATERIALS
+  HARDWARE
+  CLEANING
+  SAFETY
+  GARDENING
+  FURNITURE
+  APPLIANCES
+  OTHER
+}
+
+/// Why stock moved. Not free text, because the *reason* decides three things:
+/// whether the movement needs a reference (a receipt, a work order), whether it
+/// may make stock negative, and what a stock-take variance is allowed to be.
+enum StockMovementType {
+  /// Goods booked in against a purchase order's goods receipt. Always has a
+  /// `goodsReceiptLineId`, and always `IN`.
+  GOODS_RECEIPT
+
+  /// Consumed by a maintenance work order. Always has a `workOrderId`, and
+  /// always `OUT`.
+  WORK_ORDER_ISSUE
+
+  /// A correction after counting the shelf. The only type that may move stock in
+  /// either direction and the only one that may leave it negative, because a
+  /// count that disagrees with the books is precisely the case where the books
+  /// are wrong and the count is right.
+  ADJUSTMENT
+
+  /// Opening balance for an item that was already on the shelf before this
+  /// module existed. Always `IN`.
+  OPENING
+
+  /// Moved between two warehouses: **two rows**, an `OUT` from the source and an
+  /// `IN` at the destination, paired by a shared `transferGroup`. One row with
+  /// two warehouses would make the movement belong to both and neither, and a
+  /// warehouse's balance would stop being derivable.
+  TRANSFER
+
+  /// Went back to a supplier, or came back off a job. May be either direction.
+  RETURN
+}
+
+/// A stock item: the thing that is counted.
+///
+/// Note what is absent. There is no quantity, no `currentStock`, no
+/// `lastStockedAt` — all of that is the sum of `StockMovement`s, computed on
+/// read. `unitCost` is the *last known* price, kept for the reorder suggestion's
+/// estimate and as the fallback valuation when a movement has no cost of its own;
+/// the authoritative valuation walks the movement history.
+model InventoryItem {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Unique per organization, not globally: two companies both stocking "PTR-20"
+  /// is normal, and a globally unique SKU makes the second company unable to
+  /// create the item that already exists in their world.
+  sku String
+
+  name        String
+  description String?          @db.Text
+  category    InventoryCategory @default(OTHER)
+
+  /// The unit the quantity is counted in — "litre", "roll", "box", "metre". The
+  /// label rather than a conversion table on purpose: a property manager buying
+  /// paint does not think in millilitres, and a conversion-factor engine is a
+  /// second source of truth nobody will maintain.
+  unitOfMeasure String           @default("unit")
+
+  /// Last known buying price per unit, in the organization's default currency.
+  /// Used to estimate a reorder's cost and to value stock whose movements carry
+  /// no cost; it is a *hint*, and `StockMovement.unitCost` is the real price.
+  unitCost Decimal? @db.Decimal(14, 4)
+
+  /// Below this the item needs ordering. Zero means "never reorder
+  /// automatically" — a deliberate way to say this is tracked but not
+  /// auto-alerted, which is right for a one-off bracket nobody reorders.
+  reorderLevel Decimal @default(0) @db.Decimal(12, 2)
+
+  /// How much to put on the order when it drops below `reorderLevel`. Null
+  /// means "top up to twice the level", which is the only sensible default and
+  /// the one a buyer would otherwise retype into every item.
+  reorderQuantity Decimal? @db.Decimal(12, 2)
+
+  /// The vendor this is normally bought from. Picked from the suppliers Module
+  /// 10 already has, so the reorder suggestion can name one.
+  preferredSupplierId String?
+  preferredSupplier   Supplier? @relation("InventoryItemPreferredSupplier", fields: [preferredSupplierId], references: [id], onDelete: SetNull)
+
+  notes String? @db.Text
+
+  /// Retired rather than deleted: a movement that referenced a deleted item
+  /// would leave the ledger un-summable, and "we stopped stocking this" is a
+  /// fact worth keeping.
+  isActive Boolean @default(true)
+
+  movements       StockMovement[]
+  goodsReceiptLines GoodsReceiptLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, sku])
+  @@index([organizationId])
+  @@index([category])
+  @@map("inventory_items")
+}
+
+/// Somewhere stock is kept. A main store, a site store for one estate, a van.
+model Warehouse {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Short code so a delivery note can say "MAIN" instead of the full name.
+  code String
+  name String
+
+  address String? @db.Text
+  phone   String?
+
+  /// The store stock lands in when a receipt or an issue does not say where.
+  /// At most one is honoured per organization (`warehouses.service` demotes the
+  /// others) because "which one is the default?" is otherwise a question every
+  /// screen has to answer.
+  isDefault Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  notes String? @db.Text
+
+  movements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("warehouses")
+}
+
+/// One movement of stock, in or out, at one warehouse.
+///
+/// The ledger itself. `quantity` is signed — positive in, negative out — so a
+/// balance is `sum(quantity)` and nothing else; that is the whole derivation,
+/// and it is why there is no balance column anywhere in this domain.
+///
+/// Costs are **snapshotted per movement** rather than looked up on the item.
+/// Valuation is then a function of history: a bucket of paint bought at 1,200
+/// and a bucket bought at 1,450 must value differently, and reading today's
+/// `InventoryItem.unitCost` for a movement made last year values both at the
+/// current price and quietly inflates or deflates stock on the books.
+model StockMovement {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  /// Signed: positive brought stock in, negative took it out.
+  quantity Decimal @db.Decimal(12, 2)
+
+  type StockMovementType
+
+  /// What this movement cost per unit at the time. Null on an `OUT`, where the
+  /// cost is the one that came *in* — an issue does not create a new price.
+  unitCost Decimal? @db.Decimal(14, 4)
+
+  /// Set for `GOODS_RECEIPT`. The idempotency key is the unique index on it:
+  /// booking the same receipt line in twice raises the same constraint error
+  /// that `dedupeKey` raises for a reminder, which is the reason the column
+  /// exists rather than a boolean the caller could set twice.
+  goodsReceiptLineId String? @unique
+  goodsReceiptLine   GoodsReceiptLine? @relation(fields: [goodsReceiptLineId], references: [id], onDelete: Restrict)
+
+  /// Set for `WORK_ORDER_ISSUE`.
+  workOrderId String?
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+
+  /// Pairs the two halves of a transfer. Both rows share one value, so "show me
+  /// the moves from the site store to the main store" is a single equality
+  /// filter rather than a join on sign.
+  transferGroup String?
+
+  /// Why it moved, in words. Required for `ADJUSTMENT` (the count disagreed and
+  /// a person has to say by how much and why) and optional elsewhere.
+  reason String? @db.Text
+
+  notes String? @db.Text
+
+  createdById String?
+  createdBy   User?   @relation("UserRecordedStockMovements", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([itemId])
+  @@index([warehouseId])
+  @@index([itemId, warehouseId])
+  @@index([workOrderId])
+  @@index([type])
+  @@map("stock_movements")
 }

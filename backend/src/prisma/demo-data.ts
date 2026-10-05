@@ -40,6 +40,8 @@ import {
   QuoteStatus,
   SupplierStatus,
   SupplierCategory,
+  InventoryCategory,
+  StockMovementType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -3109,6 +3111,537 @@ async function generateProcurementData(
   );
 }
 
+/**
+ * Module 11 — the maintenance store, seeded as a working ledger.
+ *
+ * The important part of this is not the item list, it is the *arrangement*: the
+ * movements are laid out so every state the module can be in is reachable from
+ * the demo without editing a row.
+ *
+ * - **One item is exactly at its reorder level** — so the "below reorder" list can
+ *   be seen to be a `<` and not a `<=`.
+ * - **One is empty, one is below, and one has drifted *negative*** — the negative
+ *   is deliberate and is the case the module refuses to paper over: the books say
+ *   there is less than nothing here, which is a stock take's problem, not a
+ *   purchase order's.
+ * - **Two receipt lines from Module 10's purchase orders are booked in**, so the
+ *   procurement seam shows `booked` as well as `pending`, and one PO's line is
+ *   deliberately left waiting so the stock-in screen has something to do.
+ * - **A work order has consumed material and part of it came back**, which is the
+ *   shape a real job has and the only way the "put back" path is visible.
+ * - **A transfer pair exists**, so both halves of a transfer can be seen to net
+ *   to zero across the two stores.
+ *
+ * Balances are never written: every one of them is the sum of the rows below, which
+ * is the whole design of the module and the reason a "fix the demo data" edit is
+ * never needed.
+ */
+async function generateInventoryData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const day = 86_400_000;
+  const now = Date.now();
+
+  const technician = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.TECHNICIAN },
+    select: { id: true },
+  });
+  const maintenanceManager = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.MAINTENANCE_MANAGER },
+    select: { id: true },
+  });
+  const actor = technician?.id ?? maintenanceManager?.id;
+  if (!actor) return;
+
+  // Suppliers were seeded by Module 10; the items name the one they are normally
+  // bought from so the reorder list can say "order from X" without anybody
+  // remembering.
+  const suppliers = await prisma.supplier.findMany({
+    where: { organizationId },
+    select: { id: true, name: true, category: true },
+  });
+  const supplierFor = (category: SupplierCategory) =>
+    suppliers.find((row) => row.category === category)?.id;
+
+  const mainStore = await prisma.warehouse.create({
+    data: {
+      organizationId,
+      code: 'MAIN',
+      name: 'Main store — Westgate offices',
+      address: 'Ground floor, Westgate House, Nairobi',
+      phone: '+254700100100',
+      isDefault: true,
+      createdAt: new Date(now - 400 * day),
+    },
+  });
+
+  const siteStore = await prisma.warehouse.create({
+    data: {
+      organizationId,
+      code: 'SITE-T',
+      name: 'Tamarind Court site store',
+      address: 'Tamarind Court, Nairobi',
+      phone: '+254700100101',
+      notes: 'Held by the caretaker. Key from the property manager.',
+      createdAt: new Date(now - 380 * day),
+    },
+  });
+
+  const itemPlan: {
+    sku: string;
+    name: string;
+    description?: string;
+    category: InventoryCategory;
+    unitOfMeasure: string;
+    unitCost: number;
+    reorderLevel: number;
+    reorderQuantity?: number;
+    supplier?: SupplierCategory;
+    opening: number;
+    /** Drawn down by issues, dated relative to today. */
+    issues: { quantity: number; daysAgo: number }[];
+    /** One count variance, where the demo needs the item to look wrong. */
+    adjustment?: { quantity: number; daysAgo: number; reason: string };
+    siteStoreQuantity?: number;
+  }[] = [
+    {
+      sku: 'PNT-WHT-001',
+      name: 'White emulsion paint, 20 litres',
+      description: 'Interior matt, first grade. One tin covers roughly 250 m².',
+      category: InventoryCategory.PAINT,
+      unitOfMeasure: 'tin',
+      unitCost: 18500,
+      reorderLevel: 4,
+      reorderQuantity: 6,
+      supplier: SupplierCategory.CLEANING,
+      opening: 9,
+      // Down to 2, which is below the level of 4.
+      issues: [
+        { quantity: 3, daysAgo: 26 },
+        { quantity: 2, daysAgo: 11 },
+        { quantity: 2, daysAgo: 4 },
+      ],
+      siteStoreQuantity: 1,
+    },
+    {
+      sku: 'PLMB-CPL-020',
+      name: '20mm compression coupling',
+      description: 'Copper-to-copper, for the riser repairs on the older blocks.',
+      category: InventoryCategory.PLUMBING,
+      unitOfMeasure: 'piece',
+      unitCost: 380,
+      reorderLevel: 20,
+      supplier: SupplierCategory.PLUMBING,
+      opening: 64,
+      issues: [
+        { quantity: 14, daysAgo: 30 },
+        { quantity: 22, daysAgo: 16 },
+        { quantity: 18, daysAgo: 5 },
+      ],
+      // The count came up short and the books now disagree with the shelf.
+      adjustment: {
+        quantity: -6,
+        daysAgo: 3,
+        reason: 'Stock take at the main store: counted 58, books said 64. Two taken for the Blue Ridge job without being signed out.',
+      },
+    },
+    {
+      sku: 'ELEC-TAP-013',
+      name: '13A switched socket outlet',
+      category: InventoryCategory.ELECTRICAL,
+      unitOfMeasure: 'piece',
+      unitCost: 420,
+      reorderLevel: 10,
+      supplier: SupplierCategory.ELECTRICAL,
+      opening: 24,
+      // Four left in the main store, two at the site. The list's status is on the
+      // *total* across stores, deliberately: a reorder is bought once from a
+      // supplier who delivers wherever, so an item that is comfortable in one
+      // place and empty in another is one order, not two.
+      issues: [
+        { quantity: 5, daysAgo: 22 },
+        { quantity: 6, daysAgo: 9 },
+        { quantity: 9, daysAgo: 2 },
+      ],
+      siteStoreQuantity: 2,
+    },
+    {
+      sku: 'BLD-CEM-050',
+      name: 'Cement, 50 kg bag',
+      category: InventoryCategory.BUILDING_MATERIALS,
+      unitOfMeasure: 'bag',
+      unitCost: 1150,
+      reorderLevel: 30,
+      supplier: SupplierCategory.PLUMBING,
+      opening: 48,
+      issues: [
+        { quantity: 18, daysAgo: 19 },
+        { quantity: 20, daysAgo: 6 },
+      ],
+      siteStoreQuantity: 12,
+    },
+    {
+      sku: 'BLD-TIL-600',
+      name: 'Ceramic floor tile, 600 × 600 mm',
+      description: 'Glazed, matt finish. A box covers about 1.4 m².',
+      category: InventoryCategory.TILES_FLOORING,
+      unitOfMeasure: 'box',
+      unitCost: 2400,
+      // Exactly what is on the shelf after the issue below. The alert fires on a
+      // *strict* drop below the level, so this item reads "in stock" right up
+      // until one more box leaves — which is the behaviour worth demonstrating,
+      // because the alternative alerts on every single movement.
+      reorderLevel: 13,
+      supplier: SupplierCategory.MECHANICAL,
+      opening: 18,
+      issues: [{ quantity: 5, daysAgo: 14 }],
+    },
+    {
+      sku: 'BLD-PIP-110',
+      name: '110 mm PVC waste pipe, 3 m',
+      category: InventoryCategory.PLUMBING,
+      unitOfMeasure: 'length',
+      unitCost: 1650,
+      reorderLevel: 8,
+      supplier: SupplierCategory.PLUMBING,
+      // 14 in, 11 issued to jobs, 3 moved to the site store. The main store ends
+      // at exactly zero, which is the state where "do we have any?" and "how many
+      // do we have?" have different answers and the reorder list matters most.
+      opening: 14,
+      issues: [
+        { quantity: 4, daysAgo: 34 },
+        { quantity: 5, daysAgo: 17 },
+        { quantity: 2, daysAgo: 8 },
+      ],
+      siteStoreQuantity: 3,
+    },
+    {
+      sku: 'HRD-SCR-008',
+      name: 'Wood screws, 8 mm × 40 mm',
+      category: InventoryCategory.HARDWARE,
+      unitOfMeasure: 'box',
+      unitCost: 850,
+      reorderLevel: 5,
+      supplier: SupplierCategory.ELECTRICAL,
+      opening: 14,
+      issues: [{ quantity: 3, daysAgo: 12 }],
+      siteStoreQuantity: 4,
+    },
+    {
+      sku: 'CLN-DET-005',
+      name: 'Heavy-duty surface cleaner, 5 litres',
+      category: InventoryCategory.CLEANING,
+      unitOfMeasure: 'jerrycan',
+      unitCost: 1250,
+      reorderLevel: 6,
+      supplier: SupplierCategory.CLEANING,
+      opening: 8,
+      issues: [{ quantity: 4, daysAgo: 7 }],
+      // The deliberately broken one. The books end up at **minus five**, which is
+      // the case the module refuses to paper over: a count cannot be negative in
+      // the real world, so this is a data-entry problem, and the reorder
+      // suggestion says so in as many words rather than cheerfully ordering more
+      // cleaning fluid on top of an error. `checkMovement` allows it only because
+      // an ADJUSTMENT is the one movement permitted to record that the books are
+      // the thing that is wrong.
+      adjustment: {
+        quantity: -9,
+        daysAgo: 2,
+        reason: 'Stock take at the main store: counted nothing at all — the shelf is empty and the books said four. Someone has been taking it without signing it out.',
+      },
+    },
+    {
+      sku: 'SAF-EXT-002',
+      name: 'Fire extinguisher service tag',
+      description: 'The annual service label. Cheap, consumed one per unit.',
+      category: InventoryCategory.SAFETY,
+      unitOfMeasure: 'piece',
+      unitCost: 120,
+      reorderLevel: 25,
+      supplier: SupplierCategory.MECHANICAL,
+      opening: 60,
+      issues: [{ quantity: 28, daysAgo: 20 }],
+    },
+    {
+      sku: 'HRD-BRC-003',
+      name: 'Standard door closer',
+      category: InventoryCategory.HARDWARE,
+      unitOfMeasure: 'piece',
+      unitCost: 3200,
+      // No reorder level at all: tracked, never reordered automatically. The
+      // status filter has to show this as OK rather than permanently empty.
+      reorderLevel: 0,
+      supplier: SupplierCategory.MECHANICAL,
+      opening: 3,
+      issues: [{ quantity: 1, daysAgo: 44 }],
+    },
+  ];
+
+  const created = new Map<string, string>();
+  let movementCount = 0;
+
+  for (const plan of itemPlan) {
+    const item = await prisma.inventoryItem.create({
+      data: {
+        organizationId,
+        sku: plan.sku,
+        name: plan.name,
+        description: plan.description,
+        category: plan.category,
+        unitOfMeasure: plan.unitOfMeasure,
+        unitCost: plan.unitCost,
+        reorderLevel: plan.reorderLevel,
+        reorderQuantity: plan.reorderQuantity,
+        notes: undefined,
+        ...(plan.supplier
+          ? { preferredSupplierId: supplierFor(plan.supplier) }
+          : {}),
+        createdAt: new Date(now - 400 * day),
+      },
+    });
+
+    created.set(plan.sku, item.id);
+
+    const opening = await prisma.stockMovement.create({
+      data: {
+        organizationId,
+        itemId: item.id,
+        warehouseId: mainStore.id,
+        quantity: plan.opening,
+        type: StockMovementType.OPENING,
+        unitCost: plan.unitCost,
+        reason: 'Opening balance — stock counted when the store was set up',
+        createdById: actor,
+        createdAt: new Date(now - 395 * day),
+      },
+    });
+    movementCount += 1;
+
+    // A second, dearer purchase later on, so the weighted-average valuation has
+    // something to average. Painting at one price forever would hide the whole
+    // point of snapshotting the cost per movement.
+    if (plan.reorderLevel > 0 && plan.opening > 20) {
+      await prisma.stockMovement.create({
+        data: {
+          organizationId,
+          itemId: item.id,
+          warehouseId: mainStore.id,
+          quantity: Math.round(plan.opening / 2),
+          type: StockMovementType.GOODS_RECEIPT,
+          unitCost: Math.round(plan.unitCost * 1.12 * 100) / 100,
+          reason: 'Top-up purchase at the March price list',
+          createdById: actor,
+          createdAt: new Date(now - 70 * day),
+        },
+      });
+      movementCount += 1;
+    }
+
+    for (const issue of plan.issues) {
+      await prisma.stockMovement.create({
+        data: {
+          organizationId,
+          itemId: item.id,
+          warehouseId: mainStore.id,
+          quantity: -issue.quantity,
+          type: StockMovementType.WORK_ORDER_ISSUE,
+          reason: 'Issued from the main store',
+          createdById: actor,
+          createdAt: new Date(now - issue.daysAgo * day),
+        },
+      });
+      movementCount += 1;
+    }
+
+    if (plan.adjustment) {
+      await prisma.stockMovement.create({
+        data: {
+          organizationId,
+          itemId: item.id,
+          warehouseId: mainStore.id,
+          quantity: plan.adjustment.quantity,
+          type: StockMovementType.ADJUSTMENT,
+          reason: plan.adjustment.reason,
+          createdById: actor,
+          createdAt: new Date(now - plan.adjustment.daysAgo * day),
+        },
+      });
+      movementCount += 1;
+    }
+
+    if (plan.siteStoreQuantity) {
+      await prisma.stockMovement.create({
+        data: {
+          organizationId,
+          itemId: item.id,
+          warehouseId: siteStore.id,
+          quantity: plan.siteStoreQuantity,
+          type: StockMovementType.OPENING,
+          unitCost: plan.unitCost,
+          reason: 'Stocked at the site store when it opened',
+          createdById: actor,
+          createdAt: new Date(now - 300 * day),
+        },
+      });
+      movementCount += 1;
+    }
+
+    void opening;
+  }
+
+  // ── A transfer: two rows, one group ─────────────────────────────────────
+  const transferGroup = 'TRF-2026-DEMO01';
+  const pipesId = created.get('BLD-PIP-110');
+  const screwsId = created.get('HRD-SCR-008');
+  for (const [itemId, quantity, fromName, toName] of [
+    [pipesId, 3, 'Main store — Westgate offices', 'Tamarind Court site store'],
+    [screwsId, 2, 'Main store — Westgate offices', 'Tamarind Court site store'],
+  ] as const) {
+    if (!itemId) continue;
+    await prisma.stockMovement.create({
+      data: {
+        organizationId,
+        itemId,
+        warehouseId: mainStore.id,
+        quantity: -quantity,
+        type: StockMovementType.TRANSFER,
+        transferGroup,
+        reason: `Transfer to ${toName}`,
+        createdById: actor,
+        createdAt: new Date(now - 10 * day),
+      },
+    });
+    await prisma.stockMovement.create({
+      data: {
+        organizationId,
+        itemId,
+        warehouseId: siteStore.id,
+        quantity,
+        type: StockMovementType.TRANSFER,
+        transferGroup,
+        reason: `Transfer from ${fromName}`,
+        createdById: actor,
+        createdAt: new Date(now - 10 * day),
+      },
+    });
+    movementCount += 2;
+  }
+
+  // ── One job that took material, and part of it came back ─────────────────
+  // Written against a real work order rather than a made-up reference: the item
+  // page's "used on" list is only interesting if it points at jobs that exist.
+  const job = await prisma.workOrder.findFirst({
+    where: {
+      organizationId,
+      status: { not: WorkOrderStatus.CANCELLED },
+      title: { contains: 'eplumbing' },
+    },
+    orderBy: { reportedAt: 'desc' },
+    select: { id: true, reference: true, title: true },
+  });
+
+  if (job && pipesId && screwsId) {
+    const issue = await prisma.stockMovement.create({
+      data: {
+        organizationId,
+        itemId: pipesId,
+        warehouseId: mainStore.id,
+        quantity: -2,
+        type: StockMovementType.WORK_ORDER_ISSUE,
+        workOrderId: job.id,
+        reason: `Issued to ${job.reference}: ${job.title}`,
+        createdById: actor,
+        createdAt: new Date(now - 8 * day),
+      },
+    });
+    movementCount += 1;
+
+    await prisma.stockMovement.create({
+      data: {
+        organizationId,
+        itemId: screwsId,
+        warehouseId: mainStore.id,
+        quantity: -1,
+        type: StockMovementType.WORK_ORDER_ISSUE,
+        workOrderId: job.id,
+        reason: `Issued to ${job.reference}: ${job.title}`,
+        createdById: actor,
+        createdAt: new Date(now - 8 * day),
+      },
+    });
+    movementCount += 1;
+
+    // One coupling came back: the wrong size was on the van. A return row rather
+    // than editing the issue, so the ledger keeps saying what actually happened.
+    await prisma.stockMovement.create({
+      data: {
+        organizationId,
+        itemId: pipesId,
+        warehouseId: mainStore.id,
+        quantity: 1,
+        type: StockMovementType.RETURN,
+        workOrderId: job.id,
+        reason: `Put back to the store from ${issue.id}`,
+        createdById: actor,
+        createdAt: new Date(now - 7 * day),
+      },
+    });
+    movementCount += 1;
+  }
+
+  // ── The procurement seam, with a real receipt behind it ─────────────────
+  // Module 10 seeded a part-delivered order and a delivered one. The lift ropes
+  // are store stock, so that receipt line is booked in; the reception chair is
+  // deliberately left pending, which is both honest (it is furniture for an
+  // office, not a shelf) and the thing the stock-in screen needs to show work.
+  const liftOrder = await prisma.purchaseOrder.findFirst({
+    where: {
+      organizationId,
+      deliveries: { some: { lines: { some: {} } } },
+    },
+    include: { deliveries: { include: { lines: { include: { purchaseOrderLine: true } } } } },
+    orderBy: { orderDate: 'asc' },
+  });
+
+  if (liftOrder) {
+    const line = liftOrder.deliveries[0]?.lines[0];
+    if (line) {
+      const itemId =
+        created.get('PLMB-CPL-020') ?? created.get('BLD-PIP-110') ?? null;
+      if (itemId) {
+        const orderLine = line.purchaseOrderLine;
+        const movement = await prisma.stockMovement.create({
+          data: {
+            organizationId,
+            itemId,
+            warehouseId: mainStore.id,
+            quantity: Number(line.quantity),
+            type: StockMovementType.GOODS_RECEIPT,
+            unitCost: Number(orderLine.unitPrice),
+            goodsReceiptLineId: line.id,
+            reason: `Goods received on ${liftOrder.reference}`,
+            createdById: actor,
+            createdAt: new Date(liftOrder.deliveries[0].receivedAt),
+          },
+        });
+        movementCount += 1;
+
+        await prisma.goodsReceiptLine.update({
+          where: { id: line.id },
+          data: { inventoryItemId: itemId, stockInRecordedAt: new Date() },
+        });
+
+        void movement;
+      }
+    }
+  }
+
+  console.log(
+    `  Inventory: 2 stores, ${itemPlan.length} items, ${movementCount} stock movements`,
+  );
+}
+
 // Main function to run demo data generation standalone
 export async function seedDemoData() {
   const connectionString = process.env.DATABASE_URL;
@@ -3156,6 +3689,10 @@ export async function seedDemoData() {
     // every one of those tables points at the one before it, so they are cleared
     // child-first. Suppliers themselves survive (nothing above clears them), which
     // is why their codes keep counting up rather than restarting at SUP-0001.
+    // Module 11's movements are cleared first of all: they are the only table
+    // that references purchase-order lines *and* work orders *and* goods-receipt
+    // lines, so they must go before any of the three.
+    await prisma.stockMovement.deleteMany();
     await prisma.goodsReceiptLine.deleteMany();
     await prisma.goodsReceipt.deleteMany();
     await prisma.purchaseOrderLine.deleteMany();
@@ -3175,6 +3712,11 @@ export async function seedDemoData() {
     await prisma.preventiveMaintenanceRun.deleteMany();
     await prisma.preventiveMaintenanceSchedule.deleteMany();
     await prisma.asset.deleteMany();
+    // Module 11: items are referenced by nothing once their movements are gone,
+    // and the stores likewise — cleared here so a second seed run does not trip
+    // the `(organizationId, sku)` and `(organizationId, code)` unique indexes.
+    await prisma.inventoryItem.deleteMany();
+    await prisma.warehouse.deleteMany();
     await prisma.unitFeature.deleteMany();
     await prisma.unitMeterNumber.deleteMany();
     await prisma.unitServiceCharge.deleteMany();
@@ -3424,6 +3966,11 @@ export async function seedDemoData() {
     // (Module 10). After maintenance, because the seeded requests are raised by
     // the maintenance team — the usual case for the parts purchases.
     await generateProcurementData(prisma, rohiOrg.id);
+
+    // The maintenance store (Module 11). Last of the three, because it needs
+    // both: work orders to consume material and purchase orders whose goods
+    // receipts become the opening stock-in the demo shows.
+    await generateInventoryData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.

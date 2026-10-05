@@ -19,6 +19,7 @@ import { PurchaseOrdersService } from './purchase-orders.service';
 import { RfqsService } from './rfqs.service';
 import { ProcurementSuppliersService } from './suppliers.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { GoodsReceiptStockInService } from '@/modules/inventory/goods-receipt-stock-in.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
 import { PayablesService } from '@/modules/finance/payables/payables.service';
@@ -458,6 +459,10 @@ describe('Procurement services', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { logAction: jest.fn() } },
         { provide: PayablesService, useValue: payables },
+        // Module 11's stock-in service, for real: `pendingStockIn` delegates to
+        // it rather than reporting on the receipt rows itself, and a stub would
+        // only prove the call happened.
+        GoodsReceiptStockInService,
         {
           provide: NotificationsService,
           useValue: { notify: jest.fn().mockResolvedValue(undefined) },
@@ -857,11 +862,41 @@ describe('Procurement services', () => {
     expect(result.receivedPercent).toBe(50);
   });
 
-  it('reports honestly that stock-in has nowhere to go yet', async () => {
+  it('reports the receipt lines that still need booking onto a shelf', async () => {
+    prisma.__orderRows[0].deliveries = [
+      {
+        id: 'gr-1',
+        receivedAt: new Date(),
+        deliveryNote: 'DN-88',
+        lines: [
+          {
+            id: 'grl-1',
+            purchaseOrderLineId: 'pol-1',
+            quantity: 2,
+            inventoryItemId: null,
+            inventoryItem: null,
+            stockMovement: null,
+            purchaseOrderLine: {
+              description: '20mm compression coupling',
+              specification: null,
+              unitPrice: 250,
+              quantity: 4,
+              receivedQuantity: 2,
+            },
+          },
+        ],
+      },
+    ];
+
     const result = await orders.pendingStockIn('po-1', 'org-1');
 
-    expect(result.inventoryModuleAvailable).toBe(false);
-    expect(result.note).toContain('Inventory module');
+    // The honest answer is now a list of decisions somebody has to make, rather
+    // than "the inventory module does not exist yet" (master doc issue 81).
+    expect(result.stockInModuleAvailable).toBe(true);
+    expect(result.pending).toHaveLength(1);
+    expect(result.pending[0].goodsReceiptLineId).toBe('grl-1');
+    expect(result.pending[0].description).toBe('20mm compression coupling');
+    expect(result.pending[0].itemChosen).toBe(false);
   });
 
   // ==================================================================

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Award, Check, Clock, PackageCheck, ThumbsDown, Zap } from "lucide-react";
+import { AlertTriangle, Award, Check, Clock, ThumbsDown, Zap } from "lucide-react";
 import {
     Table,
     TableBody,
@@ -327,17 +327,16 @@ export function ReceiptProgress({
     );
 }
 
-/** The stock-in panel: honest about Module 11 not existing yet. */
-export function StockInNotice({ pendingLines }: { pendingLines: number }) {
-    if (pendingLines === 0) return null;
-    return (
-        <p className="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
-            <PackageCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-                {pendingLines} received {pendingLines === 1 ? "line is" : "lines are"} waiting on
-                stock-in. The Inventory module does not exist yet, so the deliveries above are
-                the record — nothing here claims stock has moved when it has not.
-            </span>
-        </p>
-    );
-}
+/**
+ * @deprecated Removed in Module 11. This used to say "the Inventory module does not
+ * exist yet" under the receipts on a purchase order, which was honest and was also
+ * why Module 10 could not meet its own acceptance criterion: a goods receipt
+ * recorded that the paint had arrived and nothing further happened.
+ *
+ * The replacement is `StockInPanel` (`@/components/inventory/stock-in-panel`), which
+ * does the job: it asks which item each delivery became and which store it went to,
+ * and writes the movements. Kept as a note rather than deleted silently, because
+ * "the receipt screen says the module is missing" was a real state of this
+ * codebase and somebody reading this later should know what replaced it and why.
+ */
+export type StockInNoticeRemoved = never;

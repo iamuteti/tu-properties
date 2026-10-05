@@ -128,13 +128,13 @@ export class PurchaseOrdersController {
   /**
    * What has arrived and still needs stock-in.
    *
-   * Reports honestly that Inventory (Module 11) does not exist yet rather than
-   * pretending stock was moved; see the service for why no speculative
-   * `inventoryItemId` was added instead.
+   * Answers through Module 11's service, so the mapping between a purchase order
+   * line ("6 × 20mm compression coupling") and an inventory item is a decision
+   * somebody records rather than a guess the API makes.
    */
   @Get(':id/stock-in')
   @Roles(...VIEW_ROLES)
-  @Permissions('purchase_orders.view')
+  @Permissions('purchase_orders.view', 'inventory_items.view')
   pendingStockIn(@Param('id') id: string, @Request() req) {
     return this.orders.pendingStockIn(id, getTenantId(req));
   }

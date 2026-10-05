@@ -45,6 +45,12 @@ Receipt,
     ClipboardList,
     Award,
     Truck,
+    // Module 11 — Inventory. `Package` for the catalogue, `Warehouse` for the
+    // stores, `ArrowLeftRight` for the ledger — the ledger is a transfer-shaped
+    // screen and reads as one.
+    Package,
+    Warehouse,
+    ArrowLeftRight,
 } from "lucide-react";
 
 type UserRole =
@@ -99,6 +105,21 @@ const navItems: NavItem[] = [
             { href: '/procurement/rfqs', label: 'Quotations', icon: FileStack, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
             { href: '/procurement/purchase-orders', label: 'Purchase orders', icon: Truck, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
             { href: '/procurement/suppliers', label: 'Suppliers', icon: Award, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'] },
+        ],
+    },
+    {
+        // Module 11 — Inventory. Sits next to Procurement because the two are two
+        // halves of one loop: an order commits to buy, the store holds what
+        // arrived. The roles mirror the backend's split exactly — a technician and
+        // an accountant can read the shelf and the ledger but write neither, and
+        // that is not an accident of the nav, it is `inventory-roles.ts`.
+        label: 'Inventory',
+        icon: Package,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'],
+        children: [
+            { href: '/inventory/items', label: 'Items', icon: Package, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
+            { href: '/inventory/warehouses', label: 'Stores', icon: Warehouse, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
+            { href: '/inventory/stock-movements', label: 'Stock ledger', icon: ArrowLeftRight, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
         ],
     },
     {

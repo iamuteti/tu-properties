@@ -26,10 +26,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { ErrorState, LoadingState, StatusBadge } from "@/components/ui/entity-states";
-import {
-    ReceiptProgress,
-    StockInNotice,
-} from "@/components/procurement/quote-comparison";
+import { ReceiptProgress } from "@/components/procurement/quote-comparison";
+import { StockInPanel } from "@/components/inventory/stock-in-panel";
 import { procurementApi } from "@/lib/api";
 import type { PurchaseOrder } from "@/types";
 
@@ -444,10 +442,10 @@ export default function PurchaseOrderDetailPage() {
                                     </div>
                                 ))
                             )}
-
-                            <StockInNotice pendingLines={order.pendingStockInLines ?? 0} />
                         </CardContent>
                     </Card>
+
+                    <StockInPanel purchaseOrderId={order.id} />
                 </div>
 
                 <div className="space-y-6">

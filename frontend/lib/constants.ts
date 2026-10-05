@@ -751,3 +751,156 @@ export function describeCadence(frequencyDays: number): string {
     const match = PM_CADENCES.find((cadence) => cadence.value === frequencyDays);
     return match ? match.label : `Every ${frequencyDays} days`;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 11 — Inventory
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Why a category, rather than a free-text field.
+ *
+ * The question the whole field exists to answer is "what do we spend on plumbing a
+ * year", and that needs a bucket rather than a string anybody typed. Free text
+ * would answer it as "plumbing", "Plumbing", "plmb" and "bathroom" — four
+ * categories, one spend.
+ */
+export const INVENTORY_CATEGORIES: Array<{
+    value: string;
+    label: string;
+    hint: string;
+}> = [
+    { value: 'PAINT', label: 'Paint', hint: 'Emulsion, enamel, primer, varnish' },
+    { value: 'PLUMBING', label: 'Plumbing', hint: 'Pipe, fittings, valves, taps' },
+    { value: 'ELECTRICAL', label: 'Electrical', hint: 'Sockets, switches, cable, boards' },
+    { value: 'TILES_FLOORING', label: 'Tiles & flooring', hint: 'Tiles, screed, skirting, lino' },
+    { value: 'BUILDING_MATERIALS', label: 'Building materials', hint: 'Cement, sand, blocks, timber' },
+    { value: 'HARDWARE', label: 'Hardware', hint: 'Screws, hinges, handles, brackets' },
+    { value: 'CLEANING', label: 'Cleaning', hint: 'Detergent, sanitiser, cloths, mops' },
+    { value: 'SAFETY', label: 'Safety', hint: 'Fire, first aid, signage, PPE' },
+    { value: 'GARDENING', label: 'Gardening', hint: 'Plants, feed, tools' },
+    { value: 'FURNITURE', label: 'Furniture', hint: 'Desks, chairs, shelves' },
+    { value: 'APPLIANCES', label: 'Appliances', hint: 'Fridges, kettles, microwaves' },
+    { value: 'OTHER', label: 'Other', hint: 'Everything that fits nowhere else' },
+];
+
+/**
+ * Every movement type, for the filter and for reading the ledger.
+ *
+ * `hint` says what a row of this type means, because "ADJUSTMENT" on its own does
+ * not tell a reader whether stock went up or down — the sign does, and the hint
+ * says why it is allowed to.
+ */
+export const STOCK_MOVEMENT_TYPES: Array<{
+    value: string;
+    label: string;
+    hint: string;
+}> = [
+    {
+        value: 'GOODS_RECEIPT',
+        label: 'Goods received',
+        hint: 'Arrived against a purchase order. Always in, never out.',
+    },
+    {
+        value: 'WORK_ORDER_ISSUE',
+        label: 'Used on a job',
+        hint: 'Consumed by a maintenance work order. Always out.',
+    },
+    {
+        value: 'ADJUSTMENT',
+        label: 'Stock take',
+        hint: 'A correction after counting. The only kind that may leave stock negative.',
+    },
+    {
+        value: 'OPENING',
+        label: 'Opening balance',
+        hint: 'Stock that was already on the shelf before this module existed.',
+    },
+    {
+        value: 'TRANSFER',
+        label: 'Transfer',
+        hint: 'Moved between stores — two rows, one transfer group.',
+    },
+    {
+        value: 'RETURN',
+        label: 'Return',
+        hint: 'Back to the supplier, or back off a job onto the shelf.',
+    },
+];
+
+/**
+ * The three a person records by hand.
+ *
+ * `GOODS_RECEIPT` and `WORK_ORDER_ISSUE` are deliberately missing: both carry a
+ * reference to another module's record and are written through that module's own
+ * endpoint, so the reference cannot be forged or pointed at the wrong thing.
+ */
+export const MANUAL_MOVEMENT_TYPES: Array<{
+    value: string;
+    label: string;
+    hint: string;
+}> = [
+    {
+        value: 'OPENING',
+        label: 'Opening balance',
+        hint: 'The first stock on the shelf for a new item.',
+    },
+    {
+        value: 'ADJUSTMENT',
+        label: 'Stock take correction',
+        hint: 'The count disagreed with the books. Needs a reason.',
+    },
+    {
+        value: 'RETURN',
+        label: 'Return',
+        hint: 'Back on the shelf from a job, or back to the supplier.',
+    },
+];
+
+/**
+ * The status filter.
+ *
+ * `belowReorder` is `!= 'OK'` rather than a second comparison, so it catches both
+ * "running low" and "nothing left" — the screen somebody opens is "what do I need
+ * to buy", not "which of the two shortage states is this".
+ */
+export const STOCK_STATUS_FILTERS: Array<{ value: string; label: string }> = [
+    { value: '', label: 'Any stock level' },
+    { value: 'belowReorder', label: 'Below reorder level or empty' },
+    { value: 'outOfStock', label: 'Empty' },
+    { value: 'ok', label: 'In stock' },
+];
+
+export const STOCK_MOVEMENT_DIRECTIONS: Array<{ value: string; label: string }> = [
+    { value: '', label: 'Both ways' },
+    { value: 'in', label: 'Came in' },
+    { value: 'out', label: 'Went out' },
+    { value: 'transfer', label: 'Transfers' },
+    { value: 'adjustment', label: 'Stock takes' },
+];
+
+/**
+ * Units offered when adding an item.
+ *
+ * Deliberately a list, not a dictionary of conversion factors: a property manager
+ * buying paint does not think in millilitres, and a conversion engine is a second
+ * source of truth that nobody will maintain. Anything else can be typed in — the
+ * field is free text for exactly that reason.
+ */
+export const STOCK_UNITS: string[] = [
+    'unit',
+    'piece',
+    'box',
+    'roll',
+    'tin',
+    'litre',
+    'metre',
+    'kg',
+    'bag',
+    'pack',
+    'length',
+    'pair',
+    'set',
+    'jerrycan',
+    'sheet',
+];
+

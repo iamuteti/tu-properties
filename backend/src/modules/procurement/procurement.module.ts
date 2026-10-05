@@ -3,6 +3,7 @@ import { AuditModule } from '@/modules/audit/audit.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { WorkflowModule } from '@/modules/workflow/workflow.module';
 import { PayablesModule } from '@/modules/finance/payables/payables.module';
+import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { ProcurementSuppliersController } from './suppliers.controller';
 import { ProcurementSuppliersService } from './suppliers.service';
 import { PurchaseOrdersController } from './purchase-orders.controller';
@@ -30,6 +31,12 @@ import { RfqsService } from './rfqs.service';
  *   finance's own service — priced by the tax engine, posted to the ledger. This
  *   is the one direction of dependency, and finance knows nothing about
  *   purchase orders.
+ * - `InventoryModule` because goods arriving have to go on a shelf, and the
+ *   mapping from "6 × 20mm coupling" to an inventory item is a human judgement
+ *   this module records. `pendingStockIn` and the stock-in call both go through
+ *   that module's service, so the balance on the shelf stays a sum of movements
+ *   that only inventory writes. The dependency is one-directional on purpose:
+ *   inventory reads receipt rows through Prisma and imports nothing from here.
  * - `AuditModule` and `NotificationsModule` for the standing requirements:
  *   decisions are audited, approvers are told.
  *
@@ -39,7 +46,13 @@ import { RfqsService } from './rfqs.service';
  * maintenance module for tenant requests.
  */
 @Module({
-  imports: [AuditModule, NotificationsModule, WorkflowModule, PayablesModule],
+  imports: [
+    AuditModule,
+    NotificationsModule,
+    WorkflowModule,
+    PayablesModule,
+    InventoryModule,
+  ],
   controllers: [
     ProcurementSuppliersController,
     PurchaseRequestsController,

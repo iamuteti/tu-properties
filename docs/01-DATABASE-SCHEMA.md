@@ -1414,10 +1414,11 @@ enum PurchaseOrderStatus {
 
 model GoodsReceipt {
   // receivedAt, deliveryNote, conditionNote, receivedById
-  //   lines GoodsReceiptLine[] — purchaseOrderLineId, quantity, and stockInRecordedAt.
-  //     Null until Inventory (Module 11) exists. Per master doc issue 70, no speculative
-  //     inventoryItemId was added pointing at a table that does not exist; the module
-  //     reports what is waiting instead of claiming stock has moved.
+  //   lines GoodsReceiptLine[] — purchaseOrderLineId, quantity, inventoryItemId (nullable, set
+  //     when Module 11 books the delivery onto a shelf) and stockInRecordedAt.
+  //     Both were deliberately left as empty columns rather than given a speculative FK to a
+  //     table that did not exist; Module 11 now fills them, and the unique index on
+  //     StockMovement.goodsReceiptLineId is what makes booking a line in twice impossible.
 }
 ```
 
@@ -1431,37 +1432,98 @@ exists and inventing one is a second organization-wide concept for no reporting 
 
 ---
 
-## Domain: Inventory (Module: Inventory) — 🆕 Not started
+## Domain: Inventory (Module 11)
+
+**Status: built 2026-10-05.** The sketch was three small tables; four things changed, and in each case
+the sketch was under-specified rather than wrong.
 
 ```prisma
+enum InventoryCategory {
+  PAINT, PLUMBING, ELECTRICAL, TILES_FLOORING, BUILDING_MATERIALS, HARDWARE,
+  CLEANING, SAFETY, GARDENING, FURNITURE, APPLIANCES, OTHER
+}
+
+enum StockMovementType {
+  GOODS_RECEIPT,    // always IN,  always has goodsReceiptLineId
+  WORK_ORDER_ISSUE, // always OUT, always has workOrderId
+  ADJUSTMENT,       // either way, the only type allowed to leave stock negative
+  OPENING,          // always IN
+  TRANSFER,         // two rows sharing transferGroup, one OUT and one IN
+  RETURN            // either way
+}
+
 model InventoryItem {
-  id             String   @id @default(uuid())
-  organizationId String
-  sku            String
-  name           String
-  unitOfMeasure  String
-  reorderLevel   Int      @default(0)
-  @@index([organizationId])
+  organizationId + sku   // UNIQUE (organizationId, sku) — not globally: two companies
+                         //   both stocking "PTR-20" is normal
+  name, description, category, unitOfMeasure  // the label, not a conversion factor table
+  unitCost        // LAST KNOWN price — a hint for the reorder estimate and the fallback
+  reorderLevel    // 0 = tracked but never auto-alerted
+  reorderQuantity // null = "top up to twice the level"
+  preferredSupplierId? -> Supplier   // reuses Module 10's table, is not a second vendor
+  notes, isActive  // retired, never deleted once movements exist
+  // NO quantityOnHand COLUMN. See below.
 }
 
 model Warehouse {
-  id             String   @id @default(uuid())
-  organizationId String
-  name           String
-  @@index([organizationId])
+  organizationId + code  // UNIQUE (organizationId, code)
+  name, address, phone, notes, isActive
+  isDefault  // at most one per org; setting one demotes the others in the same transaction
 }
 
 model StockMovement {
-  id             String   @id @default(uuid())
-  organizationId String
-  itemId         String
-  warehouseId    String
-  quantity       Int      // positive = in, negative = out
-  reason         String?
-  createdAt      DateTime @default(now())
-  @@index([organizationId])
+  organizationId, itemId -> InventoryItem, warehouseId -> Warehouse
+  quantity Decimal(12,2)   // SIGNED: positive in, negative out
+  type StockMovementType
+  unitCost Decimal(14,4)? // snapshot of the price AT THE TIME, not a lookup on the item
+  goodsReceiptLineId String? @unique   // the idempotency key for stock-in
+  workOrderId String?                 // what a job consumed
+  transferGroup String?               // pairs the two halves of a transfer
+  reason String?  // required for ADJUSTMENT, enforced in the service
+  notes, createdById?, createdAt
+  @@index([itemId, warehouseId])  @@index([workOrderId])
 }
 ```
+
+**The one rule this domain is built around: a stock level is the sum of the movements, never a stored
+counter.** `backend/src/modules/inventory/stock-ledger.ts` is the only place a stock number is computed,
+and it is pure. Two consequences worth knowing before touching these tables:
+
+- **`InventoryItem` has no `quantityOnHand`, `currentStock` or `lastStockedAt`.** This is the same
+  conclusion `Invoice.paidAmount` and `PurchaseOrderLine.receivedQuantity` already reached in this
+  schema, and for a stronger reason: a store has five kinds of writer (receipts, issues, transfers,
+  returns, counts) where an invoice has one. Any of them can leave a counter wrong while the rows stay
+  right. The cost of the rule is that **a list cannot be answered from the items table alone** — every
+  read pairs the item query with a `groupBy` over the movements.
+- **A transfer is two rows, not one.** One row with two warehouses would make each store's balance stop
+  being a plain sum, so `transferGroup` pairs an `OUT` from the source with an `IN` at the destination.
+
+**Deviations from the sketch, in short:**
+
+| Sketch | Built | Why |
+|---|---|---|
+| `quantity Int` | `quantity Decimal(12,2)`, signed | Paint goes in halves and pipe in metres; the module doc's own item list is countable-but-not-whole. Signed so a balance is `sum(quantity)` and nothing else. |
+| `reason String?` | required for `ADJUSTMENT` | An adjustment with no explanation is a mystery that never gets solved. |
+| no cost field | `unitCost` on item and per movement | The module's scope includes "stock valuation" and there was nothing to value without a price. Snapshotted per movement so a shelf bought at two different prices values as two different things. |
+| `Warehouse` with no link from stock | `StockMovement.warehouseId` | Without it "across warehouses" — the stated module goal — is unanswerable. |
+
+Also: `NotificationType += STOCK_LOW`, and `GoodsReceiptLine` gained the `inventoryItemId` FK it had
+been holding empty. Master doc issues 82–87 record what is still open (the per-receipt manual mapping,
+supplier lead times, the list-read ceiling at issue 84, the import direction, the tenant portal, and the
+`UnitStatus` coupling).
+
+---
+
+## Domain: Inventory (Module: Inventory) — ✅ Built 2026-10-05
+
+The original sketch was three tables: `InventoryItem` (id, organizationId, sku, name, unitOfMeasure,
+reorderLevel Int), `Warehouse` (id, organizationId, name) and `StockMovement` (id, organizationId,
+itemId, warehouseId, quantity Int signed, reason, createdAt).
+
+That sketch is superseded by **Domain: Inventory (Module 11)** above, which documents what was actually
+built and every deviation. The three differences a reader is most likely to trip over: `quantity` is
+`Decimal(12,2)` rather than `Int` (paint goes in halves), it is the **only** place a stock level comes
+from because there is no counter column, and `StockMovement` carries `unitCost` plus a `transferGroup`
+because the module's stated scope included stock valuation.
 
 ---
 
