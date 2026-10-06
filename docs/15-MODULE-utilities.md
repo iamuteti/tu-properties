@@ -10,9 +10,7 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status
-**In progress — schema designed and written, `prisma validate` passes. No migration yet, no code.**
-
-Last worked on: 2026-10-06.
+**Backend COMPLETE 2026-10-06 — 59 live assertions passing, 1116 tests / 56 suites. No demo data, no frontend yet.**
 
 ## Module Goal
 Track utility meters and generate consumption-based billing.
@@ -48,14 +46,14 @@ See `01-DATABASE-SCHEMA.md`, domain(s): Facilities & Utilities (the `UtilityMete
 The doc's sketch has no table for a **rate**, yet the acceptance criterion is "reading delta × rate". The rate has nowhere to live. It also has no `propertyId` (only `unitId`, so a bulk meter cannot be represented), no link to the invoice it produces, and it stores both `previousReading` and `currentReading` — i.e. it stores the delta, and lets it drift when one side is corrected.
 
 ## Tasks Checklist
-- [~] Add `UtilityMeter`, `MeterReading` models per `01-DATABASE-SCHEMA.md` — **models written and `prisma validate` passes; migration not yet written**
-- [ ] Write the migration (incl. the two correctness constraints — see below)
-- [ ] Build meter registration per property (not per unit — see decisions)
-- [ ] Build reading entry (manual for v1; smart-meter integration is a later phase) — with rollover and estimation
-- [ ] Build consumption-based invoice generation (reading delta × rate), feeding Finance's `Invoice` model
-- [ ] RBAC: `utilities-roles.ts` + permission modules + role grants, verified in SQL
+- [x] Add `UtilityMeter`, `MeterReading` models per `01-DATABASE-SCHEMA.md` — and the `UtilityRate` the doc forgot and the `UtilityCharge` that makes billing idempotent
+- [x] Write the migration — three of them, because two of the first one's constraints had bugs (see Bugs found)
+- [x] Build meter registration per property (not per unit) — bulk/sub-meter scope, apportionment, rollover config
+- [x] Build reading entry (manual for v1) — with rollover, estimation provenance, correction-not-duplication
+- [x] Build consumption-based invoice generation (reading delta × rate), feeding Finance's `Invoice` model **through `InvoicesService`**
+- [x] RBAC: `utilities-roles.ts` + four permission modules + `bill`/`void` actions, verified against the seeded roles in SQL
 - [ ] Demo seed producing every reachable state
-- [ ] Frontend: meters, readings, rates, billing runs
+- [ ] Frontend: meters, readings, tariffs, billing runs
 
 ## Schema as built
 
@@ -77,44 +75,87 @@ Enums: `UtilityType` (WATER, ELECTRICITY, GAS, **SEWAGE**), `MeterScope` (SUBMET
 - **`UtilityCharge @@unique` is null-safe by accident, and that is a real hole.** Postgres treats NULLs as distinct, so `(meterId, unitId='NULL', period)` could be inserted twice — bulk meters have no `unitId`. The migration must add a partial unique index on `COALESCE(unitId,'')` instead. **Do not forget this.**
 
 ## Backend: NestJS Notes
-Module: `backend/src/modules/utilities/`. Will import `AuditModule`, `NotificationsModule` and `FinanceModule` (for `InvoicesService`); **exports nothing**.
+Module: `backend/src/modules/utilities/`. Imports `AuditModule` and `FinanceModule`; **exports nothing**.
 
-Pure file planned: `meter-rates.ts` — consumption delta incl. rollover, bulk apportionment (areal / equal / occupancy / manual, with period proration), billing-period boundaries, and integer-cent rounding.
+Pure file: `meter-rates.ts` (43 tests) — consumption delta incl. rollover, bulk apportionment (areal / equal / occupancy / manual, with period proration), tariff resolution, and integer-cent money.
+
+### Bugs found while building this
+
+Four, three of them mine, recorded because each is a shape worth recognising:
+
+1. **A `CHECK` constraint that did not enforce what it said.** `utility_meters_rollover_consistent` read as "digits implies a wrap point of exactly 10 ** digits" — and accepted `digits = 5, digitWrapAt = NULL`. Three-valued logic: the predicate evaluates to `NULL`, and a CHECK rejects only on `FALSE`. The constraint whose entire job is to make rollover arithmetic safe was the one that could be quietly absent. All three nullable-column CHECKs rewritten as `CASE ... ELSE false`. Migration `20261006061000`.
+2. **A rollover guard that rejected the valid case.** `if (to < wrapAt || from >= wrapAt) → refuse` refuses 99998 → 00003, which is the case the code exists for. Replaced with the modulus form `(wrapAt - from) + to`.
+3. **An unreachable branch with a good error message.** "The register went round twice" — provably impossible, since `to <= from - 1` forces consumption `<= wrapAt - 1`. Deleted rather than kept.
+4. **A period window in the wrong time frame** — see the decision on UTC below. Found by live verification, and it is master doc issue 97 arriving through the database.
 
 ### Decisions worth keeping
 
-**The invoice seam is `InvoicesService.create`, and it is enough — but only because of what it will *not* set.** `Invoice` carries `@@unique([rentalAgreementId, billingPeriod])` because a lease gets one **rent** bill per month, and `recurring-billing.service.ts:45` relies on a second attempt failing that constraint and being reported as *skipped*. So a utility invoice that claimed that key would make the recurring rent run **skip the month, and the resident would never be billed rent at all.** Therefore: utility invoices leave `billingPeriod` **null** and are classified `transactionClass = 'UTILITY'` — the same convention `Invoice.saleTransactionId` sets for the Sales module. `UtilityCharge.billingPeriod` holds the period instead. *Never "fix" this by setting `billingPeriod`.*
+**The invoice seam is `InvoicesService.create`, and it is enough — but only because of what it will *not* set.** `Invoice` carries `@@unique([rentalAgreementId, billingPeriod])` because a lease gets one **rent** bill per month, and `recurring-billing.service.ts:45` relies on a second attempt failing that constraint and being reported as *skipped*. So a utility invoice that claimed that key would make the recurring rent run **skip the month, and the resident would never be billed rent at all.** Therefore: utility invoices leave `billingPeriod` **null** and are classified `transactionClass = 'UTILITY'` — the same convention `Invoice.saleTransactionId` sets for the Sales module. `UtilityCharge.billingPeriod` holds the period instead. *Never "fix" this by setting `billingPeriod`.* Verified live: the raised invoice has `billingPeriod === null`.
 
-**One charge, one invoice; many charges, one lease.** The FK points `UtilityCharge.invoiceId → Invoice`, **not** the reverse, because a monthly bill collects several charges (water, electricity, a standing charge). Modelling it as a one-to-one on `Invoice` the way `saleTransactionId` does would be wrong here. There is **no merge-into-existing-invoice method** on `InvoicesService` and none is needed, for the reason above.
+**A meter's period window is computed in UTC, not local time.** `DateTime` is `TIMESTAMP(3) WITHOUT TIME ZONE` and Prisma writes UTC, while a bare `"2026-08-01"` arrives as `2026-08-01T00:00:00Z`. Building the window at *local* midnight put its start at `2026-07-31T21:00:00Z` on this UTC+3 server, so a reading taken **on** the 1st sorted *after* the period it opens and the month could not be priced at all — the API told an operator to go and record an opening reading they had already recorded. `utcPeriodWindow` exists for queries; there is deliberately **no** local-time sibling, because a second function whose only job is to be wrong somewhere is speculative surface.
 
-**A meter belongs to a *property*, and `unitId` is optional.** A meter is a device bolted to a building. `propertyId` required is also what makes the module scopable at all: `Unit` has no `organizationId` (master doc issue 25), so a meter scoped only by unit needs a join through `unit.property.organizationId` on every single read.
+**Both period bounds are inclusive, which is not the half-open rule used everywhere else here.** A reading on the 1st *is* the month it opens: August is (1 Sep − 1 Aug). One reading closes one period and opens the next, but the deltas are adjacent rather than overlapping, so nothing is counted twice. The obvious "that double-counts" objection is wrong, and the fix was found by failing.
 
-**`MeterScope` exists because "has no `unitId`" is ambiguous.** It means either *bulk* — the riser meter the estate re-sells — or *not yet allocated to a unit*. Different states, different consequences, and a nullable FK cannot tell them apart.
+**A meter belongs to a *property*, and `unitId` is optional.** `propertyId` required is also what makes the module scopable at all: `Unit` has no `organizationId` (master doc issue 25), so a meter scoped only by unit needs a join on every read. Live-verified: attaching a meter to a unit on another property is refused.
 
-**Bulk apportionment is chosen as data, and billing refuses until it is.** Splitting water twenty ways is a **decision**, not a computation: area, headcount, occupancy days and a negotiated fixed split are all defensible and all produce different bills. So `apportionmentMethod` is stored (DB-enforced non-null when `scope = BULK`) and the module refuses to bill a bulk meter with no method rather than defaulting to area and quietly overcharging somebody every month. This is the same refusal discipline as procurement declining to pick between competing bids.
+**Bulk apportionment is chosen as data, and billing refuses until it is.** Verified live: a bulk meter with no method is refused with a sentence explaining that the module will not pick one, because each method produces a different bill. A sub-meter carrying a method is refused too, and so is a bulk meter carrying a `unitId`.
 
-**Rates are data with a validity window, and are superseded, never edited.** Identical reasoning to `TaxRule` (Module 7) and `PayrollRule` (Module 12). Resolution is most-specific-wins (meter → property → org default) and the result is **snapshotted onto the charge**, so a tariff change cannot retroactively reprice history. `ratePerUnit` is `Decimal(12,4)`: a gas tariff per MMBtu is quoted to more than two decimals, and truncating the *rate* to cents quietly moves money.
+**Rates are data with a validity window, and are superseded, never edited.** Resolution is most-specific-wins (meter → property → org default), verified live: a meter with no tariff of its own billed correctly at the organization default. The resolved rate is **snapshotted onto the charge**, so a tariff change cannot retroactively reprice history.
 
-**Consumption and amount are derived; the inputs are stored.** `UtilityCharge` snapshots the rate and the allocation share, then derives consumption from its two readings and amount from consumption × rate. The allocation share is the one input that genuinely cannot be re-derived — the units' areas and occupancy dates *at the time* are not preserved, so storing the share is the difference between an audit trail and an assertion.
+**Consumption and amount are derived; the inputs are stored.** `UtilityCharge` names its two readings, its share and its rate, and every read recomputes from them. The share is the one input that genuinely cannot be re-derived — the units' areas and occupancy dates *at the time* are not preserved.
 
-**Meter rollover is handled explicitly, and opt-in.** A 5-digit electromechanical register that reads 99998 → 00003 consumed 5 units, not −99995. `digits`/`digitWrapAt` carry it, and **null disables the logic entirely** so the ordinary meters that count up are both cheaper and impossible to mis-handle. Naive delta arithmetic on a rolled-over meter produces a catastrophic negative bill, which is why this is a named decision rather than an edge case.
+**Meter rollover is handled explicitly, and opt-in.** `digits`/`digitWrapAt` are null by default, so an ordinary meter cannot be affected by the logic. Verified live: 99998 → 00003 on a 5-digit meter prices as **5** units, not −99995, and the run reports that it rolled.
 
-**A reading stores the index it showed, and only that.** The doc's `previousReading`/`currentReading` columns are what the API *returns* (a presentation of the pair) but not what the table stores — storing a derived delta means a corrected reading silently disagrees with it.
+**A reading stores the index it showed, and only that.** The doc's `previousReading`/`currentReading` are what the API *returns*, not what the table stores.
 
-**Estimates are marked, not hidden.** `MeterReadingSource.ESTIMATED` exists because a real case has no honest reading (access denied, sealed, tenant away) and estimating is the standard industry response. Marking it is what lets a later audit tell an estimate from a real reading.
+**A reading that has already been billed cannot be edited.** Verified live: the refusal says the corrected figure and the resident's invoice would disagree. A charge stores its two reading ids precisely so this is checkable.
+
+**Voiding requires a reason, and the reason is kept.** `VoidChargeDto` demands ten characters and three columns (`voidReason`, `voidedAt`, `voidedByUserId`) exist to hold them, enforced by a CHECK. Validation that demands a sentence and discards it is worse than not asking. Migration `20261006062000`.
+
+**Voiding an invoiced charge is refused, and it names the Finance action instead.** Cancelling an invoice reverses its GL entry, and Finance owns that — a void here could not, so the two would drift.
+
+### RBAC
+
+Four permission modules, two new actions (`bill`, `void`), absent-means-denied. Verified against the seeded roles in SQL:
+
+| | record reading | register meter | write tariff | bill | void |
+|---|---|---|---|---|---|
+| Technician | yes | **no** | no | **no** | no |
+| Maintenance Manager | yes | yes | no | no | no |
+| Accountant | **no** | no | **no** | yes | no |
+| Leasing Officer | no | no | no | no | no |
+| Sales Agent | — | — | — | — | — |
+| Property Manager | yes | yes | yes | yes | yes |
+
+The three separations, each verified by a live request: a technician may report that a meter reads 4,212 and may not decide what that costs; an accountant may bill and may write neither a tariff nor a reading; a leasing officer may read all of it and touch none. Procurement Officer and HR Manager carry read-only for stated reasons (the utility company bills the estate; a payslip carries a utilities deduction).
 
 ## Acceptance Criteria
-- ⏳ **A meter reading entry produces a correctly-calculated consumption invoice.** Not yet verified. Requires: two readings bounding a period (one reading alone computes nothing), a resolvable rate, an open rental agreement, then `InvoicesService.create` with a line of `qty = consumption`, `unitPrice = ratePerUnit`, `amount` derived in integer cents.
+- ✅ **A meter reading entry produces a correctly-calculated consumption invoice.** Verified live: readings of 4000 (1 Aug) and 4150 (1 Sep) on a tariff of 55.50 with 16% VAT produced **consumption 150 → subtotal 8,325.00 → VAT 1,332.00 → total 9,657.00**, on a real `Invoice` row created through `InvoicesService`, classified `UTILITY`, with `billingPeriod` null.
+
+## Verified live
+59 assertions, all passing, against a running API with real cookies:
+- **The criterion**, end to end, including the arithmetic and the resulting Finance document.
+- **Meter registration refusals**, each with a sentence rather than a code: bulk with no method; bulk carrying a `unitId`; sub-meter carrying a method; `digits=5` with wrap 500000 (names the correct 100000); duplicate meter number; bulk-meter MANUAL with no weights.
+- **Tenant scoping**: a meter id belonging to Westhill returns **404** from Rohi — not 403, not an empty 200.
+- **Exactly-once**: a second run for the same meter + unit + period is refused naming the existing charge, while a *different* meter on the same unit and period bills successfully.
+- **Rollover**, live, as above.
+- **Readings**: a duplicate reading on one day is refused and says to *correct* rather than add; one reading alone prices nothing and explains why; a billed reading cannot be edited.
+- **Tariffs**: a second open rate for the same scope is refused; a meter with no rate of its own falls back to the organization default.
+- **RBAC role by role**, as tabled above — 14 assertions across four roles.
+- **Void**: a short reason is refused; a charge already on an invoice is refused and names the Finance action.
+- **All three CSV exports** return CSV.
 
 ## Dependencies on Other Modules
-- Depends on: **Property Management** (units) — and the tenant's **Rental Agreement**, without which there is nobody to bill
+- Depends on: **Property Management** (units), and the **Rental Agreement** — without a live lease there is nobody to bill, and `billAndInvoice` reports those charges as `unbilled` rather than dropping them silently
 - Feeds: **Finance & Accounting** — through `InvoicesService.create`, never by writing `Invoice` rows directly (the same seam procurement's supplier bills and sales instalments use)
 
 ## Known issues / open items
-1. **Bulk-meter null `unitId` needs a partial unique index** (see above). The Prisma-level `@@unique` does not cover it.
-2. **`UnitServiceCharge.totalCost` is a stored derivation** (`costPerArea` × area). Pre-existing debt — **note it, do not refactor it unasked.** It is a fixed *service* charge, not a metered one, so it is arguably out of this module's scope; the standing-charge table `PropertyStandingCharge` is the nearest true relative and also has no validity window.
-3. **`Unit.electricityAcno` / `waterAcno` / `electricityMeethno` / `waterMeethno` are now redundant** with `UtilityMeter.meterNumber`, and they only cover four utility types. Candidate for removal in a later module once nothing reads them — they are 0-populated, so it is cheap, but do not remove them as part of this module.
-4. **Bulk-meter vacancy is unspecified.** A bulk meter feeds units that are vacant; nobody is there to pay for the water. `UtilityCharge.rentalAgreementId` is nullable for this, but *where the cost goes* when it lands on an empty unit is undecided.
-5. **`ESTIMATED` has no estimator.** The source is recorded but not who estimated it or how, so an estimate cannot yet be audited. `User.assignedToMe`-style provenance is not modelled for utilities.
-6. **No `TRANSACTION_CLASSES.UTILITY` on the frontend** yet; and no utility invoice is reachable from a lease's invoice list unless the utility charge link is surfaced.
-7. **Occupancy-based apportionment needs occupancy-day data** that this schema does not have — it would mean reading lease start/end dates per unit and prorating by occupied days in the period. Not designed yet.
+1. **Bulk-meter null `unitId` needed a partial unique index** (see above) — shipped as `utility_charges_no_double_bill_bulk`, verified by the exactly-once probes.
+2. **`UnitServiceCharge.totalCost` is a stored derivation** (`costPerArea` × area). Pre-existing debt — **noted, not refactored.** It is a fixed *service* charge, not a metered one, so it is arguably out of scope; `PropertyStandingCharge` is the nearest true relative and has a worse problem: **no validity window**, so it cannot express "this charge applied until March".
+3. **`Unit.electricityAcno` / `waterAcno` / `electricityMeethno` / `waterMeethno` are now redundant** with `UtilityMeter.meterNumber`, and they cover only four utility types. 0-populated so removal is cheap, but it is not this module's job.
+4. **Bulk-meter vacancy is unspecified.** `UtilityCharge.rentalAgreementId` is nullable and `billAndInvoice` reports such charges under `unbilled` with a sentence, but *where the cost goes* is undecided — the estate absorbs it, re-rates across occupied units, or suspends billing. Right now it is measured, priced and visibly unattached.
+5. **`ESTIMATED` has no estimator.** `MeterReading.source` records that a figure was estimated but not who estimated it or how, so an estimate cannot yet be audited.
+6. **Occupancy-based apportionment proration is coarse.** `apportion` takes an `occupiedDays` figure, but the service currently passes the month length and computes no per-unit occupancy — so `OCCUPANCY` behaves as `EQUAL` until lease start/end dates are walked. The pure function and the schema are ready; the data is not wired.
+7. **No frontend and no demo seed yet**, so the module is reachable only by API. The login rate limiter (10 attempts / 5 min, in-memory) makes repeated live-verification runs need an API restart — worth knowing before writing the seed script's verification step.
+8. **`billAndInvoice` recomputes each charge one at a time**, two queries per charge for the readings. Fine at estate scale; a property with a hundred bulk-fed units would want it batched.
+9. **`UnitMeterNumber`'s `readingSetup` is preserved but unused** — carried over from the old table, with no logic reading it. Deliberate (it signalled intended functionality) but it is currently a string nobody interprets.

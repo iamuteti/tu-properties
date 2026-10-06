@@ -3,11 +3,11 @@ import {
   billingPeriodOf,
   calculateCharge,
   consumptionBetween,
-  periodWindow,
   presentReading,
   resolveRate,
   round2,
   sortReadings,
+  utcPeriodWindow,
   type ApportionableUnit,
   type RateInput,
 } from './meter-rates';
@@ -24,24 +24,39 @@ describe('meter-rates', () => {
     });
   });
 
-  describe('periodWindow', () => {
-    it('covers a month end to end', () => {
-      const w = periodWindow(2026, 10);
-      expect(w.from).toEqual(new Date(2026, 9, 1));
-      expect(w.to).toEqual(new Date(2026, 10, 1));
+  describe('utcPeriodWindow', () => {
+    it('anchors the period to UTC midnight on the 1st', () => {
+      // The whole point: a reading sent as "2026-08-01" arrives as
+      // 2026-08-01T00:00:00Z, so the period must start there and not at the local
+      // midnight of a server three hours ahead.
+      const w = utcPeriodWindow(2026, 8);
+      expect(w.from.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+      expect(w.to.toISOString()).toBe('2026-09-01T00:00:00.000Z');
     });
 
-    it('rolls December into January of the next year', () => {
-      // The case a naive `new Date(year, month, 1)` gets wrong when month is 0-based.
-      const w = periodWindow(2026, 12);
-      expect(w.from).toEqual(new Date(2026, 11, 1));
-      expect(w.to).toEqual(new Date(2027, 0, 1));
+    it('includes a reading taken exactly on the 1st at both ends of the month', () => {
+      const w = utcPeriodWindow(2026, 8);
+      const opening = new Date('2026-08-01');
+      const closing = new Date('2026-09-01');
+      expect(opening.getTime() <= w.from.getTime()).toBe(true);
+      expect(closing.getTime() <= w.to.getTime()).toBe(true);
     });
 
-    it('handles a leap February', () => {
-      const w = periodWindow(2028, 2);
-      const days = (w.to.getTime() - w.from.getTime()) / 86_400_000;
-      expect(days).toBe(29);
+    it('rolls December into the next year', () => {
+      const w = utcPeriodWindow(2026, 12);
+      expect(w.from.toISOString()).toBe('2026-12-01T00:00:00.000Z');
+      expect(w.to.toISOString()).toBe('2027-01-01T00:00:00.000Z');
+    });
+
+    it('spans the whole month, so consecutive periods share exactly one boundary', () => {
+      const july = utcPeriodWindow(2026, 7);
+      const august = utcPeriodWindow(2026, 8);
+      expect(july.to.getTime()).toBe(august.from.getTime());
+    });
+
+    it('spans 29 days for a leap February', () => {
+      const w = utcPeriodWindow(2028, 2);
+      expect((w.to.getTime() - w.from.getTime()) / 86_400_000).toBe(29);
     });
   });
 

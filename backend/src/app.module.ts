@@ -40,6 +40,7 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { HrModule } from './modules/hr/hr.module';
 import { FacilitiesModule } from './modules/facilities/facilities.module';
+import { UtilitiesModule } from './modules/utilities/utilities.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -86,6 +87,9 @@ import { SecurityModule } from './security/security.module';
     HrModule,
     // Module 13 — Facilities. Imports Notifications only; exports nothing.
     FacilitiesModule,
+    // Module 14 — Utilities. Imports Finance because it *writes into* Finance:
+    // consumption invoices go through `InvoicesService`, never a direct insert.
+    UtilitiesModule,
   ],
   controllers: [AppController],
   providers: [

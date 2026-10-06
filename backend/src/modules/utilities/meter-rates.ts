@@ -169,21 +169,33 @@ export function billingPeriodOf(date: Date): string {
 }
 
 /**
- * The half-open `[from, to)` window a billing period covers.
+ * The window a billing period covers, in **UTC**, for range queries against stored
+ * readings.
  *
- * A reading taken exactly on `to` belongs to the period that is ending, never to
- * both - the same rule facility bookings use for slots, and the reason a reading
- * entered on the 1st does not appear on two bills.
+ * `DateTime` is `TIMESTAMP(3) WITHOUT TIME ZONE` in this schema and Prisma writes
+ * UTC, while a bare `readingDate` of `"2026-08-01"` arrives from a client as
+ * `2026-08-01T00:00:00Z`. Building the window in local time instead puts its start at
+ * `2026-07-31T21:00:00Z` on a UTC+3 server, so a reading taken *on* the 1st sorts
+ * **after** the period it opens - and the month cannot be priced at all.
+ *
+ * This is master doc issue 97 arriving through the database rather than through a
+ * diary. The fix follows the discipline that issue prescribes: do not switch to UTC
+ * without deciding what the value means. Here the meaning is unambiguous - a reading
+ * is an *instant*, not a wall-clock time - so the period is resolved in the frame the
+ * data is stored in rather than the frame the server happens to be in.
+ *
+ * There is deliberately no local-time sibling. An earlier draft had one for display
+ * and it had no caller, which is the shape of speculative surface: a second function
+ * whose only job is to be wrong somewhere. If a deployment ever needs a wall-clock
+ * month, it should get one here on purpose rather than inherit it.
  */
-export function periodWindow(
+export function utcPeriodWindow(
   year: number,
   month: number,
 ): { from: Date; to: Date } {
-  // `month` is 1-based. Month 0 of the next year is December's rollover, which is
-  // what makes this correct for December without a special case.
   return {
-    from: new Date(year, month - 1, 1),
-    to: new Date(year, month, 1),
+    from: new Date(Date.UTC(year, month - 1, 1)),
+    to: new Date(Date.UTC(year, month, 1)),
   };
 }
 

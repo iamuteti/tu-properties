@@ -289,6 +289,7 @@ preApprovedVisits      VisitorVisit[]    @relation("UserPreApprovedVisits")
   // Module 14 — Utilities. Who keyed in the reading, who raised the charge.
   meterReadings            MeterReading[]  @relation("UserMeterReadings")
   utilityChargesCreated    UtilityCharge[] @relation("UserUtilityCharges")
+  utilityChargesVoided    UtilityCharge[] @relation("UserVoidedUtilityCharges")
 
   // Status
   @@index([portalTenantId])
@@ -6140,6 +6141,16 @@ model UtilityCharge {
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   status UtilityChargeStatus @default(PENDING)
+
+  /// Why a charge was voided, and when. Present because the API *requires* a reason
+  /// to void one and an unexplained write-off is indistinguishable from an error
+  /// three months later - so the reason is kept, not validated and dropped. The
+  /// charge row itself is never deleted, which is what makes the period still
+  /// explain itself after a reversal.
+  voidReason  String?
+  voidedAt    DateTime?
+  voidedByUserId String?
+  voidedBy     User?   @relation("UserVoidedUtilityCharges", fields: [voidedByUserId], references: [id], onDelete: SetNull)
 
   createdByUserId String?
   createdBy       User?   @relation("UserUtilityCharges", fields: [createdByUserId], references: [id], onDelete: SetNull)
