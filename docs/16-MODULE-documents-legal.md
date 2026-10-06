@@ -361,23 +361,50 @@ Protocol - no npm install, since Chrome is installed and Node 24 ships a global
 
 ### What the browser harness found
 
-Driving a real browser turned up two defects that a build and a fetch could not:
+Driving a real browser turned up two defects that a build and a fetch could not.
 
-1. **An infinite `/auth/logout` loop** (`frontend/lib/api.ts`). An expired session
-   makes any call 401, the interceptor dispatches `unauthorized`, `logout()` posts
-   `/auth/logout`, *that* 401s because the session is already gone, the interceptor
-   dispatches again - and it repeats until the page navigates away. Observed hammering
-   the backend continuously from one unauthenticated dashboard load. Fixed by not
-   reacting to a 401 from the logout call itself, which carries no new information.
-   Pre-existing and shared, not Module 15's, but it was breaking this module's
-   verification.
-2. **Every `<Label for=...>` in the app pointed at nothing.** `Select` is a div+button
-   and spread its `id` onto the wrapping div, so `for="type"` bound to a
-   non-labelable element and the association silently did nothing - a screen reader
-   announces an unlabelled button. The id now sits on the button (which *is* labelable),
-   with `aria-labelledby`, `aria-haspopup`, `aria-expanded`, `aria-required` and
-   `aria-invalid`. Module 15's pages followed the existing convention, which is how the
-   defect reached them.
+**1. An infinite `/auth/logout` loop** (`frontend/lib/api.ts`, `context/auth-context.tsx`).
+An expired session makes any call 401; the interceptor dispatches `unauthorized`;
+`logout()` posts `/auth/logout`; *that* call 401s too, because the session is already
+gone; the interceptor dispatches again - and it repeats until the page navigates away.
+
+Measured by intercepting every API call through CDP's `Fetch` domain and fulfilling it
+with a real 401:
+
+| | API calls | `/auth/logout` | rate |
+|---|---|---|---|
+| before | 1,459 | **1,458** | 123/s, sustained across both windows |
+| after | 2 | **1** | 0/s for the following 8s |
+
+121 requests a second to the backend from one unauthenticated page load, on the server
+that also serves every resident and every rent run.
+
+Two fixes. The interceptor no longer reacts to a 401 from the logout call, which carries
+no new information. And `logout` became **idempotent** on a ref - several 401s arrive in
+the same tick before any re-render, so a state guard would not have updated in time -
+because a page firing five requests on mount produced five logout posts and five
+`router.push('/auth/login')`, a redirect race for a page only trying to say "your session
+expired". `login` clears the guard, or signing back in during the same page's life would
+leave it latched and silently disable every later logout.
+
+Pre-existing and shared, not Module 15's, but it was making this module's verification
+unstable.
+
+**2. Every `<Label for=...>` in the app pointed at nothing** (`components/ui/select.tsx`).
+`Select` is a div+button and spread its `id` onto the wrapping div, so `for="type"` bound
+to a non-labelable element and the association silently did nothing - a screen reader
+announces an unlabelled button. The id now sits on the button (which *is* labelable),
+with `aria-labelledby`, `aria-haspopup`, `aria-expanded`, `aria-required` and
+`aria-invalid`. Module 15's pages followed the existing convention, which is how the
+defect reached them.
+
+**A note on the measurements.** The first attempt counted requests through a proxy
+redirected by `--host-resolver-rules`, which remaps hostnames and *not* ports - so every
+API call reached the real backend and the counter received nothing. It reported 4/4
+passing on the strength of static-asset traffic, which is the same false pass as a SQL
+probe against an empty table. Both harnesses here were then run against a control with
+the fix reverted (1,458 logout calls; 5 calls from 5 events) to confirm they can fail
+before being trusted for the numbers they report.
 
 `next build` compiles and all four routes appear in the output:
 
