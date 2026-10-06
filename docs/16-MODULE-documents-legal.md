@@ -304,24 +304,86 @@ grants, before `/users`.
 - Depends on: Core Platform (Document Center), Leases (`RentalAgreement.endDate` and
   `.noticePeriodDays` are read, not copied), Sales, Procurement, Landlords
 - Feeds: Notifications
-### Frontend verification
+## The `demo-data.ts` diff, audited
 
-`next build` compiles and all four routes appear in the build output:
+The Module 15 commit shows `demo-data.ts` as **743 insertions / 271 deletions** in a
+shared seed file, which is unreviewable. The claim made at the time was "roughly 270
+lines are prettier normalising pre-existing formatting". That claim is now checked
+rather than asserted.
+
+Method: take the file at `619132c` and at `30f3b2d`, strip **all** whitespace, and
+compare the two token streams line by line.
+
+- **0 pre-existing lines lost their content.** Every line before is present after.
+- **~258 insertions and ~258 deletions were whitespace or line-wrapping.**
+- The 13 residual differences git still reported under `diff -w` are two things:
+  - **12 are trailing commas.** Prettier's `trailingComma: "all"` adds a comma to the
+    last property of an object once the object is broken across lines, so a wrapped
+    statement's squashed text differs from the unwrapped one by exactly one `,`.
+  - **1 is a type expression prettier re-parenthesised**:
+    `typeof properties[number]` became `(typeof properties)[number]`. Verified
+    equivalent rather than assumed: both forms declared over the same array are
+    mutually assignable with no compile error, so the type is identical.
+
+So the diff is the ~450 added lines of `generateContractsData` plus its call site, and
+nothing else. `tsc` is clean and all 1310 tests pass against the reformatted file,
+which is the second half of the argument.
+
+**The lesson for the next module:** run `eslint --fix` on a shared file as its own
+commit, before the feature that touches it, so a review never has to separate the two.
+
+## Frontend verification
+
+Two harnesses, because the first one could not answer the question that mattered.
+
+**Fetch-based (11 assertions).** Confirms each route is served without a server error
+and is distinguishable from a bogus path. Its limit is structural: the dashboard guard
+is a client-side `router.push('/auth/login')` inside `useAuth()`, not Next middleware,
+so a server fetch always receives 200 with the app shell and never observes the
+redirect or the rendered table. Its first version asserted "is protected" and passed
+for the wrong reason; it now asserts only what it can.
+
+**Browser-based (32 assertions, all passing).** Drives real Chrome over the DevTools
+Protocol - no npm install, since Chrome is installed and Node 24 ships a global
+`WebSocket`. It asserts what the fetch harness structurally cannot:
+
+- a **contract reference is in the DOM**, so the API call succeeded, the state landed
+  and the table rendered it;
+- the status pill reads **"Notice period passed", not `Notice_due`** - proving the badge
+  that exists precisely because `StatusBadge` renders the raw string works;
+- the counterparty label the **API actually returned** is on the page, and a null
+  counterparty renders as "held centrally" rather than a blank cell;
+- the **expired-session redirect really happens** in a real client;
+- switching the type dropdown to `COMPLIANCE` makes the counterparty field disappear,
+  which is the one genuinely surprising rule in the form;
+- readiness is **polled, not slept on** - Next dev compiles a route on first request,
+  and a fixed delay is a race that passes warm and fails cold.
+
+### What the browser harness found
+
+Driving a real browser turned up two defects that a build and a fetch could not:
+
+1. **An infinite `/auth/logout` loop** (`frontend/lib/api.ts`). An expired session
+   makes any call 401, the interceptor dispatches `unauthorized`, `logout()` posts
+   `/auth/logout`, *that* 401s because the session is already gone, the interceptor
+   dispatches again - and it repeats until the page navigates away. Observed hammering
+   the backend continuously from one unauthenticated dashboard load. Fixed by not
+   reacting to a 401 from the logout call itself, which carries no new information.
+   Pre-existing and shared, not Module 15's, but it was breaking this module's
+   verification.
+2. **Every `<Label for=...>` in the app pointed at nothing.** `Select` is a div+button
+   and spread its `id` onto the wrapping div, so `for="type"` bound to a
+   non-labelable element and the association silently did nothing - a screen reader
+   announces an unlabelled button. The id now sits on the button (which *is* labelable),
+   with `aria-labelledby`, `aria-haspopup`, `aria-expanded`, `aria-required` and
+   `aria-invalid`. Module 15's pages followed the existing convention, which is how the
+   defect reached them.
+
+`next build` compiles and all four routes appear in the output:
 
 ```
-├ ○ /contracts
-├ ƒ /contracts/[id]
-├ ○ /contracts/expiry-report
-├ ○ /contracts/new
+/contracts
+/contracts/[id]
+/contracts/expiry-report
+/contracts/new
 ```
-
-`tsc --noEmit` is clean, and 11 live assertions against the running Next server confirm
-each route is served without a server error and is distinguishable from a bogus path.
-
-**What is not verified:** the pages rendering *populated* content in a browser. The
-dashboard guard is a client-side `router.push('/auth/login')` inside `useAuth()`, not
-Next middleware, so a server fetch always receives 200 with the app shell and never
-observes the redirect - which means a fetch-based harness cannot prove either the
-redirect or the rendered table. That needs a headless browser. The *data path* the
-pages call is covered by the backend's 78 live assertions, so what is untested is the
-render of data already known to be correct, not the data itself.

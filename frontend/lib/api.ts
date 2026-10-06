@@ -42,10 +42,24 @@ export const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Dispatch event to trigger logout in auth context
+    // **Never react to a 401 from the logout call itself.**
+    //
+    // This was an infinite loop, and it is worth writing down because the shape of it
+    // is not obvious: an expired session makes any API call 401, the interceptor
+    // dispatches `unauthorized`, `logout()` posts `/auth/logout`, that call 401s too
+    // (the session is already gone), the interceptor dispatches `unauthorized` again,
+    // and the cycle repeats until the page navigates away. Observed hammering
+    // `/auth/logout` continuously at 401 from a single unauthenticated dashboard load.
+    //
+    // The session is already invalid by the time logout runs, so the 401 carries no
+    // new information and the local state is cleared regardless. Skipping the dispatch
+    // for this one request is the whole fix.
+    const url: string | undefined = error.config?.url;
+    if (error.response?.status === 401 && !url?.includes('/auth/logout')) {
       window.dispatchEvent(new CustomEvent('unauthorized'));
-      console.warn('Unauthorized access - session expired');
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Unauthorized access - session expired');
+      }
     }
     return Promise.reject(error);
   }

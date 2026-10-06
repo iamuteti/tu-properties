@@ -35,6 +35,7 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
             value = "",
             onChange,
             name,
+            id,
             disabled,
             required,
             children,
@@ -91,6 +92,25 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
         const selectedOption = displayOptions.find(opt => opt.value === value)
         const selectedLabel = selectedOption?.label || placeholder
 
+        /**
+         * The id of the element the `<label for=...>` points at.
+         *
+         * This is a div+button, not a native `<select>`, so `id` has to be put on the
+         * **button** deliberately. It used to arrive through `...props` and land on the
+         * wrapping div, which made every `<Label htmlFor="type">` in the app point at a
+         * non-labelable element: the association silently did nothing, so a screen
+         * reader announced an unlabelled button. `<button>` *is* a labelable element, so
+         * `for` works once the id is in the right place.
+         */
+        const labelId = label ? `${id ?? 'select'}-label` : undefined
+        const controlProps = {
+            ...(id ? { id } : {}),
+            ...(name ? { name } : {}),
+            ...(labelId ? { 'aria-labelledby': labelId } : {}),
+            ...(required ? { 'aria-required': true as const } : {}),
+            ...(error ? { 'aria-invalid': true as const } : {}),
+        }
+
         const handleSelect = (optionValue: string) => {
             onChange?.({ target: { value: optionValue, name } })
             setIsOpen(false)
@@ -107,6 +127,9 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                     )}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     disabled={disabled}
+                    aria-haspopup="listbox"
+                    aria-expanded={isOpen}
+                    {...controlProps}
                 >
                     <span className={cn("truncate", !value && "text-slate-400")}>
                         {selectedLabel}
@@ -172,7 +195,11 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
 
         return (
             <div className="grid w-full items-center gap-1.5">
-                <label className="text-sm font-medium leading-none text-slate-700">
+                <label
+                    id={labelId}
+                    htmlFor={id}
+                    className="text-sm font-medium leading-none text-slate-700"
+                >
                     {label}
                     {required && <span className="text-red-500"> *</span>}
                 </label>
