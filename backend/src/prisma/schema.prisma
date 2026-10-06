@@ -198,6 +198,8 @@ visitorVisits              VisitorVisit[]
   utilityMeters              UtilityMeter[]
   utilityRates               UtilityRate[]
   utilityCharges             UtilityCharge[]
+  // Module 15 - Documents & Legal
+  contracts                 Contract[]
   meterReadings              MeterReading[]
 
 
@@ -314,6 +316,8 @@ preApprovedVisits      VisitorVisit[]    @relation("UserPreApprovedVisits")
   /// Module 14: a reading marked `ESTIMATED` records who produced the figure, so an
   /// estimate on a bill can be traced to a person rather than to nobody.
   readingsEstimated        MeterReading[]  @relation("UserEstimatedReadings")
+  // Module 15 - Documents & Legal. Who put the contract register together.
+  contractsCreated        Contract[]      @relation("UserContracts")
   utilityChargesCreated    UtilityCharge[] @relation("UserUtilityCharges")
   utilityChargesVoided    UtilityCharge[] @relation("UserVoidedUtilityCharges")
 
@@ -514,7 +518,11 @@ model Document {
   version Int @default(1)
 
   uploadedById String?
-  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  // Module 15 - Documents & Legal. The contract this file is the authoritative copy
+  // of. `SET NULL` so deleting the file leaves the contract standing.
+  contract Contract?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -574,9 +582,11 @@ model Landlord {
   receipts        Receipt[]
   credits         CustomerCredit[] @relation("LandlordCredits")
   creditNotes     CreditNote[]     @relation("LandlordCreditNotes")
-  ownerStatements OwnerStatement[]
+ownerStatements OwnerStatement[]
   payouts         LandlordPayout[]
   charges         LandlordCharge[]
+  // Module 15 - Documents & Legal. The property management agreement.
+  contracts       Contract[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -1227,7 +1237,11 @@ model RentalAgreement {
   // Relationships
 invoices        Invoice[]
   // Module 14 — Utilities. Utility invoices raised against this lease.
-  utilityCharges  UtilityCharge[]
+utilityCharges  UtilityCharge[]
+  // Module 15 - Documents & Legal. The signed lease agreement, which is what the
+  // contract register is actually for: an expiry date with no document behind it is
+  // a date somebody typed.
+  contracts     Contract[]
   payments        Payment[]
   commissions     Commission[]
   moveOutRequests MoveOutRequest[]
@@ -1797,7 +1811,10 @@ model SaleTransaction {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // Soft delete
+deletedAt DateTime? // Soft delete
+
+  // Module 15 - Documents & Legal. The sale agreement's contract.
+  contracts  Contract[]
 
   @@index([organizationId])
   @@index([stage])
@@ -2750,11 +2767,16 @@ model Supplier {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+deletedAt DateTime?
 
-  @@index([organizationId])
-  @@index([name])
-  @@map("suppliers")
+    // Module 15 - Documents & Legal. Vendor contracts - supply agreements,
+    // maintenance contracts, anything this organization is a party to on the
+    // purchasing side.
+    contracts Contract[]
+
+    @@index([organizationId])
+    @@index([name])
+    @@map("suppliers")
 }
 
 enum SupplierStatus {
@@ -3080,9 +3102,18 @@ enum NotificationType {
   // Module 13 - Facilities. A booking decision is the resident's own booking, so
   // it is addressed to them; a visitor arriving and a card expiring are messages
   // the *office* needs, and they land on different screens.
-  FACILITY_BOOKING_DECIDED
+FACILITY_BOOKING_DECIDED
   VISITOR_ARRIVAL
   ACCESS_CARD_EXPIRING
+  // Module 15: a contract entering a warning band. Distinct from `LEASE_EXPIRING`
+  // because the two are addressed to different people at the same moment - that one
+  // to the resident, this one to the staff who can still act on it. A contract can
+  // also reach its notice deadline while still running, a state no lease reminder
+  // reports. Note kept short on purpose: a longer comment block here failed
+  // `prisma validate` with "This line is not an enum value definition" and the cause
+  // was not established - the same comment with the value made valid and the value
+  // alone was valid too. If you extend it, re-run `npx prisma validate`.
+  CONTRACT_EXPIRING
   CUSTOM
 }
 
@@ -6296,3 +6327,140 @@ enum VacancyPolicy {
   REDISTRIBUTE
 }
 
+
+// ============================================
+// DOCUMENTS & LEGAL (Module 15)
+// ============================================
+
+/// What kind of instrument a contract is.
+///
+/// `COMPLIANCE` is not in the module doc's list and is here because the doc's own
+/// scope asks for "compliance documents" alongside contracts - a gas safety
+/// certificate, a fire inspection, a lift maintenance licence. Those expire, they
+/// matter enormously, and they have **no counterparty and no related entity**: the
+/// obligation is to the authority, not to a tenant or a supplier. A contract schema
+/// that requires a related entity cannot represent the most compliance-critical thing
+/// in the set.
+enum ContractType {
+  /// A residential or commercial lease. Points at a `RentalAgreement`.
+  LEASE
+  /// A sale agreement. Points at a `SaleTransaction`.
+  SALE
+  /// A supplier or vendor contract. Points at a `Supplier`.
+  VENDOR
+  /// A property management agreement. Points at a `Landlord`.
+  MANAGEMENT
+  /// A licence, certificate or inspection that expires. Points at nothing.
+  COMPLIANCE
+}
+
+/// The document this contract is evidenced by.
+///
+/// A foreign key rather than a second file store: the `Document` model already
+/// versions a re-upload and already attaches to any entity through its
+/// `(entityType, entityId)` pair, so **a contract's addenda and riders need no schema
+/// at all** - they hang off `('CONTRACT', <contractId>)` the way every other
+/// attachment in this system does. This column is only the *authoritative* document,
+/// the signed agreement itself.
+///
+/// `SET NULL` rather than `RESTRICT`: deleting a file is allowed and the contract
+/// must survive it. A contract whose file was removed by mistake is a problem; a
+/// contract that cannot be deleted because a file exists is worse.
+model Contract {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Human reference, unique per organization. Contracts are cited in disputes and
+  /// in correspondence, and `CON-0001` is what appears in a letter.
+  reference String
+  title     String
+
+  type ContractType @default(VENDOR)
+
+  // ── The related entity ────────────────────────────────────────────────────
+  //
+  // Four nullable foreign keys rather than the module doc's
+  // `relatedEntityType String` / `relatedEntityId String` pair. That pair is a
+  // polymorphic reference with **no referential integrity at all**: it can name a row
+  // that never existed or was deleted yesterday, nothing cascades, and every query
+  // has to hand-resolve the type. Four typed columns cost more schema and buy
+  // indexing, cascading deletes, and the ability to ask the database whether the
+  // contract is well-formed.
+  //
+  // This is the same lesson as `landlordId` / `tenantId` (two columns for one idea
+  // that should have been one) applied in the other direction: a loose id pair is the
+  // cheap way to model "one of several", and it is cheap the same way a `Any` type is
+  // cheap - until something needs to reference it safely.
+  //
+  // `COMPLIANCE` contracts set none of them, which is why the constraint below
+  // permits zero *or* one rather than demanding exactly one.
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: Cascade)
+  saleTransactionId String?
+  saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: Cascade)
+  supplierId String?
+  supplier   Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  landlordId String?
+  landlord   Landlord?    @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+/// Unique: a signed agreement is the authoritative document of **one** contract.
+  /// Without this, two contracts could each claim the same PDF and the register
+  /// would show a document attached to two different counterparties.
+  documentId String?  @unique
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  // ── The term ──────────────────────────────────────────────────────────────
+  startDate DateTime?
+  /// When it stops applying. Null means open-ended, which is a real and common state
+  /// (a management agreement that runs until terminated) and must not be confused
+  /// with "we forgot to enter it".
+  expiresAt DateTime?
+
+  /// Days of notice required to terminate early. This is the column that makes the
+  /// register more than a date list: a contract expiring in 45 days that needs 90
+  /// days' notice is **already past its notice deadline**, which is the thing the
+  /// person managing it needs to be told, and which an `expiresAt`-only view hides
+  /// completely.
+  noticeDays Int?
+
+  /// Renews without anyone doing anything.
+  ///
+  /// A field because an auto-renewing contract that alarms you on its expiry date is
+  /// an alarm nobody acts on, and one that stays silent after being terminated is a
+  /// contract you are still paying for. It does not suppress reminders entirely - a
+  /// renewal due for *negotiation* is exactly when somebody wants warning - so it is
+  /// the bands, not the existence of reminders, that change.
+  autoRenew Boolean @default(false)
+
+  /// The contract this one renews. The chain is what makes "what replaced this?"
+  /// answerable, which is the half of renewal tracking that an expiry date alone
+  /// cannot give.
+  renewalOfId String?
+  renewalOf   Contract?  @relation("ContractRenewals", fields: [renewalOfId], references: [id], onDelete: SetNull)
+  renewals    Contract[] @relation("ContractRenewals")
+
+  /// Notes are free text because a contract's caveats are whatever the parties wrote.
+  notes String? @db.Text
+
+  createdByUserId String?
+  createdBy       User?   @relation("UserContracts", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
+  @@index([type])
+  @@index([expiresAt])
+  /// The list screen sorts by expiry and filters by type, so this is the index that
+  /// makes "what is expiring next" fast rather than a full scan of every contract the
+  /// organization has ever signed.
+  @@index([organizationId, type, expiresAt])
+  @@index([rentalAgreementId])
+  @@index([saleTransactionId])
+  @@index([supplierId])
+  @@index([landlordId])
+  @@index([renewalOfId])
+  @@map("contracts")
+}

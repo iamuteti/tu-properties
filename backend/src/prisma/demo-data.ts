@@ -62,9 +62,13 @@ import {
   MeterStatus,
   UtilityChargeStatus,
   UtilityType,
+  // Module 15 - Documents & Legal
+  ContractType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import * as path from 'path';
+import * as fsp from 'fs/promises';
 import * as dotenv from 'dotenv';
 import * as bcrypt from 'bcrypt';
 import {
@@ -3712,6 +3716,11 @@ export async function seedDemoData() {
     await prisma.saleInstallment.deleteMany();
     await prisma.saleTransaction.deleteMany();
     await prisma.invoice.deleteMany();
+    // Module 15: contracts `CASCADE` from every entity they can point at, so clearing
+    // the leases, sales, suppliers and landlords below takes their contracts with
+    // them. There is no explicit `deleteMany` here on purpose - adding one would be a
+    // second, redundant path to the same outcome, and the cascade is the guarantee that
+    // a new entity type cannot be added to the contract without being cleaned up.
     await prisma.rentalAgreement.deleteMany();
     await prisma.tenantEmergencyContact.deleteMany();
     // CRM first: `Lead`/`Contact` reference properties, branches, users and
@@ -4094,6 +4103,11 @@ export async function seedDemoData() {
     // Utility meters, readings and tariffs (Module 14). After Finance, because the
     // seeded consumption charges link to real invoices.
     await generateUtilitiesData(prisma, rohiOrg.id);
+
+    // Contract register (Module 15). Last of the data generators, because its lease
+    // and sale contracts point at rows Finance and Sales have already created, and
+    // because the signed scans it writes are the only thing on disk this seed owns.
+    await generateContractsData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.
@@ -5846,7 +5860,7 @@ async function generateUtilitiesData(
   });
   const admin = users.find((u) => u.role === UserRole.ADMIN);
 
-  const byProperty = new Map<string, typeof properties[number]>();
+  const byProperty = new Map<string, (typeof properties)[number]>();
   for (const property of properties) {
     byProperty.set(property.code, property);
   }
@@ -5878,7 +5892,10 @@ async function generateUtilitiesData(
           source: MeterReadingSource.MANUAL,
           scope: MeterScope.SUBMETER,
           status: MeterStatus.ACTIVE,
-          readingSetup: type === UtilityType.WATER ? 'Direct read at the kitchen sink' : 'Direct read at the meter box',
+          readingSetup:
+            type === UtilityType.WATER
+              ? 'Direct read at the kitchen sink'
+              : 'Direct read at the meter box',
         },
       });
       metersCreated.push(meter.id);
@@ -5889,7 +5906,9 @@ async function generateUtilitiesData(
   // exists to handle, and the only place apportionment is consulted.
   const bulkMeters: string[] = [];
   for (const property of properties) {
-    const unitCount = await prisma.unit.count({ where: { propertyId: property.id } });
+    const unitCount = await prisma.unit.count({
+      where: { propertyId: property.id },
+    });
     if (unitCount < 2) {
       continue;
     }
@@ -5959,7 +5978,12 @@ async function generateUtilitiesData(
 
   // An organization default per utility, then a superseded window for water so the
   // rate list shows a tariff history rather than one mutable row.
-  const defaults: Array<{ type: UtilityType; rate: number; standing: number; vat: number | null }> = [
+  const defaults: Array<{
+    type: UtilityType;
+    rate: number;
+    standing: number;
+    vat: number | null;
+  }> = [
     { type: UtilityType.WATER, rate: 55.5, standing: 250, vat: null },
     { type: UtilityType.ELECTRICITY, rate: 32.75, standing: 150, vat: null },
     { type: UtilityType.GAS, rate: 145.0, standing: 0, vat: 16 },
@@ -5986,12 +6010,20 @@ async function generateUtilitiesData(
   // The superseded water tariff: an old window, then the replacement. Water's default
   // above is closed part-way through the year so exactly one water rate is open.
   const waterDefault = await prisma.utilityRate.findFirst({
-    where: { organizationId, type: UtilityType.WATER, meterId: null, propertyId: null },
+    where: {
+      organizationId,
+      type: UtilityType.WATER,
+      meterId: null,
+      propertyId: null,
+    },
     orderBy: { validFrom: 'desc' },
   });
   if (waterDefault) {
     const cutover = new Date(Date.UTC(new Date().getUTCFullYear(), 3, 1));
-    await prisma.utilityRate.update({ where: { id: waterDefault.id }, data: { validTo: cutover } });
+    await prisma.utilityRate.update({
+      where: { id: waterDefault.id },
+      data: { validTo: cutover },
+    });
 
     const replacement = await prisma.utilityRate.create({
       data: {
@@ -6013,7 +6045,9 @@ async function generateUtilitiesData(
 
   const readingsCreated = await Promise.all(
     metersCreated.map(async (meterId, index) => {
-const meter = await prisma.utilityMeter.findUnique({ where: { id: meterId } });
+      const meter = await prisma.utilityMeter.findUnique({
+        where: { id: meterId },
+      });
       if (!meter) {
         return 0;
       }
@@ -6038,7 +6072,13 @@ const meter = await prisma.utilityMeter.findUnique({ where: { id: meterId } });
       }> = [];
 
       for (let monthOffset = 3; monthOffset >= 1; monthOffset -= 1) {
-        const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - monthOffset, 1));
+        const d = new Date(
+          Date.UTC(
+            new Date().getUTCFullYear(),
+            new Date().getUTCMonth() - monthOffset,
+            1,
+          ),
+        );
         rows.push({
           organizationId,
           meterId,
@@ -6053,7 +6093,8 @@ const meter = await prisma.utilityMeter.findUnique({ where: { id: meterId } });
       // real case and the source column should have a row that is not MANUAL.
       if (index === 0) {
         rows[rows.length - 1].source = MeterReadingSource.ESTIMATED;
-        rows[rows.length - 1].note = 'Tenant away and the box was locked; estimated from the previous month.';
+        rows[rows.length - 1].note =
+          'Tenant away and the box was locked; estimated from the previous month.';
       }
 
       const created = await prisma.meterReading.createMany({ data: rows });
@@ -6069,17 +6110,448 @@ const meter = await prisma.utilityMeter.findUnique({ where: { id: meterId } });
     where: { organizationId, meterNumber: { startsWith: 'ROLL-PWR-' } },
   });
   if (rolloverMeter) {
-    const prev = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 2, 1));
-    const now = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1));
+    const prev = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 2, 1),
+    );
+    const now = new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1),
+    );
     await prisma.meterReading.createMany({
       data: [
-        { organizationId, meterId: rolloverMeter.id, readingDate: prev, reading: 99998, source: MeterReadingSource.MANUAL, recordedByUserId: admin?.id ?? null },
-        { organizationId, meterId: rolloverMeter.id, readingDate: now, reading: 3, source: MeterReadingSource.MANUAL, recordedByUserId: admin?.id ?? null, note: 'Register had passed its maximum and wrapped.' },
+        {
+          organizationId,
+          meterId: rolloverMeter.id,
+          readingDate: prev,
+          reading: 99998,
+          source: MeterReadingSource.MANUAL,
+          recordedByUserId: admin?.id ?? null,
+        },
+        {
+          organizationId,
+          meterId: rolloverMeter.id,
+          readingDate: now,
+          reading: 3,
+          source: MeterReadingSource.MANUAL,
+          recordedByUserId: admin?.id ?? null,
+          note: 'Register had passed its maximum and wrapped.',
+        },
       ],
     });
   }
 
   console.log(
     `  Utilities: ${metersCreated.length} meters (${bulkMeters.length} bulk), ${totalReadings} readings, ${rateRows.length} tariffs`,
+  );
+}
+
+/**
+ * Module 15 - the contract register.
+ *
+ * The point of this data is not volume, it is **coverage of the derived statuses**. A
+ * demo estate whose contracts are all comfortably active exercises none of the logic
+ * this module exists for: the notice deadline, the expiring-soon band, the renewal
+ * chain and the missing scan are all states a user has to see once before they believe
+ * the register works. So the mix is deliberately uneven - a handful of contracts at
+ * each interesting age, and a lot of quiet ones behind them.
+ *
+ * Two details that are easy to get wrong and would make the demo lie:
+ *
+ * - **`LEASE` contracts leave `expiresAt` and `noticeDays` null on purpose.** The
+ *   service falls back to `RentalAgreement.endDate` and `.noticePeriodDays`, so
+ *   filling them here would hide whether that wiring works. Two of them are filled
+ *   anyway, with values that *disagree* with the lease, to show the register's own
+ *   value winning - which is the documented behaviour and worth seeing.
+ * - **The `NOTICE_DUE` row is arithmetic, not vibes.** It needs an end date inside
+ *   `noticeDays`, so it is built as `now + 40 days` with `noticeDays: 90`: 40 days
+ *   left, 90 days' notice required, so serving notice became impossible 50 days ago
+ *   and the contract is still running. That is the state an expiry-only register
+ *   reports as healthy.
+ */
+async function generateContractsData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: { id: true, role: true },
+  });
+  const admin = users.find((u) => u.role === UserRole.ADMIN);
+  const createdBy = admin?.id ?? null;
+
+  const today = new Date();
+  const addDays = (days: number) =>
+    new Date(today.getTime() + days * 86_400_000);
+
+  const year = today.getUTCFullYear();
+  let sequence = 0;
+  /** A citable reference, in the shape a person would say out loud in a letter. */
+  const nextReference = () => {
+    sequence += 1;
+    return `CON-${year}-${String(sequence).padStart(4, '0')}`;
+  };
+
+  // ── leases ────────────────────────────────────────────────────────────────
+  // Taken across the estate rather than the first few, so the ages are spread out
+  // instead of every demo contract landing in the same year.
+  const leases = await prisma.rentalAgreement.findMany({
+    where: { organizationId, endDate: { not: null } },
+    orderBy: { endDate: 'asc' },
+    select: { id: true, code: true, endDate: true, noticePeriodDays: true },
+  });
+
+  if (leases.length === 0) {
+    console.log('  Contracts: skipped (no leases with an end date)');
+    return;
+  }
+
+  let created = 0;
+
+  // Spread across the register by expiry, so each derived status has a real row.
+  const pick = (fraction: number) =>
+    leases[Math.floor(leases.length * fraction)];
+
+  const leasePlans: {
+    lease: (typeof leases)[number];
+    overrideExpiresAt?: Date;
+    noticeDays?: number;
+    title: string;
+  }[] = [
+    // Already ended, and nobody renewed it. Reports EXPIRED.
+    { lease: pick(0.05), title: 'Standard residential lease agreement' },
+
+    // 40 days left, 90 days' notice required. The NOTICE_DUE case.
+    {
+      lease: pick(0.2),
+      overrideExpiresAt: addDays(40),
+      noticeDays: 90,
+      title: 'Lease agreement - notice period already passed',
+    },
+
+    // Inside the 30-day window. EXPIRING_SOON.
+    {
+      lease: pick(0.35),
+      overrideExpiresAt: addDays(18),
+      title: 'Lease agreement - ending this month',
+    },
+
+    // Past its end date already, so the sweep and the report have something expired.
+    {
+      lease: pick(0.5),
+      overrideExpiresAt: addDays(-12),
+      title: 'Lease agreement - ended, awaiting renewal paperwork',
+    },
+
+    // Comfortably active, with the contract's own dates disagreeing with the lease -
+    // an addendum that moved the term. The register must show the contract's value.
+    {
+      lease: pick(0.65),
+      overrideExpiresAt: addDays(400),
+      noticeDays: 30,
+      title: 'Lease agreement - as amended by addendum',
+    },
+
+    // Plain active lease, dates inherited from the lease row.
+    { lease: pick(0.8), title: 'Standard residential lease agreement' },
+    { lease: pick(0.9), title: 'Standard residential lease agreement' },
+  ];
+
+  for (const plan of leasePlans) {
+    if (!plan.lease) continue;
+    await prisma.contract.create({
+      data: {
+        organizationId,
+        reference: nextReference(),
+        title: plan.title,
+        type: ContractType.LEASE,
+        rentalAgreementId: plan.lease.id,
+        // Deliberately null unless the plan overrides: the service reads the lease's
+        // own `endDate` and `noticePeriodDays` when these are empty.
+        expiresAt: plan.overrideExpiresAt ?? null,
+        noticeDays: plan.noticeDays ?? null,
+        autoRenew: false,
+        createdByUserId: createdBy,
+        notes:
+          plan.noticeDays === 90
+            ? 'Filed from the signed agreement. Notice is 90 days, so the decision on renewal had to be taken before this term began.'
+            : null,
+      },
+    });
+    created += 1;
+  }
+
+  // ── a renewal chain ───────────────────────────────────────────────────────
+  // Two contracts where the second renews the first, so the chain walker and the
+  // `SUPERSEDED` status have real rows. The predecessor is deliberately dated in the
+  // past: a renewal of a live contract would be nonsense, and a superseded row that is
+  // still running is exactly the false alarm the status exists to avoid.
+  if (leasePlans[0].lease && leasePlans[1].lease) {
+    const original = await prisma.contract.findFirst({
+      where: { organizationId, rentalAgreementId: leasePlans[0].lease.id },
+      select: { id: true, reference: true, expiresAt: true },
+    });
+
+    if (original) {
+      // The predecessor's **effective** end date, not its `expiresAt` column. For a
+      // lease contract that column is usually empty on purpose - the service reads the
+      // lease's own `endDate` - so taking the column here would start the renewal
+      // nowhere and quietly lose the link between the two terms.
+      const originalEnds =
+        original.expiresAt ?? leasePlans[0].lease.endDate ?? null;
+
+      const renewal = await prisma.contract.create({
+        data: {
+          organizationId,
+          reference: `${original.reference}-R2`,
+          title: 'Renewed lease agreement',
+          type: ContractType.LEASE,
+          rentalAgreementId: leasePlans[1].lease.id,
+          startDate: originalEnds,
+          expiresAt: addDays(730),
+          noticeDays: 90,
+          autoRenew: false,
+          renewalOfId: original.id,
+          createdByUserId: createdBy,
+          notes: 'Second term, signed after the first ended.',
+        },
+      });
+      created += 1;
+
+      void renewal;
+    }
+  }
+
+  // ── supplier agreements ───────────────────────────────────────────────────
+  const suppliers = await prisma.supplier.findMany({
+    where: { organizationId },
+    orderBy: { code: 'asc' },
+    select: { id: true, name: true },
+  });
+
+  const supplierPlans = [
+    { days: 25, notice: 30, autoRenew: true },
+    { days: 55, notice: 60, autoRenew: false },
+    { days: 200, notice: 30, autoRenew: false },
+    { days: 340, notice: 90, autoRenew: false },
+    { days: 720, notice: 30, autoRenew: false },
+  ];
+
+  const vendorContracts: {
+    id: string;
+    reference: string;
+    title: string;
+  }[] = [];
+
+  for (const [index, supplier] of suppliers
+    .slice(0, supplierPlans.length)
+    .entries()) {
+    const plan = supplierPlans[index];
+    const contract = await prisma.contract.create({
+      data: {
+        organizationId,
+        reference: nextReference(),
+        title: `Supply agreement - ${supplier.name}`,
+        type: ContractType.VENDOR,
+        supplierId: supplier.id,
+        startDate: addDays(-Math.max(30, 365 - plan.days)),
+        expiresAt: addDays(plan.days),
+        noticeDays: plan.notice,
+        autoRenew: plan.autoRenew,
+        createdByUserId: createdBy,
+        notes:
+          index === 2
+            ? 'Terms agreed but the signed copy has not been scanned in yet.'
+            : null,
+      },
+    });
+    vendorContracts.push({
+      id: contract.id,
+      reference: contract.reference,
+      title: contract.title,
+    });
+    created += 1;
+  }
+
+  // ── signed scans ──────────────────────────────────────────────────────────
+  // Written through the same key format `LocalFileStorage` uses
+  // (`<org>/<entityType>/<entityId>/<timestamp>-v<version>-<fileName>`, with the name
+  // sanitised), so the demo attachment genuinely downloads rather than 500ing on a row
+  // pointing at bytes that were never there. Faking a `Document` with no file behind
+  // it is the kind of demo data that makes a module look broken.
+  //
+  // One contract is deliberately left without a scan, so `hasDocument=false` finds
+  // something. Every supplier agreement having a PDF makes that filter untestable.
+  const uploadRoot = path.join(process.cwd(), 'uploads');
+
+  /**
+   * Write a real file through the Document Center's key format and attach it.
+   *
+   * A `Document` row with no bytes behind it is the demo equivalent of a screenshot
+   * that 500s: it makes the module look broken and it hides the fact that the storage
+   * key convention (`<org>/<entityType>/<entityId>/<timestamp>-v<n>-<fileName>`,
+   * sanitised) has to match what `LocalFileStorage.resolve` expects. Writing it for
+   * real is the only way that stays true as either side changes.
+   */
+  const attachScan = async (
+    contractId: string,
+    reference: string,
+    title: string,
+    linkAsAuthoritative: boolean,
+  ) => {
+    const fileName = `${reference}.txt`;
+    const key = `${organizationId}/CONTRACT/${contractId}/${Date.now()}-v1-${fileName}`;
+    const body = [
+      title,
+      '',
+      `Reference: ${reference}`,
+      'Demo text standing in for the signed document.',
+      'A real file is written here so the Document Center can serve it.',
+      '',
+    ].join('\n');
+
+    await fsp.mkdir(
+      path.join(uploadRoot, organizationId, 'CONTRACT', contractId),
+      {
+        recursive: true,
+      },
+    );
+    await fsp.writeFile(path.join(uploadRoot, key), body, 'utf8');
+
+    const document = await prisma.document.create({
+      data: {
+        organizationId,
+        entityType: 'CONTRACT',
+        entityId: contractId,
+        fileName,
+        fileUrl: key,
+        mimeType: 'text/plain',
+        sizeBytes: Buffer.byteLength(body),
+        version: 1,
+        uploadedById: createdBy,
+      },
+    });
+
+    // The authoritative copy is linked by foreign key, which is `@unique` - one signed
+    // agreement belongs to exactly one contract. An addendum would instead attach
+    // through the Document Center's `(entityType, entityId)` pair with no column at all.
+    if (linkAsAuthoritative) {
+      await prisma.contract.update({
+        where: { id: contractId },
+        data: { documentId: document.id },
+      });
+    }
+  };
+
+  for (const [index, contract] of vendorContracts.entries()) {
+    // Index 2 is left without a scan on purpose, so `hasDocument=false` finds
+    // something. Every agreement having a PDF makes that filter untestable.
+    if (index === 2) continue;
+    await attachScan(contract.id, contract.reference, contract.title, true);
+  }
+
+  // ── management agreements ─────────────────────────────────────────────────
+  const landlords = await prisma.landlord.findMany({
+    where: { organizationId },
+    orderBy: { code: 'asc' },
+    select: { id: true, name: true },
+  });
+
+  for (const [index, landlord] of landlords.slice(0, 4).entries()) {
+    await prisma.contract.create({
+      data: {
+        organizationId,
+        reference: nextReference(),
+        title: `Management agreement - ${landlord.name}`,
+        type: ContractType.MANAGEMENT,
+        landlordId: landlord.id,
+        startDate: addDays(-300),
+        // One open-ended, deliberately. An agreement that rolls until terminated is
+        // real, and it must report `OPEN_ENDED` rather than appearing on a 90-day
+        // warning list where nobody would ever act on it.
+        expiresAt: index === 0 ? null : addDays(280 + index * 120),
+        noticeDays: index === 0 ? 90 : 60,
+        autoRenew: index === 0,
+        createdByUserId: createdBy,
+      },
+    });
+    created += 1;
+  }
+
+  // ── sale agreements ───────────────────────────────────────────────────────
+  const sales = await prisma.saleTransaction.findMany({
+    where: { organizationId },
+    orderBy: { code: 'asc' },
+    select: { id: true, code: true, propertyTitle: true },
+    take: 2,
+  });
+
+  for (const [index, sale] of sales.entries()) {
+    await prisma.contract.create({
+      data: {
+        organizationId,
+        reference: nextReference(),
+        title: `Sale agreement - ${sale.propertyTitle ?? sale.code}`,
+        type: ContractType.SALE,
+        saleTransactionId: sale.id,
+        startDate: addDays(-120 + index * 30),
+        expiresAt: addDays(120 + index * 45),
+        // A sale deposit is forfeited rather than noticed, so this one has no notice
+        // requirement at all - which is why `noticeDays` is nullable and why an
+        // absent notice period must not be treated as a zero-day one.
+        noticeDays: null,
+        createdByUserId: createdBy,
+      },
+    });
+    created += 1;
+  }
+
+  // ── compliance certificates ───────────────────────────────────────────────
+  // **No counterparty.** A gas safety certificate runs to the authority, and this is
+  // the reason `ContractType` has a `COMPLIANCE` value and the shape check permits
+  // zero related entities: the most compliance-critical documents in a property
+  // register are the ones with nobody on the other side of them.
+  const certificates = [
+    { title: 'Gas safety certificate - all appliances', days: 78, notice: 30 },
+    { title: 'Fire alarm and extinguisher inspection', days: 22, notice: 30 },
+    {
+      title: 'Lift maintenance and load test certificate',
+      days: 300,
+      notice: 60,
+    },
+    {
+      title: 'Electrical installation periodic inspection',
+      days: 410,
+      notice: 30,
+    },
+    { title: 'Boiler and pressure vessel inspection', days: -30, notice: 30 },
+  ];
+
+  for (const certificate of certificates) {
+    const contract = await prisma.contract.create({
+      data: {
+        organizationId,
+        reference: nextReference(),
+        title: certificate.title,
+        type: ContractType.COMPLIANCE,
+        expiresAt: addDays(certificate.days),
+        noticeDays: certificate.notice,
+        autoRenew: false,
+        createdByUserId: createdBy,
+        notes:
+          'Issued by the inspecting authority. Held centrally, not against a unit.',
+      },
+    });
+    created += 1;
+
+    // Every certificate but the last carries its scan. A compliance document you do
+    // not hold is the most consequential gap on the register, so the demo should show
+    // most of them filed and one conspicuously not - rather than all 24 contracts
+    // missing an attachment, which makes the filter meaningless.
+    if (certificate.days !== -30) {
+      await attachScan(contract.id, contract.reference, contract.title, true);
+    }
+  }
+
+  console.log(
+    `  Contracts: ${created} (${leasePlans.length} lease, ${suppliers.length > 0 ? Math.min(suppliers.length, 5) : 0} vendor, ${Math.min(landlords.length, 4)} management, ${sales.length} sale, ${certificates.length} compliance, 1 renewal)`,
   );
 }

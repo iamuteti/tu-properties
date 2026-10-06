@@ -9,10 +9,28 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { money } from './format';
+import {
+  CONTRACT_REMINDER_ROLE_NAMES,
+} from '@/modules/legal/legal-roles';
+import {
+  daysUntil,
+  nextReminderBand,
+  reminderDaysFor,
+} from '@/modules/legal/contract-expiry';
 
 const LEASE_EXPIRY_WARNINGS = [60, 30, 14, 7];
 const RENT_DUE_WINDOW_DAYS = 7;
 const OVERDUE_ESCALATION_DAYS = [1, 7, 30];
+
+/**
+ * How far ahead the contract sweep looks.
+ *
+ * The widest standard band is 90 days, and a contract's notice period is added to its
+ * own band list - so a 90-day-notice contract alerts at 90 days, not at 180. Anything
+ * past this horizon has no band in it and is read on the register instead of being
+ * nagged about. Bounds the query rather than the reminders.
+ */
+const CONTRACT_NOTICE_HORIZON_DAYS = 120;
 
 /** The request outcomes a resident can be told about. */
 type RequestDecisionType = Extract<
@@ -63,7 +81,7 @@ export class NotificationTriggersService {
       select: { id: true },
     });
 
-    const summary = { leases: 0, due: 0, overdue: 0 };
+    const summary = { leases: 0, due: 0, overdue: 0, contracts: 0 };
     for (const organization of organizations) {
       summary.leases += await this.remindExpiringLeases(
         organization.id,
@@ -71,12 +89,164 @@ export class NotificationTriggersService {
       );
       summary.due += await this.remindRentDue(organization.id, onDate);
       summary.overdue += await this.remindOverdueRent(organization.id, onDate);
+      summary.contracts += await this.remindExpiringContracts(
+        organization.id,
+        onDate,
+      );
     }
 
     this.logger.log(
-      `Reminders for ${organizations.length} org(s): ${summary.leases} lease expiry, ${summary.due} rent due, ${summary.overdue} overdue`,
+      `Reminders for ${organizations.length} org(s): ${summary.leases} lease expiry, ${summary.due} rent due, ${summary.overdue} overdue, ${summary.contracts} contract expiry`,
     );
     return summary;
+  }
+
+  /**
+   * A contract entering a warning band, or passing its notice deadline.
+   *
+   * Two things make this different from `remindExpiringLeases`, and both are the
+   * reason it is not a copy of that method:
+   *
+   * 1. **The audience is staff, not the resident.** A lease reminder goes to the
+   *    tenant; a contract reminder goes to the people who can still act on it, because
+   *    a contract past its notice deadline is a commitment nobody can undo. Recipients
+   *    are resolved once per organization rather than once per contract, or an
+   *    organization with 200 expiring contracts would run 200 identical user queries.
+   *
+   * 2. **The notice deadline is a reminder in its own right.** `reminderDaysFor`
+   *    folds `noticeDays` into the band list, so a 90-day-notice contract alerts at 90
+   *    days out rather than first surfacing at the generic 30-day band - by which point
+   *    serving notice was already impossible. The message says which case this is,
+   *    because "expires in 90 days" and "the last day to serve notice was 45 days ago"
+   *    call for completely different responses.
+   *
+   * `renewals: { none: {} }` skips superseded contracts: the successor is the live one
+   * and its own sweep will report it. Without the filter a replaced contract would
+   * remind every morning about a term that ended years ago.
+   */
+  private async remindExpiringContracts(
+    organizationId: string,
+    onDate: Date,
+  ): Promise<number> {
+    const recipients = await this.contractReminderRecipients(organizationId);
+    if (recipients.length === 0) return 0;
+
+    // The furthest band is 90 days plus whatever notice period a contract carries,
+    // which `CONTRACT_NOTICE_HORIZON_DAYS` bounds. `MAX_NOTICE_DAYS` in the contract
+    // DTO caps a notice period at 730, so an organization could in principle carry a
+    // certificate needing two years' notice - those are read on the register, not
+    // nagged about daily.
+    const horizon = new Date(
+      onDate.getTime() + CONTRACT_NOTICE_HORIZON_DAYS * 86_400_000,
+    );
+
+    const contracts = await this.prisma.contract.findMany({
+      where: {
+        organizationId,
+        expiresAt: { not: null, gt: onDate, lte: horizon },
+        renewals: { none: {} },
+      },
+      select: {
+        id: true,
+        reference: true,
+        title: true,
+        type: true,
+        expiresAt: true,
+        noticeDays: true,
+        autoRenew: true,
+        rentalAgreementId: true,
+        rentalAgreement: {
+          select: { endDate: true, noticePeriodDays: true },
+        },
+      },
+      take: 500,
+    });
+
+    const day = onDate.toISOString().slice(0, 10);
+    let sent = 0;
+
+    for (const contract of contracts) {
+      // The same lease fallback the service applies: the register does not hold a
+      // second copy of the lease's end date.
+      const expiresAt = contract.expiresAt ?? contract.rentalAgreement?.endDate ?? null;
+      const noticeDays =
+        contract.noticeDays ?? contract.rentalAgreement?.noticePeriodDays ?? null;
+      if (!expiresAt) continue;
+
+      const remainingDays = daysUntil(expiresAt, onDate);
+      const band = nextReminderBand(remainingDays, reminderDaysFor(noticeDays));
+      if (band === null) continue;
+
+      const pastNotice =
+        noticeDays !== null &&
+        remainingDays <= noticeDays &&
+        remainingDays > 0;
+
+      // An auto-renewing contract does not need the generic ladder - it renews by
+      // itself, and nagging about it trains people to ignore the report. What it does
+      // need is the notice deadline, because serving notice is how you *stop* it
+      // renewing, and that is exactly the message that gets missed.
+      if (contract.autoRenew && !pastNotice) continue;
+
+      const results = await Promise.all(
+        recipients.map((recipient) =>
+          this.notifications.notify(
+            {
+              organizationId,
+              type: NotificationType.CONTRACT_EXPIRING,
+              priority: pastNotice
+                ? NotificationPriority.CRITICAL
+                : NotificationPriority.NORMAL,
+              title: pastNotice
+                ? `${contract.reference}: notice period has passed`
+                : `${contract.reference} expires in ${band} day${band === 1 ? '' : 's'}`,
+              body: pastNotice
+                ? `${contract.title} cannot be ended or extended now - the ${noticeDays}-day notice period ended on ${new Date(expiresAt.getTime() - noticeDays * 86_400_000).toDateString()}. It ends on ${expiresAt.toDateString()}.`
+                : `${contract.title} ends on ${expiresAt.toDateString()}${noticeDays ? ` and needs ${noticeDays} days' notice` : ''}.`,
+              entityType: 'Contract',
+              entityId: contract.id,
+              actionUrl: `/contracts/${contract.id}`,
+              channels: [NotificationChannel.IN_APP],
+              // Once a day per contract, per recipient, per band. The band is in the
+              // key so crossing into a nearer band is a new message rather than a
+              // suppressed one, and the recipient keeps two people from sharing a
+              // suppression.
+              dedupeKey: `contract-expiring:${contract.id}:${band}:${day}:${recipient.id}`,
+            },
+            { userId: recipient.id },
+          ),
+        ),
+      );
+
+      if (results.some((result) => result.some((r) => r.status === 'SENT'))) {
+        sent += 1;
+      }
+    }
+
+    return sent;
+  }
+
+  /**
+   * Staff in this organization who can act on a contract.
+   *
+   * Resolved through `roleAssignments` rather than the legacy `UserRole` enum on the
+   * user, because the seeded role matrix is the authority and an enum check would
+   * quietly disagree with it for any user whose assignments were set up by hand.
+   */
+  private async contractReminderRecipients(
+    organizationId: string,
+  ): Promise<{ id: string }[]> {
+    return this.prisma.user.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        roleAssignments: {
+          some: { role: { name: { in: [...CONTRACT_REMINDER_ROLE_NAMES] } } },
+        },
+      },
+      select: { id: true },
+      take: 50,
+    });
   }
 
   /** A lease ending inside one of the warning windows, once per window. */

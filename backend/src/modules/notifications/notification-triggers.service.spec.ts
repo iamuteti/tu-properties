@@ -32,6 +32,8 @@ describe('NotificationTriggersService', () => {
   function mockPrisma(
     leases: ReturnType<typeof lease>[] = [],
     invoices: unknown[] = [],
+    contracts: unknown[] = [],
+    recipients: { id: string }[] = [],
   ) {
     return {
       organization: {
@@ -39,7 +41,15 @@ describe('NotificationTriggersService', () => {
       },
       rentalAgreement: { findMany: jest.fn().mockResolvedValue(leases) },
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
-      user: { findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }) },
+      user: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }),
+        // Module 15: the contract sweep resolves its staff audience before it looks
+        // at any contract, so this has to answer even when there are no contracts.
+        // Defaulting to no recipients is what keeps the lease and rent expectations in
+        // this file unchanged - with nobody to tell, the sweep sends nothing.
+        findMany: jest.fn().mockResolvedValue(recipients),
+      },
+      contract: { findMany: jest.fn().mockResolvedValue(contracts) },
     };
   }
 
@@ -65,7 +75,7 @@ describe('NotificationTriggersService', () => {
 
   it('sends nothing on a day with nothing due', async () => {
     const summary = await service.runDailyReminders(new Date('2026-10-01'));
-    expect(summary).toEqual({ leases: 0, due: 0, overdue: 0 });
+    expect(summary).toEqual({ leases: 0, due: 0, overdue: 0, contracts: 0 });
     expect(notifications.notify).not.toHaveBeenCalled();
   });
 
@@ -171,8 +181,214 @@ describe('NotificationTriggersService', () => {
       requestId: 'req-3',
     });
     // The same key both times — the unique index suppresses the second.
-    expect(notifications.notify.mock.calls[0][0].dedupeKey).toBe(
-      notifications.notify.mock.calls[1][0].dedupeKey,
-    );
+    expect(sentTo(0).dedupeKey).toBe(sentTo(1).dedupeKey);
+  });
+
+  /**
+   * What a `notify` call was asked for.
+   *
+   * `jest.Mock` types `calls` as `any[][]`, so `calls[0][0].type` is an unsafe chain
+   * that reads `undefined` when the mock was never called - and a test asserting on a
+   * field the mock was not given passes for the wrong reason. Typed at this one
+   * boundary so a renamed notification field becomes a compile error.
+   */
+  interface NotifyCall {
+    type: string;
+    title: string;
+    body: string;
+    priority: string;
+    dedupeKey: string;
+  }
+
+  const sentTo = (index: number): NotifyCall =>
+    notifications.notify.mock.calls[index][0];
+  const sentToUser = (index: number) =>
+    notifications.notify.mock.calls[index][1] as {
+      userId?: string;
+      tenantId?: string;
+    };
+
+  /** The `where` a mocked Prisma call was given, typed at the same boundary. */
+  interface QueryCall {
+    where: {
+      expiresAt: { gt: Date; lte: Date };
+      renewals: unknown;
+    };
+  }
+  const queriedWith = (mock: jest.Mock): QueryCall => mock.mock.calls[0][0];
+
+  /**
+   * Module 15 - the contract sweep. The rules worth pinning are the ones an
+   * expiry-only reminder would get wrong: the notice deadline is its own alert, an
+   * auto-renewing contract is only worth an alert when you want to *stop* it, and a
+   * superseded contract is not news every morning.
+   */
+  describe('contract expiry', () => {
+    const ON = new Date('2026-10-01T00:00:00.000Z');
+    const day = 86_400_000;
+    const inDays = (days: number) => new Date(ON.getTime() + days * day);
+
+    function contract(over: Record<string, unknown> = {}) {
+      return {
+        id: 'contract-1',
+        reference: 'CON-2026-0001',
+        title: 'Supply agreement - Nairobi Water',
+        type: 'VENDOR',
+        expiresAt: inDays(60),
+        noticeDays: 30,
+        autoRenew: false,
+        rentalAgreementId: null,
+        rentalAgreement: null,
+        ...over,
+      };
+    }
+
+    async function sweep(
+      contracts: Record<string, unknown>[],
+      recipients: { id: string }[] = [{ id: 'user-1' }, { id: 'user-2' }],
+    ) {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          NotificationTriggersService,
+          {
+            provide: PrismaService,
+            useValue: mockPrisma([], [], contracts, recipients),
+          },
+          { provide: NotificationsService, useValue: notifications },
+        ],
+      }).compile();
+      const local = module.get(NotificationTriggersService);
+      const summary = await local.runDailyReminders(ON);
+      return { summary, mock: notifications };
+    }
+
+    beforeEach(() => {
+      notifications.notify = jest
+        .fn()
+        .mockResolvedValue([
+          { channel: 'IN_APP', status: NotificationStatus.SENT },
+        ]);
+    });
+
+    it('says nothing when the organization has nobody to tell', async () => {
+      // Better a silent sweep than a reminder addressed to nobody.
+      const { summary } = await sweep([contract()], []);
+      expect(summary.contracts).toBe(0);
+      expect(notifications.notify).not.toHaveBeenCalled();
+    });
+
+    it('alerts at the band, once per recipient', async () => {
+      const { summary } = await sweep([contract({ expiresAt: inDays(60) })]);
+      expect(summary.contracts).toBe(1);
+      expect(notifications.notify).toHaveBeenCalledTimes(2);
+      expect(sentToUser(0)).toEqual({ userId: 'user-1' });
+    });
+
+    it('uses CONTRACT_EXPIRING, addressed to a user rather than a tenant', async () => {
+      // A different type from LEASE_EXPIRING because the audience is different: this
+      // goes to staff who can still act, that one goes to the resident.
+      await sweep([contract({ expiresAt: inDays(60) })]);
+      expect(sentTo(0).type).toBe('CONTRACT_EXPIRING');
+      expect(sentToUser(0).tenantId).toBeUndefined();
+    });
+
+    it('alerts at the notice deadline, not the expiry, when notice is longer', async () => {
+      // 40 days left, 90 days' notice. Without folding noticeDays into the bands,
+      // this would first surface at the generic 30-day band - by which point serving
+      // notice was already impossible.
+      const { summary } = await sweep([
+        contract({ expiresAt: inDays(40), noticeDays: 90 }),
+      ]);
+      expect(summary.contracts).toBe(1);
+      expect(sentTo(0).title).toContain('notice period has passed');
+      expect(sentTo(0).priority).toBe('CRITICAL');
+    });
+
+    it('quantises upward, so a cron miss does not walk a contract past every band', async () => {
+      // 58 days left: past the 60-day band's *upper* edge but still reported against
+      // it, which is what makes a missed run still alert.
+      const { summary } = await sweep([
+        contract({ expiresAt: inDays(58), noticeDays: 30 }),
+      ]);
+      expect(summary.contracts).toBe(1);
+    });
+
+    it('is silent on an auto-renewing contract until notice is the issue', async () => {
+      // It renews by itself; nagging about it trains people to ignore the report.
+      const quiet = await sweep([
+        contract({ expiresAt: inDays(60), autoRenew: true }),
+      ]);
+      expect(quiet.summary.contracts).toBe(0);
+
+      const urgent = await sweep([
+        contract({ expiresAt: inDays(40), noticeDays: 90, autoRenew: true }),
+      ]);
+      expect(urgent.summary.contracts).toBe(1);
+      expect(sentTo(0).title).toContain('notice period');
+    });
+
+    it('dedupes per contract, per band, per day', async () => {
+      await sweep([contract({ expiresAt: inDays(60) })]);
+      const keys = [0, 1].map((index) => sentTo(index).dedupeKey);
+      expect(new Set(keys).size).toBe(2);
+      for (const key of keys) {
+        expect(key).toContain('contract-1:60:2026-10-01:');
+      }
+    });
+
+    it('reads the lease end date when the contract carries none', async () => {
+      // `LEASE` contracts deliberately leave their own dates empty so the register does
+      // not hold a second copy of the lease's term. If the sweep did not apply the same
+      // fallback as the service, this contract would never be reported.
+      const { summary } = await sweep([
+        contract({
+          type: 'LEASE',
+          expiresAt: null,
+          noticeDays: null,
+          rentalAgreementId: 'lease-1',
+          rentalAgreement: { endDate: inDays(20), noticePeriodDays: null },
+        }),
+      ]);
+      expect(summary.contracts).toBe(1);
+    });
+
+    it('skips a contract with no end date anywhere', async () => {
+      const { summary } = await sweep([
+        contract({ type: 'COMPLIANCE', expiresAt: null }),
+      ]);
+      expect(summary.contracts).toBe(0);
+    });
+
+    it('never asks for a superseded contract', async () => {
+      const local = mockPrisma([], [], [contract()], [{ id: 'user-1' }]);
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          NotificationTriggersService,
+          { provide: PrismaService, useValue: local },
+          { provide: NotificationsService, useValue: notifications },
+        ],
+      }).compile();
+      await module.get(NotificationTriggersService).runDailyReminders(ON);
+      // The filter lives in the query, not in JS: a replaced contract that expired
+      // three years ago must not be re-queried and re-filtered every single morning.
+      expect(queriedWith(local.contract.findMany).where.renewals).toEqual({
+        none: {},
+      });
+    });
+
+    it('bounds the query on both sides', async () => {
+      const local = mockPrisma([], [], [], [{ id: 'user-1' }]);
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          NotificationTriggersService,
+          { provide: PrismaService, useValue: local },
+          { provide: NotificationsService, useValue: notifications },
+        ],
+      }).compile();
+      await module.get(NotificationTriggersService).runDailyReminders(ON);
+      const where = queriedWith(local.contract.findMany).where;
+      expect(where.expiresAt.gt).toEqual(ON);
+      expect(where.expiresAt.lte.getTime()).toBeGreaterThan(ON.getTime());
+    });
   });
 });

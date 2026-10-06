@@ -118,6 +118,18 @@ export const PERMISSION_MODULES = [
   'meter_readings',
   'utility_rates',
   'utility_charges',
+  // Module 15 - Documents & Legal. One module, and deliberately not two: the
+  // Document Center predates this module and already has its own `documents`
+  // permission, so a second module here would split one user's access to one
+  // concept across two rows of the matrix to answer no question.
+  //   `contracts.view`/`.create`/`.update`/`.delete`/`.renew`  the register.
+  // `create` and `update` are ordinary, but `.renew` is separate because a renewal
+  // is a new contract that supersedes an old one, and the same argument separates
+  // `payroll.approve` from `payroll.pay`: the person who decided not to renew should
+  // not be the only person able to quietly extend the term. Deleting is included and
+  // means "this row was entered in error" - a real lapse is recorded by letting the
+  // contract expire, not by removing the evidence that it ever existed.
+  'contracts',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -183,6 +195,19 @@ export interface ModulePermissions {
    * the tariff that produced it.
    */
   void?: boolean;
+  /**
+   * Module 15. Replace an expiring contract with a new term.
+   *
+   * Separate from `create` because a renewal is not a new contract in the ordinary
+   * sense: it inherits the counterparty, the type and the signed document of the
+   * contract it replaces, it lands with the predecessor's `renewalOfId` set so the
+   * register can answer "what happened to this one?", and it changes what a tenant is
+   * committed to paying for another year. Anyone who can file a contract can file the
+   * first one; extending somebody's obligation is a different decision.
+   *
+   * Absent-means-denied, like `approve`/`pay`/`decide`/`bill`/`void`.
+   */
+  renew?: boolean;
 }
 
 export interface PermissionSet {
@@ -253,6 +278,23 @@ const utilityChargeFull = (): ModulePermissions => ({
   delete: true,
   bill: true,
   void: true,
+});
+
+/**
+ * Module 15's contracts, which need `.renew` on top of the CRUD actions.
+ *
+ * Same reasoning as `utilityChargeFull`: `full()` deliberately omits it, and
+ * generalising it would hand "extend this tenant's term" to every module that has a
+ * `create` action. A renewal is a new obligation, so the power to create one has to be
+ * written down on the role that has it rather than inherited from a helper nobody
+ * reads.
+ */
+const contractFull = (): ModulePermissions => ({
+  view: true,
+  create: true,
+  update: true,
+  delete: true,
+  renew: true,
 });
 
 function set(
@@ -357,6 +399,11 @@ export const SYSTEM_ROLES: {
       meter_readings: full(),
       utility_rates: full(),
       utility_charges: utilityChargeFull(),
+      // Module 15: everything on the contract register, including `.renew` and
+      // `.delete`. An administrator accountable for the whole organization is the
+      // role that has to be able to correct a contract someone else filed in error,
+      // and to serve notice on the last day it can be served.
+      contracts: contractFull(),
     }),
   },
   {
@@ -428,6 +475,11 @@ export const SYSTEM_ROLES: {
       meter_readings: full(),
       utility_rates: full(),
       utility_charges: utilityChargeFull(),
+      // Module 15: the full register, and the role that most needs it - a property
+      // manager is who serves notice, decides not to renew, and answers the landlord
+      // what the notice period is. `.renew` included because extending the estate's
+      // terms is their decision and nobody else's.
+      contracts: contractFull(),
     }),
   },
   {
@@ -491,6 +543,13 @@ export const SYSTEM_ROLES: {
       meter_readings: view(),
       utility_rates: view(),
       utility_charges: view(),
+      // Module 15: read-only, and nothing else - the same instinct as
+      // `utility_charges: view()` directly above. A leasing officer asks about the
+      // notice period in every renewal conversation and must be able to read the
+      // answer, but a leasing officer who can *renew* is a leasing officer who can keep
+      // a flat they cannot re-let off the market, under a lease they negotiated. No
+      // `.create` either: filing a contract is an obligation, not a lead.
+      contracts: view(),
     }),
   },
 
@@ -511,6 +570,12 @@ export const SYSTEM_ROLES: {
       // (This block used to sit here by mistake - it was written for the Leasing
       // Officer, whose block it was mistaken for. The role that can answer a
       // resident "how much water did you use" is the one that deals with residents.)
+      //
+      // Module 15: `view`, and only `view`. A sales agent showing a buyer the signed
+      // sale agreement needs to read it - that is the whole of their reason, and it is
+      // a real one. They may not file a `SALE` contract: the sale is `crm_leads` and
+      // `sales` work, and turning a signed contract into a row is what closes it.
+      contracts: view(),
     }),
   },
   {
@@ -542,6 +607,14 @@ export const SYSTEM_ROLES: {
       meter_readings: view(),
       utility_rates: view(),
       utility_charges: { view: true, create: true, update: true, bill: true },
+      // Module 15: `view`, `renew` and **no `create`**. The exclusion is the point
+      // and it is the same one as `utility_charges` above: the accountant already
+      // owns every payable in this organization, so granting them `contracts.create`
+      // would let them manufacture the lease that a payable hangs off. They can
+      // extend a term - renewing a supplier agreement is genuinely their job - but
+      // not file the original obligation. They also get no `.delete`, because a
+      // contract they can reverse is a contract they can make disappear.
+      contracts: { view: true, renew: true },
       // Module 7: chart of accounts, journal entries and trial balance.
       accounting: full(),
       credits: full(),
@@ -636,6 +709,13 @@ export const SYSTEM_ROLES: {
       meter_readings: full(),
       utility_rates: view(),
       utility_charges: view(),
+      // Module 15: compliance certificates, and nothing else. `view`/`create`/
+      // `update` and no `.renew` - a maintenance manager is who goes and gets the
+      // lift licence and the gas safety certificate done, and is not who decides the
+      // estate commits to another year of them. No `.create` for `COMPLIANCE` alone:
+      // the same key would also let them file a supplier contract, which is why the
+      // service re-checks the type against `canFileComplianceCertificate`.
+      contracts: { view: true, create: true, update: true },
     }),
   },
 
@@ -681,10 +761,16 @@ export const SYSTEM_ROLES: {
       // ground truth; deciding what that costs a resident is not, and the two
       // being in the same hands is how a technician ends up responsible for the
       // accuracy of somebody's invoice.
-      utility_meters: view(),
-      meter_readings: viewWrite(),
+utility_meters: view(),
+      meter_readings: view(),
       utility_rates: view(),
       utility_charges: view(),
+      // Module 15: `view`, for one specific reason - a technician working on a lift
+      // needs to know whether its licence is current, and an expired one is the whole
+      // reason not to ride it. That is a read of the register, not a stake in it, so
+      // it stops there: they perform the inspection that produces a certificate, but
+      // the certificate is the maintenance manager's to hold, not theirs to file.
+      contracts: view(),
     }),
   },
   {
@@ -700,6 +786,14 @@ export const SYSTEM_ROLES: {
       // Module 6: the owner portal (Phase 2) reads exactly these two.
       owner_statements: view(),
       owner_payouts: view(),
+      // Module 15: **nothing, deliberately.** A landlord is a counterparty on the
+      // `MANAGEMENT` contracts in this very register, so the honest grant would be
+      // `view` scoped to contracts whose `landlordId` is this user - and there is no
+      // way to express that scope here, because these permissions are organisation
+      // wide. Granting `contracts.view` unqualified would show every landlord in the
+      // estate every other landlord's agreement. `documents: view()` above is already
+      // scoped per landlord by the service, so the per-counterparty portal belongs with
+      // Module 19, where that resolution machinery exists and can be reused.
     }),
   },
   {
@@ -707,6 +801,11 @@ export const SYSTEM_ROLES: {
     description: 'Resident-facing access to their own documents.',
     permissions: set({
       documents: view(),
+      // Module 15: **nothing, for the same reason as the Landlord role above.** A
+      // tenant is a counterparty on the `LEASE` contracts, so this is the highest-value
+      // unread grant in the matrix if it is ever scoped wrongly - and the scope that
+      // makes it safe is per-tenant, not per-organisation. `documents: view()` is
+      // already resolved against the caller's own rental agreement.
     }),
   },
   {
@@ -743,6 +842,14 @@ export const SYSTEM_ROLES: {
       meter_readings: view(),
       utility_rates: view(),
       utility_charges: view(),
+      // Module 15: the strongest grant outside the property manager, and the one that
+      // justifies `contracts` being a single module rather than one per contract type.
+      // A `VENDOR` contract is the document a procurement officer negotiates, so
+      // `.renew` is literally their job - and if `.renew` had been scoped to the finance
+      // team only, renewing the supply contract would have gone to an accountant who
+      // did not negotiate it. `.delete` is withheld: the officer who negotiated a
+      // supplier must not be able to erase the record of what they agreed.
+      contracts: { view: true, create: true, update: true, renew: true },
       // Module 12: sees who exists (a purchase request may name a
       // requester) but nothing else.
       employees: view(),
@@ -794,6 +901,12 @@ export const SYSTEM_ROLES: {
       employees: { self: true },
       leave_requests: { self: true },
       payroll: { self: true },
+      // Module 15: nothing, and the absence is the design. An employee's own
+      // employment contract is the one document in the register they might
+      // reasonably expect, and `ContractType` has no employment value - a staff
+      // contract is payroll and employee data, which is why those two carry `self`
+      // above. Granting this role `contracts.view` to reach it would hand them
+      // every landlord agreement in the organization.
     }),
   },
 ];

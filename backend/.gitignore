@@ -52,6 +52,14 @@ pids
 *.seed
 *.pid.lock
 
+# Local file storage for the Document Center (`LocalFileStorage` roots at
+# `process.cwd()/uploads`, matching main.ts's uploads dir creation).
+# Per-deployment data, not source: the keys embed organization and record ids,
+# so committing them would pin demo database identifiers into the repository.
+# Regenerate with `npm run db:seed:demo`, which writes real files for the
+# contracts it seeds so their attachments genuinely download.
+/uploads
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
