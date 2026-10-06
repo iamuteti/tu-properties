@@ -3255,3 +3255,380 @@ export interface HolidayRow {
     regionCode?: string | null;
     isRecurring: boolean;
 }
+
+// =============================================================
+// Module 13 — Facilities
+// =============================================================
+
+export type FacilityKind =
+    | 'CLUBHOUSE'
+    | 'MEETING_ROOM'
+    | 'PARKING'
+    | 'GYM'
+    | 'POOL'
+    | 'TENNIS_COURT'
+    | 'LAUNDRY'
+    | 'RECREATION'
+    | 'OTHER';
+
+/**
+ * Five states and no sixth.
+ *
+ * The missing one is `COMPLETED`, and it is missing on purpose: the backend derives
+ * "has this already happened" from `endsAt`, so a status the server computes is not
+ * one the client has to invent. `NO_SHOW` is the only past-tense state because it is
+ * a judgement somebody makes when they find an empty room.
+ */
+export type FacilityBookingStatus =
+    | 'PENDING'
+    | 'CONFIRMED'
+    | 'CANCELLED'
+    | 'REJECTED'
+    | 'NO_SHOW';
+
+/** The five actions the booking lifecycle will accept. */
+export type FacilityBookingAction =
+    | 'APPROVE'
+    | 'REJECT'
+    | 'CANCEL'
+    | 'REACTIVATE'
+    | 'MARK_NO_SHOW';
+
+export interface FacilityBookingTiming {
+    phase: 'PAST' | 'NOW' | 'UPCOMING';
+    inProgress: boolean;
+    hasEnded: boolean;
+    minutesUntilStart: number;
+    minutesUntilEnd: number;
+    hasHappened: boolean;
+}
+
+export interface FacilityRow {
+    id: string;
+    name: string;
+    kind: FacilityKind;
+    description?: string | null;
+    capacity?: number | null;
+    /** Minutes from local midnight — the shape the database stores. */
+    opensAtMinutes: number;
+    closesAtMinutes: number;
+    slotMinutes: number;
+    maxAdvanceDays: number;
+    requiresApproval: boolean;
+    isBookable: boolean;
+    isActive: boolean;
+    bookingFee: number | null;
+    bookingFeeCurrency: string | null;
+    opensAtLabel: string;
+    closesAtLabel: string;
+    property?: { id: string; code: string; name: string } | null;
+    /** Only present on the list read. */
+    openingHours?: string;
+    /** **Derived on read** — nothing stores "open now" and nothing has to sweep it. */
+    isOpenNow?: boolean;
+    totalBookings?: number;
+}
+
+export interface FacilityBlackoutRow {
+    id: string;
+    reason: string;
+    startsAt: string;
+    endsAt: string;
+    createdAt?: string;
+}
+
+export interface FacilityDetail extends FacilityRow {
+    blackouts: FacilityBlackoutRow[];
+    upcomingBookings: Array<{
+        id: string;
+        reference: string;
+        bookedForName: string;
+        startsAt: string;
+        endsAt: string;
+        status: FacilityBookingStatus;
+        slotLabel: string;
+        timing: FacilityBookingTiming;
+    }>;
+    statistics: {
+        confirmed: number;
+        noShow: number;
+        awaitingApproval: number;
+        closuresScheduled: number;
+    };
+}
+
+export interface FacilityAvailabilitySlot {
+    minutes: number;
+    label: string;
+    available: boolean;
+    /** Who holds it — `null` when free or closed. */
+    bookedBy: string | null;
+}
+
+export interface FacilityAvailabilityDay {
+    date: string;
+    isOpen: boolean;
+    reason: string | null;
+    slots: FacilityAvailabilitySlot[];
+}
+
+export interface FacilityAvailability {
+facility: {
+        id: string;
+        name: string;
+        kind: FacilityKind;
+        slotMinutes: number;
+        requiresApproval: boolean;
+        isBookable: boolean;
+        maxAdvanceDays: number;
+        /** Shown on the booking screen as advice; never enforced. */
+        capacity: number | null;
+        bookingFee: number | null;
+        bookingFeeCurrency: string | null;
+    };
+
+    openingHours: string;
+    days: FacilityAvailabilityDay[];
+    bookings: Array<{
+        id: string;
+        reference: string;
+        bookedForName: string;
+        startsAt: string;
+        endsAt: string;
+        status: FacilityBookingStatus;
+        slotLabel: string;
+        timing: FacilityBookingTiming;
+    }>;
+    blackouts: FacilityBlackoutRow[];
+}
+
+/**
+ * What the preview endpoint answers, so the booking dialog can tell somebody the
+ * clubhouse shuts at 22:00 while they are still looking at the time picker.
+ *
+ * `code` is the machine-readable companion to `reason`; both are present because a
+ * form that branches on prose is a form that breaks when the wording improves.
+ */
+export interface FacilityBookingPreview {
+    ok: boolean;
+    code: string | null;
+    reason: string | null;
+    startsAtMinutes: number;
+    endsAtMinutes: number;
+    slots: number[];
+    facilityName: string;
+    openingHours: string;
+    fee: number | null;
+    feeCurrency: string | null;
+    willRequireApproval: boolean;
+}
+
+export interface FacilityBookingRow {
+    id: string;
+    reference: string;
+    facilityId: string;
+    facility?: {
+        id: string;
+        name: string;
+        kind: FacilityKind;
+        propertyId: string;
+        requiresApproval: boolean;
+    } | null;
+    bookedByUserId?: string | null;
+    bookedByUser?: { id: string; firstName: string; lastName: string } | null;
+    tenant?: {
+        id: string;
+        surname: string;
+        otherNames: string | null;
+        code: string;
+        phone: string;
+    } | null;
+    contact?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        company: string | null;
+        phone: string | null;
+    } | null;
+    bookedForName: string;
+    bookedForPhone: string | null;
+    purpose: string | null;
+    attendeeCount: number | null;
+    startsAt: string;
+    endsAt: string;
+    slotLabel: string;
+    status: FacilityBookingStatus;
+    statusLabel: string;
+    statusAdvice: string;
+    decisionNote: string | null;
+    decidedAt: string | null;
+    decidedByUser?: { id: string; firstName: string; lastName: string } | null;
+    cancelledAt: string | null;
+    cancelReason: string | null;
+    /** Snapshotted at booking time; not invoiced yet — see the module's open items. */
+    fee: number | null;
+    feeCurrency: string | null;
+    createdAt: string;
+    /** **Derived**, never stored — the reason there is no COMPLETED status. */
+    timing: FacilityBookingTiming;
+    isPast: boolean;
+    /**
+     * Computed **by the server**, so the row menu cannot offer an action the API
+     * would refuse. The client renders these and nothing else.
+     */
+    availableActions: FacilityBookingAction[];
+}
+
+export type AccessCardType = 'BUILDING' | 'UNIT' | 'PARKING' | 'FACILITY' | 'GATE';
+export type AccessCardHolder = 'STAFF' | 'TENANT' | 'CONTACT' | 'VISITOR' | 'NONE';
+export type AccessCardStatus =
+    | 'ACTIVE'
+    | 'SUSPENDED'
+    | 'LOST'
+    | 'EXPIRED'
+    | 'REVOKED';
+
+export type AccessCardAction =
+    | 'SUSPEND'
+    | 'REACTIVATE'
+    | 'MARK_LOST'
+    | 'MARK_EXPIRED'
+    | 'REVOKE'
+    | 'RECORD_REPLACEMENT';
+
+export interface AccessCardRow {
+    id: string;
+    cardNumber: string;
+    type: AccessCardType;
+    status: AccessCardStatus;
+    /**
+     * The status the **gate** honours: `EXPIRED` when `expiresAt` has passed even
+     * though the column still says ACTIVE. Two columns on purpose — the column is
+     * what the database holds, this is what actually opens a door.
+     */
+    effectiveStatus: AccessCardStatus;
+    statusLabel: string;
+    isUsable: boolean;
+    holder: AccessCardHolder;
+    holderName: string;
+    property?: { id: string; code: string; name: string } | null;
+    unit?: { id: string; code: string; name: string } | null;
+    facility?: { id: string; name: string; kind: FacilityKind } | null;
+    tenant?: { id: string; surname: string; otherNames: string | null; code: string } | null;
+    contact?: { id: string; firstName: string; lastName: string; company: string | null } | null;
+    user?: { id: string; firstName: string; lastName: string; email: string } | null;
+    visitor?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        isBlacklisted?: boolean;
+    } | null;
+    issuedAt: string;
+    expiresAt: string | null;
+    lastSeenAt: string | null;
+    suspendedAt: string | null;
+    revokedAt: string | null;
+    revokedReason: string | null;
+    replacementCardId: string | null;
+    notes: string | null;
+daysUntilExpiry: number | null;
+    /**
+     * Inside the 30-day renewal window. **False on a revoked or lost card** — a
+     * revoked card whose date is three weeks out is not "expiring soon", it opens
+     * nothing, and nudging somebody to renew it would be nonsense.
+     */
+    expiringSoon: boolean;
+    /** Nothing further will happen to this card, whatever its date says. */
+    isTerminal: boolean;
+
+    /** What a guard would say the card is for, in one line. */
+    opensDescription: string;
+    recentVisits?: Array<{
+        id: string;
+        createdAt: string;
+        checkedInAt: string | null;
+        checkedOutAt: string | null;
+    }>;
+}
+
+/** Derived from two timestamps and the clock; nothing stores it. */
+export type VisitorVisitState =
+    | 'COMPLETED'
+    | 'OVERSTAY'
+    | 'ON_SITE'
+    | 'MISSED'
+    | 'EXPECTED';
+
+export interface VisitorRow {
+    id: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    phone: string | null;
+    email: string | null;
+    company: string | null;
+    idType: string | null;
+    idNumber: string | null;
+    isBlacklisted: boolean;
+    blacklistedAt: string | null;
+    blacklistReason: string | null;
+    notes: string | null;
+    isActive: boolean;
+    createdAt: string;
+    totalVisits?: number;
+    /** Open visits right now — derived, and a per-row count for the picker. */
+    onSiteNow?: number;
+}
+
+export interface VisitorDetail extends VisitorRow {
+    contact?: { id: string; firstName: string; lastName: string; company: string | null } | null;
+    accessCards: Array<{
+        id: string;
+        cardNumber: string;
+        status: AccessCardStatus;
+        expiresAt: string | null;
+        type: AccessCardType;
+    }>;
+    visits: VisitorVisitRow[];
+    statistics: {
+        totalVisits: number;
+        onSiteNow: number;
+        overdue: number;
+        lastVisitAt: string | null;
+        cardsHeld: number;
+    };
+}
+
+export interface VisitorVisitRow {
+    id: string;
+    propertyId: string | null;
+    property?: { id: string; name: string } | null;
+    visitorId: string;
+    visitorName: string;
+    visitorCompany: string | null;
+    visitorPhone: string | null;
+    visitorIsBlacklisted: boolean;
+    hostName: string;
+    hostPhone: string | null;
+    purpose: string | null;
+    expectedAt: string;
+    expectedOutAt: string | null;
+    checkedInAt: string | null;
+    checkedOutAt: string | null;
+    notes: string | null;
+    isPreApproved: boolean;
+    accessCard?: {
+        id: string;
+        cardNumber: string;
+        status: string;
+        expiresAt: string | null;
+    } | null;
+    createdAt: string;
+    state: VisitorVisitState;
+    stateLabel: string;
+    isOnSite: boolean;
+    isOverdue: boolean;
+    /** Negative once overdue; null when no departure was expected. */
+    minutesOverdue: number | null;
+    availableActions: Array<'check-in' | 'check-out'>;
+}

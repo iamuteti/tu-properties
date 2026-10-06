@@ -164,6 +164,19 @@ model Organization {
   inventoryItems             InventoryItem[]
   warehouses                 Warehouse[]
   stockMovements             StockMovement[]
+  // Module 13 — Facilities
+  facilities                 Facility[]
+  facilityBookings           FacilityBooking[]
+  facilityBlackouts          FacilityBlackout[]
+  accessCards                AccessCard[]
+  visitors                   Visitor[]
+visitorVisits              VisitorVisit[]
+  // Module 14 — Utilities
+  utilityMeters              UtilityMeter[]
+  utilityRates               UtilityRate[]
+  utilityCharges             UtilityCharge[]
+  meterReadings              MeterReading[]
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -264,6 +277,18 @@ model User {
   // *and* hold a role that grants far more than self-service), and joining them
   // one-to-many would let one person be two employees.
   employeeRecord Employee?
+
+  // Module 13 — Facilities. Who took the booking, who decided it, who issued the
+  // card, who is being visited, who signed the visitor in.
+  facilityBookingsMade   FacilityBooking[] @relation("UserMadeFacilityBookings")
+  facilityBookingsDecided FacilityBooking[] @relation("UserDecidedFacilityBookings")
+  facilityBlackouts       FacilityBlackout[] @relation("UserFacilityBlackouts")
+  accessCards            AccessCard[]      @relation("UserAccessCards")
+  hostedVisits           VisitorVisit[]    @relation("HostUserVisits")
+preApprovedVisits      VisitorVisit[]    @relation("UserPreApprovedVisits")
+  // Module 14 — Utilities. Who keyed in the reading, who raised the charge.
+  meterReadings            MeterReading[]  @relation("UserMeterReadings")
+  utilityChargesCreated    UtilityCharge[] @relation("UserUtilityCharges")
 
   // Status
   @@index([portalTenantId])
@@ -801,6 +826,16 @@ model Property {
   // not delete its maintenance history.
   assets           Asset[]
   workOrders       WorkOrder[]               @relation("PropertyWorkOrders")
+  // Module 13 — Facilities. The bookable things this property owns, the cards
+  // that open its doors, and the visitor log for its gate.
+  facilities       Facility[]
+  accessCards      AccessCard[]
+visitorVisits    VisitorVisit[]
+  // Module 14 — Utilities. `propertyId` on a meter is required precisely because
+  // `Unit` has no `organizationId` (master doc issue 25): it is what makes
+  // "every meter on this estate" answerable without joining through the unit.
+  utilityMeters  UtilityMeter[]
+  utilityRates   UtilityRate[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -876,13 +911,22 @@ model Unit {
 
   // Relationships
   rentalAgreements RentalAgreement[]
-  serviceCharges   UnitServiceCharge[]
-  meterNumbers     UnitMeterNumber[]
+serviceCharges   UnitServiceCharge[]
   features         UnitFeature[]
   inspections      InspectionReport[]
   // Module 9: faults reported against this unit, plus any unit-level equipment.
   workOrders       WorkOrder[]
   assets           Asset[]
+  // Module 13 — Facilities. A unit-level access card (the fob that opens this
+  // door and the parking bay outside it). `Unit` has no `organizationId`, so
+  // scoping a card by its unit has to go through this relation — master doc
+  // issue 25.
+accessCards      AccessCard[]
+  // Module 14 — Utilities. A sub-meter serves exactly one unit; a bulk meter has
+  // no `unitId` at all, so `utilityMeters` here are the meters billed to *this*
+  // unit and `utilityCharges` are this unit's share of whatever meters feed it.
+  utilityMeters  UtilityMeter[]
+  utilityCharges UtilityCharge[]
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -922,22 +966,6 @@ model UnitServiceCharge {
 
   @@index([unitId])
   @@map("unit_service_charges")
-}
-
-model UnitMeterNumber {
-  id String @id @default(cuid())
-
-  unitId String
-  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  meterNo      String
-  readingSetup String? // Reading setup configuration
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([unitId])
-  @@map("unit_meter_numbers")
 }
 
 model UnitFeature {
@@ -1086,6 +1114,13 @@ model Tenant {
   // Module 9: maintenance issues this resident reported. SetNull rather than
   // Cascade — a resident record is financial history and outlives their tenancy.
   workOrders        WorkOrder[]
+  // Module 13 — Facilities. A resident books the clubhouse and the parking, a
+  // contractor is on site as a visitor, and a resident may hold an access card.
+  // All SetNull for the same reason as `workOrders`: none of these are the reason
+  // the resident row exists.
+  facilityBookings  FacilityBooking[]        @relation("TenantFacilityBookings")
+  accessCards       AccessCard[]             @relation("TenantAccessCards")
+  visitorVisits     VisitorVisit[]           @relation("HostTenantVisits")
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -1160,7 +1195,9 @@ model RentalAgreement {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Relationships
-  invoices        Invoice[]
+invoices        Invoice[]
+  // Module 14 — Utilities. Utility invoices raised against this lease.
+  utilityCharges  UtilityCharge[]
   payments        Payment[]
   commissions     Commission[]
   moveOutRequests MoveOutRequest[]
@@ -1507,6 +1544,14 @@ model Contact {
   sales          SaleTransaction[]  @relation("ContactSales")
   communications CommunicationLog[]
   tenant         Tenant?
+  // Module 13 — Facilities. A contact is the shared people directory, so a
+  // contractor who books the clubhouse or a supplier engineer who is on site as a
+  // visitor hangs off the same row a lead would.
+  facilityBookings FacilityBooking[] @relation("ContactFacilityBookings")
+  accessCards      AccessCard[]      @relation("ContactAccessCards")
+  visitorVisits    VisitorVisit[]    @relation("HostContactVisits")
+  visitorRecords   Visitor[]         @relation("VisitorContact")
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1824,7 +1869,15 @@ model Invoice {
   // module through `InvoicesService` and classified with
   // `transactionClass = 'SALE'`; they are not rental invoices.
   saleTransactionId String?
-  saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: SetNull)
+saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: SetNull)
+
+  // Utility consumption link (Module 14). Consumption invoices are raised by the
+  // Utilities module through `InvoicesService` and classified with
+  // `transactionClass = 'UTILITY'`. The FK lives on `UtilityCharge` rather than
+  // here, because one invoice collects several charges (water, electricity, a
+  // standing charge) - so the relation is one invoice to many charges, and only
+  // one side of it needs a foreign key.
+  utilityCharges UtilityCharge[]
 
   // Invoice Details
   issueDate   DateTime @default(now())
@@ -2994,6 +3047,12 @@ enum NotificationType {
   // Distinct from anything else because the recipient is staff deciding to
   // spend money, not a resident waiting on the office.
   STOCK_LOW
+  // Module 13 - Facilities. A booking decision is the resident's own booking, so
+  // it is addressed to them; a visitor arriving and a card expiring are messages
+  // the *office* needs, and they land on different screens.
+  FACILITY_BOOKING_DECIDED
+  VISITOR_ARRIVAL
+  ACCESS_CARD_EXPIRING
   CUSTOM
 }
 
@@ -5216,3 +5275,894 @@ model PayslipLine {
   @@index([payrollRuleId])
   @@map("payslip_lines")
 }
+
+
+// ============================================
+// FACILITIES (Module 13)
+// ============================================
+
+/// What a bookable thing *is*, for the screens that group and filter them.
+///
+/// An enum rather than the free text the module doc sketched
+/// (`facilityName String // clubhouse, meeting room, parking slot`), because the
+/// same problem `Property.type` had: free text cannot answer "show me every
+/// bookable room on this estate", and a gym that gets typed as "Gym", "gymnasium"
+/// and "fitness centre" is three facilities to the API and one to the person who
+/// runs the place. `OTHER` is the honest escape hatch — a Japanese bath house is
+/// still a facility, it just has no slot in this list yet.
+enum FacilityKind {
+  CLUBHOUSE
+  MEETING_ROOM
+  PARKING
+  GYM
+  POOL
+  TENNIS_COURT
+  LAUNDRY
+  RECREATION
+  OTHER
+}
+
+/// A bookable thing a property owns: the clubhouse, a meeting room, a parking bay.
+///
+/// The module doc put `facilityName String` on the booking. That is a booking with
+/// a name typed into it and no facility behind it, which cannot answer "when is
+/// the clubhouse free", cannot carry opening hours, and cannot refuse a booking
+/// that overlaps one somebody else holds. So the facility is its own row and the
+/// booking points at it — which is also what makes a *schedule* possible at all.
+model Facility {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  name String
+  kind FacilityKind @default(OTHER)
+
+  description String? @db.Text
+
+  /// How many people it takes. Advisory rather than enforced on a resident's own
+  /// booking — a swimming pool with a capacity of 8 would be refused by anybody
+  /// bringing 9 people — but the booking screen shows it, because "the room seats
+  /// 12" is the fact that stops the mistake.
+  capacity Int?
+
+  /// Opening hours as **minutes from local midnight**, not a timestamp.
+  ///
+  /// A facility is open at 08:00 on every day it exists; storing that as two
+  /// `DateTime`s means storing today's date too, and then the row is wrong
+  /// tomorrow. Minutes also mean a 24-hour facility (a car park) needs no
+  /// overnight special case, which a `opensAt`/`closesAt` pair on a clock cannot
+  /// express without one. The property's local time is the organization's
+  /// `timezone`; no second timezone column, because two answers to "what time is
+  /// it here" is worse than one.
+  opensAtMinutes  Int @default(480)  // 08:00
+  closesAtMinutes Int @default(1320) // 22:00
+
+  /// The grid a booking snaps to. A 60-minute facility means "10:00 or 11:00", a
+  /// 15-minute one means "10:00, 10:15, 10:30". This is a property of the
+  /// facility rather than of each booking because it is the unit the *diary* is
+  /// drawn in — a grid nobody agreed on produces a diary that is not bookable.
+  slotMinutes Int @default(60)
+
+  /// How far ahead a booking may be taken. Without it, "this Sunday at 3am" is a
+  /// legitimate request against a facility that opens at 08:00, and the refusal
+  /// has to come from somewhere.
+  maxAdvanceDays Int @default(90)
+
+  /// A resident's booking waits for somebody to say yes. Staff booking on behalf
+  /// of somebody is confirmed immediately, because there is already a person in
+  /// the decision rather than a queue behind one.
+  requiresApproval Boolean @default(false)
+
+  /// A facility nobody may book (a staff store, a plant room registered so its
+  /// access cards have something to point at).
+  isBookable Boolean @default(true)
+
+  /// Charged per booking, and **recorded but not yet invoiced**.
+  ///
+  /// The figure is snapshotted onto the booking at creation, the same reason
+  /// `OwnerStatement` freezes its lines: a facility whose fee changes next month
+  /// must not retroactively change what last month's booking said it cost. What
+  /// is deliberately absent is the invoice — see the module doc's open items;
+  /// billing a fee through `InvoicesService` is a Finance change, and a facilities
+  /// module that quietly wrote an invoice would put a money document behind a
+  /// permission that has nothing to do with money.
+  bookingFee        Decimal? @db.Decimal(12, 2)
+  bookingFeeCurrency String?
+
+  notes String? @db.Text
+
+  isActive Boolean @default(true)
+
+  bookings  FacilityBooking[]
+  blackouts FacilityBlackout[]
+  accessCards AccessCard[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Unique per property rather than per organization: two towers in one estate
+  /// may each have a "Clubhouse", and they are not the same room.
+  @@unique([propertyId, name])
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([kind])
+  @@map("facilities")
+}
+
+enum FacilityBookingStatus {
+  /// Waiting for somebody to decide. Only reachable on a facility that requires
+  /// approval, and only for a request that did not come from staff.
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REJECTED
+  /// Confirmed, the slot has passed, and nobody turned up.
+  ///
+  /// There is deliberately no COMPLETED: a booking is not "completed" by an
+  /// action, it is over when the clock says so, and a state somebody has to set
+  /// by hand is a state that rots. "Has this already happened" is derived on read
+  /// from `endsAt`. NO_SHOW is different because it *is* a decision — somebody has
+  /// to look at an empty room and say so — and because it is the fact a repeat
+  /// booking is judged on.
+  NO_SHOW
+}
+
+/// One reserved slot on one facility.
+model FacilityBooking {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  /// Human-quotable, printed on the day sheet. Sequential within the facility's
+  /// property so the front desk can say "that's FB-0007" and mean one row.
+  reference String
+
+  // ── Who asked, and who the slot is for ───────────────────────────────────
+  //
+  // Two different people, and collapsing them is the mistake this shape avoids: a
+  // property manager books the clubhouse *for* a resident, and a resident books it
+  // for themselves. `bookedByUserId` is who pressed the button — always a staff
+  // login, or null when a resident did it through the portal. The three subject
+  // columns are who the room is for, and any of them may be null because the
+  // answer is sometimes "a guest of the family at B4, and we do not have their
+  // details", which is why `bookedForName` is required rather than derived.
+  bookedByUserId String?
+  bookedByUser   User?   @relation("UserMadeFacilityBookings", fields: [bookedByUserId], references: [id], onDelete: SetNull)
+
+  contactId String?
+  contact   Contact? @relation("ContactFacilityBookings", fields: [contactId], references: [id], onDelete: SetNull)
+
+  tenantId String?
+  tenant   Tenant? @relation("TenantFacilityBookings", fields: [tenantId], references: [id], onDelete: SetNull)
+
+  /// What the day sheet says. Snapshotted from the contact or tenant when the
+  /// caller did not supply one, so a later name change does not rewrite history.
+  bookedForName  String
+  bookedForPhone String?
+
+  purpose       String?
+  attendeeCount Int?
+
+  // ── The slot ────────────────────────────────────────────────────────────
+  //
+  // Half-open, `[startsAt, endsAt)`: a booking that ends at 12:00 and one that
+  // starts at 12:00 do not conflict. The alternative is a one-minute overlap
+  // guard on every comparison, which is exactly the kind of thing that is right
+  // in one code path and forgotten in another. `endsAt` is **derived** from
+  // `startsAt` and the facility's slot grid rather than accepted from the caller
+  // — see `booking-slots.ts`.
+  startsAt DateTime
+  endsAt   DateTime
+
+  status        FacilityBookingStatus @default(PENDING)
+  decisionNote  String?
+
+  decidedAt     DateTime?
+  decidedByUserId String?
+  decidedByUser   User?   @relation("UserDecidedFacilityBookings", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  cancelledAt   DateTime?
+  cancelReason  String?
+
+  /// The fee this booking was accepted at. See `Facility.bookingFee`.
+  fee         Decimal? @db.Decimal(12, 2)
+  feeCurrency String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([facilityId, reference])
+  @@index([organizationId])
+  @@index([facilityId, startsAt])
+  @@index([status])
+  @@map("facility_bookings")
+}
+
+/// A period in which a facility cannot be booked at all.
+///
+/// The counterpart to a booking, and the reason a booking cannot be made for that
+/// period either. Without it, "the clubhouse is being repainted" lives in somebody's
+/// head and the slot gets sold twice.
+model FacilityBlackout {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  /// Required, and not merely good manners: a closure with no stated reason is
+  /// indistinguishable from a mistake, and the next person to look at it cannot
+  /// tell whether it is safe to lift.
+  reason String
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  createdByUserId String?
+  createdByUser   User?   @relation("UserFacilityBlackouts", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([facilityId, startsAt])
+  @@map("facility_blackouts")
+}
+
+/// What an access card opens.
+enum AccessCardType {
+  BUILDING
+  UNIT
+  PARKING
+  FACILITY
+  GATE
+}
+
+/// Who is holding the card.
+///
+/// Separate from the three nullable holder columns on purpose: `holderType` says
+/// which of them is the one that matters, so a query for "every card a resident
+/// holds" is a filter rather than an OR across three nullable FKs — and so a card
+/// with no holder at all is a legitimate state (a spare, kept at the gate) rather
+/// than a data error.
+enum AccessCardHolder {
+  STAFF
+  TENANT
+  CONTACT
+  VISITOR
+  NONE
+}
+
+enum AccessCardStatus {
+  ACTIVE
+  /// Temporarily off: a card reported in the wrong pocket, a dispute over a bill.
+  /// Reactivable, and the only non-terminal state besides ACTIVE.
+  SUSPENDED
+  /// Reported lost. Not reactivated — a lost card is replaced by a new one, and
+  /// silently reissuing the same number to a new holder is how a building ends up
+  /// with two people who both hold "card 014".
+  LOST
+  /// Past `expiresAt`. Derived on read, and settable by hand for the contractor
+  /// whose visa ran out before the card did.
+  EXPIRED
+  /// Deliberately ended by the organization. Terminal, and the reason must be
+  /// recorded — this is the row somebody asks about after a dispute.
+  REVOKED
+}
+
+/// An access card: a fob, a key card, a gate sticker.
+///
+/// **Data tracking only, no hardware.** The module doc left this as an explicit
+/// v1 decision and it is the right one: every reader integration is vendor-
+/// specific, and a table whose only job is to say who holds what and when it
+/// stops being valid is useful on its own — it answers "who can get into B4 after
+/// the contractor leaves on Friday", which is the question that is actually asked.
+/// `lastSeenAt` exists so that when a reader *is* added, the column is already
+/// there and does not need a migration in the middle of an integration.
+model AccessCard {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Unique within the organization, not globally: card numbers come off a
+  /// printer per estate and two estates legitimately both start at 0001.
+  cardNumber String
+
+  type     AccessCardType   @default(BUILDING)
+  status   AccessCardStatus @default(ACTIVE)
+  holder   AccessCardHolder @default(NONE)
+
+  // ── What it opens ───────────────────────────────────────────────────────
+  //
+  // At least one of these, checked by the service. Which one is required depends
+  // on `type` — a UNIT card with no unit opens nothing, which is a card that
+  // looks valid in a list and fails at the gate.
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  unitId String?
+  unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  facilityId String?
+  facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  // ── Who holds it ────────────────────────────────────────────────────────
+  userId String?
+  user   User?   @relation("UserAccessCards", fields: [userId], references: [id], onDelete: SetNull)
+
+  tenantId String?
+  tenant   Tenant? @relation("TenantAccessCards", fields: [tenantId], references: [id], onDelete: SetNull)
+
+  contactId String?
+  contact   Contact? @relation("ContactAccessCards", fields: [contactId], references: [id], onDelete: SetNull)
+
+  /// A temporary card handed to somebody who has no relationship with us — the
+  /// reason `AccessCardHolder.VISITOR` exists as a value at all. Null for every
+  /// other holder type; the service refuses a visitor card with no visitor,
+  /// because a card that says VISITOR and names nobody is a card that cannot be
+  /// withdrawn from anybody.
+  visitorId String?
+  visitor   Visitor? @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+
+
+  /// What the guard reads off the card. Snapshotted from the holder for the same
+  /// reason `FacilityBooking.bookedForName` is: a card that says the name of the
+  /// person who held it last term is a security problem, and a card with no name
+  /// on it is refused at the gate.
+  holderName String
+
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  /// Set by hand today, populated by a reader when one exists. See the note above.
+  lastSeenAt DateTime?
+
+  suspendedAt       DateTime?
+  revokedAt         DateTime?
+  revokedReason     String?
+  replacementCardId String? // the card issued after this one was reported lost
+
+  notes String? @db.Text
+
+  visits VisitorVisit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, cardNumber])
+  @@index([organizationId])
+  @@index([status])
+  @@index([holder])
+  @@index([unitId])
+  @@map("access_cards")
+}
+
+/// A person who comes to the gate.
+///
+/// A table, not a free-text field on the visit, and the reason is the whole
+/// purpose of a visitor log: a name typed onto yesterday's row cannot be
+/// answered "have we had this person before" or "are they on the barred list".
+/// Both of those are questions about a *person*, and a person with one row is
+/// what makes them answerable.
+model Visitor {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName  String
+
+  phone String?
+  email String?
+
+  company String?
+
+  /// What the gate actually checks. Deliberately one free-text `idType` and one
+  /// free-text `idNumber` rather than an enum of national ID types: "National
+  /// ID", "NIN", "SIN", "passport" and "CPF" are five names for a check that is
+  /// the same shape in every country, and an enum of them would mean a migration
+  /// every time the company hires a guard in a new one. The same reasoning as
+  /// `Employee.nationalId`.
+  idType   String?
+  idNumber String?
+
+  /// Link to the shared people directory when this visitor is somebody we already
+  /// deal with — a contractor, a buyer's agent. A walk-in stays unlinked.
+  contactId String?
+  contact   Contact? @relation("VisitorContact", fields: [contactId], references: [id], onDelete: SetNull)
+
+
+  /// Barred from the site.
+  ///
+  /// A flag rather than a separate list, because a barred person still visits in
+  /// the sense that they are still turned away at the gate — and a separate list
+  /// is a second place to forget. A bar requires a reason, for the same reason a
+  /// blackout does: "do not admit" with nothing behind it is indistinguishable
+  /// from an error, and it is the decision somebody will be asked to justify.
+  isBlacklisted     Boolean @default(false)
+  blacklistedAt     DateTime?
+  blacklistReason   String?
+
+  notes String? @db.Text
+
+  isActive Boolean @default(true)
+
+  visits      VisitorVisit[]
+  accessCards AccessCard[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([phone])
+  @@index([isBlacklisted])
+  @@map("visitors")
+}
+
+/// One arrival.
+///
+/// State is **derived from the two timestamps** rather than stored as an enum:
+/// `checkedInAt`/`checkedOutAt` is the fact, and "is this person still on site"
+/// or "who overstayed" is a comparison against the clock. An enum would be a
+/// fourth thing that can disagree with the two timestamps it was supposed to
+/// describe — the exact failure this codebase has now fixed in six other places
+/// (invoice money columns, stock levels, received quantities, owner statement
+/// lines, received quantities, derived `overdue` on work orders).
+model VisitorVisit {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  visitorId String
+  visitor   Visitor @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  // ── Who they are here to see ────────────────────────────────────────────
+  //
+  // `hostName` is required for the same reason `Visitor.holderName` is: the gate
+  // log is read by somebody who needs a name, not a foreign key they would have
+  // to resolve. Snapshotted from whichever host was given.
+  tenantId String?
+  tenant   Tenant? @relation("HostTenantVisits", fields: [tenantId], references: [id], onDelete: SetNull)
+
+  contactId String?
+  contact   Contact? @relation("HostContactVisits", fields: [contactId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User?   @relation("HostUserVisits", fields: [userId], references: [id], onDelete: SetNull)
+
+  hostName  String
+  hostPhone String?
+
+  purpose String?
+
+  /// When they are due. Defaults to now, because the common case is a person at
+  /// the gate rather than an appointment made yesterday.
+  expectedAt DateTime @default(now())
+
+  /// When they are due to leave. What "overstayed" is measured against; null
+  /// means they are not expected to leave on their own.
+  expectedOutAt DateTime?
+
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+
+  /// Pre-authorised before arrival — the contractor with a job this week, the
+  /// family of a resident who called ahead. Recorded separately from
+  /// `checkedInAt` because "was this expected" and "did they arrive" are
+  /// different questions.
+  preApprovedByUserId String?
+  preApprovedByUser   User?   @relation("UserPreApprovedVisits", fields: [preApprovedByUserId], references: [id], onDelete: SetNull)
+
+  /// A card handed over at the gate, if one was.
+  accessCardId String?
+  accessCard   AccessCard? @relation(fields: [accessCardId], references: [id], onDelete: SetNull)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+@@index([organizationId])
+  @@index([visitorId])
+  @@index([expectedAt])
+  @@index([checkedOutAt])
+  @@map("visitor_visits")
+}
+
+// ============================================
+// UTILITIES (Module 14)
+// ============================================
+
+/// What a meter measures.
+///
+/// `WATER` / `ELECTRICITY` are the two the module doc named and the two Kenya
+/// estates actually recover cost on. `GAS` is in the doc and is kept. `SEWAGE` is
+/// added because on most Kenyan estates sewerage is charged separately from
+/// water and is very often on a bulk meter - the tenant never sees a water
+/// volume, only a fixed charge, which is exactly the case a `WATER` meter row
+/// cannot represent honestly.
+enum UtilityType {
+  WATER
+  ELECTRICITY
+  GAS
+  SEWAGE
+}
+
+/// Which unit a meter feeds, and for a bulk meter, how that feed is divided.
+///
+/// This enum exists because "has no `unitId`" is ambiguous. A meter with no unit
+/// is either a *bulk* meter - the one Kenya Water or Kenya Power installed on
+/// the riser that the estate then re-sells - or a meter that simply has not been
+/// allocated to a unit yet. Those are different states with different
+/// consequences, and a nullable foreign key cannot tell you which you have.
+///
+/// Splitting the water bill twenty ways is a *decision*, not a computation: area,
+/// headcount, occupancy days and a negotiated fixed split are all defensible and
+/// all produce different bills. So the method is stored as data and the module
+/// refuses to bill a bulk meter until the estate has chosen one, rather than
+/// picking a default and quietly overcharging somebody every month.
+enum MeterScope {
+  /// Serves exactly one unit. Consumption is that unit's bill, undivided.
+  SUBMETER
+  /// Serves many units through the estate. Must have an apportionment method.
+  BULK
+}
+
+/// How a bulk meter's consumption is divided across the units it feeds.
+enum ApportionmentMethod {
+  /// By `Unit.areaSqFt`. A 90 sqm unit in a shared meter pays for 90 sqm.
+  AREA
+  /// Split evenly between the units fed, regardless of size.
+  EQUAL
+  /// By days of occupancy in the billing period, so a unit that moved in
+  /// mid-month pays for the part of the month it was there.
+  OCCUPANCY
+  /// A negotiated split held in `UtilityMeter.apportionmentWeights`, keyed by
+  /// unit id. The escape hatch when the other three are all unfair.
+  MANUAL
+}
+
+/// A physical utility meter.
+///
+/// The module doc sketched `UtilityMeter` with `unitId` required and nothing
+/// else, which models only the easy case: one meter, one unit, read it, bill
+/// that unit. The pre-existing `UnitMeterNumber` table had the same blind spot -
+/// a `meterNo` and a `readingSetup` string and no type, no property, no readings
+/// and no rate - and it held zero rows, because a schema that cannot answer
+/// "who paid for this water" gets no data.
+///
+/// So the table is reshaped rather than duplicated. Two "meter" tables is how an
+/// estate ends up with two halves of the truth and no way to reconcile them -
+/// the same failure the master doc records for `Supplier`.
+///
+/// The corrections that matter:
+///
+/// - `propertyId` is required, not `unitId`. A meter is a device bolted to a
+///   building; that is where it lives even when it is a sub-meter inside a flat.
+///   It is also what makes "every meter on this estate" answerable, and it is
+///   how the module scopes a query at all - `Unit` carries no `organizationId`
+///   (master doc issue 25), so a meter scoped only by unit would need a join
+///   through `unit.property.organizationId` on every read.
+/// - `unitId` is nullable and paired with `scope`, because bulk meters feed many
+///   units and have no single one.
+/// - `type` distinguishes the utilities that share a table but not a tariff.
+/// - `digits` and `digitWrapAt` carry meter rollover (see `MeterReading`).
+model UtilityMeter {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  /// Set only for `SUBMETER`. Null for `BULK` by definition.
+  unitId String?
+  unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  type        UtilityType
+  meterNumber String
+  /// Serial/asset tag of the device, distinct from the number the utility
+  /// company bills against.
+  serialNumber String?
+
+  /// How the reading is collected. `MANUAL` is v1 per the module doc; smart
+  /// meter integration is a later phase, and `SMART` exists so those rows are
+  /// distinguishable from day one rather than indistinguishable from manual ones
+  /// once an integration lands.
+  source MeterReadingSource @default(MANUAL)
+
+  scope         MeterScope           @default(SUBMETER)
+  /// Required when `scope = BULK`, null for a sub-meter. Enforced in the
+  /// database - see the `utility_meters_bulk_needs_method` check constraint.
+  apportionmentMethod ApportionmentMethod?
+  /// `MANUAL` split, unit id -> weight. Only consulted when
+  /// `apportionmentMethod = MANUAL`.
+  apportionmentWeights Json?
+
+  /// Digits on the meter's register, and the value the register returns to zero
+  /// (i.e. `10 ** digits`). Null disables rollover handling, so the vast
+  /// majority of meters - which are read as plain increasing numbers - need no
+  /// special handling and cannot be mis-handled by it.
+  digits       Int?
+  digitWrapAt  Int?
+
+  /// Last date this meter's figures were confirmed against the utility company's
+  /// own bill. What tells you whether a suspicious consumption spike is a
+  /// re-read or a leak.
+  lastBilledThrough DateTime?
+
+  status MeterStatus @default(ACTIVE)
+
+  /// Carried over verbatim from the `UnitMeterNumber` table this replaces. It
+  /// records how the reading is taken - direct, bulk-and-divided, estimated -
+  /// which is the same idea as `apportionmentMethod` and predates it. Kept
+  /// rather than dropped because it was somebody's deliberate signal about
+  /// intended functionality.
+  readingSetup String?
+
+  readings  MeterReading[]
+  rates     UtilityRate[]
+  charges   UtilityCharge[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// A meter number is issued by the utility company and is unique per utility
+  /// within an organization. Without this the estate can register the same
+  /// physical meter twice and read both copies - the failure mode that makes a
+  /// building's consumption look like double what it is.
+  @@unique([organizationId, type, meterNumber])
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([type, status])
+  @@map("utility_meters")
+}
+
+enum MeterStatus {
+  ACTIVE
+  /// Stopped reading (removed, failed, replaced). Kept, not deleted, so historic
+  /// readings still explain the invoices that quoted them.
+  RETIRED
+}
+
+/// How a reading was captured.
+///
+/// `SMART` is declared now for the integration the module doc defers to a later
+/// phase. `ESTIMATED` exists because a genuine case has no honest reading: the
+/// meter could not be read (access denied, sealed, tenant away). Estimating is
+/// the standard industry response, and marking the row is what lets a later
+/// audit tell an estimate from a real reading instead of silently guessing.
+enum MeterReadingSource {
+  MANUAL
+  SMART
+  ESTIMATED
+}
+
+/// The register value observed at a moment in time.
+///
+/// The module doc stored `previousReading` and `currentReading` and called the
+/// difference "consumption". That stores a derived number and lets it drift:
+/// correct one of the two readings and the delta silently disagrees. So a
+/// reading stores the *index it showed* and nothing else; `previousReading` and
+/// `consumption` are derived on read by pairing a reading with the one before
+/// it. The doc's two columns are still what the API returns - they are a
+/// presentation of the pair, not a stored fact.
+model MeterReading {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  meterId String
+  meter   UtilityMeter @relation(fields: [meterId], references: [id], onDelete: Cascade)
+
+  readingDate DateTime
+  /// The value on the register at `readingDate`.
+  reading     Decimal @db.Decimal(12, 2)
+
+  source MeterReadingSource @default(MANUAL)
+  note   String?
+
+  recordedByUserId String?
+  recordedBy       User?   @relation("UserMeterReadings", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  chargesAsOpening UtilityCharge[] @relation("ChargeOpeningReading")
+  chargesAsClosing UtilityCharge[] @relation("ChargeClosingReading")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One reading per meter per day. Two readings of the same meter on the same
+  /// day is either a correction - which is an `update`, not a second row - or a
+  /// double entry that would double-bill the period. This is the reading-side
+  /// twin of `utility_charges_no_double_bill`: the database refuses it, and the
+  /// service names the conflict.
+  @@unique([meterId, readingDate])
+  @@index([organizationId])
+  @@index([meterId, readingDate])
+  @@index([readingDate])
+  @@map("meter_readings")
+}
+
+/// What one unit of a utility costs, over a period of validity.
+///
+/// The module doc's formula is "reading delta x rate" and it names no table for
+/// the rate, so the acceptance criterion cannot be met without one. Rates are
+/// data with a validity window for the same reason `TaxRule` (Module 7) and
+/// `PayrollRule` (Module 12) are: tariffs change, and a bill raised in March
+/// must still be explicable after the tariff changes in April.
+///
+/// Specificity is most-specific-wins: a meter-specific rate beats a
+/// property-wide rate, which beats the organization default. Resolution picks one
+/// and snapshots it onto the charge, so a later tariff change cannot retroactively
+/// reprice history.
+model UtilityRate {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Most-specific-wins scope. All three null = the organization default.
+  meterId    String?
+  meter      UtilityMeter? @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  propertyId String?
+  property   Property?     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  type     UtilityType
+  currency String @default("KES") // ISO 4217, e.g. KES, USD
+
+  /// Price of one unit of consumption. `Decimal(12, 4)` because a tariff can be
+  /// quoted to more than two decimals (a gas tariff per MMBtu, a water tariff per
+  /// 1000 litres) and truncating to cents at the rate would quietly move money.
+  ratePerUnit Decimal @db.Decimal(12, 4)
+  /// Fixed component charged per billing period regardless of consumption. Zero
+  /// for a pure usage tariff.
+  standingCharge Decimal @default(0) @db.Decimal(12, 2)
+  /// Whether `standingCharge` is prorated when a period is not a full month.
+  prorateStandingCharge Boolean @default(false)
+
+  /// ISO 4217 of the money the *utility company* bills in, distinct from the
+  /// currency the resident is billed in.
+  purchaseCurrency String? @default("KES")
+  spotRate Decimal? @db.Decimal(12, 4)
+
+  vatRate       Decimal? @db.Decimal(5, 2)
+  incomeAccount String?
+  /// `INCOME_ACCOUNTS` "3" - Utility Income. Free text, matching the rest of the
+  /// ledger-facing classification in this schema.
+  revenueExpenseItem String?
+
+  validFrom DateTime
+  /// Null = current. A tariff is superseded by closing the old row and opening a
+  /// new one; the row is never edited in place, so an old invoice's rate is
+  /// still readable.
+  validTo DateTime?
+
+  charges UtilityCharge[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, type, validFrom])
+  @@index([meterId])
+  @@index([propertyId])
+  @@map("utility_rates")
+}
+
+/// One billable utility event: this unit consumed this much, at this rate, for
+/// this period.
+///
+/// This row is the module's audit spine and its idempotency anchor. Consumption
+/// is derived from the two readings it references, and the amount is derived from
+/// consumption and the snapshotted rate - but the *inputs* (which readings,
+/// which rate, which share of a bulk meter, which currency) are stored, because a
+/// calculation you cannot reconstruct is not an audit trail.
+///
+/// `@@unique([meterId, unitId, billingPeriod])` is the load-bearing constraint of
+/// the whole module: billing the same meter to the same unit for the same period
+/// twice is the one error that hands a resident two bills for one month's water.
+/// It is in the database rather than in a `findFirst` because two concurrent
+/// requests both pass a `findFirst`.
+model UtilityCharge {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  meterId String
+  meter   UtilityMeter @relation(fields: [meterId], references: [id], onDelete: Cascade)
+
+  /// Who is billed. Equals `meter.unitId` for a sub-meter; for a bulk meter it is
+  /// the unit this share of the meter belongs to.
+  unitId String?
+  unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  /// Rental agreement the invoice goes to. Null when the unit is vacant, which is
+  /// a legitimate state for a bulk meter - nobody is there to pay for the water.
+  rentalAgreementId String?
+  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+
+  /// The two readings that bound the period. Consumption is the difference
+  /// between them, derived - see `MeterReading`.
+  fromReadingId String
+  fromReading   MeterReading @relation("ChargeOpeningReading", fields: [fromReadingId], references: [id], onDelete: Restrict)
+  toReadingId   String
+  toReading     MeterReading @relation("ChargeClosingReading", fields: [toReadingId], references: [id], onDelete: Restrict)
+
+  /// The rate in force for the period, snapshotted so repricing a tariff cannot
+  /// rewrite history. Null when no rate could be resolved - which is refused at
+  /// charge time, and so only reachable by hand-edited data.
+  rateId String?
+  rate   UtilityRate? @relation(fields: [rateId], references: [id], onDelete: SetNull)
+  ratePerUnit       Decimal @db.Decimal(12, 4)
+  currency          String  @default("KES")
+  spotRate          Decimal? @db.Decimal(12, 4)
+  vatRate           Decimal? @db.Decimal(5, 2)
+  incomeAccount     String?
+  revenueExpenseItem String?
+
+  /// The unit's share of the meter. `1` for a sub-meter; a fraction for a bulk
+  /// meter apportioned by area, occupancy or manual weight. Stored because it is
+  /// the one input that cannot be re-derived later: the units' areas and the
+  /// occupancy dates they had at the time are not preserved.
+  allocationShare Decimal @default(1) @db.Decimal(12, 6)
+  /// `MANUAL` apportionment is a negotiated split; it is a business fact about
+  /// who agreed to what, so it is preserved even though it is not a measurement.
+  allocationBasis String?
+
+  /// "2026-10" - the period this charge bills. Same `YYYY-MM` form as
+  /// `Invoice.billingPeriod` so the two are comparable, but it is *not* written
+  /// to the invoice: `invoices` carries
+  /// `@@unique([rentalAgreementId, billingPeriod])` because a lease has one rent
+  /// bill per month, and a utility invoice claiming that key would make the
+  /// recurring rent run skip the month and the resident never get billed rent at
+  /// all (recurring-billing.service.ts:45). So the utility bill is its own
+  /// document, classified `transactionClass = 'UTILITY'`, the way the Sales
+  /// module's invoices are classified `SALE`.
+  billingPeriod String
+
+  /// The invoice this charge was put on. One charge, one invoice - the FK
+  /// points this way, not the reverse, because a lease's monthly bill collects
+  /// several charges (water, electricity, a standing charge) on one document.
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  status UtilityChargeStatus @default(PENDING)
+
+  createdByUserId String?
+  createdBy       User?   @relation("UserUtilityCharges", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Exactly-once billing per meter, per unit, per period.
+  @@unique([meterId, unitId, billingPeriod])
+  @@index([organizationId])
+  @@index([billingPeriod])
+  @@index([invoiceId])
+  @@index([unitId])
+  @@map("utility_charges")
+}
+
+enum UtilityChargeStatus {
+  /// Consumption is priced but nothing has been billed yet.
+  PENDING
+  /// An invoice exists and carries this charge.
+  INVOICED
+  /// The charge was written off or reversed. The row stays, so the period still
+  /// explains itself.
+  VOID
+}
+

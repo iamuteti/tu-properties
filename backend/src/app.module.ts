@@ -39,6 +39,7 @@ import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { HrModule } from './modules/hr/hr.module';
+import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -83,6 +84,8 @@ import { SecurityModule } from './security/security.module';
     InventoryModule,
     // Module 12 — HR & Payroll. Imports Workflow and Finance; neither imports it.
     HrModule,
+    // Module 13 — Facilities. Imports Notifications only; exports nothing.
+    FacilitiesModule,
   ],
   controllers: [AppController],
   providers: [

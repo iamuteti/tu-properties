@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -2944,4 +2944,367 @@ export const hrApi = {
 
     cancelSelfLeave: (id: string, note?: string) =>
         api.post<LeaveRequestRow>(`/hr/me/leave/${id}/cancel`, { note }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module 13 — Facilities
+// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Three resources, deliberately three concerns rather than one object.
+ *
+ * A clubhouse diary, a gate log and a card register have three different owners and
+ * three different sets of permissions — `facility_bookings.decide` is narrower than
+ * `facility_bookings.create`, and `access_cards` is the most sensitive grant in the
+ * product. Merging them into a single `facilitiesApi` would make "which permission
+ * does this button need" unanswerable from the client, which is the same reason
+ * procurement has four.
+ *
+ * As everywhere else in this file, **every state change is its own method** rather
+ * than a generic `update(status)`: the API refuses an illegal transition with a
+ * message written for the person who pressed the button, so the client should not be
+ * able to ask for one. Which buttons a row offers comes from the record's
+ * `availableActions`, computed server-side — the two cannot drift.
+ *
+ * Payloads named rather than derived: `Parameters<typeof facilitiesApi.createFacility>[0]`
+ * inside the object would make `facilitiesApi` reference its own initializer, which
+ * TypeScript resolves as `any` — and a client typed `any` defeats the point.
+ */
+type FacilityPayload = {
+    name: string;
+    kind?: string;
+    description?: string;
+    capacity?: number;
+    /** `"HH:MM"` — converted to minutes-from-midnight by the backend. */
+    opensAt?: string;
+    closesAt?: string;
+    slotMinutes?: number;
+    maxAdvanceDays?: number;
+    requiresApproval?: boolean;
+    isBookable?: boolean;
+    bookingFee?: number;
+    bookingFeeCurrency?: string;
+    notes?: string;
+    isActive?: boolean;
+};
+
+type FacilityBookingPayload = {
+    facilityId: string;
+    startsAt: string;
+    endsAt: string;
+    contactId?: string;
+    tenantId?: string;
+    bookedForName?: string;
+    bookedForPhone?: string;
+    purpose?: string;
+    attendeeCount?: number;
+    /** Forces PENDING on a facility that does not require it. */
+    requestApproval?: boolean;
+};
+
+type AccessCardPayload = {
+    cardNumber?: string;
+    type?: string;
+    propertyId?: string;
+    unitId?: string;
+    facilityId?: string;
+    userId?: string;
+    tenantId?: string;
+    contactId?: string;
+    visitorId?: string;
+    holderName?: string;
+    expiresAt?: string;
+    notes?: string;
+};
+
+export const facilitiesApi = {
+    // ── The register ────────────────────────────────────────────────────────
+    facilities: (
+        params?: Record<string, string | number | boolean | undefined>,
+    ) => api.get<FacilityRow[]>('/facilities', { params }),
+
+    facility: (id: string) => api.get<FacilityDetail>(`/facilities/${id}`),
+
+    facilitiesExportUrl: () => `${API_BASE_URL}/facilities/export`,
+
+    /**
+     * The diary.
+     *
+     * Slot-by-slot availability, which is what a booking screen needs and what a
+     * list of bookings cannot answer: "when is the clubhouse free?" is a question
+     * about *empty* slots.
+     */
+    facilityAvailability: (
+        id: string,
+        params?: { from?: string; to?: string; days?: number },
+    ) => api.get<FacilityAvailability>(`/facilities/${id}/availability`, { params }),
+
+    createFacility: (data: FacilityPayload, propertyId: string) =>
+        api.post<FacilityDetail>(`/facilities?propertyId=${encodeURIComponent(propertyId)}`, data),
+
+    updateFacility: (id: string, data: Partial<FacilityPayload>) =>
+        api.patch<FacilityDetail>(`/facilities/${id}`, data),
+
+    /**
+     * Close a facility for a period.
+     *
+     * Refused when live bookings fall inside, and the message names them — the same
+     * guard Module 6 uses for overlapping owner statements.
+     */
+    closeFacility: (
+        id: string,
+        data: { reason: string; startsAt: string; endsAt: string },
+    ) => api.post<FacilityBlackoutRow>(`/facilities/${id}/close`, data),
+
+    facilityBlackouts: (id: string) =>
+        api.get<{ facilityId: string; blackouts: FacilityBlackoutRow[] }>(
+            `/facilities/${id}/blackouts`,
+        ),
+
+    reopenFacility: (facilityId: string, blackoutId: string) =>
+        api.delete<{ message: string }>(
+            `/facilities/blackouts/${blackoutId}?facilityId=${encodeURIComponent(facilityId)}`,
+        ),
+};
+
+export const facilityBookingsApi = {
+    bookings: (
+        params?: Record<string, string | number | boolean | undefined>,
+    ) => api.get<FacilityBookingRow[]>('/facilities/bookings', { params }),
+
+    booking: (id: string) => api.get<FacilityBookingRow>(`/facilities/bookings/${id}`),
+
+    bookingsExportUrl: (params?: {
+        facilityId?: string;
+        status?: string;
+        when?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const search = query.toString();
+        return `${API_BASE_URL}/facilities/bookings/export${search ? `?${search}` : ''}`;
+    },
+
+    /**
+     * Read-only, and it answers with the *same* `checkSlot` the create path uses —
+     * so it cannot tell somebody the slot is free when the server is about to
+     * refuse it.
+     */
+    previewBooking: (data: {
+        facilityId: string;
+        startsAt: string;
+        endsAt: string;
+    }) => api.post<FacilityBookingPreview>('/facilities/bookings/preview', data),
+
+    createBooking: (data: FacilityBookingPayload) =>
+        api.post<FacilityBookingRow>('/facilities/bookings', data),
+
+    /** Descriptive fields only — there is no `status` here by design. */
+    updateBooking: (
+        id: string,
+        data: {
+            bookedForName?: string;
+            bookedForPhone?: string;
+            purpose?: string;
+            attendeeCount?: number;
+            contactId?: string;
+            tenantId?: string;
+        },
+    ) => api.patch<FacilityBookingRow>(`/facilities/bookings/${id}`, data),
+
+    /**
+     * Move a booking. Its own action because this is the one edit that re-enters the
+     * overlap check against a possibly-changed grid.
+     */
+    rescheduleBooking: (
+        id: string,
+        data: { startsAt: string; endsAt: string },
+    ) => api.post<FacilityBookingRow>(`/facilities/bookings/${id}/reschedule`, data),
+
+    approveBooking: (id: string, note?: string) =>
+        api.post<FacilityBookingRow>(`/facilities/bookings/${id}/approve`, { note }),
+
+    /** The note is **required** by the API — it is the only thing the booker reads. */
+    rejectBooking: (id: string, note: string) =>
+        api.post<FacilityBookingRow>(`/facilities/bookings/${id}/reject`, { note }),
+
+    cancelBooking: (id: string, note: string) =>
+        api.post<FacilityBookingRow>(`/facilities/bookings/${id}/cancel`, { note }),
+
+    /** Undoing a cancellation is a correction, not a decision, so it needs no note. */
+    reactivateBooking: (id: string) =>
+        api.post<FacilityBookingRow>(`/facilities/bookings/${id}/reactivate`),
+
+    /** Only valid once the slot has passed — it records that nobody came. */
+    markBookingNoShow: (id: string) =>
+        api.post<FacilityBookingRow>(`/facilities/bookings/${id}/no-show`),
+
+    /** Per-row outcomes: some rows are refused and some are not. */
+    bulkBookingAction: (data: {
+        ids: string[];
+        action: 'approve' | 'reject' | 'cancel';
+        note?: string;
+    }) =>
+        api.post<{
+            succeeded: number;
+            failed: number;
+            results: { id: string; ok: boolean; reason?: string }[];
+            message: string;
+        }>('/facilities/bookings/bulk', data),
+};
+
+/**
+ * The gate.
+ *
+ * The narrowest permission in the product: the people in this log did not choose to
+ * be recorded and have no other relationship with the organization.
+ */
+export const visitorsApi = {
+    visitors: (
+        params?: Record<string, string | number | boolean | undefined>,
+    ) => api.get<VisitorRow[]>('/facilities/visitors', { params }),
+
+    visitor: (id: string) => api.get<VisitorDetail>(`/facilities/visitors/${id}`),
+
+    visitorsExportUrl: () => `${API_BASE_URL}/facilities/visitors/export`,
+
+    createVisitor: (data: {
+        firstName: string;
+        lastName: string;
+        phone?: string;
+        email?: string;
+        company?: string;
+        idType?: string;
+        idNumber?: string;
+        contactId?: string;
+        notes?: string;
+    }) => api.post<VisitorDetail>('/facilities/visitors', data),
+
+    updateVisitor: (
+        id: string,
+        data: Partial<{
+            firstName: string;
+            lastName: string;
+            phone: string;
+            email: string;
+            company: string;
+            idType: string;
+            idNumber: string;
+            contactId: string;
+            notes: string;
+            isActive: boolean;
+        }>,
+    ) => api.patch<VisitorDetail>(`/facilities/visitors/${id}`, data),
+
+    /** The API refuses a bar with no reason, and refuses while they are on site. */
+    barVisitor: (id: string, reason: string) =>
+        api.post<VisitorDetail & { message: string }>(`/facilities/visitors/${id}/bar`, {
+            reason,
+        }),
+
+    /** Keeps the original reason on the record — a history with a blank "why" is useless. */
+    unbarVisitor: (id: string, note?: string) =>
+        api.post<VisitorDetail & { message: string }>(
+            `/facilities/visitors/${id}/unbar`,
+            { note },
+        ),
+
+    // ── The visit log, at its own route ─────────────────────────────────────
+    //
+    // Separate from the visitor directory because they are different documents with
+    // different rates of change: a visitor row changes when somebody joins the list,
+    // a visit changes every time somebody arrives.
+
+    /**
+     * The gate book. `state` is a **derived** filter — `onsite`, `expected`,
+     * `overdue` and `history` are comparisons against the clock.
+     */
+    visits: (params?: Record<string, string | number | boolean | undefined>) =>
+        api.get<VisitorVisitRow[]>('/facilities/visits', { params }),
+
+    visit: (id: string) => api.get<VisitorVisitRow>(`/facilities/visits/${id}`),
+
+    visitsExportUrl: () => `${API_BASE_URL}/facilities/visits/export`,
+
+    /** A **barred** visitor is refused outright, not accepted with a warning. */
+    logArrival: (data: {
+        visitorId: string;
+        propertyId?: string;
+        tenantId?: string;
+        contactId?: string;
+        userId?: string;
+        hostName?: string;
+        hostPhone?: string;
+        purpose?: string;
+        expectedAt?: string;
+        expectedOutAt?: string;
+        accessCardId?: string;
+        notes?: string;
+    }) => api.post<VisitorVisitRow>('/facilities/visits', data),
+
+    checkIn: (id: string) => api.post<VisitorVisitRow>(`/facilities/visits/${id}/check-in`),
+
+    checkOut: (id: string) => api.post<VisitorVisitRow>(`/facilities/visits/${id}/check-out`),
+
+    /**
+     * "Was this expected" and "did they arrive" are different questions: a contractor
+     * booked for Thursday who never turns up has to be visible as a missed
+     * appointment, which is only possible if the expectation is recorded first.
+     */
+    preApproveVisit: (id: string) =>
+        api.post<VisitorVisitRow>(`/facilities/visits/${id}/pre-approve`),
+};
+
+export const accessCardsApi = {
+    /**
+     * The register.
+     *
+     * `?status=EXPIRED` filters on the **effective** status, so it also finds cards
+     * whose date has passed while their column still says ACTIVE. That is what the
+     * gate honours, and a filter that disagreed with it would hide live cards.
+     */
+    accessCards: (
+        params?: Record<string, string | number | boolean | undefined>,
+    ) => api.get<AccessCardRow[]>('/facilities/access-cards', { params }),
+
+    accessCard: (id: string) => api.get<AccessCardRow>(`/facilities/access-cards/${id}`),
+
+    accessCardsExportUrl: () => `${API_BASE_URL}/facilities/access-cards/export`,
+
+    createAccessCard: (data: AccessCardPayload) =>
+        api.post<AccessCardRow>('/facilities/access-cards', data),
+
+    /** Holder name and expiry only. `type`, `status` and the target are not here. */
+    updateAccessCard: (
+        id: string,
+        data: { holderName?: string; expiresAt?: string; notes?: string },
+    ) => api.patch<AccessCardRow>(`/facilities/access-cards/${id}`, data),
+
+    suspendCard: (id: string, note: string) =>
+        api.post<AccessCardRow>(`/facilities/access-cards/${id}/suspend`, { note }),
+
+    reactivateCard: (id: string, note?: string) =>
+        api.post<AccessCardRow>(`/facilities/access-cards/${id}/reactivate`, { note }),
+
+    /**
+     * Terminal on purpose: a lost card has been in somebody else's pocket, so its
+     * number is compromised and there is no `reactivate` from here.
+     */
+    markCardLost: (id: string, note: string) =>
+        api.post<AccessCardRow>(`/facilities/access-cards/${id}/mark-lost`, { note }),
+
+    /** The contractor whose visa ran out before the card did. */
+    markCardExpired: (id: string, note?: string) =>
+        api.post<AccessCardRow>(`/facilities/access-cards/${id}/mark-expired`, { note }),
+
+    revokeCard: (id: string, note: string) =>
+        api.post<AccessCardRow>(`/facilities/access-cards/${id}/revoke`, { note }),
+
+    /** Records the chain; the lost card's own status does not change. */
+    recordCardReplacement: (id: string, replacementCardId: string, note?: string) =>
+        api.post<AccessCardRow>(`/facilities/access-cards/${id}/record-replacement`, {
+            replacementCardId,
+            note,
+        }),
 };

@@ -57,6 +57,10 @@ Receipt,
     Calendar,
     Wallet,
     Calculator,
+    // Module 13 — Facilities. `DoorOpen` for the register (it is the doors of a
+    // building), `ClipboardList` for the gate book, and `KeyRound` for the card
+    // register — the only one of the three that decides who can get in.
+    KeyRound,
 } from "lucide-react";
 
 type UserRole =
@@ -223,6 +227,35 @@ const navItems: NavItem[] = [
             { href: '/hr/payroll', label: 'Payroll runs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'] },
             { href: '/hr/settings/payroll-rules', label: 'Statutory rules', icon: Calculator, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'] },
             { href: '/hr/me', label: 'My account', icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'] },
+        ],
+    },
+    /**
+     * Module 13. The register and the diary are broad — "is the clubhouse free on
+     * Saturday" is a question a leasing officer, an accountant and a technician all
+     * need answered, and none of them should have to ask a colleague.
+     *
+     * The two gate screens are the opposite, and the split is the design rather than
+     * an accident of the copy-paste: `visitors` and `access-cards` are for the roles
+     * whose actual job is being at the door, because the people in the visitor log
+     * did not choose to be recorded and have no other relationship with the company.
+     * A leasing officer and an accountant are both excluded. Note that a technician
+     * gets the visitor log but **not** the card register — they need to know whether
+     * the person who called about the boiler is expected, and should not be able to
+     * answer "does the caretaker have a key?" by issuing one.
+     *
+     * Every list here mirrors `FACILITIES_VIEW_ROLES` and `FACILITIES_DOOR_ROLES` in
+     * `backend/src/modules/facilities/facilities-roles.ts`, copied rather than guessed.
+     */
+    {
+        label: 'Facilities',
+        icon: DoorOpen,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'],
+        children: [
+            { href: '/facilities', label: 'Facility register', icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'] },
+            { href: '/facilities/bookings', label: 'Bookings', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'LEASING_OFFICER', 'ACCOUNTANT'] },
+            { href: '/facilities/visits', label: 'The gate book', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
+            { href: '/facilities/visitors', label: 'Visitors', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
+            { href: '/facilities/access-cards', label: 'Access cards', icon: KeyRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
         ],
     },
     { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },

@@ -49,6 +49,12 @@ import {
   PayFrequency,
   PayrollLineDirection,
   PayrollRunStatus,
+  // Module 13 — Facilities
+  AccessCardHolder,
+  AccessCardStatus,
+  AccessCardType,
+  FacilityBookingStatus,
+  FacilityKind,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -3956,6 +3962,31 @@ export async function seedDemoData() {
         role: UserRole.PROCUREMENT_OFFICER,
         organizationId: defaultOrg.id,
       },
+      // Leasing officers (Module 13). The same hole as maintenance and procurement,
+      // and here it matters more than anywhere else: **Module 13's central RBAC
+      // decision is that a Leasing Officer may book a facility but may not approve
+      // one** — `facility_bookings.create` without `.decide` — so that whoever shows a
+      // prospect the clubhouse is not the person who authorises it. With no login
+      // holding the role, that split could not be demonstrated *or tested live*: the
+      // seeded role held permissions no user in the demo could exercise. Both
+      // organizations get one, because the facility and booking pickers are
+      // tenant-scoped and a single-tenant demo cannot show a cross-tenant refusal.
+      {
+        email: 'leasing@rohi.co.ke',
+        firstName: 'Faith',
+        lastName: 'Chebet',
+        phone: '+254700000014',
+        role: UserRole.LEASING_OFFICER,
+        organizationId: rohiOrg.id,
+      },
+      {
+        email: 'leasing@westhill.co.ke',
+        firstName: 'Joseph',
+        lastName: 'Kimani',
+        phone: '+254700000015',
+        role: UserRole.LEASING_OFFICER,
+        organizationId: defaultOrg.id,
+      },
     ];
     for (const staff of maintenanceStaff) {
       await prisma.user.create({ data: { passwordHash, ...staff } });
@@ -3983,6 +4014,8 @@ export async function seedDemoData() {
       { email: 'technician@westhill.co.ke', roleName: 'Technician' },
       { email: 'procurement@rohi.co.ke', roleName: 'Procurement Officer' },
       { email: 'procurement@westhill.co.ke', roleName: 'Procurement Officer' },
+      { email: 'leasing@rohi.co.ke', roleName: 'Leasing Officer' },
+      { email: 'leasing@westhill.co.ke', roleName: 'Leasing Officer' },
       // Module 12 self-service. A **second** role on an existing login, on
       // purpose: one person being both a technician and somebody who can read
       // their own payslip is the ordinary arrangement, and it is also the only
@@ -4037,6 +4070,12 @@ export async function seedDemoData() {
     // Staff, leave and payroll (Module 12). After inventory and after users exist,
     // because it links employee records to logins.
     await generateHrData(prisma, rohiOrg.id);
+
+    // Bookings, the gate log and access cards (Module 13). After HR, because it
+    // links cards and bookings to staff logins, tenants and contacts that all
+    // exist by now — and its bookings must not collide with the ones HR does not
+    // create, which is why the exclusion constraint is not optional here.
+    await generateFacilitiesData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.
@@ -4712,5 +4751,1028 @@ async function generateHrData(prisma: PrismaClient, organizationId: string) {
 
   console.log(
     `  HR: ${created.length} employees, ${leavePlan.length} leave requests, ${runsCreated} payroll runs, ${rulesInForce} statutory rules for ${country}`,
+  );
+}
+
+/**
+ * Module 13 — Facilities: bookable things, bookings, the gate log and access cards.
+ *
+ * Seeded so that every branch the module has is reachable from the demo without
+ * anybody having to invent data first:
+ *
+ * - **Facilities span the six sub-systems the module doc asked for**, so the
+ *   `FacilityKind` enum is visible as a grouping rather than as an abstraction:
+ *   clubhouse, meeting rooms, a parking bay, a gym, a pool and a laundry.
+ * - **One facility requires approval** (the residents' clubhouse) so a booking can
+ *   be found sitting in PENDING and the approve/decline buttons have something to
+ *   act on. The others confirm immediately, so the happy path is one click away.
+ * - **A closure overlaps nothing** but sits inside the clubhouse's horizon, so the
+ *   diary's greyed-out slots are demonstrable and the "refuse a closure over a live
+ *   booking" refusal is one deliberate attempt away.
+ * - **The gate log covers all five derived states** — on site, expected, overdue,
+ *   left, and did-not-arrive — because every one of them is a comparison against the
+ *   clock and a seed that only produced `LEFT` would make the derived logic look
+ *   like an untested claim.
+ * - **One visitor is barred, with a reason**, so the refusal at the gate is
+ *   reachable by trying to log them in.
+ * - **Access cards span all five statuses**, including a `LOST` card whose
+ *   `replacementCardId` points at its successor — which is the one thing that
+ *   demonstrates that a lost card is terminal and that the chain is the way back.
+ *
+ * `references` and `cardNumber`s are sequential per facility / organization for the
+ * same reason they are in the service: the front desk quotes one.
+ */
+async function generateFacilitiesData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const properties = await prisma.property.findMany({
+    where: { organizationId },
+    orderBy: { code: 'asc' },
+    select: { id: true, code: true, name: true },
+  });
+  if (properties.length === 0) {
+    return;
+  }
+
+  const users = await prisma.user.findMany({
+    where: { organizationId, portalTenantId: null },
+    select: { id: true, role: true },
+  });
+  const byRole = (role: UserRole) => users.find((user) => user.role === role);
+
+  const admin = byRole(UserRole.ADMIN)?.id ?? null;
+  const propertyManager = byRole(UserRole.PROPERTY_MANAGER)?.id ?? null;
+  const maintenanceManager = byRole(UserRole.MAINTENANCE_MANAGER)?.id ?? null;
+  const leasingOfficer = byRole(UserRole.LEASING_OFFICER)?.id ?? null;
+  const technician = byRole(UserRole.TECHNICIAN)?.id ?? null;
+
+  const tenants = await prisma.tenant.findMany({
+    where: { organizationId },
+    orderBy: { code: 'asc' },
+    select: { id: true, surname: true, otherNames: true, phone: true },
+  });
+  const contacts = await prisma.contact.findMany({
+    where: { organizationId },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      phone: true,
+    },
+  });
+
+  // ==========================================================================
+  // The register — one facility per sub-system the module doc named, plus a
+  // couple, so grouping by `kind` on the list screen does something.
+  // ==========================================================================
+
+  const hours = (
+    opens: string,
+    closes: string,
+    slotMinutes: number,
+  ): {
+    opensAtMinutes: number;
+    closesAtMinutes: number;
+    slotMinutes: number;
+  } => {
+    const toMinutes = (clock: string) => {
+      const [h, m] = clock.split(':').map(Number);
+      return h * 60 + m;
+    };
+    return {
+      opensAtMinutes: toMinutes(opens),
+      closesAtMinutes: toMinutes(closes),
+      slotMinutes,
+    };
+  };
+
+  const plan: Array<{
+    name: string;
+    kind: FacilityKind;
+    propertyIndex: number;
+    hours: {
+      opensAtMinutes: number;
+      closesAtMinutes: number;
+      slotMinutes: number;
+    };
+    capacity?: number;
+    requiresApproval?: boolean;
+    /** Set false to register a facility without letting anybody book it. */
+    isBookable?: boolean;
+    bookingFee?: number;
+    currency?: string;
+    description?: string;
+  }> = [
+    {
+      name: 'Residents Clubhouse',
+      kind: FacilityKind.CLUBHOUSE,
+      propertyIndex: 0,
+      hours: hours('08:00', '22:00', 120),
+      capacity: 80,
+      // The one facility that needs a person to agree, so PENDING is reachable.
+      requiresApproval: true,
+      bookingFee: 15000,
+      currency: 'KES',
+      description:
+        'Main hall, kitchen and terrace. Bookable in two-hour blocks; the caretaker needs the key by 08:00.',
+    },
+    {
+      name: 'Boardroom',
+      kind: FacilityKind.MEETING_ROOM,
+      propertyIndex: 0,
+      hours: hours('08:00', '18:00', 60),
+      capacity: 14,
+      bookingFee: 2500,
+      currency: 'KES',
+      description:
+        'Seats 14 around one table. The projector needs its own adapter.',
+    },
+    {
+      name: 'Meeting Room 2',
+      kind: FacilityKind.MEETING_ROOM,
+      propertyIndex: 0,
+      hours: hours('08:00', '18:00', 60),
+      capacity: 6,
+      description: 'Off the lobby. No video conferencing — it is a glass room.',
+    },
+    {
+      name: 'Visitors Car Park',
+      kind: FacilityKind.PARKING,
+      propertyIndex: 0,
+      // 24-hour facility with no overnight special case, because the hours are
+      // stored as minutes from midnight rather than as a pair of clock times.
+      hours: hours('00:00', '23:59', 60),
+      capacity: 18,
+      description:
+        'Bay 1-18, visitor permits issued at the gate. Bookable in whole days.',
+    },
+    {
+      name: 'Rooftop Gym',
+      kind: FacilityKind.GYM,
+      propertyIndex: 1,
+      hours: hours('05:00', '22:00', 60),
+      capacity: 20,
+      bookingFee: 1000,
+      currency: 'KES',
+      description: 'Residents only. Induction required before first use.',
+    },
+    {
+      name: 'Swimming Pool',
+      kind: FacilityKind.POOL,
+      propertyIndex: 1,
+      hours: hours('06:00', '20:00', 120),
+      capacity: 30,
+      requiresApproval: true,
+      description:
+        'Lifeguard on duty for the whole opening period. Closed for water testing on the first Monday of each month.',
+    },
+    {
+      name: 'Tennis Court',
+      kind: FacilityKind.TENNIS_COURT,
+      propertyIndex: 1,
+      hours: hours('06:00', '21:00', 60),
+      capacity: 4,
+    },
+    {
+      name: 'Shared Laundry',
+      kind: FacilityKind.LAUNDRY,
+      propertyIndex: 2 % properties.length,
+      hours: hours('06:00', '21:00', 60),
+      capacity: 12,
+      description:
+        'Six machines. Book the slot rather than queueing with your basket.',
+    },
+    {
+      name: 'Staff Store',
+      kind: FacilityKind.OTHER,
+      propertyIndex: 0,
+      hours: hours('08:00', '17:00', 60),
+      // On the register so its access cards have something to point at, but not
+      // bookable — the two settings are independent on purpose.
+      isBookable: false,
+      description: 'Key store and cleaning chemicals. Not bookable.',
+    },
+  ];
+
+  const createdFacilities: Array<{
+    id: string;
+    name: string;
+    propertyId: string;
+    propertyName: string;
+    slotMinutes: number;
+    isBookable: boolean;
+  }> = [];
+
+  for (const spec of plan) {
+    const property = properties[spec.propertyIndex % properties.length];
+    const existing = await prisma.facility.findFirst({
+      where: { propertyId: property.id, name: spec.name },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    const isBookable = spec.isBookable !== false;
+
+    const facility = await prisma.facility.create({
+      data: {
+        organizationId,
+        propertyId: property.id,
+        name: spec.name,
+        kind: spec.kind,
+        description: spec.description ?? null,
+        capacity: spec.capacity ?? null,
+        opensAtMinutes: spec.hours.opensAtMinutes,
+        closesAtMinutes: spec.hours.closesAtMinutes,
+        slotMinutes: spec.hours.slotMinutes,
+        maxAdvanceDays: spec.kind === FacilityKind.PARKING ? 180 : 90,
+        requiresApproval: spec.requiresApproval ?? false,
+        isBookable,
+        bookingFee:
+          spec.bookingFee != null ? new Prisma.Decimal(spec.bookingFee) : null,
+        bookingFeeCurrency:
+          spec.bookingFee != null ? (spec.currency ?? 'KES') : null,
+      },
+      select: {
+        id: true,
+        name: true,
+        propertyId: true,
+        slotMinutes: true,
+        isBookable: true,
+      },
+    });
+
+    createdFacilities.push({ ...facility, propertyName: property.name });
+  }
+
+  const byName = (name: string) =>
+    createdFacilities.find((facility) => facility.name === name);
+
+  // ==========================================================================
+  // A closure, inside the horizon and over nothing.
+  // ==========================================================================
+
+  const clubhouse = byName('Residents Clubhouse');
+  if (clubhouse) {
+    const from = daysFromNow(21);
+    from.setHours(8, 0, 0, 0);
+    const to = new Date(from);
+    to.setDate(to.getDate() + 2);
+    to.setHours(22, 0, 0, 0);
+
+    const existingClosure = await prisma.facilityBlackout.findFirst({
+      where: {
+        facilityId: clubhouse.id,
+        reason: 'Floors stripped and refinished',
+      },
+      select: { id: true },
+    });
+    if (!existingClosure) {
+      await prisma.facilityBlackout.create({
+        data: {
+          organizationId,
+          facilityId: clubhouse.id,
+          reason: 'Floors stripped and refinished',
+          startsAt: from,
+          endsAt: to,
+          ...(maintenanceManager
+            ? { createdByUserId: maintenanceManager }
+            : {}),
+        },
+      });
+    }
+  }
+
+  // ==========================================================================
+  // Bookings — one per reachable state, each on a different day so no two of
+  // them can possibly collide.
+  // ==========================================================================
+
+  const clubhouseBookingFacility = clubhouse ?? createdFacilities[0];
+  const boardroom = byName('Boardroom');
+  const pool = byName('Swimming Pool');
+  const carPark = byName('Visitors Car Park');
+
+  const tenantName = (
+    tenant: { surname: string; otherNames: string | null } | undefined,
+  ) =>
+    tenant
+      ? [tenant.otherNames, tenant.surname].filter(Boolean).join(' ')
+      : undefined;
+
+  /**
+   * `FB-0007`, **sequential per facility** — the same shape
+   * `FacilitiesService.nextReference` produces, because the front desk quotes one
+   * number and "FB-0007 on the boardroom" has to mean a single row. A global counter
+   * would satisfy the unique index just as well and quietly produce references that
+   * look unlike every other reference in the system.
+   */
+  const referenceCounters = new Map<string, number>();
+  // Seeded from what is already there, so re-running the demo does not try to
+  // reissue FB-0001 and trip the unique index on (facilityId, reference).
+  for (const facility of createdFacilities) {
+    const count = await prisma.facilityBooking.count({
+      where: { facilityId: facility.id },
+    });
+    referenceCounters.set(facility.id, count);
+  }
+
+  const nextReference = (facilityId: string): string => {
+    const next = (referenceCounters.get(facilityId) ?? 0) + 1;
+    referenceCounters.set(facilityId, next);
+    return `FB-${String(next).padStart(4, '0')}`;
+  };
+
+  const bookingPlan: Array<{
+    facilityId: string;
+    dayOffset: number;
+    hour: number;
+    durationHours: number;
+    status: FacilityBookingStatus;
+    bookedByUserId: string | null;
+    tenantId?: string | null;
+    contactId?: string | null;
+    purpose: string;
+    attendeeCount?: number;
+    cancelReason?: string;
+    decisionNote?: string;
+  }> = [];
+
+  if (clubhouseBookingFacility) {
+    bookingPlan.push(
+      // Pending, so the approval queue has something in it.
+      {
+        facilityId: clubhouseBookingFacility.id,
+        dayOffset: 4,
+        hour: 16,
+        durationHours: 2,
+        status: FacilityBookingStatus.PENDING,
+        bookedByUserId: leasingOfficer,
+        tenantId: tenants[0]?.id ?? null,
+        purpose: "Children's end-of-term party",
+        attendeeCount: 30,
+      },
+      // Confirmed and paid-for, on a residents' clubhouse. 12:00 rather than 18:00
+      // because the clubhouse grid is two hours: a seeded booking that does not
+      // sit on its own facility's grid makes the diary and the rule look like they
+      // disagree, which is the one thing the demo must not do.
+      {
+        facilityId: clubhouseBookingFacility.id,
+        dayOffset: 6,
+        hour: 12,
+        durationHours: 2,
+        status: FacilityBookingStatus.CONFIRMED,
+        bookedByUserId: propertyManager,
+        tenantId: tenants[1]?.id ?? tenants[0]?.id ?? null,
+        purpose: 'Family gathering',
+        attendeeCount: 25,
+      },
+      // Declined, with the note the booker would have read.
+      {
+        facilityId: clubhouseBookingFacility.id,
+        dayOffset: 9,
+        hour: 12,
+        durationHours: 2,
+        status: FacilityBookingStatus.REJECTED,
+        bookedByUserId: leasingOfficer,
+        contactId: contacts[0]?.id ?? null,
+        purpose: 'Prospective tenant viewing — would like to see the clubhouse',
+        attendeeCount: 4,
+        decisionNote:
+          'The clubhouse is shown to prospective tenants only when a property manager is present. Book a viewing through the leasing team instead.',
+      },
+
+      // Cancelled with a reason, so the diary explains itself.
+      {
+        facilityId: clubhouseBookingFacility.id,
+        dayOffset: 12,
+        hour: 10,
+        durationHours: 2,
+        status: FacilityBookingStatus.CANCELLED,
+        bookedByUserId: propertyManager,
+        contactId: contacts[1]?.id ?? null,
+        purpose: 'Book launch',
+        attendeeCount: 60,
+        cancelReason: 'Client postponed to the new financial year.',
+      },
+      // Confirmed and already past, with nobody recorded as a no-show — which is
+      // what most past bookings look like and is why `COMPLETED` is not a state.
+      {
+        facilityId: clubhouseBookingFacility.id,
+        dayOffset: -5,
+        hour: 16,
+        durationHours: 2,
+        status: FacilityBookingStatus.CONFIRMED,
+        bookedByUserId: propertyManager,
+        tenantId: tenants[2]?.id ?? tenants[0]?.id ?? null,
+        purpose: 'Residents association meeting',
+        attendeeCount: 18,
+      },
+      // A genuine no-show, which *is* a state because somebody had to look at an
+      // empty room and record it.
+      {
+        facilityId: clubhouseBookingFacility.id,
+        dayOffset: -12,
+        hour: 14,
+        durationHours: 2,
+        status: FacilityBookingStatus.NO_SHOW,
+        bookedByUserId: leasingOfficer,
+        contactId: contacts[2]?.id ?? contacts[0]?.id ?? null,
+        purpose: 'Site walkthrough for the fit-out contractor',
+        attendeeCount: 3,
+      },
+    );
+  }
+
+  if (boardroom) {
+    bookingPlan.push(
+      {
+        facilityId: boardroom.id,
+        dayOffset: 2,
+        hour: 9,
+        durationHours: 1,
+        status: FacilityBookingStatus.CONFIRMED,
+        bookedByUserId: admin,
+        purpose: 'Rent review with the landlord',
+        attendeeCount: 4,
+      },
+      {
+        facilityId: boardroom.id,
+        dayOffset: 3,
+        hour: 14,
+        durationHours: 1,
+        status: FacilityBookingStatus.CONFIRMED,
+        bookedByUserId: admin,
+        purpose: 'Audit planning',
+        attendeeCount: 3,
+      },
+    );
+  }
+
+  if (pool) {
+    // 08:00 rather than 09:00: the pool's grid is two hours, and a seeded booking
+    // off its own grid would make the rule and the diary look inconsistent.
+    bookingPlan.push({
+      facilityId: pool.id,
+      dayOffset: 7,
+      hour: 8,
+      durationHours: 2,
+      status: FacilityBookingStatus.PENDING,
+      bookedByUserId: propertyManager,
+      tenantId: tenants[0]?.id ?? null,
+      purpose: 'Swimming lessons for the residents’ children',
+      attendeeCount: 12,
+    });
+  }
+
+  if (carPark) {
+    bookingPlan.push({
+      facilityId: carPark.id,
+      dayOffset: 1,
+      hour: 0,
+      durationHours: 8,
+      status: FacilityBookingStatus.CONFIRMED,
+      bookedByUserId: propertyManager,
+      contactId: contacts[0]?.id ?? null,
+      purpose: 'Contractor delivery van, 8 bays for the day',
+      attendeeCount: 1,
+    });
+  }
+
+  let bookingsCreated = 0;
+  for (const spec of bookingPlan) {
+    const startsAt = daysFromNow(spec.dayOffset);
+    startsAt.setHours(spec.hour, 0, 0, 0);
+    const endsAt = new Date(startsAt);
+    endsAt.setHours(spec.hour + spec.durationHours, 0, 0, 0);
+
+    // Dedupe on the **purpose**, which is unique per spec, rather than on the booker's
+    // name. A name-based check looks like it works right up until two bookings on
+    // the same facility share a tenant — which they do here by construction,
+    // because `tenants[0]` is used twice — and the second is silently skipped.
+    const already = await prisma.facilityBooking.findFirst({
+      where: { facilityId: spec.facilityId, purpose: spec.purpose },
+      select: { id: true },
+    });
+    if (already) continue;
+
+    const subjectTenant = spec.tenantId
+      ? tenants.find((tenant) => tenant.id === spec.tenantId)
+      : undefined;
+    const subjectContact = spec.contactId
+      ? contacts.find((contact) => contact.id === spec.contactId)
+      : undefined;
+
+    const bookedForName = subjectTenant
+      ? tenantName(subjectTenant)!
+      : subjectContact
+        ? [
+            subjectContact.company,
+            subjectContact.firstName,
+            subjectContact.lastName,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        : 'Prospective tenant — viewing';
+
+    try {
+      await prisma.facilityBooking.create({
+        data: {
+          organizationId,
+          facilityId: spec.facilityId,
+          reference: nextReference(spec.facilityId),
+          ...(spec.bookedByUserId
+            ? { bookedByUserId: spec.bookedByUserId }
+            : {}),
+          ...(spec.tenantId ? { tenantId: spec.tenantId } : {}),
+          ...(spec.contactId ? { contactId: spec.contactId } : {}),
+          bookedForName,
+          bookedForPhone: subjectTenant?.phone ?? subjectContact?.phone ?? null,
+          purpose: spec.purpose,
+          attendeeCount: spec.attendeeCount ?? null,
+          startsAt,
+          endsAt,
+          status: spec.status,
+          ...(spec.decisionNote ? { decisionNote: spec.decisionNote } : {}),
+          ...(spec.status === FacilityBookingStatus.CANCELLED
+            ? {
+                cancelledAt: daysFromNow(Math.max(0, spec.dayOffset - 1)),
+                cancelReason: spec.cancelReason,
+              }
+            : {}),
+          ...(spec.status === FacilityBookingStatus.REJECTED ||
+          spec.status === FacilityBookingStatus.CONFIRMED ||
+          spec.status === FacilityBookingStatus.PENDING
+            ? {
+                decidedAt: daysFromNow(Math.max(0, spec.dayOffset - 2)),
+                decidedByUserId: propertyManager,
+              }
+            : {}),
+        },
+      });
+      bookingsCreated += 1;
+    } catch (error) {
+      // The exclusion constraint is real, so two seeded bookings landing on the same
+      // facility and slot is refused rather than silently double-booked. That is
+      // the module working; log it rather than failing the whole demo seed.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('facility_bookings_no_overlap')) throw error;
+    }
+  }
+
+  // ==========================================================================
+  // The gate log — a person, then their visits.
+  // ==========================================================================
+
+  const visitorPlan: Array<{
+    firstName: string;
+    lastName: string;
+    company?: string;
+    idType?: string;
+    idNumber?: string;
+    phone?: string;
+    barred?: string;
+    contactId?: string | null;
+  }> = [
+    {
+      firstName: 'Grace',
+      lastName: 'Muthoni',
+      company: 'Brightpath Fit-Outs',
+      idType: 'National ID',
+      idNumber: '29458812',
+      phone: '+254722004411',
+      contactId: contacts[0]?.id ?? null,
+    },
+    {
+      firstName: 'Daniel',
+      lastName: 'Otieno',
+      company: 'LiftServe Kenya Ltd',
+      idType: 'Passport',
+      idNumber: 'AK7231190',
+      phone: '+254733009922',
+    },
+    {
+      firstName: 'Beatrice',
+      lastName: 'Wanjiru',
+      company: 'Safaricom Enterprise',
+      idType: 'National ID',
+      idNumber: '31827455',
+      phone: '+254711228833',
+    },
+    {
+      firstName: 'Anthony',
+      lastName: 'Kimani',
+      phone: '+254720554400',
+      idNumber: '29003311',
+    },
+    {
+      firstName: 'Samuel',
+      lastName: 'Mburu',
+      company: 'Plumbing Works',
+      phone: '+254798800112',
+      // Barred, with a reason — the refusal at the gate is then reachable by
+      // simply trying to log this person in.
+      barred:
+        'Caught on CCTV taking other residents’ mail from the lobby postbox on two occasions. Do not admit; contact the property manager.',
+    },
+  ];
+
+  let visitorsCreated = 0;
+  const visitorIds: string[] = [];
+
+  for (const spec of visitorPlan) {
+    const existing = await prisma.visitor.findFirst({
+      where: {
+        organizationId,
+        firstName: spec.firstName,
+        lastName: spec.lastName,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      visitorIds.push(existing.id);
+      continue;
+    }
+
+    const visitor = await prisma.visitor.create({
+      data: {
+        organizationId,
+        firstName: spec.firstName,
+        lastName: spec.lastName,
+        company: spec.company ?? null,
+        phone: spec.phone ?? null,
+        idType: spec.idType ?? null,
+        idNumber: spec.idNumber ?? null,
+        ...(spec.contactId ? { contactId: spec.contactId } : {}),
+        ...(spec.barred
+          ? {
+              isBlacklisted: true,
+              blacklistedAt: daysFromNow(-20),
+              blacklistReason: spec.barred,
+            }
+          : {}),
+      },
+      select: { id: true },
+    });
+
+    visitorIds.push(visitor.id);
+    visitorsCreated += 1;
+  }
+
+  // One visit per derived state, so the gate screen shows all of them at once.
+  const visitPlan: Array<{
+    visitorIndex: number;
+    hostName: string;
+    purpose: string;
+    /** Days from now for the arrival. Negative means it has already happened. */
+    dayOffset: number;
+    expectedOutOffsetHours?: number;
+    /** `now` = checked in and still on site. `past` = already left. */
+    check: 'now' | 'past' | 'none';
+    /** Overstay only applies to `now`. */
+    overdueByHours?: number;
+  }> = [
+    {
+      visitorIndex: 0,
+      hostName: tenantName(tenants[0]) ?? 'Resident',
+      purpose: 'Measuring the kitchen units before the fit-out',
+      dayOffset: 0,
+      check: 'now',
+      overdueByHours: 2,
+    },
+    {
+      visitorIndex: 1,
+      hostName: 'Maintenance office',
+      purpose: 'Quarterly lift safety inspection',
+      dayOffset: 0,
+      expectedOutOffsetHours: 5,
+      check: 'now',
+    },
+    {
+      visitorIndex: 2,
+      hostName: tenantName(tenants[1]) ?? 'Resident',
+      purpose: 'Network installation for the home office',
+      dayOffset: 0,
+      expectedOutOffsetHours: 8,
+      check: 'past',
+    },
+    {
+      visitorIndex: 3,
+      hostName: tenantName(tenants[0]) ?? 'Resident',
+      purpose: 'Friend of the family, staying the weekend',
+      dayOffset: 2,
+      check: 'none',
+    },
+    {
+      visitorIndex: 0,
+      hostName: 'Maintenance office',
+      purpose: 'Follow-up on the flashing above the laundry door',
+      dayOffset: -3,
+      check: 'past',
+    },
+    {
+      visitorIndex: 3,
+      hostName: 'Leasing office',
+      purpose: 'Second viewing — booked but never arrived',
+      dayOffset: -6,
+      check: 'none',
+    },
+  ];
+
+  let visitsCreated = 0;
+
+  for (const spec of visitPlan) {
+    const visitorId = visitorIds[spec.visitorIndex];
+    if (!visitorId) continue;
+
+    const expectedAt = daysFromNow(spec.dayOffset);
+    expectedAt.setHours(9, 0, 0, 0);
+    const expectedOutAt =
+      spec.expectedOutOffsetHours != null
+        ? new Date(expectedAt.getTime() + spec.expectedOutOffsetHours * 3600000)
+        : new Date(expectedAt.getTime() + 4 * 3600000);
+
+    const already = await prisma.visitorVisit.findFirst({
+      where: { visitorId, purpose: spec.purpose },
+      select: { id: true },
+    });
+    if (already) continue;
+
+    let checkedInAt: Date | null = null;
+    let checkedOutAt: Date | null = null;
+    let effectiveOut = expectedOutAt;
+
+    if (spec.check === 'now') {
+      checkedInAt =
+        spec.overdueByHours != null
+          ? new Date(Date.now() - spec.overdueByHours * 3600000)
+          : new Date();
+      if (spec.overdueByHours != null) {
+        // Arrived before they were due to leave, which is what makes this one
+        // OVERSTAY rather than ON_SITE.
+        effectiveOut = new Date(checkedInAt.getTime() + 30 * 60000);
+      }
+    } else if (spec.check === 'past') {
+      checkedInAt = expectedAt;
+      checkedOutAt = new Date(expectedAt.getTime() + 3 * 3600000);
+    }
+
+    await prisma.visitorVisit.create({
+      data: {
+        organizationId,
+        visitorId,
+        propertyId: properties[0].id,
+        hostName: spec.hostName,
+        purpose: spec.purpose,
+        expectedAt,
+        expectedOutAt: effectiveOut,
+        checkedInAt,
+        checkedOutAt,
+        ...(spec.check === 'none' && spec.dayOffset > 0 && technician
+          ? { preApprovedByUserId: technician }
+          : {}),
+      },
+    });
+    visitsCreated += 1;
+  }
+
+  // ==========================================================================
+  // Access cards — all five statuses, and the lost→replaced chain.
+  // ==========================================================================
+
+  const cardPlan: Array<{
+    /** Stable identity for linking, **not** an array index. */
+    key: string;
+    type: AccessCardType;
+
+    status: AccessCardStatus;
+    holder: AccessCardHolder;
+    holderName: string;
+    tenantId?: string | null;
+    userId?: string | null;
+    contactId?: string | null;
+    visitorId?: string | null;
+
+    propertyIndex?: number;
+    unitIndex?: number;
+    facilityName?: string;
+    issuedDaysAgo: number;
+    expiresInDays?: number | null;
+    notes?: string;
+    revokedReason?: string;
+    /** `key` of the card that replaced this one. */
+    replacedByKey?: string;
+  }> = [
+    {
+      key: 'staff-master',
+      type: AccessCardType.BUILDING,
+
+      status: AccessCardStatus.ACTIVE,
+      holder: AccessCardHolder.STAFF,
+      holderName: 'Office administrator',
+      userId: admin,
+      issuedDaysAgo: 400,
+      expiresInDays: null,
+      notes: 'Master card. Keeps a spare in the safe.',
+    },
+    {
+      key: 'resident-a-unit',
+      type: AccessCardType.UNIT,
+      status: AccessCardStatus.ACTIVE,
+      holder: AccessCardHolder.TENANT,
+      holderName: tenantName(tenants[0]) ?? 'Resident',
+      tenantId: tenants[0]?.id ?? null,
+      issuedDaysAgo: 300,
+      expiresInDays: null,
+    },
+    {
+      key: 'resident-b-parking',
+      type: AccessCardType.PARKING,
+      status: AccessCardStatus.ACTIVE,
+      holder: AccessCardHolder.TENANT,
+      holderName: tenantName(tenants[1]) ?? tenants[0]?.surname ?? 'Resident',
+      tenantId: tenants[1]?.id ?? tenants[0]?.id ?? null,
+      issuedDaysAgo: 280,
+      // Inside the 30-day warning window, so the renewal nudge is demonstrable.
+      expiresInDays: 21,
+    },
+    {
+      key: 'gym-cupboard',
+      type: AccessCardType.FACILITY,
+      status: AccessCardStatus.ACTIVE,
+      holder: AccessCardHolder.STAFF,
+      holderName: 'Maintenance manager',
+      userId: maintenanceManager,
+      facilityName: 'Rooftop Gym',
+      issuedDaysAgo: 90,
+      expiresInDays: null,
+      notes: 'Opens the gym store cupboard as well as the gym.',
+    },
+    {
+      key: 'lapsed-contractor',
+      type: AccessCardType.GATE,
+      status: AccessCardStatus.ACTIVE,
+      holder: AccessCardHolder.VISITOR,
+      holderName: visitorIds[0] ? 'Grace Muthoni' : 'Visitor',
+      visitorId: visitorIds[0] ?? null,
+      issuedDaysAgo: 120,
+      // **Negative**, which is the point of this row. The column says ACTIVE and
+      // the date has passed, so the card *behaves* as expired while nobody has
+      // flipped anything. That is `effectiveStatus` doing its job, and it is the
+      // case that cannot be demonstrated by seeding `EXPIRED` — which is exactly the
+      // state nobody would want to have to set by hand in the first place.
+      expiresInDays: -9,
+      notes:
+        'Contractor pass that lapsed. Nobody was at a reader on the expiry date.',
+    },
+    {
+      key: 'lift-engineer',
+      type: AccessCardType.GATE,
+      status: AccessCardStatus.SUSPENDED,
+
+      holder: AccessCardHolder.VISITOR,
+      holderName: visitorIds[1] ? 'Daniel Otieno' : 'Visitor',
+      visitorId: visitorIds[1] ?? null,
+      issuedDaysAgo: 60,
+      expiresInDays: 90,
+      notes: 'Suspended while the lift service is invoiced.',
+    },
+    {
+      key: 'lost-resident-card',
+      type: AccessCardType.UNIT,
+      status: AccessCardStatus.LOST,
+      holder: AccessCardHolder.TENANT,
+      holderName: tenantName(tenants[2] ?? tenants[0]) ?? 'Resident',
+      tenantId: tenants[2]?.id ?? tenants[0]?.id ?? null,
+      issuedDaysAgo: 200,
+      expiresInDays: 365,
+      notes: 'Lost on a school trip. Terminal — the replacement is a new card.',
+      replacedByKey: 'resident-c-replacement',
+    },
+    {
+      key: 'resident-c-replacement',
+      type: AccessCardType.UNIT,
+      status: AccessCardStatus.ACTIVE,
+      holder: AccessCardHolder.TENANT,
+      holderName: tenantName(tenants[2] ?? tenants[0]) ?? 'Resident',
+      tenantId: tenants[2]?.id ?? tenants[0]?.id ?? null,
+      issuedDaysAgo: 12,
+      expiresInDays: 365,
+      notes: 'Replacement for the lost card.',
+    },
+    {
+      key: 'contractor-cupboard',
+      type: AccessCardType.FACILITY,
+      status: AccessCardStatus.REVOKED,
+      holder: AccessCardHolder.CONTACT,
+      holderName: contacts[0]
+        ? [contacts[0].company, contacts[0].firstName, contacts[0].lastName]
+            .filter(Boolean)
+            .join(' ')
+        : 'Contractor',
+      contactId: contacts[0]?.id ?? null,
+      issuedDaysAgo: 150,
+      expiresInDays: 30,
+      notes: 'Fit-out finished; the gym cupboard card is not needed.',
+      revokedReason:
+        'Fit-out contract completed. The contractor no longer needs building access.',
+    },
+  ];
+
+  const cardIdsByKey = new Map<string, string>();
+  let cardsCreated = 0;
+
+  for (const spec of cardPlan) {
+    const cardNumber = `AC-${String(cardIdsByKey.size + 1).padStart(4, '0')}`;
+
+    const already = await prisma.accessCard.findFirst({
+      where: { organizationId, cardNumber },
+      select: { id: true },
+    });
+    if (already) {
+      cardIdsByKey.set(spec.key, already.id);
+      continue;
+    }
+
+    const property = properties[(spec.propertyIndex ?? 0) % properties.length];
+    const unit =
+      spec.type === AccessCardType.UNIT
+        ? await prisma.unit.findFirst({
+            where: { propertyId: property.id },
+            orderBy: { code: 'asc' },
+            select: { id: true },
+          })
+        : null;
+    const facility = spec.facilityName ? byName(spec.facilityName) : undefined;
+
+    const card = await prisma.accessCard.create({
+      data: {
+        organizationId,
+        cardNumber,
+        type: spec.type,
+        status: spec.status,
+        holder: spec.holder,
+        // A facility card's property is derived by the service in real life; the
+        // seed writes it directly so the demo has the same shape.
+        ...(property ? { propertyId: property.id } : {}),
+        ...(unit ? { unitId: unit.id } : {}),
+        ...(facility ? { facilityId: facility.id } : {}),
+        ...(spec.userId ? { userId: spec.userId } : {}),
+        ...(spec.tenantId ? { tenantId: spec.tenantId } : {}),
+        ...(spec.contactId ? { contactId: spec.contactId } : {}),
+        ...(spec.visitorId ? { visitorId: spec.visitorId } : {}),
+        holderName: spec.holderName,
+        issuedAt: daysFromNow(-spec.issuedDaysAgo),
+        expiresAt:
+          spec.expiresInDays == null ? null : daysFromNow(spec.expiresInDays),
+        ...(spec.status === AccessCardStatus.SUSPENDED
+          ? { suspendedAt: daysFromNow(-2) }
+          : {}),
+        ...(spec.status === AccessCardStatus.REVOKED
+          ? {
+              revokedAt: daysFromNow(-5),
+              revokedReason: spec.revokedReason,
+            }
+          : {}),
+        ...(spec.notes ? { notes: spec.notes } : {}),
+      },
+      select: { id: true },
+    });
+
+    cardIdsByKey.set(spec.key, card.id);
+    cardsCreated += 1;
+  }
+
+  // Link each lost card to its replacement, which is the only way back from LOST.
+  //
+  // Keyed rather than by array index on purpose: an earlier version used
+  // `replacedByIndex: 6` and silently produced a card that pointed at *itself* the
+  // moment one more row was inserted above it. A self-referential chain is the kind
+  // of wrong that looks fine in the data and breaks the only question the chain
+  // exists to answer — "how many times has this resident lost their fob".
+  for (const spec of cardPlan) {
+    if (!spec.replacedByKey) continue;
+    const lostId = cardIdsByKey.get(spec.key);
+    const replacementId = cardIdsByKey.get(spec.replacedByKey);
+    if (!lostId || !replacementId) {
+      throw new Error(
+        `Demo data: card "${spec.key}" says it was replaced by "${spec.replacedByKey}", which is not in the plan. A dangling key would seed a lost card with no way back to it.`,
+      );
+    }
+    if (lostId === replacementId) {
+      throw new Error(
+        `Demo data: card "${spec.key}" is recorded as replaced by itself.`,
+      );
+    }
+    await prisma.accessCard.update({
+      where: { id: lostId },
+      data: { replacementCardId: replacementId },
+    });
+  }
+
+  console.log(
+    `  Facilities: ${createdFacilities.length} facilities, ${bookingsCreated} bookings, ${visitorsCreated} visitors, ${visitsCreated} visits, ${cardsCreated} access cards`,
   );
 }

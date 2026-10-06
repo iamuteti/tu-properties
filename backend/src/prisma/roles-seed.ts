@@ -78,6 +78,25 @@ export const PERMISSION_MODULES = [
   'leave_policies',
   'holidays',
   'payroll',
+  // Module 13 — Facilities. Five modules rather than one, because a clubhouse
+  // diary and a gate log are not the same subject and should never share a
+  // permission:
+  //   `facilities.view`/`create`/`update`/`delete`  the register and the diary
+  //   `facility_bookings.view`/`.create`/`.decide`  the slots. `.decide` is
+  //     separate from `.update` for the same reason `payroll.approve` is: whoever
+  //     books on a resident's behalf must not be the person who signs it off, and
+  //     the row-level "nobody approves their own booking" rule cannot help when
+  //     the two are the same account.
+  //   `facility_blackouts.update`  closing a facility, which is a maintenance act.
+  //   `visitors.view`/`.create`/`.update`  the gate log. Restricted to the roles
+  //     whose job is being at the gate — see `FACILITIES_DOOR_ROLES`.
+  //   `access_cards.view`/`.create`/`.update`  who can get in. The most sensitive
+  //     grant in this file.
+  'facilities',
+  'facility_bookings',
+  'facility_blackouts',
+  'visitors',
+  'access_cards',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -110,6 +129,17 @@ export interface ModulePermissions {
    * in which an employee can name somebody else.
    */
   self?: boolean;
+  /**
+   * Module 13. Approve, decline and cancel a booking.
+   *
+   * Separate from `update` for the same reason `approve` is separate from the
+   * payroll's CRUD actions: a leasing officer books the clubhouse to show a
+   * prospect, and must not be the person who then authorises it. Splitting the
+   * permission keeps the account that *writes* a request out of the account that
+   * *grants* it, which the per-row "nobody approves their own booking" rule alone
+   * cannot do when both are the same login.
+   */
+  decide?: boolean;
 }
 
 export interface PermissionSet {
@@ -145,6 +175,23 @@ const payrollFull = (): ModulePermissions => ({
   delete: true,
   approve: true,
   pay: true,
+});
+
+/**
+ * Module 13's bookings, which need `.decide` on top of the four CRUD actions.
+ *
+ * Same reasoning as `payrollFull`, and the same refusal to generalise: giving every
+ * module a `decide` key would hand an action that means nothing to seventeen
+ * modules, and a permission nobody has thought about is a permission nobody
+ * reviews. `.update` stays granted to whoever may edit a booking's descriptive
+ * fields, while `.decide` is what actually moves it between states.
+ */
+const facilityBookingFull = (): ModulePermissions => ({
+  view: true,
+  create: true,
+  update: true,
+  delete: true,
+  decide: true,
 });
 
 function set(
@@ -234,6 +281,14 @@ export const SYSTEM_ROLES: {
       leave_policies: full(),
       holidays: full(),
       payroll: payrollFull(),
+      // Module 13: full facilities, including the gate. An administrator who
+      // cannot revoke a resident's card would have to ask somebody else to do the
+      // job they are accountable for, which is how the card outlives the tenancy.
+      facilities: full(),
+      facility_bookings: facilityBookingFull(),
+      facility_blackouts: full(),
+      visitors: full(),
+      access_cards: full(),
     }),
   },
   {
@@ -285,6 +340,16 @@ export const SYSTEM_ROLES: {
       leave_requests: viewWrite(),
       leave_policies: view(),
       holidays: view(),
+      // Module 13: a property manager runs the buildings, so they own the clubhouse
+      // diary and the gate. They book *and* decide, which is safe here because the
+      // booking lifecycle still refuses to let one person approve a booking they
+      // raised themselves — the row-level rule, not the permission, is what stops
+      // that.
+      facilities: full(),
+      facility_bookings: facilityBookingFull(),
+      facility_blackouts: full(),
+      visitors: full(),
+      access_cards: full(),
     }),
   },
   {
@@ -331,8 +396,17 @@ export const SYSTEM_ROLES: {
       employees: view(),
       leave_requests: viewWrite(),
       holidays: view(),
+      // Module 13: a leasing officer shows prospects around, so they may book — and
+      // may *not* decide, because the person who promised a prospect the clubhouse
+      // must not be the person who authorises it. That separation is the whole
+      // reason `facility_bookings.decide` is its own key. No visitor log and no
+      // access cards: neither is theirs to read.
+      facilities: view(),
+      facility_bookings: { view: true, create: true },
+      facility_blackouts: view(),
     }),
   },
+
   {
     name: 'Sales Agent',
     description:
@@ -397,6 +471,13 @@ export const SYSTEM_ROLES: {
       leave_requests: view(),
       holidays: view(),
       payroll: payrollFull(),
+      // Module 13: read-only, and only the diary. A booking fee is money this
+      // organization will eventually charge, so the accountant must be able to see
+      // what was charged — but the *visitor log* and the *access cards* are a
+      // privacy question, not a finance one, and neither belongs here.
+      facilities: view(),
+      facility_bookings: view(),
+      facility_blackouts: view(),
     }),
   },
   {
@@ -428,10 +509,22 @@ export const SYSTEM_ROLES: {
       // Module 12: runs the technicians, so they approve their leave. No
       // compensation.
       employees: view(),
-      leave_requests: full(),
+      leave_requests: viewWrite(),
       holidays: view(),
+      // Module 13: a maintenance manager closes the clubhouse for repairs and
+      // approves who uses it, so they book *and* decide. The gate is theirs too —
+      // they are as likely as anybody to be the one holding a visitor's pass at the
+      // barrier — but **not** the access cards: issuing and revoking a fob is a
+      // property decision, and the person who maintains the plant should not be the
+      // person who hands out keys to it.
+      facilities: viewWrite(),
+      facility_bookings: facilityBookingFull(),
+      facility_blackouts: full(),
+      visitors: full(),
+      access_cards: view(),
     }),
   },
+
   {
     name: 'Technician',
     description: 'Field technician — read access to properties and units.',
@@ -454,6 +547,17 @@ export const SYSTEM_ROLES: {
       employees: view(),
       leave_requests: viewWrite(),
       holidays: view(),
+      // Module 13: a technician needs one thing from this module and no more —
+      // they need to know whether the person who called about the boiler is
+      // expected at the gate, which is `visitors.view` and deliberately nothing
+      // else. They do **not** book facilities: a maintenance manager books the
+      // clubhouse for a building meeting, and widening it to every technician is
+      // the kind of drift that happens one role at a time until nobody can say who
+      // may book a room. And no cards — a technician should not be able to answer
+      // "does the caretaker have a key?" by granting one.
+      facilities: view(),
+      facility_bookings: view(),
+      visitors: view(),
     }),
   },
   {

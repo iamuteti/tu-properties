@@ -1218,3 +1218,126 @@ export const PAYROLL_WARNING_LABELS: Record<string, string> = {
     BASE_BELOW_FLOOR: 'The base is below a statutory minimum contributory wage.',
     MISSING_PERIODS: 'Periods per year is wrong, so an annualised rule fell back to 12.',
 };
+
+// =============================================================
+// Module 13 — Facilities
+// =============================================================
+
+export const FACILITY_KINDS: Array<{ value: string; label: string }> = [
+    { value: 'CLUBHOUSE', label: 'Clubhouse' },
+    { value: 'MEETING_ROOM', label: 'Meeting room' },
+    { value: 'PARKING', label: 'Parking' },
+    { value: 'GYM', label: 'Gym' },
+    { value: 'POOL', label: 'Swimming pool' },
+    { value: 'TENNIS_COURT', label: 'Tennis court' },
+    { value: 'LAUNDRY', label: 'Laundry' },
+    { value: 'RECREATION', label: 'Recreation' },
+    { value: 'OTHER', label: 'Other' },
+];
+
+/**
+ * Booking-grid sizes.
+ *
+ * A list rather than "any positive integer" because this is the unit the diary is
+ * drawn in: a facility with a 7-minute grid produces a diary nobody can read and a
+ * booking form with 300 options. The backend constrains it to the same range.
+ */
+export const FACILITY_SLOT_MINUTES: Array<{ value: number; label: string; hint: string }> = [
+    { value: 15, label: '15 minutes', hint: 'Short slots — a treatment room or a court' },
+    { value: 30, label: '30 minutes', hint: 'Consulting or a single desk' },
+    { value: 60, label: '1 hour', hint: 'Meeting rooms and desks' },
+    { value: 120, label: '2 hours', hint: 'Clubhouses and pools' },
+];
+
+export const FACILITY_BOOKING_STATUSES: Array<{ value: string; label: string }> = [
+    { value: 'PENDING', label: 'Awaiting approval' },
+    { value: 'CONFIRMED', label: 'Confirmed' },
+    { value: 'CANCELLED', label: 'Cancelled' },
+    { value: 'REJECTED', label: 'Declined' },
+    { value: 'NO_SHOW', label: 'Did not turn up' },
+];
+
+/**
+ * Column headers for `?status=`. The value is `ALL` rather than an empty string
+ * because an empty `<Select>` option and "no filter" are different meanings and the
+ * second one is what the query string wants.
+ */
+export const FACILITY_STATUS_FILTERS: Array<{ value: string; label: string }> = [
+    { value: 'ALL', label: 'All states' },
+    { value: 'UPCOMING', label: 'Upcoming' },
+    { value: 'PAST', label: 'Past' },
+    { value: 'TODAY', label: 'Today' },
+];
+
+export const FACILITY_BOOKING_FILTERS: Array<{ value: string; label: string }> = [
+    { value: 'ALL', label: 'All states' },
+    { value: 'PENDING', label: 'Awaiting approval' },
+    { value: 'CONFIRMED', label: 'Confirmed' },
+    { value: 'CANCELLED', label: 'Cancelled' },
+    { value: 'REJECTED', label: 'Declined' },
+    { value: 'NO_SHOW', label: 'Did not turn up' },
+];
+
+export const ACCESS_CARD_TYPES: Array<{ value: string; label: string }> = [
+    { value: 'BUILDING', label: 'Building — every door' },
+    { value: 'UNIT', label: 'Unit — this door and the building' },
+    { value: 'PARKING', label: 'Parking' },
+    { value: 'FACILITY', label: 'Facility — gym, store, clubhouse' },
+    { value: 'GATE', label: 'Gate permit' },
+];
+
+export const ACCESS_CARD_STATUSES: Array<{ value: string; label: string }> = [
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'SUSPENDED', label: 'Suspended' },
+    { value: 'LOST', label: 'Reported lost' },
+    { value: 'EXPIRED', label: 'Expired' },
+    { value: 'REVOKED', label: 'Revoked' },
+];
+
+/**
+ * **Derived** filters for the gate log — every one is a comparison between two
+ * timestamps and the current time, which is why there is no column behind them.
+ */
+export const VISIT_STATE_FILTERS: Array<{ value: string; label: string }> = [
+    { value: 'ALL', label: 'Everything' },
+    { value: 'onsite', label: 'On site now' },
+    { value: 'expected', label: 'Expected, not yet arrived' },
+    { value: 'overdue', label: 'Overstayed' },
+    { value: 'history', label: 'History' },
+];
+
+/**
+ * Module 13 badge styles.
+ *
+ * Deliberately **not** added to `STATUS_STYLES` in `entity-states.tsx`: that record
+ * is keyed on a bare status string shared across every module, and both
+ * `FacilityBookingStatus` and `AccessCardStatus` contain `ACTIVE`, `PENDING` and
+ * `EXPIRED` with entirely different meanings. A card that is `EXPIRED` and a booking
+ * that is `EXPIRED` — well, one has no such state — would otherwise borrow each
+ * other's colours from a lookup table that cannot tell which resource it is
+ * rendering. Each list therefore maps its own status.
+ */
+export const FACILITY_BOOKING_STATUS_STYLES: Record<string, string> = {
+    PENDING: 'bg-amber-100 text-amber-800',
+    CONFIRMED: 'bg-emerald-100 text-emerald-700',
+    CANCELLED: 'bg-slate-100 text-slate-500',
+    REJECTED: 'bg-red-100 text-red-700',
+    NO_SHOW: 'bg-orange-100 text-orange-800',
+};
+
+export const ACCESS_CARD_STATUS_STYLES: Record<string, string> = {
+    ACTIVE: 'bg-emerald-100 text-emerald-700',
+    SUSPENDED: 'bg-amber-100 text-amber-800',
+    LOST: 'bg-orange-100 text-orange-800',
+    EXPIRED: 'bg-slate-100 text-slate-500',
+    REVOKED: 'bg-red-100 text-red-700',
+};
+
+/** The gate book. `OVERSTAY` is the one that matters most, so it is the loudest. */
+export const VISIT_STATE_STYLES: Record<string, string> = {
+    EXPECTED: 'bg-sky-100 text-sky-800',
+    ON_SITE: 'bg-emerald-100 text-emerald-700',
+    OVERSTAY: 'bg-red-100 text-red-700',
+    MISSED: 'bg-slate-100 text-slate-500',
+    COMPLETED: 'bg-slate-100 text-slate-500',
+};
