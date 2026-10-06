@@ -3897,3 +3897,157 @@ export interface BillPeriodPayload {
     unitId?: string;
     dueInDays?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Module 15 - Documents & Legal
+// ---------------------------------------------------------------------------
+
+export type ContractType = 'LEASE' | 'SALE' | 'VENDOR' | 'MANAGEMENT' | 'COMPLIANCE';
+
+/**
+ * A contract's derived status.
+ *
+ * **Never a stored field and never a value this app sends.** It is computed on the
+ * server from `expiresAt`, `startDate`, `noticeDays` and whether a successor exists,
+ * which is why there is no way to PATCH it - `UpdateContractPayload` has no field
+ * for it and the server's DTO has none either.
+ */
+export type ContractStatus =
+    | 'PENDING'
+    | 'SUPERSEDED'
+    | 'EXPIRED'
+    | 'NOTICE_DUE'
+    | 'EXPIRING_SOON'
+    | 'ACTIVE'
+    | 'OPEN_ENDED'
+    | 'UNDATED';
+
+/** One link in a contract's renewal chain, newest first. */
+export interface ContractRenewalLink {
+    id: string;
+    reference: string;
+    expiresAt: string | null;
+    isCurrent: boolean;
+}
+
+/** The authoritative signed agreement, via the `documentId` foreign key. */
+export interface ContractDocument {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    version: number;
+}
+
+/**
+ * A contract row.
+ *
+ * `status`, `daysUntilExpiry`, `noticeDueAt` and `reminderBand` are all **derived** and
+ * none of them is a column. `noticeDueAt` is the one worth understanding: it is the
+ * last day notice could be served, which is frequently well before `expiresAt`, and a
+ * contract sitting past it is already committed while still looking active.
+ */
+export interface ContractRow {
+    id: string;
+    organizationId: string;
+    reference: string;
+    title: string;
+    type: ContractType;
+    status: ContractStatus;
+    startDate: string | null;
+    expiresAt: string | null;
+    /** Negative once the date has passed. Null for an open-ended agreement. */
+    daysUntilExpiry: number | null;
+    noticeDays: number | null;
+    /** The last day notice could be served, or null if there is no notice period. */
+    noticeDueAt: string | null;
+    autoRenew: boolean;
+    renewalOfId: string | null;
+    documentId: string | null;
+    notes: string | null;
+    createdByUserId: string | null;
+    createdAt: string;
+    updatedAt: string;
+    /** The one related entity's id, whichever of the four columns carried it. */
+    relatedId: string | null;
+    /** The counterparty's display name, resolved server-side. Null for a certificate. */
+    relatedLabel: string | null;
+    hasDocument: boolean | null;
+    /** The band the nightly sweep would alert on. Null when there is nothing to warn about. */
+    reminderBand: number | null;
+}
+
+export interface ContractDetail extends ContractRow {
+    renewalChain: ContractRenewalLink[];
+    renewalOf: { id: string; reference: string; expiresAt: string | null } | null;
+    renewals: { id: string; reference: string; expiresAt: string | null; title: string }[];
+    document: ContractDocument | null;
+    /** Addenda and riders, through the Document Center's own entity pair. */
+    attachments: ContractDocument[];
+}
+
+/**
+ * Creating a contract.
+ *
+ * Exactly one of the four related ids is required, except for `COMPLIANCE`, which
+ * requires none - a gas safety certificate runs to the authority and has no
+ * counterparty. The server refuses anything else with a sentence naming the field, so
+ * the form's job is to make the rule visible rather than to discover it on submit.
+ */
+export interface ContractPayload {
+    reference: string;
+    title: string;
+    type: ContractType;
+    rentalAgreementId?: string;
+    saleTransactionId?: string;
+    supplierId?: string;
+    landlordId?: string;
+    documentId?: string;
+    startDate?: string;
+    expiresAt?: string;
+    noticeDays?: number;
+    autoRenew?: boolean;
+    notes?: string;
+}
+
+/**
+ * Correcting a contract.
+ *
+ * Note what is **absent** and why: no `type`, no related ids, no `renewalOfId`, no
+ * `status`. `type` is the record's identity - it decides which entity column must be
+ * set, so changing it would re-point a signed document at a different counterparty.
+ * `renewalOfId` belongs to the renew action, or the chain could be forged. A
+ * mis-filed contract is deleted and refiled.
+ */
+export type ContractUpdatePayload = Partial<
+    Pick<
+        ContractPayload,
+        'title' | 'startDate' | 'expiresAt' | 'noticeDays' | 'autoRenew' | 'documentId' | 'notes'
+    >
+>;
+
+/**
+ * Renewing a contract.
+ *
+ * `type` and the counterparty are **inherited** and cannot be supplied - a renewal
+ * that pointed at a different landlord would not be a renewal. The reference is
+ * derived server-side.
+ */
+export interface ContractRenewPayload {
+    expiresAt: string;
+    noticeDays?: number;
+    autoRenew?: boolean;
+    documentId?: string;
+    notes?: string;
+}
+
+export interface ContractExpiryReport {
+    generatedAt: string;
+    withinDays: number;
+    horizon: string;
+    total: number;
+    /** Count per derived status. */
+    byStatus: Partial<Record<ContractStatus, number>>;
+    /** Ordered by urgency rather than by date, deliberately. */
+    needsAttention: ContractRow[];
+}

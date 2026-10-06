@@ -1446,3 +1446,69 @@ export const VISIT_STATE_STYLES: Record<string, string> = {
     MISSED: 'bg-slate-100 text-slate-500',
     COMPLETED: 'bg-slate-100 text-slate-500',
 };
+
+// ---------------------------------------------------------------------------
+// Module 15 - Documents & Legal
+// ---------------------------------------------------------------------------
+
+export const CONTRACT_TYPES = [
+  { value: "LEASE", label: "Lease agreement", hint: "The signed tenancy agreement for a unit." },
+  { value: "SALE", label: "Sale agreement", hint: "The signed agreement for a property sale." },
+  { value: "VENDOR", label: "Supplier agreement", hint: "A supply, service or works contract with a supplier." },
+  { value: "MANAGEMENT", label: "Management agreement", hint: "The agreement to manage a landlord's property." },
+  {
+    value: "COMPLIANCE",
+    label: "Compliance certificate",
+    hint: "Gas, fire, lift or electrical inspection. Has NO counterparty - it is owed to the authority, not to a tenant or a supplier.",
+  },
+];
+
+/**
+ * How each contract type links to a record.
+ *
+ * Rendered in the form because "pick the matching record" is the single most common
+ * thing a user gets wrong, and the server refuses it with a sentence naming the field.
+ * `null` means none is required, which is `COMPLIANCE`'s whole peculiarity.
+ */
+export const CONTRACT_ENTITY_FOR_TYPE: Record<string, {
+  field: 'rentalAgreementId' | 'saleTransactionId' | 'supplierId' | 'landlordId';
+  label: string;
+  picker: 'lease' | 'sale' | 'supplier' | 'landlord';
+} | null> = {
+  LEASE: { field: 'rentalAgreementId', label: 'Lease', picker: 'lease' },
+  SALE: { field: 'saleTransactionId', label: 'Sale', picker: 'sale' },
+  VENDOR: { field: 'supplierId', label: 'Supplier', picker: 'supplier' },
+  MANAGEMENT: { field: 'landlordId', label: 'Landlord', picker: 'landlord' },
+  COMPLIANCE: null,
+};
+
+/**
+ * Plain-English labels for the derived statuses.
+ *
+ * `StatusBadge` would render `NOTICE_DUE` as "Notice_due", which is not a phrase a
+ * person reads. The wording matters more than usual here because the whole point of
+ * these statuses is that a user acts differently on each one.
+ */
+export const CONTRACT_STATUS_LABELS: Record<string, string> = {
+  NOTICE_DUE: 'Notice period passed',
+  EXPIRED: 'Expired',
+  EXPIRING_SOON: 'Expiring soon',
+  PENDING: 'Not started',
+  ACTIVE: 'Active',
+  OPEN_ENDED: 'Open-ended',
+  SUPERSEDED: 'Superseded',
+  UNDATED: 'No dates recorded',
+};
+
+/** What each status means, shown as a hint so the word is not a puzzle. */
+export const CONTRACT_STATUS_HINTS: Record<string, string> = {
+  NOTICE_DUE:
+    'The notice deadline has passed while the contract is still running, so it can no longer be ended or extended. Decide what to do next.',
+  EXPIRED: 'The term has ended. Nothing is required unless it was meant to be renewed.',
+  EXPIRING_SOON: 'Ends within 30 days, and notice can still be served.',
+  PENDING: 'The term has not started yet.',
+  ACTIVE: 'Running, with an end date ahead of it.',
+  OPEN_ENDED: 'Running with no end date. It renews until somebody terminates it.',
+  SUPERSEDED: 'Replaced by a later contract. Kept as the record of what was agreed.',
+  UNDATED: 'No dates recorded. Worth fixing - the register cannot warn about this one.',
+};

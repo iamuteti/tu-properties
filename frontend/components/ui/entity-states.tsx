@@ -107,6 +107,10 @@ const STATUS_STYLES: Record<string, string> = {
     // green (delivered) → near-black (closed), with one amber exception for
     // "part of it arrived", which is the state that most needs to stand out.
     DRAFT: 'bg-slate-100 text-slate-700',
+    // NOTE: `PENDING` is shared deliberately. It is amber here for a purchase order
+    // awaiting approval and it is the right colour for a contract whose term has not
+    // started - both mean "real, but not running yet", and a second identical key would
+    // be a compile error that only exists to be worked around.
     PENDING: 'bg-amber-100 text-amber-800',
     ISSUED: 'bg-amber-100 text-amber-800',
     QUOTES_RECEIVED: 'bg-violet-100 text-violet-700',
@@ -133,6 +137,18 @@ const STATUS_STYLES: Record<string, string> = {
     CALCULATED: 'bg-sky-100 text-sky-800',
     PAID: 'bg-emerald-100 text-emerald-700',
     VOID: 'bg-red-100 text-red-700',
+    // Module 15: contract statuses, which are **derived on read** rather than stored,
+    // so these describe a comparison against the clock rather than a state anybody set.
+    // The ordering here is the urgency ordering, and it is deliberately not a gradient:
+    // NOTICE_DUE is red because a contract past its notice deadline is already
+    // committed and cannot be stopped, which is a different and worse thing than
+    // EXPIRING_SOON at 14 days where there is still time to negotiate.
+    NOTICE_DUE: 'bg-red-100 text-red-700',
+    EXPIRED: 'bg-red-50 text-red-600',
+    EXPIRING_SOON: 'bg-amber-100 text-amber-800',
+    OPEN_ENDED: 'bg-slate-100 text-slate-600',
+    SUPERSEDED: 'bg-slate-200 text-slate-500',
+    UNDATED: 'bg-yellow-50 text-yellow-700',
 };
 
 /** Coloured status pill, shared by property and unit lists/details. */

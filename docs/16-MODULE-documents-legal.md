@@ -10,7 +10,7 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status Hint
-**Backend COMPLETE.** Frontend not started. See "What Is Actually Built" below.
+**COMPLETE** - backend, demo seed and frontend. See "What Is Actually Built" below.
 
 ## Module Goal
 Track contracts and legal compliance documents with expiry/renewal visibility.
@@ -269,13 +269,24 @@ visible without editing data.
 - [x] Demo seed covering every derived status
 - [x] Service spec + routing spec
 - [x] Live verification (78 assertions)
-- [ ] **Frontend: contracts list with derived status and quick access to the document**
-- [ ] **Frontend: expiry report screen**
-- [ ] **Frontend: contract detail with the renewal chain and attachments**
+- [x] Frontend: contracts list with derived status and the notice deadline
+- [x] Frontend: expiry report screen
+- [x] Frontend: contract detail with the renewal chain and attachments
+- [x] Frontend: file-a-contract form, with the shape rule visible before submit
 
-## Frontend Notes (not started)
+## Frontend Notes
 
-Three screens under `frontend/app/(dashboard)/contracts/`:
+Four routes under `frontend/app/(dashboard)/contracts/`, plus `_components.tsx` for the
+shared status pill and expiry cell.
+
+Built as described below. `StatusBadge` could **not** be reused for the status pill
+because it derives its label from the raw string, which renders `NOTICE_DUE` as
+"Notice_due" - and on this screen the word *is* the message, since the statuses exist so
+that a user acts differently on each one. `_components.tsx` carries the wording, the
+hint and the colour; the colour keys were added to the shared `STATUS_STYLES` map so a
+contract and a purchase order that both mean "expired" look the same.
+
+The three screens:
 
 - `page.tsx` - the register. Filters map to the columns (`type`, date window,
   `relatedId`, `hasDocument`); the status is a **display** value, never a filter, per
@@ -293,3 +304,24 @@ grants, before `/users`.
 - Depends on: Core Platform (Document Center), Leases (`RentalAgreement.endDate` and
   `.noticePeriodDays` are read, not copied), Sales, Procurement, Landlords
 - Feeds: Notifications
+### Frontend verification
+
+`next build` compiles and all four routes appear in the build output:
+
+```
+├ ○ /contracts
+├ ƒ /contracts/[id]
+├ ○ /contracts/expiry-report
+├ ○ /contracts/new
+```
+
+`tsc --noEmit` is clean, and 11 live assertions against the running Next server confirm
+each route is served without a server error and is distinguishable from a bogus path.
+
+**What is not verified:** the pages rendering *populated* content in a browser. The
+dashboard guard is a client-side `router.push('/auth/login')` inside `useAuth()`, not
+Next middleware, so a server fetch always receives 200 with the app shell and never
+observes the redirect - which means a fetch-based harness cannot prove either the
+redirect or the rendered table. That needs a headless browser. The *data path* the
+pages call is covered by the backend's 78 live assertions, so what is untested is the
+render of data already known to be correct, not the data itself.

@@ -64,6 +64,9 @@ Receipt,
     // Module 14 — Utilities. `Gauge` for the register (it is what a meter is), and
     // `Receipt` for the billing ledger, which is a document rather than a measurement.
     Gauge,
+    // Module 15 - Documents & Legal.
+    FileSignature,
+    PlusCircle,
 } from "lucide-react";
 
 type UserRole =
@@ -285,6 +288,30 @@ const navItems: NavItem[] = [
             { href: '/utilities/readings', label: 'Readings', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
             { href: '/utilities/tariffs', label: 'Tariffs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
             { href: '/utilities/billing', label: 'Billing', icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
+        ],
+    },
+    {
+        // Module 15 - Documents & Legal. `FileSignature` for the register and
+        // `CalendarClock` for the expiry report, because the report is a *calendar*
+        // problem - what ends, and when somebody has to decide - rather than another
+        // table of the same rows.
+        //
+        // Roles mirror `legal-roles.ts` exactly, and the asymmetry is the design:
+        // a lease officer and an accountant can both **read** the register, but
+        // Tariffs-style restriction means neither can file or renew anything. The
+        // renewal screen is hidden from the accountant even though the API lets them
+        // renew, because renewing is done from the contract's own detail page rather
+        // than from this list.
+        href: '/contracts',
+        label: 'Contracts',
+        icon: FileSignature,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'],
+        children: [
+            { href: '/contracts', label: 'Contract register', icon: FileSignature, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
+            { href: '/contracts/expiry-report', label: 'Expiry report', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
+            // Filing is narrower than reading: an accountant may read every obligation
+            // but may not manufacture one, and the Form button is hidden to match.
+            { href: '/contracts/new', label: 'File a contract', icon: PlusCircle, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER'] },
         ],
     },
     { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },

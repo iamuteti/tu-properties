@@ -15,6 +15,13 @@ import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, P
     MeterScope,
     ApportionmentMethod,
     MeterReadingSource,
+    ContractRow,
+    ContractDetail,
+    ContractExpiryReport,
+    ContractPayload,
+    ContractUpdatePayload,
+    ContractRenewPayload,
+    ContractType,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
@@ -3458,4 +3465,60 @@ export const utilityChargesApi = {
      */
     voidCharge: (id: string, reason: string) =>
         api.post<UtilityChargeRow>(`/utilities/charges/${id}/void`, { reason }),
+};
+
+/**
+ * Module 15 - the contract register.
+ *
+ * Two list endpoints rather than one with a mode flag, because they answer genuinely
+ * different questions and filter differently:
+ *
+ * - `contracts` filters on the **columns** - type, a date window, a counterparty,
+ *   whether a scan is attached. Deliberately *not* on status: a status is derived from
+ *   those very columns, so filtering on it would either need a stored value that can
+ *   contradict the dates or a second implementation of the rules.
+ * - `expiryReport` is where the derived statuses are **reported**, over a bounded
+ *   forward window and ordered by urgency rather than by date.
+ *
+ * `renew` is a named action rather than a flag, and creates a new contract: the old
+ * one's end date is evidence, so it is never overwritten.
+ */
+export const contractsApi = {
+    contracts: (params?: {
+        type?: ContractType;
+        expiresFrom?: string;
+        expiresTo?: string;
+        relatedId?: string;
+        hasDocument?: boolean;
+        search?: string;
+    }) => api.get<ContractRow[]>('/contracts', { params }),
+
+    contract: (id: string) => api.get<ContractDetail>(`/contracts/${id}`),
+
+    expiryReport: (params?: { withinDays?: number; type?: ContractType }) =>
+        api.get<ContractExpiryReport>('/contracts/expiry-report', { params }),
+
+    createContract: (data: ContractPayload) => api.post<ContractRow>('/contracts', data),
+
+    updateContract: (id: string, data: ContractUpdatePayload) =>
+        api.patch<ContractRow>(`/contracts/${id}`, data),
+
+    /**
+     * Replace an expiring contract with a new term.
+     *
+     * Type and counterparty are inherited by the server, so the payload has no field
+     * for either. A renewal naming a different landlord is not a renewal.
+     */
+    renewContract: (id: string, data: ContractRenewPayload) =>
+        api.post<ContractRow>(`/contracts/${id}/renew`, data),
+
+    /**
+     * Remove a contract that was **entered in error**.
+     *
+     * Not "the contract has lapsed" - a lapse is recorded by letting the term end,
+     * which keeps the counterparty and the dates as evidence. The server refuses this
+     * on a contract that has been renewed, and says so.
+     */
+    deleteContract: (id: string) =>
+        api.delete<{ deleted: boolean; reference: string }>(`/contracts/${id}`),
 };
