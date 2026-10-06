@@ -130,6 +130,14 @@ export const PERMISSION_MODULES = [
   // means "this row was entered in error" - a real lapse is recorded by letting the
   // contract expire, not by removing the evidence that it ever existed.
   'contracts',
+  // Module 16 - Reports. One module for every report, on purpose: a reader who may see
+  // the revenue may see the occupancy that produced it. Splitting `reports` into
+  // `reports.occupancy` and `reports.financial` would make a role with the first and
+  // not the second possible, and there is no coherent version of that - an occupancy
+  // figure with no revenue beside it is not more confidential, just less useful.
+  // No bespoke actions either: a report is derived from rows that already exist, so
+  // view is the whole of it.
+  'reports',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -404,6 +412,9 @@ export const SYSTEM_ROLES: {
       // role that has to be able to correct a contract someone else filed in error,
       // and to serve notice on the last day it can be served.
       contracts: contractFull(),
+      // Module 16: reports. An administrator and a property manager are who a report
+      // is for; both already see the whole organization's finances.
+      reports: view(),
     }),
   },
   {
@@ -480,6 +491,9 @@ export const SYSTEM_ROLES: {
       // what the notice period is. `.renew` included because extending the estate's
       // terms is their decision and nobody else's.
       contracts: contractFull(),
+      // Module 16: reports. An administrator and a property manager are who a report
+      // is for; both already see the whole organization's finances.
+      reports: view(),
     }),
   },
   {
@@ -550,6 +564,11 @@ export const SYSTEM_ROLES: {
       // a flat they cannot re-let off the market, under a lease they negotiated. No
       // `.create` either: filing a contract is an obligation, not a lead.
       contracts: view(),
+      // Module 16: **nothing, deliberately.** See `reports-roles.ts`.
+      // A leasing officer, a sales agent and a technician can each get the
+      // figure they need from the screens they already have, and what they must
+      // not have is revenue beside it. A number to negotiate against is the
+      // exclusion that matters.
     }),
   },
 
@@ -576,6 +595,11 @@ export const SYSTEM_ROLES: {
       // a real one. They may not file a `SALE` contract: the sale is `crm_leads` and
       // `sales` work, and turning a signed contract into a row is what closes it.
       contracts: view(),
+      // Module 16: **nothing, deliberately.** See `reports-roles.ts`.
+      // A leasing officer, a sales agent and a technician can each get the
+      // figure they need from the screens they already have, and what they must
+      // not have is revenue beside it. A number to negotiate against is the
+      // exclusion that matters.
     }),
   },
   {
@@ -615,6 +639,8 @@ export const SYSTEM_ROLES: {
       // not file the original obligation. They also get no `.delete`, because a
       // contract they can reverse is a contract they can make disappear.
       contracts: { view: true, renew: true },
+      // Module 16: the accountant owns the P&L, so the financial report is theirs.
+      reports: view(),
       // Module 7: chart of accounts, journal entries and trial balance.
       accounting: full(),
       credits: full(),
@@ -716,6 +742,9 @@ export const SYSTEM_ROLES: {
       // the same key would also let them file a supplier contract, which is why the
       // service re-checks the type against `canFileComplianceCertificate`.
       contracts: { view: true, create: true, update: true },
+      // Module 16: **nothing.** Cost *per property* across an estate they do not
+      // manage is a budget conversation, and their own throughput is on the
+      // work-order queue they already use.
     }),
   },
 
@@ -771,6 +800,11 @@ utility_meters: view(),
       // it stops there: they perform the inspection that produces a certificate, but
       // the certificate is the maintenance manager's to hold, not theirs to file.
       contracts: view(),
+      // Module 16: **nothing, deliberately.** See `reports-roles.ts`.
+      // A leasing officer, a sales agent and a technician can each get the
+      // figure they need from the screens they already have, and what they must
+      // not have is revenue beside it. A number to negotiate against is the
+      // exclusion that matters.
     }),
   },
   {
@@ -850,6 +884,9 @@ utility_meters: view(),
       // did not negotiate it. `.delete` is withheld: the officer who negotiated a
       // supplier must not be able to erase the record of what they agreed.
       contracts: { view: true, create: true, update: true, renew: true },
+      // Module 16: **nothing.** Supplier spend across the estate is Finance's
+      // picture; procurement has its own module for its own figures.
+
       // Module 12: sees who exists (a purchase request may name a
       // requester) but nothing else.
       employees: view(),

@@ -42,6 +42,7 @@ import { HrModule } from './modules/hr/hr.module';
 import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { UtilitiesModule } from './modules/utilities/utilities.module';
 import { LegalModule } from './modules/legal/legal.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -92,6 +93,7 @@ import { SecurityModule } from './security/security.module';
     // consumption invoices go through `InvoicesService`, never a direct insert.
     UtilitiesModule,
   LegalModule,
+  ReportsModule,
   ],
   controllers: [AppController],
   providers: [
