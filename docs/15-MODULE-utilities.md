@@ -10,7 +10,7 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status
-**Backend COMPLETE 2026-10-06 — 59 live assertions passing, 1116 tests / 56 suites. No demo data, no frontend yet.**
+**COMPLETE 2026-10-06** — backend, demo seed and frontend. 1156 tests / 57 suites, 59 live assertions, `tsc` clean both apps, `eslint` clean on every new file, `next build` clean, `migrate diff --from-migrations` no difference.
 
 ## Module Goal
 Track utility meters and generate consumption-based billing.
@@ -52,8 +52,8 @@ The doc's sketch has no table for a **rate**, yet the acceptance criterion is "r
 - [x] Build reading entry (manual for v1) — with rollover, estimation provenance, correction-not-duplication
 - [x] Build consumption-based invoice generation (reading delta × rate), feeding Finance's `Invoice` model **through `InvoicesService`**
 - [x] RBAC: `utilities-roles.ts` + four permission modules + `bill`/`void` actions, verified against the seeded roles in SQL
-- [ ] Demo seed producing every reachable state
-- [ ] Frontend: meters, readings, tariffs, billing runs
+- [x] Demo seed producing every reachable state — 108 meters (100 bulk), 323 readings, 5 tariffs
+- [x] Frontend: meter register, meter detail with the reading ledger, readings (list + entry), tariffs, billing
 
 ## Schema as built
 
@@ -144,6 +144,16 @@ The three separations, each verified by a live request: a technician may report 
 - **RBAC role by role**, as tabled above — 14 assertions across four roles.
 - **Void**: a short reason is refused; a charge already on an invoice is refused and names the Finance action.
 - **All three CSV exports** return CSV.
+
+## Frontend: Next.js Notes
+Seven routes under `(dashboard)/utilities/`: register, meter new, meter detail, readings, reading entry, tariffs, billing. Sidebar group with four screens whose role lists each mirror one in `utilities-roles.ts`.
+
+The four screens that earn their shape:
+
+- **The register's "Billed to" column.** The register answers two different questions — what meters exist, and *who does each one bill* — and a bulk meter bills nobody individually until its consumption is divided. `billsTo` is therefore a column, and it comes from the server: scope and apportionment are a fact about the row, not something a table should re-derive. `canBeBilled` likewise, so a form never lets somebody try and then explain a refusal the page could have shown.
+- **The meter's reading ledger.** The column that makes it worth looking at is consumption, which is derived by pairing each reading with the one before it, so a corrected reading cannot leave a stale delta beside it. The oldest entry shows `baseline` rather than `0` — it establishes the starting point, it is not a period. A rolled-over register is flagged, because 99998 → 00003 is 5 units and without the flag it reads as a meter that ran backwards.
+- **The registration form is driven by `scope`.** Choosing `BULK` *replaces* the unit field with the apportionment field, marks it required, and says why: there is no default, because area, occupancy and a negotiated split all produce different bills. And the rollover wrap point is **derived, not typed** — entering 5 digits fills in 100000 — because a hand-typed wrap point is exactly how it drifts from the digit count and the arithmetic breaks.
+- **Billing has two buttons, not one.** "Price this period" creates a charge and stops; "Price and invoice" also raises the document. They fail independently, and a figure about to go to a resident should be reviewable first — which is also what makes a wrong bill correctable without a credit note. The result panel shows consumption, whether the register rolled, the invoices raised, and **`unbilled`** charges with their reason, because a vacant unit's water is measured whether or not anybody is there to be charged for it.
 
 ## Dependencies on Other Modules
 - Depends on: **Property Management** (units), and the **Rental Agreement** — without a live lease there is nobody to bill, and `billAndInvoice` reports those charges as `unbilled` rather than dropping them silently

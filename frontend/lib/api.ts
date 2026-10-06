@@ -1,5 +1,21 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow } from '@/types';
+import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow,
+    UtilityMeterRow,
+    UtilityMeterDetail,
+    MeterReadingRow,
+    UtilityRateRow,
+    UtilityChargeRow,
+    BillRunResult,
+    BulkReadingResult,
+    UtilityMeterPayload,
+    UtilityRatePayload,
+    CreateReadingPayload,
+    BillPeriodPayload,
+    UtilityType,
+    MeterScope,
+    ApportionmentMethod,
+    MeterReadingSource,
+} from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
@@ -3307,4 +3323,139 @@ export const accessCardsApi = {
             replacementCardId,
             note,
         }),
+};
+
+/**
+ * Module 14 - utilities.
+ *
+ * Three clients rather than one, because the three resources have genuinely different
+ * shapes of question: the register asks *what meters exist*, the ledger asks *what did
+ * they read*, and billing asks *what did that cost*.
+ *
+ * The billing methods are two actions rather than one flag. `bill` prices a period
+ * and stops; `billAndInvoice` raises the document. They fail independently, and
+ * separating them is what makes a wrong figure correctable without a credit note.
+ */
+export const utilitiesApi = {
+    // ── The meter register ────────────────────────────────────────────────────
+    meters: (params?: {
+        propertyId?: string;
+        type?: UtilityType;
+        scope?: MeterScope;
+        unitId?: string;
+        search?: string;
+        status?: string;
+    }) => api.get<UtilityMeterRow[]>('/utilities/meters', { params }),
+
+    meter: (id: string) => api.get<UtilityMeterDetail>(`/utilities/meters/${id}`),
+
+    metersExportUrl: (params?: { propertyId?: string; type?: UtilityType }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/utilities/meters/export${qs ? `?${qs}` : ''}`;
+    },
+
+    createMeter: (data: UtilityMeterPayload) =>
+        api.post<UtilityMeterRow>('/utilities/meters', data),
+
+    updateMeter: (id: string, data: Partial<UtilityMeterPayload>) =>
+        api.patch<UtilityMeterRow>(`/utilities/meters/${id}`, data),
+
+    /**
+     * Retire a meter. Named rather than a status field, and refused while a bulk
+     * meter has priced-but-unbilled periods — retiring would leave the consumption
+     * measured and nothing explaining what it cost.
+     */
+    retireMeter: (id: string) => api.post<UtilityMeterRow>(`/utilities/meters/${id}/retire`, {}),
+};
+
+export const meterReadingsApi = {
+    readings: (params?: {
+        meterId?: string;
+        source?: MeterReadingSource;
+        from?: string;
+        to?: string;
+    }) => api.get<MeterReadingRow[]>('/utilities/readings', { params }),
+
+    readingsExportUrl: (params?: { meterId?: string; from?: string; to?: string }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/utilities/readings/export${qs ? `?${qs}` : ''}`;
+    },
+
+    createReading: (data: CreateReadingPayload) =>
+        api.post<MeterReadingRow>('/utilities/readings', data),
+
+    /**
+     * Bulk entry for an estate with one bulk meter feeding many units.
+     *
+     * Per-row outcomes rather than all-or-nothing: one mistyped meter number must not
+     * discard the rest of the clipboard, and the caller needs to know which row to fix.
+     */
+    createReadingsBulk: (readings: CreateReadingPayload[]) =>
+        api.post<BulkReadingResult>('/utilities/readings/bulk', { readings }),
+
+    /**
+     * Correct a reading. Refused once the reading has been billed, because the
+     * invoice already carries the consumption derived from it.
+     */
+    updateReading: (id: string, data: Partial<CreateReadingPayload>) =>
+        api.patch<MeterReadingRow>(`/utilities/readings/${id}`, data),
+};
+
+export const utilityRatesApi = {
+    rates: (params?: { type?: UtilityType; meterId?: string; propertyId?: string; at?: string }) =>
+        api.get<UtilityRateRow[]>('/utilities/rates', { params }),
+
+    createRate: (data: UtilityRatePayload) =>
+        api.post<UtilityRateRow>('/utilities/rates', data),
+
+    /**
+     * Supersede a tariff: close the current window and open its replacement.
+     *
+     * Deliberately not an `updateRate`. Changing a rate and stopping one applying from
+     * a date are different intents with different consequences for invoices already
+     * issued under it.
+     */
+    supersedeRate: (id: string, ratePerUnit: number, validTo: string, reason?: string) =>
+        api.post<{ superseded: string; rate: UtilityRateRow }>(
+            `/utilities/rates/${id}/supersede`,
+            { ratePerUnit, validTo, reason },
+        ),
+};
+
+export const utilityChargesApi = {
+    charges: (params?: { unitId?: string; billingPeriod?: string; status?: string }) =>
+        api.get<UtilityChargeRow[]>('/utilities/charges', { params }),
+
+    chargesExportUrl: (params?: { unitId?: string; billingPeriod?: string; status?: string }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value) query.append(key, value);
+        });
+        const qs = query.toString();
+        return `${API_BASE_URL}/utilities/charges/export${qs ? `?${qs}` : ''}`;
+    },
+
+    /** Price a period and stop. Nothing is asked of anybody. */
+    billPeriod: (data: BillPeriodPayload) =>
+        api.post<BillRunResult>('/utilities/charges/bill', data),
+
+    /** The acceptance criterion: a reading in, a correctly-calculated invoice out. */
+    billAndInvoice: (data: BillPeriodPayload) =>
+        api.post<BillRunResult>('/utilities/charges/bill-and-invoice', data),
+
+    /**
+     * Write off a charge. A reason is required and kept — an unexplained write-off is
+     * indistinguishable from an error three months later. Refused once the charge is
+     * on an invoice, because cancelling that invoice is Finance's action.
+     */
+    voidCharge: (id: string, reason: string) =>
+        api.post<UtilityChargeRow>(`/utilities/charges/${id}/void`, { reason }),
 };

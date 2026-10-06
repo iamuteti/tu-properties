@@ -61,6 +61,9 @@ Receipt,
     // building), `ClipboardList` for the gate book, and `KeyRound` for the card
     // register — the only one of the three that decides who can get in.
     KeyRound,
+    // Module 14 — Utilities. `Gauge` for the register (it is what a meter is), and
+    // `Receipt` for the billing ledger, which is a document rather than a measurement.
+    Gauge,
 } from "lucide-react";
 
 type UserRole =
@@ -256,6 +259,32 @@ const navItems: NavItem[] = [
             { href: '/facilities/visits', label: 'The gate book', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
             { href: '/facilities/visitors', label: 'Visitors', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
             { href: '/facilities/access-cards', label: 'Access cards', icon: KeyRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
+        ],
+    },
+    /**
+     * Module 14 — Utilities.
+     *
+     * Every role list here mirrors one in
+     * `backend/src/modules/utilities/utilities-roles.ts`, copied rather than guessed,
+     * and the differences between the four screens are the module's permission design
+     * rather than an accident of navigation:
+     *
+     * - the register and the ledger are broad, because "how much water did this flat
+     *   use in June" is a question a leasing officer, an accountant and a technician
+     *   all need answered;
+     * - **tariffs are the narrowest screen**, held by exactly the roles that may write
+     *   one. An accountant can bill *from* a tariff and must not be able to change
+     *   what every resident owes.
+     */
+    {
+        label: 'Utilities',
+        icon: Gauge,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'],
+        children: [
+            { href: '/utilities', label: 'Meter register', icon: Gauge, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
+            { href: '/utilities/readings', label: 'Readings', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
+            { href: '/utilities/tariffs', label: 'Tariffs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: '/utilities/billing', label: 'Billing', icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
         ],
     },
     { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },

@@ -96,6 +96,66 @@ export const TRANSACTION_CLASSES = [
   { value: "SECURITY", label: "Security" },
   { value: "SERVICE CHARGE", label: "Service Charge" },
   { value: "WATER", label: "Water" },
+  // Module 14. `ELECTRICITY` and `WATER` above predate the utilities module and are
+  // what the *rent* invoice's service lines are classified with. A **consumption**
+  // invoice is a different document - raised by the Utilities module through
+  // `InvoicesService`, carrying a measured quantity rather than a fixed charge - so
+  // it gets its own class rather than borrowing one of those two. That is also what
+  // keeps it from claiming `Invoice.billingPeriod`, which belongs to the rent bill.
+  { value: "UTILITY", label: "Utility consumption" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Module 14 — Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const UTILITY_TYPES = [
+  { value: "WATER", label: "Water" },
+  { value: "ELECTRICITY", label: "Electricity" },
+  { value: "GAS", label: "Gas" },
+  // Not in the module doc's list, and the reason it is here: on most Kenyan estates
+  // sewerage is charged separately from water, usually off a bulk meter, so a tenant
+  // never sees a water volume - only a fixed charge. That is a case a `WATER` meter
+  // row cannot represent honestly.
+  { value: "SEWAGE", label: "Sewerage" },
+];
+
+/**
+ * How a bulk meter's consumption is divided across the units it feeds.
+ *
+ * Rendered with the reason it exists, because a bare `AREA` on a dropdown does not
+ * say what the resident is being charged for. The module **refuses** to bill a bulk
+ * meter until one of these is chosen - it will not default to the first.
+ */
+export const APPORTIONMENT_METHODS = [
+  { value: "AREA", label: "By floor area", hint: "A 90 sqm unit in a shared meter pays for 90 sqm." },
+  { value: "EQUAL", label: "Split evenly", hint: "Every unit the meter feeds pays the same share." },
+  { value: "OCCUPANCY", label: "By days occupied", hint: "A unit that moved in mid-month pays for the part of the month it was there." },
+  { value: "MANUAL", label: "Negotiated split", hint: "A fixed split you record yourself. Requires the weights." },
+];
+
+export const METER_SCOPES = [
+  { value: "SUBMETER", label: "Sub-meter", hint: "Serves exactly one unit. Its consumption is that unit's bill." },
+  { value: "BULK", label: "Bulk meter", hint: "Serves many units. Its consumption must be divided before anybody is billed." },
+];
+
+export const METER_READING_SOURCES = [
+  { value: "MANUAL", label: "Manual" },
+  { value: "SMART", label: "Smart meter" },
+  // Marked rather than hidden: a meter that could not be read is a real case, and an
+  // estimate that looks like a reading is worse than an obvious estimate.
+  { value: "ESTIMATED", label: "Estimated", hint: "Could not be read. Recorded so a later audit can tell it from a real reading." },
+];
+
+export const METER_STATUSES = [
+  { value: "ACTIVE", label: "Active" },
+  { value: "RETIRED", label: "Retired", hint: "Kept, not deleted, so historic readings still explain old invoices." },
+];
+
+export const UTILITY_CHARGE_STATUSES = [
+  { value: "PENDING", label: "Priced, not invoiced" },
+  { value: "INVOICED", label: "Invoiced" },
+  { value: "VOID", label: "Voided", hint: "Written off. The reason is kept, so it still explains itself." },
 ];
 
 /**

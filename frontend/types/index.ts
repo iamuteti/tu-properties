@@ -3632,3 +3632,217 @@ export interface VisitorVisitRow {
     minutesOverdue: number | null;
     availableActions: Array<'check-in' | 'check-out'>;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Module 14 - Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type UtilityType = 'WATER' | 'ELECTRICITY' | 'GAS' | 'SEWAGE';
+
+export type MeterScope = 'SUBMETER' | 'BULK';
+
+export type ApportionmentMethod = 'AREA' | 'EQUAL' | 'OCCUPANCY' | 'MANUAL';
+
+export type MeterStatus = 'ACTIVE' | 'RETIRED';
+
+export type MeterReadingSource = 'MANUAL' | 'SMART' | 'ESTIMATED';
+
+export type UtilityChargeStatus = 'PENDING' | 'INVOICED' | 'VOID';
+
+/**
+ * A meter row.
+ *
+ * `canBeBilled` and `billsTo` are server-computed rather than derived here, because
+ * "can this be billed right now" depends on scope and apportionment as the server
+ * holds them — and a form that guesses at it will let somebody try and then explain
+ * the refusal.
+ */
+export interface UtilityMeterRow {
+    id: string;
+    meterNumber: string;
+    serialNumber: string | null;
+    type: UtilityType;
+    scope: MeterScope;
+    status: MeterStatus;
+    source: MeterReadingSource;
+    unitId: string | null;
+    propertyId: string;
+    apportionmentMethod: ApportionmentMethod | null;
+    digits: number | null;
+    digitWrapAt: number | null;
+    lastBilledThrough: string | null;
+    readingSetup: string | null;
+    createdAt: string;
+    updatedAt: string;
+    propertyName: string | null;
+    unitCode: string | null;
+    unitName: string | null;
+    readingCount: number;
+    chargeCount: number;
+    isTerminal: boolean;
+    canBeBilled: boolean;
+    billsTo: string;
+}
+
+/** A meter with its recent reading ledger attached. */
+export interface UtilityMeterDetail extends UtilityMeterRow {
+    /**
+     * Each reading paired with the one before it, so `consumption` is the derived
+     * delta rather than a stored column. The oldest entry has `null` for both
+     * previous and consumption: it establishes the baseline, it is not a period.
+     */
+    readings: MeterReadingRow[];
+}
+
+/**
+ * One register value at one moment.
+ *
+ * `previousReading` and `consumption` are null on the oldest reading of a list rather
+ * than zero, because zero would claim the meter did not move.
+ */
+export interface MeterReadingRow {
+    id: string;
+    readingDate: string;
+    meterNumber: string;
+    type: UtilityType;
+    currentReading: number;
+    previousReading: number | null;
+    consumption: number | null;
+    rolledOver: boolean;
+    source: MeterReadingSource;
+    note: string | null;
+}
+
+export interface UtilityRateRow {
+    id: string;
+    type: UtilityType;
+    currency: string;
+    ratePerUnit: number | string;
+    standingCharge: number | string;
+    prorateStandingCharge: boolean;
+    purchaseCurrency: string | null;
+    spotRate: number | string | null;
+    vatRate: number | string | null;
+    incomeAccount: string | null;
+    revenueExpenseItem: string | null;
+    meterId: string | null;
+    propertyId: string | null;
+    validFrom: string;
+    validTo: string | null;
+    meter?: { id: string; meterNumber: string } | null;
+    property?: { id: string; name: string } | null;
+}
+
+/**
+ * A priced period, ready to invoice.
+ *
+ * The money fields are recomputed by the server from the two readings and the tariff
+ * every time this is fetched — nothing here is a stored figure.
+ */
+export interface UtilityChargeRow {
+    id: string;
+    billingPeriod: string;
+    status: UtilityChargeStatus;
+    meterId: string;
+    meterNumber: string;
+    type: UtilityType;
+    meterScope: MeterScope;
+    unitId: string | null;
+    unitCode: string | null;
+    unitName: string | null;
+    allocationShare: number;
+    allocationBasis: string | null;
+    ratePerUnit: number;
+    currency: string;
+    invoiceId: string | null;
+    invoiceNumber: string | null;
+    invoiceStatus: string | null;
+    /** Present on the ledger, which prices every charge it returns. */
+    meterConsumption?: number;
+    billableConsumption?: number;
+    consumptionAmount?: number;
+    standingChargeAmount?: number;
+    subtotal?: number;
+    vatAmount?: number;
+    total?: number;
+}
+
+/** The result of a billing run, as the server reports it. */
+export interface BillRunResult {
+    billingPeriod: string;
+    meter: { id: string; meterNumber: string; type: UtilityType; scope: MeterScope };
+    meterConsumption: number;
+    rolledOver: boolean;
+    periodFrom: string;
+    periodTo: string;
+    charges: Array<{ unitId: string | null; share: number; total: number }>;
+    invoices?: Array<{
+        chargeId: string;
+        invoiceId: string;
+        invoiceNumber: string;
+        total: number;
+        unitCode: string | null;
+    }>;
+    /**
+     * Priced but with nobody to invoice - a vacant unit on a bulk meter.
+     *
+     * Shown rather than swallowed: a vacant unit's water is a real cost somebody has
+     * to decide about, and a silently dropped row is how it goes unnoticed.
+     */
+    unbilled?: Array<{ chargeId: string; unitCode: string | null; reason: string }>;
+}
+
+/** Bulk reading entry returns per-row outcomes, so one bad row does not lose the rest. */
+export interface BulkReadingResult {
+    created: number;
+    failed: Array<{ readingDate: string; meterId: string; message: string }>;
+    readings: unknown[];
+}
+
+export interface UtilityMeterPayload {
+    propertyId: string;
+    unitId?: string;
+    type: UtilityType;
+    meterNumber: string;
+    serialNumber?: string;
+    /** How readings on this meter are collected. Defaults to MANUAL server-side. */
+    source?: MeterReadingSource;
+    scope?: MeterScope;
+    apportionmentMethod?: ApportionmentMethod;
+    apportionmentWeights?: Record<string, number>;
+    digits?: number;
+    digitWrapAt?: number;
+    lastBilledThrough?: string;
+    readingSetup?: string;
+}
+
+export interface UtilityRatePayload {
+    meterId?: string;
+    propertyId?: string;
+    type: UtilityType;
+    currency?: string;
+    ratePerUnit: number;
+    standingCharge?: number;
+    prorateStandingCharge?: boolean;
+    purchaseCurrency?: string;
+    spotRate?: number;
+    vatRate?: number;
+    incomeAccount?: string;
+    revenueExpenseItem?: string;
+    validFrom: string;
+}
+
+export interface CreateReadingPayload {
+    meterId: string;
+    readingDate: string;
+    reading: number;
+    source?: MeterReadingSource;
+    note?: string;
+}
+
+export interface BillPeriodPayload {
+    meterId: string;
+    billingPeriod: string;
+    unitId?: string;
+    dueInDays?: number;
+}
