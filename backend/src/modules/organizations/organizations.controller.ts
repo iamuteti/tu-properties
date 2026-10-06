@@ -77,6 +77,13 @@ export class OrganizationsController {
       taxId?: string | null;
       currency?: string;
       timezone?: string;
+      /**
+       * Module 14 — Utilities. Which way a vacant unit's share of a bulk meter is
+       * handled. Typed as a union here rather than trusting the caller, because an
+       * unrecognised value would otherwise reach the enum column and fail as a
+       * database error rather than as a validation message.
+       */
+      vacancyPolicy?: 'RECORD_ONLY' | 'SKIP' | 'REDISTRIBUTE' | null;
     },
   ) {
     const orgId = getTenantId(req);

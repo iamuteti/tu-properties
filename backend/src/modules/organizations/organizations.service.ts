@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, VacancyPolicy } from '@prisma/client';
 
 @Injectable()
 export class OrganizationsService {
@@ -80,6 +80,15 @@ export class OrganizationsService {
       taxId?: string | null;
       currency?: string;
       timezone?: string;
+      /**
+       * Module 14 — Utilities. What to do with a bulk meter's consumption for a unit
+       * with nobody under a lease.
+       *
+       * Nullable on purpose, and `null` is meaningful rather than "unset": it means the
+       * same as `RECORD_ONLY`, and is kept distinct from `RECORD_ONLY` so that "nobody
+       * has decided" stays visible as its own state.
+       */
+      vacancyPolicy?: VacancyPolicy | null;
     },
   ) {
     await this.findOne(id); // Verify exists
@@ -91,6 +100,9 @@ export class OrganizationsService {
     if (data.taxId !== undefined) clean.taxId = data.taxId;
     if (data.currency !== undefined) clean.currency = data.currency;
     if (data.timezone !== undefined) clean.timezone = data.timezone;
+    // Explicitly `!== undefined` so a caller can send `null` to go back to "nobody has
+    // decided" — a column nobody can clear is a setting nobody can undo.
+    if (data.vacancyPolicy !== undefined) clean.vacancyPolicy = data.vacancyPolicy;
     return this.prisma.organization.update({
       where: { id },
       data: clean,
