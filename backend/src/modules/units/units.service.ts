@@ -267,7 +267,11 @@ export class UnitsService {
           property: true,
           features: { orderBy: { name: 'asc' } },
           serviceCharges: true,
-          meterNumbers: true,
+          // Was `meterNumbers` (the old `UnitMeterNumber` table, which held a
+          // number and nothing else and was never populated). Module 14 reshaped
+          // it into `utility_meters`, which is a proper register: type, scope and
+          // the readings behind it.
+          utilityMeters: true,
           rentalAgreements: {
             orderBy: { startDate: 'desc' },
             include: {

@@ -22,12 +22,65 @@ async function main() {
   await prisma.receiptLine.deleteMany();
   await prisma.receipt.deleteMany();
   await prisma.invoiceItem.deleteMany();
+  // Sales own instalments and commissions, and reference properties/users, so they
+  // are cleared before the tables they point at. Without these three lines this
+  // seed cannot run a second time at all: `sale_transactions_propertyId_fkey` is
+  // ON DELETE RESTRICT, so the `properties.deleteMany()` below trips over the sales
+  // module's data. `demo-data.ts` has always had them; this file had not caught up.
+  await prisma.commission.deleteMany();
+  await prisma.saleInstallment.deleteMany();
+  await prisma.saleTransaction.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.rentalAgreement.deleteMany();
   await prisma.tenantEmergencyContact.deleteMany();
+  // CRM first: `Lead`/`Contact` reference properties, branches, users and (optionally)
+  // tenants, and `CommunicationLog` references both.
+  await prisma.communicationLog.deleteMany();
+  await prisma.lead.deleteMany();
+  await prisma.contact.deleteMany();
   await prisma.tenant.deleteMany();
+  // Module 10 runs request -> RFQ -> quote -> order -> receipt and every table points
+  // at the one before it, so it is cleared child-first. Module 11's movements come
+  // first of all: they are the only table referencing purchase-order lines, work
+  // orders *and* goods-receipt lines at once.
+  await prisma.stockMovement.deleteMany();
+  await prisma.goodsReceiptLine.deleteMany();
+  await prisma.goodsReceipt.deleteMany();
+  await prisma.purchaseOrderLine.deleteMany();
+  await prisma.purchaseOrder.deleteMany();
+  await prisma.rfqQuoteLine.deleteMany();
+  await prisma.rfqQuote.deleteMany();
+  await prisma.rfqInvitation.deleteMany();
+  await prisma.rfq.deleteMany();
+  await prisma.purchaseRequestLine.deleteMany();
+  await prisma.purchaseRequest.deleteMany();
+  // Module 12: payslips hang off a run, an employee and (via their reason) a work
+  // order, so they go before all three.
+  await prisma.payslipLine.deleteMany();
+  await prisma.payslip.deleteMany();
+  await prisma.payrollRun.deleteMany();
+  await prisma.leaveRequest.deleteMany();
+  await prisma.employeeComponent.deleteMany();
+  await prisma.payComponent.deleteMany();
+  await prisma.leavePolicy.deleteMany();
+  await prisma.holiday.deleteMany();
+  // Module 9: work orders point at properties, units, tenants, assets and users.
+  await prisma.workOrderTask.deleteMany();
+  await prisma.workOrder.deleteMany();
+  await prisma.preventiveMaintenanceRun.deleteMany();
+  await prisma.preventiveMaintenanceSchedule.deleteMany();
+  await prisma.asset.deleteMany();
+  await prisma.inventoryItem.deleteMany();
+  await prisma.warehouse.deleteMany();
   await prisma.unitFeature.deleteMany();
-  await prisma.unitMeterNumber.deleteMany();
+  // Module 14 - Utilities. Charges first: they reference readings with
+  // ON DELETE RESTRICT, so a readings delete would otherwise be refused. Meters
+  // last, since readings and rates cascade from them but their own deletes are
+  // clearer in this order than relying on four cascades.
+  await prisma.utilityCharge.deleteMany();
+  await prisma.meterReading.deleteMany();
+  await prisma.utilityRate.deleteMany();
+  await prisma.utilityMeter.deleteMany();
   await prisma.unitServiceCharge.deleteMany();
   await prisma.unit.deleteMany();
   await prisma.propertySecurityDeposit.deleteMany();

@@ -97,6 +97,27 @@ export const PERMISSION_MODULES = [
   'facility_blackouts',
   'visitors',
   'access_cards',
+  // Module 14 - Utilities. Four modules rather than one, because a meter register,
+  // a reading taken off a meter, a tariff and a bill are four different kinds of
+  // fact with four different consequences, and lumping them into `utilities.full`
+  // is how a role ends up able to invent a consumption figure and bill it:
+  //   `utility_meters.view`/`.create`/`.update`/`.delete`  the register. `update`
+  //     covers retiring a meter, which is why `status` is not in the DTO.
+  //   `meter_readings.view`/`.create`/`.update`/`.delete`  the readings. Held by
+  //     the roles whose job is physically at the meter, and **not** by ACCOUNTANT -
+  //     a finance user who can type a reading can write an arbitrary cheque.
+  //   `utility_rates.view`/`.create`/`.update`  the tariffs. `update` is
+  //     superseding: a rate is never edited in place, a window is closed and a new
+  //     one opened, so an old bill still explains itself.
+  //   `utility_charges.view`/`.create`/`.bill`/`.void`  the charges. `.bill` is the
+  //     money action (consumption becomes an invoice) and is separate from
+  //     `.update` for the same reason `.approve` and `.decide` are: the person who
+  //     prepares a bill should not be the only person who can reverse it. `.void`
+  //     is narrower again - see `utilities-roles.ts`.
+  'utility_meters',
+  'meter_readings',
+  'utility_rates',
+  'utility_charges',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -140,6 +161,28 @@ export interface ModulePermissions {
    * cannot do when both are the same login.
    */
   decide?: boolean;
+  /**
+   * Module 14. Turn a period's consumption into an invoice.
+   *
+   * Separate from `create` and from `update` because it is the only action in this
+   * product that creates a **document a resident is expected to pay**, out of a
+   * measurement somebody else took. A role that can record a reading should not
+   * thereby gain the power to price it, and `TECHNICIAN` is exactly that case: they
+   * may report that the meter read 4,212, and may not decide what that costs.
+   *
+   * Absent-means-denied, like `approve`/`pay`/`decide` - adding this key does not
+   * grant it to any role that does not already name it.
+   */
+  bill?: boolean;
+  /**
+   * Module 14. Reverse or write off a charge.
+   *
+   * Narrower than `bill` on purpose, and narrower than it is useful to be in a small
+   * estate: raising a bill is routine, reversing one is a decision about money
+   * somebody has already been asked for, so it takes the same authority as changing
+   * the tariff that produced it.
+   */
+  void?: boolean;
 }
 
 export interface PermissionSet {
@@ -192,6 +235,24 @@ const facilityBookingFull = (): ModulePermissions => ({
   update: true,
   delete: true,
   decide: true,
+});
+
+/**
+ * Module 14's charges, which need `.bill` and `.void` on top of the CRUD actions.
+ *
+ * `full()` deliberately does not include them, and this is not a generalisation of
+ * it: `.bill` is the action that creates a payable document, and `.void` is the one
+ * that takes one back. Both are granted here explicitly so that a role's ability to
+ * move money has to be written down on that role rather than inherited from a helper
+ * nobody reads.
+ */
+const utilityChargeFull = (): ModulePermissions => ({
+  view: true,
+  create: true,
+  update: true,
+  delete: true,
+  bill: true,
+  void: true,
 });
 
 function set(
@@ -289,6 +350,13 @@ export const SYSTEM_ROLES: {
       facility_blackouts: full(),
       visitors: full(),
       access_cards: full(),
+      // Module 14: full utilities. An administrator accountable for the whole
+      // organization is the role that must be able to correct a tariff and reverse
+      // a bill, since both are decisions above any single operator.
+      utility_meters: full(),
+      meter_readings: full(),
+      utility_rates: full(),
+      utility_charges: utilityChargeFull(),
     }),
   },
   {
@@ -350,6 +418,16 @@ export const SYSTEM_ROLES: {
       facility_blackouts: full(),
       visitors: full(),
       access_cards: full(),
+      // Module 14: the property manager owns all of it, and this is the role that
+      // shows why the `UTILITIES_BILL_ROLES` list includes them - most estates this
+      // is sold to have one person doing the billing. Note they get
+      // `utility_rates` too: the tariff is a commercial decision about what the
+      // estate charges residents, and that is a landlord conversation, not a
+      // bookkeeping one.
+      utility_meters: full(),
+      meter_readings: full(),
+      utility_rates: full(),
+      utility_charges: utilityChargeFull(),
     }),
   },
   {
@@ -404,6 +482,15 @@ export const SYSTEM_ROLES: {
       facilities: view(),
       facility_bookings: { view: true, create: true },
       facility_blackouts: view(),
+      // Module 14: read-only, and deliberately nothing more. A leasing officer
+      // asking a resident "how much water did you use last month" is a fair
+      // question — it comes up in every renewal conversation. A leasing officer who
+      // can *bill* is a leasing officer who can bill a prospect to win the lease, so
+      // no reading, no rate and no charge beyond reading them.
+      utility_meters: view(),
+      meter_readings: view(),
+      utility_rates: view(),
+      utility_charges: view(),
     }),
   },
 
@@ -419,6 +506,11 @@ export const SYSTEM_ROLES: {
       crm_contacts: viewWrite(),
       // Sales agents own the sale pipeline and their own commission.
       sales: viewWrite(),
+      // Module 14: nothing. A sales agent showing a flat to a prospect has no reason
+      // to see its meter's consumption, and no reason at all to be able to change it.
+      // (This block used to sit here by mistake - it was written for the Leasing
+      // Officer, whose block it was mistaken for. The role that can answer a
+      // resident "how much water did you use" is the one that deals with residents.)
     }),
   },
   {
@@ -435,6 +527,21 @@ export const SYSTEM_ROLES: {
       // Module 6: statements and payouts are finance work.
       owner_statements: full(),
       owner_payouts: full(),
+      // Module 14: reads the meters, the readings, the tariff **and** the charges -
+      // they reconcile a utility bill against what the utility company actually
+      // charged the estate, which needs all four. They raise the bills (`.bill`).
+      //
+      // They get **no `meter_readings` write and no `utility_rates` write**, and
+      // those two absences are the whole point of this module's permission split:
+      // an accountant who can type in a consumption figure can write an arbitrary
+      // cheque, and an accountant who can set a tariff can quietly change what every
+      // resident owes. `utilityChargeFull()` is not used here precisely because it
+      // carries `.void`; billing is reversible, reversing is an administrator's or
+      // property manager's call.
+      utility_meters: view(),
+      meter_readings: view(),
+      utility_rates: view(),
+      utility_charges: { view: true, create: true, update: true, bill: true },
       // Module 7: chart of accounts, journal entries and trial balance.
       accounting: full(),
       credits: full(),
@@ -522,6 +629,13 @@ export const SYSTEM_ROLES: {
       facility_blackouts: full(),
       visitors: full(),
       access_cards: view(),
+      // Module 14: a maintenance manager installs meters, so they may register one and key
+      // in its readings. They may not `utility_rates` at all and cannot bill: what
+      // a resident pays for water is not a maintenance decision.
+      utility_meters: full(),
+      meter_readings: full(),
+      utility_rates: view(),
+      utility_charges: view(),
     }),
   },
 
@@ -558,6 +672,19 @@ export const SYSTEM_ROLES: {
       facilities: view(),
       facility_bookings: view(),
       visitors: view(),
+      // Module 14: a technician is the person who finds the burst pipe that
+      // doubled a building's water bill, so they need to read the meters, read
+      // the readings and read the charges.
+      //
+      // They get `meter_readings` **write** and nothing else in this module -
+      // not the rate, not the bill. Reporting that a meter reads 4,212 is
+      // ground truth; deciding what that costs a resident is not, and the two
+      // being in the same hands is how a technician ends up responsible for the
+      // accuracy of somebody's invoice.
+      utility_meters: view(),
+      meter_readings: viewWrite(),
+      utility_rates: view(),
+      utility_charges: view(),
     }),
   },
   {
@@ -607,6 +734,15 @@ export const SYSTEM_ROLES: {
       inventory_items: view(),
       warehouses: view(),
       stock_movements: viewWrite(),
+      // Module 14: read-only, and not an obvious fit — included on purpose. The
+      // utility company bills the *estate*, not the resident, so the same
+      // reconciliation argument that puts an accountant on this data applies to
+      // whoever negotiates and checks the supply contract. They have no reason to
+      // type a reading, set a tariff or raise a bill, and no reason to be able to.
+      utility_meters: view(),
+      meter_readings: view(),
+      utility_rates: view(),
+      utility_charges: view(),
       // Module 12: sees who exists (a purchase request may name a
       // requester) but nothing else.
       employees: view(),
@@ -633,6 +769,15 @@ export const SYSTEM_ROLES: {
       leave_policies: full(),
       holidays: full(),
       payroll: payrollFull(),
+      // Module 14: view only, and the least obvious grant in this file. An HR
+      // manager's job involves payslips, and a payslip carrying a utilities
+      // deduction is a document they will be asked about - so they need to be able
+      // to read what a resident was charged and why. Read is the whole of it: no
+      // reading, no rate, no bill.
+      utility_meters: view(),
+      meter_readings: view(),
+      utility_rates: view(),
+      utility_charges: view(),
     }),
   },
   {

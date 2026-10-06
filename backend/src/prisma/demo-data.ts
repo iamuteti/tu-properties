@@ -3756,7 +3756,14 @@ export async function seedDemoData() {
     await prisma.inventoryItem.deleteMany();
     await prisma.warehouse.deleteMany();
     await prisma.unitFeature.deleteMany();
-    await prisma.unitMeterNumber.deleteMany();
+    // Module 14 - Utilities. Charges first: they reference readings with
+    // ON DELETE RESTRICT, so a readings delete would otherwise be refused. Meters
+    // last, since readings and rates cascade from them but their own deletes are
+    // clearer in this order than relying on four cascades.
+    await prisma.utilityCharge.deleteMany();
+    await prisma.meterReading.deleteMany();
+    await prisma.utilityRate.deleteMany();
+    await prisma.utilityMeter.deleteMany();
     await prisma.unitServiceCharge.deleteMany();
     await prisma.unit.deleteMany();
     await prisma.propertySecurityDeposit.deleteMany();
