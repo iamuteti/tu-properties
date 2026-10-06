@@ -9,6 +9,7 @@ import {
   MeterScope,
   MeterStatus,
   Prisma,
+  UtilityBillingMode,
   UtilityChargeStatus,
   UtilityType,
   VacancyPolicy,
@@ -875,9 +876,52 @@ export class UtilitiesService {
     // honest behaviour before they decide is the one that refuses to invent a payer.
     const org = await this.prisma.organization.findUnique({
       where: { id: tenantId },
-      select: { vacancyPolicy: true },
+      select: { vacancyPolicy: true, utilityBillingMode: true },
     });
     const vacancyPolicy = org?.vacancyPolicy ?? VacancyPolicy.RECORD_ONLY;
+
+    // Which document a charge ends up on. Per-organization, because the answer is
+    // jurisdictional and the markets differ — the same reason tax, currency and
+    // timezone are columns rather than code. Null means SEPARATE_STATEMENT, and the
+    // split is deliberate: "nobody has decided" stays its own state.
+    const billingMode =
+      org?.utilityBillingMode ?? UtilityBillingMode.SEPARATE_STATEMENT;
+
+    // DIRECT_ACCOUNT: the resident is invoiced by the utility company directly, so this
+    // organization has no standing to raise them a document. The consumption is still
+    // priced and kept — that is the point of the mode, since it is what lets an estate
+    // reconcile its portfolio against what the utility company actually billed.
+    if (billingMode === UtilityBillingMode.DIRECT_ACCOUNT) {
+      const reconciled: Array<{
+        chargeId: string;
+        unitCode: string | null;
+        total: number;
+      }> = [];
+
+      for (const charge of charges) {
+        const calculation = await this.priceStoredCharge(tenantId, charge);
+        await this.prisma.utilityCharge.update({
+          where: { id: charge.id },
+          data: { status: UtilityChargeStatus.RECONCILED },
+        });
+        reconciled.push({
+          chargeId: charge.id,
+          unitCode: charge.unit?.code ?? null,
+          total: calculation.total,
+        });
+      }
+
+      return {
+        ...priced,
+        invoices: [],
+        unbilled: [],
+        skipped: [],
+        vacancyPolicy,
+        billingMode,
+        reconciled,
+        note: 'Residents are invoiced by the utility company directly, so no document was raised here. Each period has been priced and marked reconciled against the utility bill instead.',
+      };
+    }
 
     const invoiced: Array<{
       chargeId: string;
@@ -1022,7 +1066,15 @@ export class UtilitiesService {
       });
     }
 
-    return { ...priced, invoices: invoiced, unbilled, skipped, vacancyPolicy };
+    return {
+      ...priced,
+      invoices: invoiced,
+      unbilled,
+      skipped,
+      vacancyPolicy,
+      billingMode,
+      reconciled: [],
+    };
   }
 
   // --------------------------------------------------------------- charges

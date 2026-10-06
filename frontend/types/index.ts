@@ -205,6 +205,14 @@ export interface Organization {
     /** Org-level defaults (System Settings). */
     currency?: string;
     timezone?: string;
+    /**
+     * Module 14 — Utilities. Both are organization settings rather than utilities-screen
+     * fields because they are commercial choices the landlord makes, and neither is the
+     * same in every market. Null means "nobody has decided", which is deliberately
+     * distinguishable from a choice.
+     */
+    vacancyPolicy?: VacancyPolicy | null;
+    utilityBillingMode?: UtilityBillingMode | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -217,6 +225,10 @@ export interface OrganizationProfileInput {
     taxId?: string | null;
     currency?: string;
     timezone?: string;
+    /** Module 14 — Utilities. `null` clears back to "nobody has decided". */
+    vacancyPolicy?: VacancyPolicy | null;
+    /** Module 14 — Utilities. `null` clears back to "nobody has decided". */
+    utilityBillingMode?: UtilityBillingMode | null;
 }
 
 export interface User {
@@ -3645,7 +3657,7 @@ export type MeterStatus = 'ACTIVE' | 'RETIRED';
 
 export type MeterReadingSource = 'MANUAL' | 'SMART' | 'ESTIMATED';
 
-export type UtilityChargeStatus = 'PENDING' | 'INVOICED' | 'VOID';
+export type UtilityChargeStatus = 'PENDING' | 'INVOICED' | 'RECONCILED' | 'VOID';
 
 /**
  * A meter row.
@@ -3655,6 +3667,15 @@ export type UtilityChargeStatus = 'PENDING' | 'INVOICED' | 'VOID';
  * holds them — and a form that guesses at it will let somebody try and then explain
  * the refusal.
  */
+/**
+ * What a metered utility charge ends up on.
+ *
+ * Per-organization, because the markets differ: a resident may hold the utility
+ * account themselves (the norm in the US and Canada), or the organization may re-bill
+ * on its own statement. Undefined/`null` means `SEPARATE_STATEMENT`.
+ */
+export type UtilityBillingMode = 'SEPARATE_STATEMENT' | 'DIRECT_ACCOUNT';
+
 export interface UtilityMeterRow {
     id: string;
     meterNumber: string;
@@ -3804,6 +3825,15 @@ export interface BillRunResult {
     skipped?: Array<{ chargeId: string; unitCode: string | null; reason: string }>;
     /** Which vacancy policy the run applied. */
     vacancyPolicy?: VacancyPolicy;
+    /** Which billing mode the run applied. */
+    billingMode?: UtilityBillingMode;
+    /**
+     * Priced and matched against the utility company's own bill, with no resident
+     * document — the `DIRECT_ACCOUNT` arrangement.
+     */
+    reconciled?: Array<{ chargeId: string; unitCode: string | null; total: number }>;
+    /** A plain sentence explaining a run that raised nothing, in the API's own words. */
+    note?: string;
 }
 
 /** Bulk reading entry returns per-row outcomes, so one bad row does not lose the rest. */
@@ -3858,10 +3888,7 @@ export interface CreateReadingPayload {
     estimatedFromReadingId?: string;
 }
 
-/**
- * What the organization does with a bulk meter's consumption for a unit with nobody
- * under a lease. A commercial decision stored on `Organization`, not picked here.
- */
+/** What the organization does with a bulk meter's consumption for a unit with nobody under a lease. */
 export type VacancyPolicy = 'RECORD_ONLY' | 'SKIP' | 'REDISTRIBUTE';
 
 export interface BillPeriodPayload {

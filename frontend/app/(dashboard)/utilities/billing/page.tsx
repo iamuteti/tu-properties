@@ -17,7 +17,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@/components/ui/entity-states';
-import { UTILITY_CHARGE_STATUSES, UTILITY_TYPES } from '@/lib/constants';
+import { UTILITY_BILLING_MODES, UTILITY_CHARGE_STATUSES, UTILITY_TYPES } from '@/lib/constants';
 import type { BillRunResult, UtilityChargeRow, UtilityMeterRow, UtilityType } from '@/types';
 
 /**
@@ -220,6 +220,19 @@ export default function BillingPage() {
                                     </p>
                                 )}
 
+                                {runResult.note && <p className="mt-2 text-sm text-muted-foreground">{runResult.note}</p>}
+
+                                {runResult.reconciled && runResult.reconciled.length > 0 && (
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                        {runResult.reconciled.length} priced and marked reconciled (
+                                        {runResult.reconciled
+                                            .reduce((sum, r) => sum + r.total, 0)
+                                            .toFixed(2)}{' '}
+                                        in total) — residents are invoiced by the utility company directly, so no
+                                        document was raised.
+                                    </p>
+                                )}
+
                                 {runResult.unbilled && runResult.unbilled.length > 0 && (
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         {runResult.unbilled.length} priced but not invoiced:{' '}
@@ -245,7 +258,20 @@ export default function BillingPage() {
                                     </p>
                                 )}
 
-                                {!runResult.invoices?.length && !runResult.unbilled?.length && (
+                                {runResult.billingMode && (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                        Billing mode:{' '}
+                                        {UTILITY_BILLING_MODES.find(
+                                            (m) => m.value === runResult.billingMode,
+                                        )?.label ?? runResult.billingMode}
+                                        .
+                                    </p>
+                                )}
+
+                                {!runResult.invoices?.length &&
+                                    !runResult.unbilled?.length &&
+                                    !runResult.skipped?.length &&
+                                    !runResult.reconciled?.length && (
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         Priced only — nothing has been invoiced. Review the figures, then run “Price and
                                         invoice”.

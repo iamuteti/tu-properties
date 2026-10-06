@@ -155,7 +155,52 @@ export const METER_STATUSES = [
 export const UTILITY_CHARGE_STATUSES = [
   { value: "PENDING", label: "Priced, not invoiced" },
   { value: "INVOICED", label: "Invoiced" },
+  {
+    value: "RECONCILED",
+    label: "Reconciled",
+    hint: "Priced and matched against the utility company's own bill, with no resident document.",
+  },
   { value: "VOID", label: "Voided", hint: "Written off. The reason is kept, so it still explains itself." },
+];
+
+/**
+ * What document a metered charge ends up on. Per-organization, because the markets
+ * differ — the same reason tax, currency and timezone are organization settings rather
+ * than code.
+ *
+ * Left unset means `SEPARATE_STATEMENT`, and the split is deliberate: "nobody has
+ * decided" stays distinguishable from a decision. Nothing in the product picks this
+ * for an organization.
+ */
+export const UTILITY_BILLING_MODES = [
+  {
+    value: "SEPARATE_STATEMENT",
+    label: "We re-bill residents",
+    hint: 'One invoice per charge. The arrangement that leaves rent billing untouched, and so cannot stop a resident being billed rent.',
+  },
+  {
+    value: "DIRECT_ACCOUNT",
+    label: "Residents are invoiced by the utility directly",
+    hint: 'The norm in the US and Canada, and common elsewhere. Consumption is still priced and reconciled against what the utility company billed the estate, but no resident invoice is raised — we have no standing to raise one.',
+  },
+];
+
+export const VACANCY_POLICIES = [
+  {
+    value: "RECORD_ONLY",
+    label: "Record it and decide later",
+    hint: "The consumption is priced and reported, and nobody is invoiced. The default when nothing is set: it makes a real cost visible without inventing a payer.",
+  },
+  {
+    value: "SKIP",
+    label: "Do not bill vacant units",
+    hint: "The charge is voided with that reason kept.",
+  },
+  {
+    value: "REDISTRIBUTE",
+    label: "Re-rate across the occupied units",
+    hint: "Configured but not yet applied. Moving one unit's share onto its neighbours changes what other residents owe, so it has to be run deliberately rather than as a side effect of billing.",
+  },
 ];
 
 /**

@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Prisma, VacancyPolicy } from '@prisma/client';
+import { Prisma, UtilityBillingMode, VacancyPolicy } from '@prisma/client';
 
 @Injectable()
 export class OrganizationsService {
@@ -89,6 +89,13 @@ export class OrganizationsService {
        * has decided" stays visible as its own state.
        */
       vacancyPolicy?: VacancyPolicy | null;
+      /**
+       * Module 14 — Utilities. Which document a metered charge ends up on.
+       *
+       * Nullable on purpose: `null` means `SEPARATE_STATEMENT`, and is kept distinct
+       * from it so "nobody has decided" stays visible as its own state.
+       */
+      utilityBillingMode?: UtilityBillingMode | null;
     },
   ) {
     await this.findOne(id); // Verify exists
@@ -102,7 +109,10 @@ export class OrganizationsService {
     if (data.timezone !== undefined) clean.timezone = data.timezone;
     // Explicitly `!== undefined` so a caller can send `null` to go back to "nobody has
     // decided" — a column nobody can clear is a setting nobody can undo.
-    if (data.vacancyPolicy !== undefined) clean.vacancyPolicy = data.vacancyPolicy;
+    if (data.vacancyPolicy !== undefined)
+      clean.vacancyPolicy = data.vacancyPolicy;
+    if (data.utilityBillingMode !== undefined)
+      clean.utilityBillingMode = data.utilityBillingMode;
     return this.prisma.organization.update({
       where: { id },
       data: clean,

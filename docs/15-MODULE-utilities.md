@@ -10,7 +10,7 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status
-**COMPLETE 2026-10-06** — backend, demo seed and frontend. **1175 tests / 57 suites, 63 live assertions**, `tsc` clean both apps, `eslint` clean on every new file, `next build` clean, `migrate diff --from-migrations` no difference.
+**COMPLETE 2026-10-06** — backend, demo seed and frontend. **1175 tests / 57 suites, 73 live assertions**, `tsc` clean both apps, `eslint` clean on every new file, `next build` clean, `migrate diff --from-migrations` no difference.
 
 ## Module Goal
 Track utility meters and generate consumption-based billing.
@@ -89,6 +89,14 @@ Four, three of them mine, recorded because each is a shape worth recognising:
 4. **A period window in the wrong time frame** — see the decision on UTC below. Found by live verification, and it is master doc issue 97 arriving through the database.
 
 ### Decisions worth keeping
+
+**Which document a charge ends up on is an organization setting, not a hardcoded shape.** `Organization.utilityBillingMode` is `SEPARATE_STATEMENT` (the default) or `DIRECT_ACCOUNT`, null meaning "nobody has decided" and kept distinct from a choice.
+
+This was originally hardcoded to separate statements, and the justification offered for that was "not what a Kenyan estate usually does" — which was wrong twice over. It treated one market's practice as the standard in a codebase whose stated architecture is that *jurisdictional differences are configuration* (`taxCountryCode` + `TaxRule`, `payrollCountryCode`, ISO-4217 `currency`, `defaultLocale`, `timezone`). And it was wrong on the merits: across the markets this targets a resident frequently holds the utility account themselves — the norm in the US and Canada — and an organization there still wants consumption recorded so it can reconcile the estate against what the utility company billed, while having **no standing to raise them an invoice**. That is `DIRECT_ACCOUNT`: the period is priced, the charge is marked `RECONCILED`, and no resident document is raised. `RECONCILED` is a status rather than a nullable `invoiceId`, because "priced and reconciled" is a real end state for that charge and not the absence of one — leaving it `PENDING` forever would make every reconciliation report show work that is in fact finished.
+
+A third arrangement, **bundling utilities into the rent bill or a consolidated service-charge statement** (common in parts of the UK, the Netherlands and the Gulf), is **deliberately not implemented** and is named in the enum's schema comment so its absence is a stated decision with a reason. It collides with `@@unique([rentalAgreementId, billingPeriod])` — the same key as below — and it would additionally double-bill against `UnitServiceCharge`, which already carries fixed per-unit utility charges onto the rent invoice through recurring billing. Implementing it needs the merge seam deliberately left out, and a decision about those two mechanisms together.
+
+Both settings live on the **Organization settings screen** beside `currency` and `timezone`, which is the point: they are landlord-level commercial choices, not utilities-screen preferences.
 
 **The invoice seam is `InvoicesService.create`, and it is enough — but only because of what it will *not* set.** `Invoice` carries `@@unique([rentalAgreementId, billingPeriod])` because a lease gets one **rent** bill per month, and `recurring-billing.service.ts:45` relies on a second attempt failing that constraint and being reported as *skipped*. So a utility invoice that claimed that key would make the recurring rent run **skip the month, and the resident would never be billed rent at all.** Therefore: utility invoices leave `billingPeriod` **null** and are classified `transactionClass = 'UTILITY'` — the same convention `Invoice.saleTransactionId` sets for the Sales module. `UtilityCharge.billingPeriod` holds the period instead. *Never "fix" this by setting `billingPeriod`.* Verified live: the raised invoice has `billingPeriod === null`.
 

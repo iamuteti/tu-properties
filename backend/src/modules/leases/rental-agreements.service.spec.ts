@@ -41,7 +41,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
   };
 
   function mockPrisma() {
-    // indFirst serves two different queries: the "is the unit already let"
+    // findFirst serves two different queries: the "is the unit already let"
     // guard (where.status is a filter) and "load this lease" (where.id). The
     // state object lets a test change either one without fighting the mock.
     const state = {

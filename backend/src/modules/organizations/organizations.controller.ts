@@ -84,6 +84,15 @@ export class OrganizationsController {
        * database error rather than as a validation message.
        */
       vacancyPolicy?: 'RECORD_ONLY' | 'SKIP' | 'REDISTRIBUTE' | null;
+      /**
+       * Module 14 - Utilities. Which document a metered charge ends up on.
+       *
+       * DIRECT_ACCOUNT is for markets where the resident is invoiced by the utility
+       * company directly (the norm in the US and Canada): consumption is still priced
+       * and reconciled, but no resident document is raised. Typed as a union for the
+       * same reason as the vacancy policy above.
+       */
+      utilityBillingMode?: 'SEPARATE_STATEMENT' | 'DIRECT_ACCOUNT' | null;
     },
   ) {
     const orgId = getTenantId(req);

@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { authApi, organizationsApi } from "@/lib/api";
-import { LoginEvent } from "@/types";
+import { UTILITY_BILLING_MODES, VACANCY_POLICIES } from "@/lib/constants";
+import { LoginEvent, UtilityBillingMode, VacancyPolicy } from "@/types";
 import { useEffect, useState } from "react";
 
 type ActiveSession = {
@@ -54,6 +55,13 @@ export default function SettingsPage() {
         taxId: "",
         currency: "KES",
         timezone: "Africa/Nairobi",
+        // Module 14 — Utilities. Both are per-organization because the answer is
+        // jurisdictional and the markets genuinely differ, so they belong beside
+        // `currency` and `timezone` rather than inside the utilities screens. Empty
+        // string means "nobody has decided", which the API keeps distinct from a
+        // choice.
+        vacancyPolicy: "" as VacancyPolicy | "",
+        utilityBillingMode: "" as UtilityBillingMode | "",
     });
     const [profileLoaded, setProfileLoaded] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -85,6 +93,8 @@ export default function SettingsPage() {
                 taxId: organization.taxId || "",
                 currency: organization.currency || "KES",
                 timezone: organization.timezone || "Africa/Nairobi",
+                vacancyPolicy: organization.vacancyPolicy ?? "",
+                utilityBillingMode: organization.utilityBillingMode ?? "",
             });
             setProfileLoaded(true);
         }
@@ -124,6 +134,10 @@ export default function SettingsPage() {
                 taxId: profile.taxId || null,
                 currency: profile.currency,
                 timezone: profile.timezone,
+                // Sent as `null` rather than omitted when blank, because the API
+                // distinguishes "clear it back to undecided" from "leave it alone".
+                vacancyPolicy: profile.vacancyPolicy || null,
+                utilityBillingMode: profile.utilityBillingMode || null,
             });
             await refreshProfile();
             setSaveMsg({ kind: "success", text: "Settings saved." });
@@ -309,6 +323,82 @@ export default function SettingsPage() {
                                     <option key={tz} value={tz}>{tz}</option>
                                 ))}
                             </select>
+                        </div>
+                    </div>
+
+                    {/*
+                        Module 14 — Utilities. Both belong here rather than inside the
+                        utilities screens because they are *organization* settings, the
+                        same class of decision as `currency` and `timezone` above: what
+                        document a charge ends up on, and who carries a vacant unit's
+                        water, are commercial choices the landlord makes and neither is
+                        the same in every market.
+
+                        "Not decided" is a real, selectable state in both, and it is not
+                        the same as a choice — which is why each offers an explicit
+                        blank option rather than silently showing the default.
+                    */}
+                    <div className="space-y-1 border-t pt-6">
+                        <h3 className="text-sm font-semibold">Utility billing</h3>
+                        <p className="text-sm text-muted-foreground">
+                            How metered consumption is documented and billed. Both apply to bulk meters as well as
+                            sub-meters.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="utilityBillingMode">Who is billed for utilities?</Label>
+                            <select
+                                id="utilityBillingMode"
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                                value={profile.utilityBillingMode}
+                                onChange={(e) =>
+                                    setProfile((p) => ({
+                                        ...p,
+                                        utilityBillingMode: e.target.value as UtilityBillingMode | "",
+                                    }))
+                                }
+                                disabled={!profileLoaded}
+                            >
+                                <option value="">Not decided — re-bill residents (the default)</option>
+                                {UTILITY_BILLING_MODES.map((m) => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
+                            {profile.utilityBillingMode && (
+                                <p className="text-xs text-muted-foreground">
+                                    {UTILITY_BILLING_MODES.find(
+                                        (m) => m.value === profile.utilityBillingMode,
+                                    )?.hint}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="vacancyPolicy">A vacant unit on a bulk meter</Label>
+                            <select
+                                id="vacancyPolicy"
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                                value={profile.vacancyPolicy}
+                                onChange={(e) =>
+                                    setProfile((p) => ({
+                                        ...p,
+                                        vacancyPolicy: e.target.value as VacancyPolicy | "",
+                                    }))
+                                }
+                                disabled={!profileLoaded}
+                            >
+                                <option value="">Not decided — record it and decide later (the default)</option>
+                                {VACANCY_POLICIES.map((m) => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
+                            {profile.vacancyPolicy && (
+                                <p className="text-xs text-muted-foreground">
+                                    {VACANCY_POLICIES.find((m) => m.value === profile.vacancyPolicy)?.hint}
+                                </p>
+                            )}
                         </div>
                     </div>
 

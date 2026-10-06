@@ -92,6 +92,15 @@ model Organization {
   /// accept deliberately.
   vacancyPolicy VacancyPolicy?
 
+  /// Module 14 — Utilities. What document a metered charge ends up on.
+  ///
+  /// Per-organization, because the answer is jurisdictional and the markets differ —
+  /// the same reasoning that puts `taxCountryCode`, `currency` and `timezone` here
+  /// rather than in code. **Null means `SEPARATE_STATEMENT`**, and the split matters:
+  /// "nobody has decided" should stay visible as its own state rather than being
+  /// silently indistinguishable from a decision.
+  utilityBillingMode UtilityBillingMode?
+
   /// Which weekdays are non-working, as ISO day-of-week numbers where Monday is
   /// 1 and Sunday is 7 (so the ISO week reads left-to-right). Empty means
   /// Monday-to-Friday. Stored rather than assumed because "Saturday" is not a
@@ -6212,9 +6221,55 @@ enum UtilityChargeStatus {
   PENDING
   /// An invoice exists and carries this charge.
   INVOICED
+  /// Priced and matched against the utility company's own bill, with **no resident
+  /// invoice** — the `DIRECT_ACCOUNT` arrangement, where the utility company invoices
+  /// the resident directly.
+  ///
+  /// A status rather than a nullable `invoiceId`, because "priced and reconciled" is a
+  /// real end state for this charge and not the absence of one. Leaving such a charge
+  /// `PENDING` forever would make every reconciliation report show work outstanding
+  /// that is in fact finished.
+  RECONCILED
   /// The charge was written off or reversed. The row stays, so the period still
   /// explains itself.
   VOID
+}
+
+/// What document a metered utility charge ends up on.
+///
+/// This is a per-organization decision because **there is no universal answer and
+/// the markets genuinely differ**, which is the same reason `taxCountryCode` and
+/// `Organization.currency` exist. The three real-world arrangements are:
+///
+/// - **The resident holds the utility account themselves.** The norm in the US and
+///   Canada, and common elsewhere: the utility company invoices the resident directly
+///   and the landlord's involvement is nil. An organization in such a market still
+///   wants this module - to see portfolio consumption and to reconcile the estate's
+///   total against what the utility company billed - but it must not raise a resident
+///   invoice it has no standing to raise.
+/// - **The organization re-bills on its own statement.** One charge, one document.
+/// - **Bundled into the rent or a consolidated service-charge statement.** Common in
+///   parts of the UK, the Netherlands and the Gulf. **Not implemented**, and the
+///   reason is structural rather than an oversight: bundling means the utility line
+///   joins the monthly bill, and `Invoice.billingPeriod` is unique per lease per
+///   period *because it is the rent bill's key* - so a utility charge claiming it
+///   would make the recurring rent run skip the month. It also has to be reconciled
+///   against `UnitServiceCharge`, which already carries fixed per-unit utility charges
+///   onto the rent invoice, or a resident is billed twice for the same water.
+///
+/// `DIRECT_ACCOUNT` and `SEPARATE_STATEMENT` are the two this module can honour
+/// correctly, and between them they cover the plurality of arrangements. The third is
+/// named here so its absence is a stated decision with a reason rather than an
+/// unexplained gap.
+enum UtilityBillingMode {
+  /// One invoice per charge. The default, and `null` means the same thing — chosen
+  /// rather than neutral: it is the arrangement that leaves rent billing untouched and
+  /// so cannot stop a resident being billed rent.
+  SEPARATE_STATEMENT
+  /// The resident is invoiced by the utility company directly. Consumption is still
+  /// priced and kept, for reconciliation, but **no resident invoice is raised** and
+  /// the charge is marked `RECONCILED`.
+  DIRECT_ACCOUNT
 }
 
 /// What happens to a bulk meter's consumption for a unit with nobody under a lease.
