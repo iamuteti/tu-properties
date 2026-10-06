@@ -20,7 +20,7 @@ import type {
   UpdateContractDto,
 } from './dto/contracts.dto';
 import { canFileComplianceCertificate } from './legal-roles';
-import type { UserRole } from '@prisma/client';
+import type { Prisma, UserRole } from '@prisma/client';
 import {
   buildRenewalChain,
   daysUntil,
@@ -92,7 +92,7 @@ const RELATED_COLUMNS = [
  * `RentalAgreement` also brings `startDate`, `endDate` and `noticePeriodDays` - see
  * `effectiveTerm` for why they are selected.
  */
-const RELATED_INCLUDE = {
+export const RELATED_INCLUDE = {
   rentalAgreement: {
     select: {
       code: true,
@@ -106,7 +106,7 @@ const RELATED_INCLUDE = {
   saleTransaction: { select: { code: true, propertyTitle: true } },
   supplier: { select: { name: true, code: true } },
   landlord: { select: { name: true, code: true, email: true } },
-} as const;
+} satisfies Prisma.ContractSelect;
 
 /**
  * The include shared by every read: the four related entities (so the list can label
@@ -117,7 +117,7 @@ const RELATED_INCLUDE = {
 const READ_INCLUDE = { ...RELATED_INCLUDE, renewals: { select: { id: true } } };
 
 /** The columns a list returns. Deliberately explicit: `notes` is omitted from list rows. */
-const LIST_SELECT = {
+export const LIST_SELECT = {
   id: true,
   organizationId: true,
   reference: true,
@@ -149,7 +149,7 @@ const LIST_SELECT = {
   saleTransaction: { select: { code: true, propertyTitle: true } },
   supplier: { select: { name: true, code: true } },
   landlord: { select: { name: true, code: true, email: true } },
-} as const;
+} satisfies Prisma.ContractSelect;
 
 /**
  * Module 15 - the contract register.
@@ -908,76 +908,85 @@ function countBy<T>(
 }
 
 /**
- * A contract row as every read returns it: the columns plus the four related entities
- * and the reverse renewal relation.
+ * A contract row as every read returns it, **derived from `LIST_SELECT` rather than
+ * hand-written**.
  *
- * Declared rather than left as `any` for two reasons. One is that the selects are
- * written out explicitly (see `LIST_SELECT`), and an `any` erases the compiler's
- * ability to notice when one of them drifts from the schema - which is exactly how
- * `Landlord.firstName`, `Unit.label` and a `renewedBy` relation that does not exist got
- * in, and they were caught only because the row was *not* `any` where it mattered. The
- * other is that this module is expected to hold zero lint errors, and
- * `no-unsafe-member-access` on every field of an `any` row is eighty errors of noise
- * that hides the next real one.
+ * That is the second half of the fix for the defect that shipped a 500. `satisfies
+ * Prisma.ContractSelect` on the literal makes a wrong field a compile error; deriving
+ * this from the same literal makes it impossible for the *spec's mock* to describe a
+ * shape the service cannot produce. The original `ContractRow` was written out by hand
+ * and claimed `notes` and `createdByUserId` were present when neither is in the select -
+ * so a mock built from it agreed with a type that was itself fiction, and the whole
+ * suite stayed green while every read 500'd.
+ *
+ * Concretely: adding a field to `LIST_SELECT` widens this type automatically, removing
+ * one narrows it, and a test fixture that returns the wrong shape stops compiling.
+ *
+ * The three detail-only relations (`renewalOf`, `document`, and a richer `renewals`)
+ * are intersected on rather than selected, because they are resolved by `include` in
+ * `findOne` only. They are optional here so one row type serves both the list and the
+ * detail path.
  */
-interface ContractRow {
-  id: string;
-  organizationId: string;
-  reference: string;
-  title: string;
-  type: ContractType;
-  startDate: Date | null;
-  expiresAt: Date | null;
-  noticeDays: number | null;
-  autoRenew: boolean;
-  renewalOfId: string | null;
-  documentId: string | null;
-  notes: string | null;
-  createdByUserId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+type ContractRowFromSelect = Prisma.ContractGetPayload<{
+  select: typeof LIST_SELECT;
+}>;
+
+/** The four related entities, non-nullable where the schema says they are. */
+interface RelatedShape {
   rentalAgreementId: string | null;
   saleTransactionId: string | null;
   supplierId: string | null;
   landlordId: string | null;
-  /**
-   * Contracts that name this one as their predecessor.
-   *
-   * Their presence is what makes this contract superseded - the reverse edge, not
-   * `renewalOfId`, which says this contract is somebody else's renewal.
-   */
-  renewals: {
-    id: string;
-    reference?: string;
-    expiresAt?: Date | null;
-    title?: string;
-  }[];
-  rentalAgreement: {
-    code: string;
-    startDate: Date;
-    endDate: Date | null;
-    noticePeriodDays: number | null;
-    tenant: {
-      surname: string | null;
-      otherNames: string | null;
-      email: string | null;
-    } | null;
-    unit: { name: string | null; code: string | null } | null;
-  } | null;
-  saleTransaction: { code: string; propertyTitle: string | null } | null;
-  supplier: { name: string; code: string } | null;
-  landlord: { name: string; code: string; email: string | null } | null;
-  /** Detail-only. The predecessor this contract renews, resolved for `findOne`. */
-  renewalOf?: { id: string; reference: string; expiresAt: Date | null } | null;
-  /** Detail-only. The authoritative scan, resolved for `findOne`. */
-  document?: {
-    id: string;
-    fileName: string;
-    mimeType: string;
-    sizeBytes: number;
-    version: number;
-  } | null;
 }
+
+/**
+ * `renewals` comes back as `{ id }[]` from the select, but `requireOwned` includes
+ * `{ id, reference }` and `findOne` includes `{ id, reference, expiresAt, title }`.
+ * Widening to the union means one row type covers all three call sites, and every
+ * consumer already treats `reference` as optional (the delete refusal falls back to a
+ * generic phrase).
+ */
+/**
+ * Exported so the service spec's fixtures are typed against it.
+ *
+ * That export is the point rather than an incidental convenience: with the type
+ * module-private, `contracts.service.spec.ts` had to declare its fixture shape by hand
+ * or fall back to `Record<string, any>`, and both let it invent a field the service
+ * cannot produce. Verified - typing the fixture with this type makes a fixture using
+ * `Tenant.firstName` a compile error, where previously it type-checked happily while
+ * every read 500'd.
+ */
+export type ContractRow = ContractRowFromSelect &
+  RelatedShape & {
+    renewals: {
+      id: string;
+      reference?: string;
+      expiresAt?: Date | null;
+      title?: string;
+    }[];
+    /** Detail-only. The predecessor this contract renews, resolved for `findOne`. */
+    renewalOf?: {
+      id: string;
+      reference: string;
+      expiresAt: Date | null;
+    } | null;
+    /** Detail-only. The authoritative scan, resolved for `findOne`. */
+    document?: {
+      id: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      version: number;
+    } | null;
+    /**
+     * Not in `LIST_SELECT`, so a list row does not carry them.
+     *
+     * Declared optional rather than `string | null` because the honest type is
+     * "absent", and `toView` normalises both to `null` on the way out.
+     */
+    notes?: string | null;
+    createdByUserId?: string | null;
+  };
 
 /**
  * The dates and notice period a contract is actually read against.

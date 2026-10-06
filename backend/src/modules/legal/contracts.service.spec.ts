@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ContractType } from '@prisma/client';
-import { ContractsService } from './contracts.service';
+import { ContractsService, type ContractRow } from './contracts.service';
 
 /**
  * Module 15 - the contracts service, against a hand-written Prisma mock.
@@ -104,7 +104,7 @@ const requestFor = (organizationId: string, role = 'ADMIN') => ({
 });
 
 /** A contract row shaped like the service's `LIST_SELECT` output. */
-function row(overrides: Record<string, any> = {}) {
+function row(overrides: Partial<ContractRow> = {}): ContractRow {
   return {
     id: CONTRACT_A,
     organizationId: ORG_A,
@@ -139,7 +139,7 @@ function row(overrides: Record<string, any> = {}) {
  * contract and not about its counterparty; the tenant-leak tests override one entry to
  * `null` explicitly.
  */
-function makePrisma(rows: Record<string, any>[] = [row()]) {
+function makePrisma(rows: ContractRow[] = [row()]) {
   const found: Record<string, any[]> = {
     supplier: [{ id: SUPPLIER_A }],
     rentalAgreement: [{ id: LEASE_A }],
@@ -325,7 +325,11 @@ describe('ContractsService', () => {
             startDate: inDays(-300),
             endDate: inDays(60),
             noticePeriodDays: 30,
-            tenant: null,
+            // Was `null` here, which the hand-written `ContractRow` allowed. It is
+            // not nullable in the schema - `RentalAgreement.tenantId` is required with
+            // `onDelete: Restrict` - so the fixture was describing a lease with no
+            // tenant, which is not a state any row can be in.
+            tenant: { surname: 'Otieno', otherNames: 'Ama', email: null },
             unit: { name: 'Flat 2B', code: 'U-2B' },
           },
         }),
