@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { User, Organization } from "@/types";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -21,6 +21,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+    /**
+     * Whether a logout is already in flight.
+     *
+     * A ref, not state, because it must be readable **synchronously**: several 401s
+     * arriving in the same tick all dispatch `unauthorized` before any re-render, so a
+     * state guard would not have updated in time and every one of them would run.
+     */
+    const loggingOutRef = useRef(false);
   const router = useRouter();
 
   const refreshProfile = useCallback(async () => {
@@ -70,28 +78,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = (newUser: User) => {
-    setUser(newUser);
-    if (newUser.organization) {
-      setOrganization(newUser.organization);
-    }
-    // A tenant portal login belongs in the portal, not the dashboard: every
-    // dashboard endpoint is organization-scoped and would deny them.
-    router.push(newUser.portalTenantId ? "/portal" : "/dashboard");
-  };
+const login = (newUser: User) => {
+        // Clear the logout guard, or signing back in during this page's life would find
+        // the guard still set and every later logout would be silently ignored - a far
+        // worse bug than the duplicate-logout one it prevents.
+        loggingOutRef.current = false;
+        setUser(newUser);
+        if (newUser.organization) {
+            setOrganization(newUser.organization);
+        }
+        // A tenant portal login belongs in the portal, not the dashboard: every
+        // dashboard endpoint is organization-scoped and would deny them.
+        router.push(newUser.portalTenantId ? "/portal" : "/dashboard");
+    };
 
-  const logout = useCallback(async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch {
-      // Best-effort: clear the local state regardless.
-    }
-    setUser(null);
-    setOrganization(null);
-    router.push("/auth/login");
-  }, [router]);
+const logout = useCallback(async () => {
+        // **Idempotent, deliberately.** Every 401 dispatches `unauthorized`, so a page
+        // that fires five requests in parallel on mount and has an expired session
+        // produces five of them, and five `logout()` calls would mean five
+        // `/auth/logout` posts and five `router.push('/auth/login')` - a redirect race
+        // for a page that is only trying to say "your session expired".
+        //
+        // The guard is a ref rather than state because it has to be readable
+        // synchronously: `setIsLoggingOut` would not have taken effect by the time the
+        // second event arrives in the same tick.
+        if (loggingOutRef.current) return;
+        loggingOutRef.current = true;
 
-  useEffect(() => {
+        try {
+            await api.post('/auth/logout');
+        } catch {
+            // Best-effort: clear the local state regardless. The session is already
+            // invalid by the time we get here, so a failure carries no new information.
+        }
+setUser(null);
+        setOrganization(null);
+        router.push("/auth/login");
+    }, [router]);
+
+    useEffect(() => {
     const handleUnauthorized = () => logout();
     window.addEventListener('unauthorized', handleUnauthorized);
     return () => window.removeEventListener('unauthorized', handleUnauthorized);
