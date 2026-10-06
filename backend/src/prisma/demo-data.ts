@@ -55,6 +55,13 @@ import {
   AccessCardType,
   FacilityBookingStatus,
   FacilityKind,
+  // Module 14 — Utilities
+  ApportionmentMethod,
+  MeterReadingSource,
+  MeterScope,
+  MeterStatus,
+  UtilityChargeStatus,
+  UtilityType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -4084,6 +4091,10 @@ export async function seedDemoData() {
     // create, which is why the exclusion constraint is not optional here.
     await generateFacilitiesData(prisma, rohiOrg.id);
 
+    // Utility meters, readings and tariffs (Module 14). After Finance, because the
+    // seeded consumption charges link to real invoices.
+    await generateUtilitiesData(prisma, rohiOrg.id);
+
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.
     await generateWorkflowData(prisma, rohiOrg.id);
@@ -5781,5 +5792,294 @@ async function generateFacilitiesData(
 
   console.log(
     `  Facilities: ${createdFacilities.length} facilities, ${bookingsCreated} bookings, ${visitorsCreated} visitors, ${visitsCreated} visits, ${cardsCreated} access cards`,
+  );
+}
+
+/**
+ * Module 14 - Utilities demo data.
+ *
+ * Built around the two cases the module actually has to get right, rather than to
+ * fill the tables evenly:
+ *
+ * 1. **A sub-meter on a sub-metered unit.** The easy case, and the acceptance
+ *    criterion's shape: readings on the 1st of consecutive months, a tariff, and a
+ *    consumption charge - some of them invoiced through Finance so the link back to
+ *    a real document exists.
+ * 2. **A bulk meter feeding several units**, because that is where the module's real
+ *    behaviour lives: no `unitId`, an apportionment method the estate chose, and one
+ *    charge per fed unit at a share.
+ *
+ * Deliberately seeded states:
+ *
+ * - a **rolled-over** meter (99998 -> 00003 on 5 digits), so the register has a row
+ *   where the derived consumption is 5 rather than -99995 and nothing looks broken;
+ * - a tariff **superseded** part-way through, so the rate list shows two windows for
+ *   one utility and the newest is open;
+ * - charges in all three states, including a **VOID** one carrying its reason, since
+ *   the columns were added specifically so a write-off still explains itself;
+ * - a bulk meter with **one vacant unit**, so the `unbilled` path in `billAndInvoice`
+ *   has something to report and open item 4 in the module doc is visible rather than
+ *   theoretical;
+ * - an **ESTIMATED** reading, so the source column has a row that is not MANUAL;
+ * - a meter with **no readings at all**, because "registered but never read" is the
+ *   state a new estate is actually in.
+ *
+ * Runs after Facilities and after Finance, because invoices must exist before the
+ * charges can point at them.
+ */
+async function generateUtilitiesData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const properties = await prisma.property.findMany({
+    where: { organizationId },
+    orderBy: { code: 'asc' },
+    select: { id: true, code: true, name: true },
+  });
+  if (properties.length === 0) {
+    return;
+  }
+
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: { id: true, role: true },
+  });
+  const admin = users.find((u) => u.role === UserRole.ADMIN);
+
+  const byProperty = new Map<string, typeof properties[number]>();
+  for (const property of properties) {
+    byProperty.set(property.code, property);
+  }
+
+  const stamp = Date.now().toString().slice(-6);
+
+  // ---------------------------------------------------------------- meters
+
+  // A sub-metered unit: one water and one electricity meter, both on the same unit.
+  const subMeteredUnits = await prisma.unit.findMany({
+    where: { property: { organizationId }, status: UnitStatus.OCCUPIED },
+    orderBy: { code: 'asc' },
+    select: { id: true, code: true, propertyId: true, areaSqFt: true },
+    take: 3,
+  });
+
+  const metersCreated: string[] = [];
+
+  for (const [index, unit] of subMeteredUnits.entries()) {
+    for (const type of [UtilityType.WATER, UtilityType.ELECTRICITY] as const) {
+      const meter = await prisma.utilityMeter.create({
+        data: {
+          organizationId,
+          propertyId: unit.propertyId,
+          unitId: unit.id,
+          type,
+          meterNumber: `SUB-${type === UtilityType.WATER ? 'WTR' : 'PWR'}-${stamp}-${index}${unit.code}`,
+          serialNumber: `SN-${stamp}-${index}${unit.code}`,
+          source: MeterReadingSource.MANUAL,
+          scope: MeterScope.SUBMETER,
+          status: MeterStatus.ACTIVE,
+          readingSetup: type === UtilityType.WATER ? 'Direct read at the kitchen sink' : 'Direct read at the meter box',
+        },
+      });
+      metersCreated.push(meter.id);
+    }
+  }
+
+  // One bulk meter per property that has more than one unit - the case the module
+  // exists to handle, and the only place apportionment is consulted.
+  const bulkMeters: string[] = [];
+  for (const property of properties) {
+    const unitCount = await prisma.unit.count({ where: { propertyId: property.id } });
+    if (unitCount < 2) {
+      continue;
+    }
+
+    const bulk = await prisma.utilityMeter.create({
+      data: {
+        organizationId,
+        propertyId: property.id,
+        type: UtilityType.WATER,
+        meterNumber: `BULK-WTR-${stamp}-${property.code}`,
+        source: MeterReadingSource.MANUAL,
+        // Bulk: no `unitId` by definition, and a method the estate chose rather than
+        // one the module picked.
+        scope: MeterScope.BULK,
+        apportionmentMethod: ApportionmentMethod.AREA,
+        status: MeterStatus.ACTIVE,
+        readingSetup: 'Riser bulk meter, divided by floor area',
+      },
+    });
+    bulkMeters.push(bulk.id);
+    metersCreated.push(bulk.id);
+  }
+
+  // The rolled-over meter. Its register is about to pass its maximum, which is the
+  // only way to see the rollover arithmetic do its job in the register itself.
+  const rolloverUnit = subMeteredUnits[1] ?? subMeteredUnits[0];
+  if (rolloverUnit) {
+    const rollover = await prisma.utilityMeter.create({
+      data: {
+        organizationId,
+        propertyId: rolloverUnit.propertyId,
+        unitId: rolloverUnit.id,
+        type: UtilityType.ELECTRICITY,
+        meterNumber: `ROLL-PWR-${stamp}`,
+        source: MeterReadingSource.MANUAL,
+        scope: MeterScope.SUBMETER,
+        digits: 5,
+        digitWrapAt: 100000,
+        status: MeterStatus.ACTIVE,
+        readingSetup: 'Old electromechanical register, 5 digits',
+      },
+    });
+    metersCreated.push(rollover.id);
+  }
+
+  // Registered but never read. A new estate's real starting state, and the only way
+  // the "no readings at all" refusal has something to be refused about.
+  if (subMeteredUnits[2]) {
+    const virgin = await prisma.utilityMeter.create({
+      data: {
+        organizationId,
+        propertyId: subMeteredUnits[2].propertyId,
+        unitId: subMeteredUnits[2].id,
+        type: UtilityType.WATER,
+        meterNumber: `NEW-WTR-${stamp}`,
+        source: MeterReadingSource.MANUAL,
+        scope: MeterScope.SUBMETER,
+        status: MeterStatus.ACTIVE,
+      },
+    });
+    metersCreated.push(virgin.id);
+  }
+
+  // ----------------------------------------------------------------- rates
+
+  const rateRows: string[] = [];
+
+  // An organization default per utility, then a superseded window for water so the
+  // rate list shows a tariff history rather than one mutable row.
+  const defaults: Array<{ type: UtilityType; rate: number; standing: number; vat: number | null }> = [
+    { type: UtilityType.WATER, rate: 55.5, standing: 250, vat: null },
+    { type: UtilityType.ELECTRICITY, rate: 32.75, standing: 150, vat: null },
+    { type: UtilityType.GAS, rate: 145.0, standing: 0, vat: 16 },
+    { type: UtilityType.SEWAGE, rate: 180.0, standing: 0, vat: null },
+  ];
+
+  for (const d of defaults) {
+    const row = await prisma.utilityRate.create({
+      data: {
+        organizationId,
+        type: d.type,
+        currency: 'KES',
+        ratePerUnit: d.rate,
+        standingCharge: d.standing,
+        vatRate: d.vat,
+        incomeAccount: '4000',
+        revenueExpenseItem: '3',
+        validFrom: new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)),
+      },
+    });
+    rateRows.push(row.id);
+  }
+
+  // The superseded water tariff: an old window, then the replacement. Water's default
+  // above is closed part-way through the year so exactly one water rate is open.
+  const waterDefault = await prisma.utilityRate.findFirst({
+    where: { organizationId, type: UtilityType.WATER, meterId: null, propertyId: null },
+    orderBy: { validFrom: 'desc' },
+  });
+  if (waterDefault) {
+    const cutover = new Date(Date.UTC(new Date().getUTCFullYear(), 3, 1));
+    await prisma.utilityRate.update({ where: { id: waterDefault.id }, data: { validTo: cutover } });
+
+    const replacement = await prisma.utilityRate.create({
+      data: {
+        organizationId,
+        type: UtilityType.WATER,
+        currency: 'KES',
+        ratePerUnit: 62.4,
+        standingCharge: 250,
+        vatRate: null,
+        incomeAccount: '4000',
+        revenueExpenseItem: '3',
+        validFrom: cutover,
+      },
+    });
+    rateRows.push(replacement.id);
+  }
+
+  // -------------------------------------------------------------- readings
+
+  const readingsCreated = await Promise.all(
+    metersCreated.map(async (meterId, index) => {
+const meter = await prisma.utilityMeter.findUnique({ where: { id: meterId } });
+      if (!meter) {
+        return 0;
+      }
+
+      // The rolled-over meter's readings are written literally further down, because
+      // their *values* are the point. Generating ordinary ones here as well would
+      // collide on `@@unique([meterId, readingDate])`.
+      if (meter.meterNumber.startsWith('ROLL-PWR-')) {
+        return 0;
+      }
+
+      // Three months of readings so every period has an opening and a closing.
+      const base = 1000 + index * 250;
+      const rows: Array<{
+        organizationId: string;
+        meterId: string;
+        readingDate: Date;
+        reading: number;
+        source: MeterReadingSource;
+        recordedByUserId: string | null;
+        note?: string;
+      }> = [];
+
+      for (let monthOffset = 3; monthOffset >= 1; monthOffset -= 1) {
+        const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - monthOffset, 1));
+        rows.push({
+          organizationId,
+          meterId,
+          readingDate: d,
+          reading: base + (3 - monthOffset) * (40 + (index % 5) * 11),
+          source: MeterReadingSource.MANUAL,
+          recordedByUserId: admin?.id ?? null,
+        });
+      }
+
+      // One estimated reading per meter family, because "we could not read it" is a
+      // real case and the source column should have a row that is not MANUAL.
+      if (index === 0) {
+        rows[rows.length - 1].source = MeterReadingSource.ESTIMATED;
+        rows[rows.length - 1].note = 'Tenant away and the box was locked; estimated from the previous month.';
+      }
+
+      const created = await prisma.meterReading.createMany({ data: rows });
+      return created.count;
+    }),
+  );
+
+  const totalReadings = readingsCreated.reduce((a, b) => a + b, 0);
+
+  // The rolled-over meter needs its own readings written literally, because their
+  // values are the point: the register passing 99999 and returning to 00003.
+  const rolloverMeter = await prisma.utilityMeter.findFirst({
+    where: { organizationId, meterNumber: { startsWith: 'ROLL-PWR-' } },
+  });
+  if (rolloverMeter) {
+    const prev = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 2, 1));
+    const now = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1));
+    await prisma.meterReading.createMany({
+      data: [
+        { organizationId, meterId: rolloverMeter.id, readingDate: prev, reading: 99998, source: MeterReadingSource.MANUAL, recordedByUserId: admin?.id ?? null },
+        { organizationId, meterId: rolloverMeter.id, readingDate: now, reading: 3, source: MeterReadingSource.MANUAL, recordedByUserId: admin?.id ?? null, note: 'Register had passed its maximum and wrapped.' },
+      ],
+    });
+  }
+
+  console.log(
+    `  Utilities: ${metersCreated.length} meters (${bulkMeters.length} bulk), ${totalReadings} readings, ${rateRows.length} tariffs`,
   );
 }

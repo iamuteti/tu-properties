@@ -41,6 +41,37 @@ import type {
 } from './dto/utilities.dto';
 
 /**
+ * Pull a human sentence out of whatever was thrown.
+ *
+ * Nest's `HttpException` puts the message at `err.response.message` (Nest 4+), while
+ * this codebase's Axios-shaped reads elsewhere use `err.response.data.message` — and
+ * a client-side error has it on `err.message` with nothing above it. Trying one shape
+ * and silently falling back to a generic string is how a bulk endpoint ends up
+ * reporting "Could not record this reading" for thirty-nine different reasons.
+ */
+function messageOf(err: unknown): string {
+  const e = err as {
+    response?: { message?: unknown; data?: { message?: unknown } };
+    message?: unknown;
+  };
+
+  const candidates = [
+    e?.response?.message,
+    e?.response?.data?.message,
+    e?.message,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() !== '')
+      return candidate;
+    // A validation failure arrives as an array of messages.
+    if (Array.isArray(candidate) && candidate.length > 0)
+      return candidate.map(String).join('; ');
+  }
+
+  return 'Could not record this reading.';
+}
+
+/**
  * Module 14 - Utilities.
  *
  * Three jobs, kept in one service because they share the same correctness rules and
@@ -393,9 +424,7 @@ export class UtilitiesService {
         failed.push({
           readingDate: dto.readingDate,
           meterId: dto.meterId,
-          message:
-            (err as { response?: { data?: { message?: string } } })?.response
-              ?.data?.message ?? 'Could not record this reading.',
+          message: messageOf(err),
         });
       }
     }
