@@ -44,6 +44,7 @@ export default function NewReadingPage() {
     const [reading, setReading] = useState('');
     const [source, setSource] = useState<MeterReadingSource>('MANUAL');
     const [note, setNote] = useState('');
+    const [estimationMethod, setEstimationMethod] = useState('');
 
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -84,6 +85,9 @@ export default function NewReadingPage() {
                 reading: value,
                 source,
                 ...(note.trim() ? { note: note.trim() } : {}),
+                // The API refuses an estimate with no stated basis, so this is sent
+                // rather than left for the refusal to catch.
+                ...(estimationMethod.trim() ? { estimationMethod: estimationMethod.trim() } : {}),
             });
             router.push(`/utilities/meters/${meterId}`);
         } catch (err) {
@@ -177,10 +181,19 @@ export default function NewReadingPage() {
                                 ))}
                             </Select>
                             {source === 'ESTIMATED' && (
-                                <p className="text-sm text-muted-foreground">
-                                    Marked as estimated so a later audit can tell it from a real reading. Say why
-                                    in the note.
-                                </p>
+                                <>
+                                    <p className="text-sm text-muted-foreground">
+                                        An estimate has to say where the figure came from. The API refuses one that
+                                        does not — a figure nobody can account for will end up on somebody&apos;s
+                                        bill, and nothing about it invites a question.
+                                    </p>
+                                    <Input
+                                        id="estimationMethod"
+                                        value={estimationMethod}
+                                        onChange={(e) => setEstimationMethod(e.target.value)}
+                                        placeholder="e.g. the same as last month, or the average of the last three"
+                                    />
+                                </>
                             )}
                         </div>
 
@@ -190,8 +203,13 @@ export default function NewReadingPage() {
                                 id="note"
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
-                                placeholder="Optional — access refused, estimated from last month, …"
+                                placeholder="Optional — access refused, tenant away, …"
                             />
+                            {source === 'ESTIMATED' && !estimationMethod.trim() && !note.trim() && (
+                                <p className="text-sm text-muted-foreground">
+                                    A note counts as the basis too, so one of the two is enough.
+                                </p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

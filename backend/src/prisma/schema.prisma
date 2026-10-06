@@ -78,6 +78,20 @@ model Organization {
   /// master doc issue 88.
   defaultLocale String? @db.VarChar(35)
 
+  /// Module 14 — Utilities. What to do with a bulk meter's consumption for a unit
+  /// with nobody under a lease.
+  ///
+  /// A commercial policy belonging to the landlord, and deliberately on the
+  /// organization rather than the meter or the property: an organization running
+  /// several estates wants it uniform, and it is a decision about who carries a cost,
+  /// not a property of a building.
+  ///
+  /// **Null means `RECORD_ONLY`** — the charge is priced and reported, and no invoice
+  /// is raised. That is the honest default: it makes a real cost visible without
+  /// inventing a payer, which is the failure the other two options are choosing to
+  /// accept deliberately.
+  vacancyPolicy VacancyPolicy?
+
   /// Which weekdays are non-working, as ISO day-of-week numbers where Monday is
   /// 1 and Sunday is 7 (so the ISO week reads left-to-right). Empty means
   /// Monday-to-Friday. Stored rather than assumed because "Saturday" is not a
@@ -288,6 +302,9 @@ model User {
 preApprovedVisits      VisitorVisit[]    @relation("UserPreApprovedVisits")
   // Module 14 — Utilities. Who keyed in the reading, who raised the charge.
   meterReadings            MeterReading[]  @relation("UserMeterReadings")
+  /// Module 14: a reading marked `ESTIMATED` records who produced the figure, so an
+  /// estimate on a bill can be traced to a person rather than to nobody.
+  readingsEstimated        MeterReading[]  @relation("UserEstimatedReadings")
   utilityChargesCreated    UtilityCharge[] @relation("UserUtilityCharges")
   utilityChargesVoided    UtilityCharge[] @relation("UserVoidedUtilityCharges")
 
@@ -889,14 +906,17 @@ model Unit {
   furnished        Boolean @default(false)
   outSourceParking String? // Out Source/Parking
 
-  // Ownership
+// Ownership
   ownerOccupied Boolean @default(false)
 
-  // Utility Account & Billing Numbers
-  electricityAcno    String?
-  waterAcno          String?
-  electricityMeethno String?
-  waterMeethno       String?
+  // The utility account and meter numbers that used to live here
+  // (`electricityAcno`, `waterAcno`, `electricityMeethno`, `waterMeethno`) are gone.
+  // Module 14's `UtilityMeter` is their replacement and answers strictly more: it
+  // records which utility a number belongs to, which unit it serves, whether it is a
+  // bulk meter, and what it has actually read. Four nullable columns hard-coding two
+  // utilities could not answer any of that, and a fifth utility needed a migration.
+  // Verified before removal: all four were NULL across all 2522 units, and the only
+  // code reference was four optional fields on the frontend `Unit` type.
 
   // Letting Details
   takeOnLettingDate DateTime?
@@ -5976,14 +5996,34 @@ model MeterReading {
   /// The value on the register at `readingDate`.
   reading     Decimal @db.Decimal(12, 2)
 
-  source MeterReadingSource @default(MANUAL)
-  note   String?
+source MeterReadingSource @default(MANUAL)
+  note String?
+
+  /// Who produced an `ESTIMATED` figure and how they got it.
+  ///
+  /// `ESTIMATED` exists because a genuine case has no honest reading - the box was
+  /// locked, the meter was buried, the resident was away - and estimating is the
+  /// standard industry response. But `source = ESTIMATED` alone cannot be audited: it
+  /// says a number was not measured without saying who invented it or on what basis,
+  /// and an un-auditable estimate on a bill is worse than an obvious fudge.
+  ///
+  /// `estimatedFromReadingId` is the reference that makes the number defensible - "we
+  /// assumed last month's usage", which is a checkable claim, as against "we assumed".
+  /// Both are nullable and only meaningful for an estimated reading; nothing enforces
+  /// that here because a `SMART` row legitimately needs neither.
+  estimatedFromReadingId String?
+  estimatedFrom          MeterReading? @relation("EstimatedFromReading", fields: [estimatedFromReadingId], references: [id], onDelete: SetNull)
+  estimationMethod       String?
+  estimatedByUserId      String?
+  estimatedBy            User?          @relation("UserEstimatedReadings", fields: [estimatedByUserId], references: [id], onDelete: SetNull)
 
   recordedByUserId String?
   recordedBy       User?   @relation("UserMeterReadings", fields: [recordedByUserId], references: [id], onDelete: SetNull)
 
   chargesAsOpening UtilityCharge[] @relation("ChargeOpeningReading")
   chargesAsClosing UtilityCharge[] @relation("ChargeClosingReading")
+  /// Readings that were assumed from this one.
+  estimatedReadings MeterReading[] @relation("EstimatedFromReading")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6175,5 +6215,29 @@ enum UtilityChargeStatus {
   /// The charge was written off or reversed. The row stays, so the period still
   /// explains itself.
   VOID
+}
+
+/// What happens to a bulk meter's consumption for a unit with nobody under a lease.
+///
+/// Water keeps arriving whether or not anybody is home to use it, and on a bulk meter
+/// that cost lands on whoever is not there. There is no universally right answer — an
+/// estate can absorb it, re-rate it across the units that *are* occupied, or suspend
+/// billing for the month — so it is a decision the estate makes and the module stores,
+/// rather than a default this module picks on its behalf.
+///
+/// It lives on `Organization` rather than on the meter or the property because it is a
+/// commercial policy that belongs to the landlord, and because an organization running
+/// several estates will want it uniform. Left null, a bulk meter is **never** billed
+/// for a vacant unit: the charge is still priced and reported, because the cost is
+/// real and somebody has to decide about it.
+enum VacancyPolicy {
+  /// Price the consumption, create no invoice, report it. The default, and the honest
+  /// one — it makes the cost visible without inventing a payer.
+  RECORD_ONLY
+  /// Do not create a charge at all for a unit with no lease.
+  SKIP
+  /// Re-rate the vacant unit's share across the occupied units on the same meter.
+  /// Only valid with an apportionment method that can absorb a share.
+  REDISTRIBUTE
 }
 

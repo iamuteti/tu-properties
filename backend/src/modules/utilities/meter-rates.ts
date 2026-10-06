@@ -279,13 +279,74 @@ export function consumptionBetween(
   return { ok: true, consumption: wrapAt - from + to, rolledOver: true };
 }
 
+/** A tenancy, in the shape `occupiedDaysInPeriod` needs. */
+export interface TenancyInput {
+  startDate: Date;
+  /** Null = open-ended, i.e. still running. */
+  endDate: Date | null;
+}
+
+/** UTC day number, the unit occupancy is counted in. */
+function utcDay(date: Date): number {
+  return Math.floor(date.getTime() / 86_400_000);
+}
+
+/**
+ * How many days of a billing period a unit was actually occupied.
+ *
+ * This is what makes `OCCUPANCY` mean anything. Without it the method silently
+ * behaves like `EQUAL`, which is the worst kind of wrong: the split is defensible,
+ * the label on it is not, and nobody finds out until a resident who moved in on the
+ * 20th is charged a full month of the building's water.
+ *
+ * A tenancy covers `startDate` **through** `endDate` inclusive - a lease ending on
+ * the 31st means the 31st was occupied - while the billing window is `[from, to)`.
+ * Mixing those two conventions silently drops a day at every boundary, so each is
+ * made explicit here rather than left to the caller.
+ *
+ * Overlapping tenancies are unioned, not summed. A renewal that was recorded twice,
+ * or a lease that was extended and re-entered, would otherwise report twice the days
+ * the unit was actually there and hand it a bigger share than a unit that was
+ * occupied every day of the month.
+ *
+ * Open-ended tenancies (`endDate = null`) run to the end of the period, and are capped
+ * at the period's own length - a lease that started in 2019 has not occupied this
+ * month more times than the month contains.
+ */
+export function occupiedDaysInPeriod(
+  tenancies: TenancyInput[],
+  window: { from: Date; to: Date },
+): number {
+  const fromDay = utcDay(window.from);
+  // `to` is exclusive, so the last day *in* the period is the day before it.
+  const lastDay = utcDay(window.to) - 1;
+  if (lastDay < fromDay) return 0;
+
+  const covered = new Set<number>();
+  for (const tenancy of tenancies) {
+    const start = utcDay(tenancy.startDate);
+    const end = tenancy.endDate === null ? lastDay : utcDay(tenancy.endDate);
+    const lo = Math.max(start, fromDay);
+    const hi = Math.min(end, lastDay);
+    for (let day = lo; day <= hi; day += 1) {
+      covered.add(day);
+    }
+  }
+
+  return covered.size;
+}
+
+/** Days a `[from, to)` window contains. The denominator occupancy is prorated against. */
+export function daysInWindow(window: { from: Date; to: Date }): number {
+  return Math.max(0, utcDay(window.to) - utcDay(window.from));
+}
+
 /**
  * Divide a bulk meter's consumption across the units it feeds.
  *
  * There is deliberately no default. Every method here is a defensible business
- * decision that produces a different bill, so the estate picks one and the module
- * refuses to invent it - the same refusal discipline Module 10 uses when the bid
- * comparison is a trade-off rather than a winner.
+ * decision that produces a different bill, so there is no default here: a bulk
+ * meter with no method cannot be priced, and that refusal is the correct behaviour.
  */
 export function apportion(
   method: ApportionmentMethod | null,

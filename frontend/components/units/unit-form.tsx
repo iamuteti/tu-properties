@@ -42,10 +42,6 @@ const unitSchema = z.object({
     currency: z.string().optional(),
     chargePlan: z.string().optional(),
     outSourceParking: z.string().optional(),
-    electricityAcno: z.string().optional(),
-    waterAcno: z.string().optional(),
-    electricityMeethno: z.string().optional(),
-    waterMeethno: z.string().optional(),
     takeOnLettingDate: z.string().optional(),
     tenantResidentCodeCounter: z.number().int().min(0).optional().or(z.literal(NaN)),
     apartmentNotes: z.string().optional(),
@@ -57,7 +53,11 @@ const STEPS = [
     { id: 'identity', label: 'Unit', fields: ['propertyId', 'name', 'type', 'sequence', 'floor'] },
     { id: 'specs', label: 'Specifications', fields: ['bedrooms', 'bathrooms', 'areaSqFt', 'furnished', 'ownerOccupied'] },
     { id: 'pricing', label: 'Pricing', fields: ['baseRent', 'currency', 'chargePlan'] },
-    { id: 'utilities', label: 'Utilities', fields: ['electricityAcno', 'waterAcno'] },
+    {
+        id: 'utilities',
+        label: 'Utilities',
+        fields: [],
+    },
     { id: 'features', label: 'Features', fields: [] },
 ] as const;
 
@@ -99,10 +99,6 @@ export function UnitForm({
             currency: 'KES',
             chargePlan: '',
             outSourceParking: '',
-            electricityAcno: '',
-            waterAcno: '',
-            electricityMeethno: '',
-            waterMeethno: '',
             takeOnLettingDate: '',
             apartmentNotes: '',
             furnished: false,
@@ -127,10 +123,6 @@ export function UnitForm({
             currency: initial.currency ?? 'KES',
             chargePlan: initial.chargePlan ?? '',
             outSourceParking: initial.outSourceParking ?? '',
-            electricityAcno: initial.electricityAcno ?? '',
-            waterAcno: initial.waterAcno ?? '',
-            electricityMeethno: initial.electricityMeethno ?? '',
-            waterMeethno: initial.waterMeethno ?? '',
             takeOnLettingDate: initial.takeOnLettingDate ? initial.takeOnLettingDate.slice(0, 10) : '',
             tenantResidentCodeCounter: initial.tenantResidentCodeCounter,
             apartmentNotes: initial.apartmentNotes ?? '',
@@ -364,20 +356,23 @@ export function UnitForm({
 
             {step.id === 'utilities' && (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <Field label="Electricity account no." id="electricityAcno">
-                            <Input id="electricityAcno" {...register('electricityAcno')} disabled={isSubmitting} />
-                        </Field>
-                        <Field label="Water account no." id="waterAcno">
-                            <Input id="waterAcno" {...register('waterAcno')} disabled={isSubmitting} />
-                        </Field>
-                        <Field label="Electricity meter no." id="electricityMeethno">
-                            <Input id="electricityMeethno" {...register('electricityMeethno')} disabled={isSubmitting} />
-                        </Field>
-                        <Field label="Water meter no." id="waterMeethno">
-                            <Input id="waterMeethno" {...register('waterMeethno')} disabled={isSubmitting} />
-                        </Field>
-                    </div>
+                    {/*
+                        Module 14 moved this off the unit entirely. The four fields that
+                        used to be here - the utility company's account number and the
+                        meter's own number, per flat - are now `UtilityMeter` rows, which
+                        also record which utility a number belongs to, whether the meter
+                        is bulk and what it has read. A flat with a bulk meter and no meter
+                        of its own is now representable, which it was not here.
+                    */}
+                    <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                        Utility account and meter numbers are no longer kept on the unit. They live in the meter
+                        register, which records the readings behind them and can tell a sub-meter from a bulk one. A
+                        meter for this unit is registered from{' '}
+                        <a href="/utilities/meters/new" className="font-medium underline">
+                            the meter register
+                        </a>
+                        .
+                    </p>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field label="Take on letting date" id="takeOnLettingDate">
                             <Input id="takeOnLettingDate" type="date" {...register('takeOnLettingDate')} disabled={isSubmitting} />

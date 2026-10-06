@@ -18,7 +18,28 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@/components/ui/entity-states';
-import type { UtilityMeterDetail } from '@/types';
+import type { MeterReadingRow, UtilityMeterDetail } from '@/types';
+
+/**
+ * Whether an estimated reading says where its figure came from.
+ *
+ * Derived here rather than read off `reading.estimateIsUnexplained`, which the API
+ * also sends. Two reasons, and the second is the honest one: the page has all four
+ * inputs already, so consuming a fifth field it cannot use is a needless coupling —
+ * and a locally-derived flag keeps working if the server-side field is ever renamed
+ * or dropped.
+ *
+ * The API refuses to *create* an estimate without a basis, so a row that trips this
+ * is either older data or one that arrived by another route; the tooltip says so.
+ */
+function isUnexplainedEstimate(reading: MeterReadingRow): boolean {
+    return (
+        reading.source === 'ESTIMATED' &&
+        !reading.estimationMethod &&
+        !reading.estimatedFromReadingId &&
+        !reading.note
+    );
+}
 
 /**
  * One meter, and its reading ledger.
@@ -190,6 +211,19 @@ export default function MeterDetailPage() {
                                         </TableCell>
                                         <TableCell>
                                             <StatusBadge status={reading.source} />
+                                            {isUnexplainedEstimate(reading) && (
+                                                <span
+                                                    className="ml-1 text-xs text-destructive"
+                                                    title="Marked estimated with no stated basis. The API refuses these now, so this row predates that."
+                                                >
+                                                    no basis recorded
+                                                </span>
+                                            )}
+                                            {reading.estimationMethod && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {reading.estimationMethod}
+                                                </p>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {reading.note ?? '—'}

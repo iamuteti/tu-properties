@@ -5,9 +5,11 @@ import {
 } from '@nestjs/common';
 import {
   ApportionmentMethod,
+  MeterReadingSource,
   MeterScope,
   UtilityChargeStatus,
   UtilityType,
+  VacancyPolicy,
 } from '@prisma/client';
 import { UtilitiesService } from './utilities.service';
 
@@ -33,6 +35,7 @@ interface MockPrisma {
   utilityRate: MockDelegate;
   utilityCharge: MockDelegate;
   invoice: MockDelegate;
+  organization: MockDelegate;
   property: MockDelegate;
   unit: MockDelegate;
   rentalAgreement: MockDelegate;
@@ -175,6 +178,12 @@ function buildService() {
       count: jest.fn().mockResolvedValue(0),
     },
     invoice: { findFirst: jest.fn() },
+    // The vacancy policy lives on the organization: a commercial decision about who
+    // carries a vacant unit's water belongs to the landlord, not to this module.
+    // Null here means "nobody has decided".
+    organization: {
+      findUnique: jest.fn().mockResolvedValue({ vacancyPolicy: null }),
+    },
     property: { findFirst: jest.fn().mockResolvedValue({ id: PROPERTY_A }) },
     unit: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -182,6 +191,9 @@ function buildService() {
     },
     rentalAgreement: {
       findFirst: jest.fn().mockResolvedValue({ id: LEASE_A }),
+      // One query for every tenancy in the property, which is how OCCUPANCY gets
+      // every unit's occupancy in one round trip instead of one query per unit.
+      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -457,6 +469,88 @@ describe('UtilitiesService — readings', () => {
         reading: 1,
       }),
     ).rejects.toThrow(/no longer read/);
+  });
+
+  it('refuses an estimate that does not say where the figure came from', async () => {
+    // An un-auditable estimate on a resident's bill is worse than an obvious fudge,
+    // because nothing about it invites a question.
+    const { service, prisma } = buildService();
+    prisma.utilityMeter.findFirst.mockResolvedValue(meterRow());
+
+    const promise = service.createReading(ORG_A, {
+      meterId: METER_A,
+      readingDate: '2026-08-01',
+      reading: 4100,
+      source: MeterReadingSource.ESTIMATED,
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+    await expect(promise).rejects.toThrow(
+      /needs to say where the figure came from/,
+    );
+    expect(prisma.meterReading.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts an estimate that names its basis, and records who estimated it', async () => {
+    const { service, prisma } = buildService();
+    prisma.utilityMeter.findFirst.mockResolvedValue(meterRow());
+    prisma.meterReading.create.mockResolvedValue(readingRow());
+
+    await service.createReading(
+      ORG_A,
+      {
+        meterId: METER_A,
+        readingDate: '2026-08-01',
+        reading: 4100,
+        source: MeterReadingSource.ESTIMATED,
+        estimationMethod: 'Average of the last three months',
+      },
+      'user-1',
+    );
+
+    expect(prisma.meterReading.create).toHaveBeenCalledWith(
+      objectContaining({
+        data: objectContaining({
+          estimationMethod: 'Average of the last three months',
+          estimatedByUserId: 'user-1',
+        }),
+      }),
+    );
+  });
+
+  it('refuses an estimate that points at a reading on another meter', async () => {
+    // "Assumed from reading X" names nothing a reader can go and look at if X is not
+    // on this meter.
+    const { service, prisma } = buildService();
+    prisma.utilityMeter.findFirst.mockResolvedValue(meterRow());
+    prisma.meterReading.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.createReading(ORG_A, {
+        meterId: METER_A,
+        readingDate: '2026-08-01',
+        reading: 4100,
+        source: MeterReadingSource.ESTIMATED,
+        estimatedFromReadingId: 'read-other',
+      }),
+    ).rejects.toThrow(/not on this meter/);
+  });
+
+  it('does not attach estimator provenance to a reading that was actually measured', async () => {
+    const { service, prisma } = buildService();
+    prisma.utilityMeter.findFirst.mockResolvedValue(meterRow());
+    prisma.meterReading.create.mockResolvedValue(readingRow());
+
+    await service.createReading(
+      ORG_A,
+      { meterId: METER_A, readingDate: '2026-08-01', reading: 4100 },
+      'user-1',
+    );
+
+    expect(
+      callArg<{ data: Record<string, unknown> }>(prisma.meterReading.create)
+        .data.estimatedByUserId,
+    ).toBeNull();
   });
 
   it('refuses to edit a reading that has already been billed', async () => {
@@ -834,6 +928,95 @@ describe('UtilitiesService — billing', () => {
     expect(result.unbilled[0].reason).toMatch(/no active rental agreement/);
   });
 
+  /** One vacant charge, and a service set up to price-then-invoice it. */
+  function vacantChargePrisma(policy: VacancyPolicy | null) {
+    const built = buildService();
+    const { prisma, invoicesService } = built;
+
+    prisma.utilityMeter.findFirst.mockResolvedValue(meterRow());
+    prisma.utilityRate.findMany.mockResolvedValue([rateRow()]);
+    prisma.utilityRate.findUnique.mockResolvedValue(rateRow());
+    prisma.utilityCharge.findFirst.mockResolvedValue(null);
+    prisma.utilityCharge.findMany.mockResolvedValue([
+      {
+        id: 'charge-vacant',
+        rentalAgreementId: null,
+        currency: 'KES',
+        ratePerUnit: dec('55.5'),
+        vatRate: dec(16),
+        incomeAccount: '4000',
+        revenueExpenseItem: '3',
+        billingPeriod: '2026-08',
+        allocationShare: dec(1),
+        fromReadingId: 'open',
+        toReadingId: 'close',
+        meterId: METER_A,
+        meter: { id: METER_A, meterNumber: 'WTR-001', type: UtilityType.WATER },
+        unit: { id: UNIT_A, code: 'A-101', name: 'Flat 101' },
+      },
+    ]);
+    prisma.rentalAgreement.findUnique.mockResolvedValue(null);
+    prisma.meterReading.findFirst
+      .mockResolvedValueOnce(readingRow({ id: 'open', reading: dec(4000) }))
+      .mockResolvedValueOnce(readingRow({ id: 'close', reading: dec(4150) }));
+    prisma.organization.findUnique.mockResolvedValue({ vacancyPolicy: policy });
+
+    return { ...built, invoicesService };
+  }
+
+  it('treats an undecided vacancy policy as record-only rather than guessing', async () => {
+    // NULL means "nobody has decided". The honest behaviour before they decide is the
+    // one that refuses to invent a payer, which is RECORD_ONLY.
+    const { service, invoicesService } = vacantChargePrisma(null);
+
+    const result = await service.billAndInvoice(ORG_A, {
+      meterId: METER_A,
+      billingPeriod: '2026-08',
+    });
+
+    expect(result.vacancyPolicy).toBe(VacancyPolicy.RECORD_ONLY);
+    expect(result.unbilled).toHaveLength(1);
+    expect(invoicesService.create).not.toHaveBeenCalled();
+  });
+
+  it('SKIP voids the charge and keeps the reason, rather than leaving it pending forever', async () => {
+    const { service, prisma, invoicesService } = vacantChargePrisma(
+      VacancyPolicy.SKIP,
+    );
+
+    const result = await service.billAndInvoice(ORG_A, {
+      meterId: METER_A,
+      billingPeriod: '2026-08',
+    });
+
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toMatch(/does not bill vacant units/);
+    expect(invoicesService.create).not.toHaveBeenCalled();
+    expect(prisma.utilityCharge.update).toHaveBeenCalledWith(
+      objectContaining({
+        where: { id: 'charge-vacant' },
+        data: objectContaining({ status: UtilityChargeStatus.VOID }),
+      }),
+    );
+  });
+
+  it('REDISTRIBUTE refuses to re-rate silently, and says why', async () => {
+    // Moving one unit's share onto its neighbours changes what *other* residents owe,
+    // and a billing run is not the place to decide that.
+    const { service, invoicesService } = vacantChargePrisma(
+      VacancyPolicy.REDISTRIBUTE,
+    );
+
+    const result = await service.billAndInvoice(ORG_A, {
+      meterId: METER_A,
+      billingPeriod: '2026-08',
+    });
+
+    expect(result.unbilled).toHaveLength(1);
+    expect(result.unbilled[0].reason).toMatch(/needs to be run deliberately/);
+    expect(invoicesService.create).not.toHaveBeenCalled();
+  });
+
   it('refuses to bill a sub-meter to a unit it does not serve', async () => {
     const { service, prisma } = augustPrisma();
     prisma.utilityRate.findMany.mockResolvedValue([rateRow()]);
@@ -922,6 +1105,94 @@ describe('UtilitiesService — billing', () => {
     await expect(
       service.billPeriod(ORG_A, { meterId: METER_A, billingPeriod: '2026-08' }),
     ).rejects.toThrow(/No units are attached/);
+  });
+
+  it('splits OCCUPANCY by days actually occupied, not by an even split', async () => {
+    // The regression this pins: OCCUPANCY used to degrade to EQUAL because nothing
+    // supplied `occupiedDays`, so a unit that moved in on the 20th was charged a full
+    // month of the building's water under a label saying otherwise. The worst kind of
+    // wrong — the split is defensible, the label on it is not.
+    const { service, prisma } = buildService();
+    prisma.utilityMeter.findFirst.mockResolvedValue(
+      meterRow({
+        scope: MeterScope.BULK,
+        unitId: null,
+        apportionmentMethod: ApportionmentMethod.OCCUPANCY,
+      }),
+    );
+    prisma.meterReading.findFirst
+      .mockResolvedValueOnce(readingRow({ id: 'open', reading: dec(4000) }))
+      .mockResolvedValueOnce(readingRow({ id: 'close', reading: dec(4300) }));
+    // Equal areas on purpose: the ONLY thing that can make these two shares differ is
+    // occupancy, so an even split here would mean the method is being ignored.
+    prisma.unit.findMany.mockResolvedValue([
+      { id: UNIT_A, areaSqFt: dec(1000) },
+      { id: 'unit-b', areaSqFt: dec(1000) },
+    ]);
+    // August 2026: unit A occupied all 31 days, unit B only from the 20th (12 days).
+    prisma.rentalAgreement.findMany.mockResolvedValue([
+      {
+        id: 'lease-a',
+        unitId: UNIT_A,
+        startDate: new Date('2026-01-01T00:00:00Z'),
+        endDate: null,
+      },
+      {
+        id: 'lease-b',
+        unitId: 'unit-b',
+        startDate: new Date('2026-08-20T00:00:00Z'),
+        endDate: null,
+      },
+    ]);
+    prisma.utilityRate.findMany.mockResolvedValue([rateRow()]);
+    prisma.utilityRate.findUnique.mockResolvedValue(rateRow());
+    prisma.utilityCharge.findFirst.mockResolvedValue(null);
+
+    const result = await service.billPeriod(ORG_A, {
+      meterId: METER_A,
+      billingPeriod: '2026-08',
+    });
+
+    const a = result.charges.find((c) => c.unitId === UNIT_A);
+    const b = result.charges.find((c) => c.unitId === 'unit-b');
+
+    expect(a?.share).toBeCloseTo(31 / 43, 5);
+    expect(b?.share).toBeCloseTo(12 / 43, 5);
+    expect(a?.share).toBeGreaterThan(b?.share ?? 0);
+  });
+
+  it('loads every tenancy in the property in one query rather than one per unit', async () => {
+    // A tower of thirty units would otherwise turn into thirty queries just to build
+    // one apportionment.
+    const { service, prisma } = buildService();
+    prisma.utilityMeter.findFirst.mockResolvedValue(
+      meterRow({
+        scope: MeterScope.BULK,
+        unitId: null,
+        apportionmentMethod: ApportionmentMethod.AREA,
+      }),
+    );
+    prisma.meterReading.findFirst
+      .mockResolvedValueOnce(readingRow({ id: 'open', reading: dec(4000) }))
+      .mockResolvedValueOnce(readingRow({ id: 'close', reading: dec(4300) }));
+    prisma.unit.findMany.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({
+        id: `unit-${i}`,
+        areaSqFt: dec(1000 + i),
+      })),
+    );
+    prisma.rentalAgreement.findMany.mockResolvedValue([]);
+    prisma.utilityRate.findMany.mockResolvedValue([rateRow()]);
+    prisma.utilityRate.findUnique.mockResolvedValue(rateRow());
+    prisma.utilityCharge.findFirst.mockResolvedValue(null);
+
+    await service.billPeriod(ORG_A, {
+      meterId: METER_A,
+      billingPeriod: '2026-08',
+    });
+
+    expect(prisma.rentalAgreement.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.rentalAgreement.findFirst).not.toHaveBeenCalled();
   });
 });
 

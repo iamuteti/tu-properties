@@ -508,11 +508,9 @@ export interface Unit {
     // Ownership
     ownerOccupied?: boolean;
 
-    // Utility Account & Billing Numbers
-    electricityAcno?: string;
-    waterAcno?: string;
-    electricityMeethno?: string;
-    waterMeethno?: string;
+    // The `electricityAcno` / `waterAcno` / `electricityMeethno` / `waterMeethno`
+    // fields are gone: `UtilityMeter` (Module 14) replaced them, and answers which
+    // utility a number belongs to, which unit it serves and what it has read.
 
     // Letting Details
     takeOnLettingDate?: string;
@@ -3711,6 +3709,18 @@ export interface MeterReadingRow {
     rolledOver: boolean;
     source: MeterReadingSource;
     note: string | null;
+    /**
+     * Provenance for an `ESTIMATED` figure: what it was based on, and how.
+     *
+     * `estimateIsUnexplained` is true when a reading is marked estimated with none of
+     * it — which the API now refuses on create, so a row carrying the flag is either
+     * older data or one that arrived by another route. It is surfaced rather than
+     * hidden so the register can show it.
+     */
+    estimationMethod?: string | null;
+    estimatedFromReadingId?: string | null;
+    isEstimate?: boolean;
+    estimateIsUnexplained?: boolean;
 }
 
 export interface UtilityRateRow {
@@ -3790,6 +3800,10 @@ export interface BillRunResult {
      * to decide about, and a silently dropped row is how it goes unnoticed.
      */
     unbilled?: Array<{ chargeId: string; unitCode: string | null; reason: string }>;
+    /** Charges voided because the organization does not bill vacant units. */
+    skipped?: Array<{ chargeId: string; unitCode: string | null; reason: string }>;
+    /** Which vacancy policy the run applied. */
+    vacancyPolicy?: VacancyPolicy;
 }
 
 /** Bulk reading entry returns per-row outcomes, so one bad row does not lose the rest. */
@@ -3838,7 +3852,17 @@ export interface CreateReadingPayload {
     reading: number;
     source?: MeterReadingSource;
     note?: string;
+    /** Required in practice for an `ESTIMATED` reading — see `MeterReadingRow`. */
+    estimationMethod?: string;
+    /** The earlier reading on the same meter this figure was assumed from. */
+    estimatedFromReadingId?: string;
 }
+
+/**
+ * What the organization does with a bulk meter's consumption for a unit with nobody
+ * under a lease. A commercial decision stored on `Organization`, not picked here.
+ */
+export type VacancyPolicy = 'RECORD_ONLY' | 'SKIP' | 'REDISTRIBUTE';
 
 export interface BillPeriodPayload {
     meterId: string;

@@ -5,11 +5,13 @@ import {
 } from '@nestjs/common';
 import {
   ApportionmentMethod,
+  MeterReadingSource,
   MeterScope,
   MeterStatus,
   Prisma,
   UtilityChargeStatus,
   UtilityType,
+  VacancyPolicy,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { requireRecord } from '@/common/utils';
@@ -19,6 +21,8 @@ import {
   apportion,
   calculateCharge,
   consumptionBetween,
+  daysInWindow,
+  occupiedDaysInPeriod,
   presentReading,
   resolveRate,
   utcPeriodWindow,
@@ -231,9 +235,16 @@ export class UtilitiesService {
 
     // The derived pair the module doc asked for, presented rather than stored: each
     // reading is shown against the one before it, with the consumption between them.
+    //
+    // Built through `shapeReading` and then *overlaid* with the derived pair, rather
+    // than mapping `presentReading` directly. The direct version returned only the
+    // four arithmetic fields, so the detail payload had no `id`, `source`, `note` or
+    // estimate provenance on it — which meant the ledger screen could not key or
+    // correct a reading, and the frontend's declared type described a shape the API
+    // was not sending. One shaper, so the list and the detail cannot drift apart.
     const chronologically = [...readings].reverse();
-    const ledger = chronologically.map((reading, i) =>
-      presentReading(
+    const ledger = chronologically.map((reading, i) => {
+      const presented = presentReading(
         i === 0
           ? null
           : {
@@ -242,8 +253,10 @@ export class UtilitiesService {
             },
         { reading: Number(reading.reading), readingDate: reading.readingDate },
         rollover,
-      ),
-    );
+      );
+
+      return { ...this.shapeReading(reading, meter), ...presented };
+    });
 
     return { ...shaped, readings: ledger.reverse() };
   }
@@ -375,6 +388,34 @@ export class UtilitiesService {
       );
     }
 
+    if (
+      dto.source === MeterReadingSource.ESTIMATED &&
+      !dto.estimationMethod &&
+      !dto.estimatedFromReadingId &&
+      !dto.note
+    ) {
+      // Refused rather than warned about. An estimate with no stated basis is the one
+      // number on a resident's bill that nobody can later check, and asking once here
+      // costs a sentence while omitting it costs an unanswerable question forever.
+      throw new BadRequestException(
+        'An estimated reading needs to say where the figure came from. Name the basis — "same as last month", "average of the last three", "engineering estimate" — or point at the reading it was assumed from. A figure nobody can account for will end up on somebody\'s bill.',
+      );
+    }
+
+    if (dto.estimatedFromReadingId) {
+      // The reference has to be a real reading on *this* meter, or "assumed from" names
+      // nothing a reader can go and look at.
+      const source = await this.prisma.meterReading.findFirst({
+        where: { id: dto.estimatedFromReadingId, meterId: meter.id },
+        select: { id: true },
+      });
+      if (!source) {
+        throw new BadRequestException(
+          'That reading is not on this meter, so it cannot be what this estimate was based on.',
+        );
+      }
+    }
+
     const readingDate = new Date(dto.readingDate);
 
     const clash = await this.prisma.meterReading.findUnique({
@@ -396,6 +437,13 @@ export class UtilitiesService {
         source: dto.source,
         note: dto.note,
         recordedByUserId: userId,
+        // An estimate is only auditable if it says where the number came from, so the
+        // provenance travels with it rather than living in a free-text note that a
+        // later reader has to interpret.
+        estimatedFromReadingId: dto.estimatedFromReadingId ?? null,
+        estimationMethod: dto.estimationMethod ?? null,
+        estimatedByUserId:
+          dto.source === MeterReadingSource.ESTIMATED ? (userId ?? null) : null,
       },
     });
 
@@ -820,6 +868,17 @@ export class UtilitiesService {
       },
     });
 
+    // The organization's answer to "whose water is it when nobody is home?" — a
+    // commercial decision that belongs to the landlord, so it is stored on
+    // `Organization` rather than picked here. Null and RECORD_ONLY behave
+    // identically on purpose: a null column means "nobody has decided", and the
+    // honest behaviour before they decide is the one that refuses to invent a payer.
+    const org = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+      select: { vacancyPolicy: true },
+    });
+    const vacancyPolicy = org?.vacancyPolicy ?? VacancyPolicy.RECORD_ONLY;
+
     const invoiced: Array<{
       chargeId: string;
       invoiceId: string;
@@ -828,6 +887,11 @@ export class UtilitiesService {
       unitCode: string | null;
     }> = [];
     const unbilled: Array<{
+      chargeId: string;
+      unitCode: string | null;
+      reason: string;
+    }> = [];
+    const skipped: Array<{
       chargeId: string;
       unitCode: string | null;
       reason: string;
@@ -845,13 +909,50 @@ export class UtilitiesService {
         : null;
 
       if (!lease) {
-        // The consumption was measured and priced; there is simply nobody under a
-        // lease to ask for it. Reported rather than silently dropped, because a
-        // vacant unit's water is a real cost that somebody has to decide about -
-        // see open item 7 in the module doc.
+        // Nobody under a lease to ask for it. What happens next is the
+        // organization's stored decision, not this module's guess — and every branch
+        // reports, because a vacant unit's water is a real cost that somebody has to
+        // decide about rather than a row that should quietly disappear.
+        const unitCode = charge.unit?.code ?? null;
+
+        if (vacancyPolicy === VacancyPolicy.SKIP) {
+          await this.prisma.utilityCharge.update({
+            where: { id: charge.id },
+            data: {
+              status: UtilityChargeStatus.VOID,
+              voidReason: `No active tenancy in ${charge.billingPeriod}; the organization's vacancy policy is to skip.`,
+              voidedAt: new Date(),
+              voidedByUserId: userId ?? null,
+            },
+          });
+          skipped.push({
+            chargeId: charge.id,
+            unitCode,
+            reason:
+              'No active tenancy, and the organization does not bill vacant units. The charge has been voided with that reason.',
+          });
+          continue;
+        }
+
+        if (vacancyPolicy === VacancyPolicy.REDISTRIBUTE) {
+          // Refused rather than performed. Moving one unit's share onto its
+          // neighbours is a change to what other residents owe, decided at the moment
+          // a billing run happens — and a run is not the place to decide it. The
+          // policy is recorded so the estate can see it is configured; making it work
+          // safely needs a deliberate re-run with the occupied set named, which is a
+          // separate piece of work rather than a branch added here quietly.
+          unbilled.push({
+            chargeId: charge.id,
+            unitCode,
+            reason:
+              'No active tenancy, and the organization re-rates vacant consumption across the occupied units. That redistribution has not been applied: it changes what other residents owe, so it needs to be run deliberately rather than as a side effect of billing.',
+          });
+          continue;
+        }
+
         unbilled.push({
           chargeId: charge.id,
-          unitCode: charge.unit?.code ?? null,
+          unitCode,
           reason:
             'The unit has no active rental agreement, so there is nobody to invoice. The charge is priced and waiting.',
         });
@@ -921,7 +1022,7 @@ export class UtilitiesService {
       });
     }
 
-    return { ...priced, invoices: invoiced, unbilled };
+    return { ...priced, invoices: invoiced, unbilled, skipped, vacancyPolicy };
   }
 
   // --------------------------------------------------------------- charges
@@ -1308,16 +1409,48 @@ export class UtilitiesService {
       string,
       number
     > | null;
+
+    // One query for every tenancy in the property that touches the period, rather
+    // than one per unit inside the loop below. It is both the fix for an N+1 that a
+    // tower of thirty units would turn into sixty queries, and the only way OCCUPANCY
+    // can be answered at all - every unit needs its occupancy before any share can be
+    // computed, because shares are relative to each other.
+    const window = periodFromPeriodKey(billingPeriod);
+    const tenancies = await this.prisma.rentalAgreement.findMany({
+      where: {
+        unit: { property: { organizationId: tenantId } },
+        // Any tenancy overlapping the window at all, including an open-ended one.
+        startDate: { lt: window.to },
+        OR: [{ endDate: null }, { endDate: { gte: window.from } }],
+      },
+      select: { id: true, unitId: true, startDate: true, endDate: true },
+    });
+
+    const tenanciesByUnit = new Map<
+      string,
+      Array<{ startDate: Date; endDate: Date | null }>
+    >();
+    for (const tenancy of tenancies) {
+      const list = tenanciesByUnit.get(tenancy.unitId) ?? [];
+      list.push({ startDate: tenancy.startDate, endDate: tenancy.endDate });
+      tenanciesByUnit.set(tenancy.unitId, list);
+    }
+
+    const occupancies = (unitId: string) =>
+      occupiedDaysInPeriod(tenanciesByUnit.get(unitId) ?? [], window);
+
     const apportionable: ApportionableUnit[] = units.map((u) => ({
       id: u.id,
       areaSqFt: u.areaSqFt === null ? null : Number(u.areaSqFt),
+      // Only consulted by OCCUPANCY, and cheap to supply for the others.
+      occupiedDays: occupancies(u.id),
     }));
 
     const split = apportion(meter.apportionmentMethod, apportionable, {
       weights,
       // The denominator is the month being billed, not the month we happen to be in:
       // billing October's period in November must prorate against 31 days.
-      periodDays: daysInPeriodKey(billingPeriod),
+      periodDays: daysInWindow(window),
     });
 
     if (!split.ok) {
@@ -1327,6 +1460,28 @@ export class UtilitiesService {
     const wanted = requestedUnitId
       ? [requestedUnitId]
       : Object.keys(split.shares);
+
+    // Which tenancy to bill, chosen from the same loaded set rather than re-queried.
+    // An occupancy-based split needs the *whole period*'s tenancies, while the invoice
+    // needs the one covering today - so both come out of this one query.
+    const leaseIdAt = (unitId: string) => {
+      const candidates = tenanciesByUnit.get(unitId) ?? [];
+      const covering = candidates.filter(
+        (t) =>
+          t.startDate.getTime() <= Date.now() &&
+          (t.endDate === null || t.endDate.getTime() >= Date.now()),
+      );
+      const chosen = (covering.length > 0 ? covering : candidates).sort(
+        (a, b) => b.startDate.getTime() - a.startDate.getTime(),
+      )[0];
+      if (!chosen) return null;
+      const match = tenancies.find(
+        (t) =>
+          t.unitId === unitId &&
+          t.startDate.getTime() === chosen.startDate.getTime(),
+      );
+      return match?.id ?? null;
+    };
 
     const targets: Array<{
       unitId: string | null;
@@ -1345,12 +1500,11 @@ export class UtilitiesService {
       // line on a resident's statement reads like a mistake, and there is nothing to
       // recover from it.
       if (share <= 0) continue;
-      const lease = await this.activeLeaseFor(tenantId, unitId);
       targets.push({
         unitId,
         share,
         basis: split.basis,
-        rentalAgreementId: lease?.id ?? null,
+        rentalAgreementId: leaseIdAt(unitId),
       });
     }
 
@@ -1540,6 +1694,8 @@ export class UtilitiesService {
       readingDate: Date;
       source: string;
       note: string | null;
+      estimationMethod?: string | null;
+      estimatedFromReadingId?: string | null;
     },
     meter: {
       meterNumber: string;
@@ -1553,6 +1709,7 @@ export class UtilitiesService {
       { reading: Number(r.reading), readingDate: r.readingDate },
       { digits: meter.digits, digitWrapAt: meter.digitWrapAt },
     );
+    const isEstimate = r.source === MeterReadingSource.ESTIMATED;
     return {
       // The id is on the wire because a reading row is the unit of correction - the
       // client corrects a reading by id. Omitting it made every `PATCH
@@ -1570,6 +1727,17 @@ export class UtilitiesService {
       rolledOver: presented.rolledOver,
       source: r.source,
       note: r.note,
+      // Surfaced so the register can *flag* an estimate whose basis was never recorded,
+      // rather than leaving the audit trail to be reconstructed from free text.
+      isEstimate,
+      estimationMethod: r.estimationMethod ?? null,
+      estimatedFromReadingId: r.estimatedFromReadingId ?? null,
+      // An estimate with nothing behind it is the one figure nobody can later check.
+      estimateIsUnexplained:
+        isEstimate &&
+        !r.estimationMethod &&
+        !r.estimatedFromReadingId &&
+        !r.note,
     };
   }
 
@@ -1626,14 +1794,13 @@ export class UtilitiesService {
  * local midnight here put the period's start hours *before* the 1st of the month, so
  * a reading taken on the 1st fell outside the period it opens - caught by live
  * verification, and the same root cause as master doc issue 97.
+ *
+ * `daysInPeriodKey` used to sit beside this and is gone: it counted the same days
+ * with `new Date(year, month, 0).getDate()` in **local** time, which is the identical
+ * time-frame mistake one function further down. `daysInWindow` in `meter-rates.ts`
+ * counts them in UTC from the window itself, so there is now one way to do it.
  */
 function periodFromPeriodKey(key: string): { from: Date; to: Date } {
   const [year, month] = key.split('-').map(Number);
   return utcPeriodWindow(year, month);
-}
-
-/** Days in the month a period key names - the denominator `OCCUPANCY` prorates by. */
-function daysInPeriodKey(key: string): number {
-  const [year, month] = key.split('-').map(Number);
-  return new Date(year, month, 0).getDate();
 }

@@ -181,8 +181,6 @@ export default function UnitDetailPage() {
                             }
                         />
                         <Detail label="Charge plan" value={unit.chargePlan} />
-                        <Detail label="Electricity ACNO" value={unit.electricityAcno} />
-                        <Detail label="Water ACNO" value={unit.waterAcno} />
                     </CardContent>
                 </Card>
 

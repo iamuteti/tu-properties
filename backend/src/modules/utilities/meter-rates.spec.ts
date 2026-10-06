@@ -3,6 +3,8 @@ import {
   billingPeriodOf,
   calculateCharge,
   consumptionBetween,
+  daysInWindow,
+  occupiedDaysInPeriod,
   presentReading,
   resolveRate,
   round2,
@@ -141,6 +143,125 @@ describe('meter-rates', () => {
       ];
       expect(sortReadings(input).map((r) => r.reading)).toEqual([1, 2, 3]);
       expect(input[0].reading).toBe(3);
+    });
+  });
+
+  describe('occupiedDaysInPeriod', () => {
+    const august = utcPeriodWindow(2026, 8); // 31 days, 1 Aug – 1 Sep exclusive
+
+    const d = (iso: string) => new Date(iso);
+
+    it('counts a tenancy that covers the whole period', () => {
+      const days = occupiedDaysInPeriod(
+        [
+          {
+            startDate: d('2026-01-01T00:00:00Z'),
+            endDate: d('2026-12-31T00:00:00Z'),
+          },
+        ],
+        august,
+      );
+      expect(days).toBe(31);
+    });
+
+    it('counts a tenancy that moved in part-way through the month', () => {
+      // The case OCCUPANCY exists for: from the 20th is 12 days, not a full month.
+      const days = occupiedDaysInPeriod(
+        [{ startDate: d('2026-08-20T00:00:00Z'), endDate: null }],
+        august,
+      );
+      expect(days).toBe(12);
+    });
+
+    it('counts a tenancy that ended part-way through the month', () => {
+      const days = occupiedDaysInPeriod(
+        [
+          {
+            startDate: d('2026-07-01T00:00:00Z'),
+            endDate: d('2026-08-10T00:00:00Z'),
+          },
+        ],
+        august,
+      );
+      expect(days).toBe(10);
+    });
+
+    it('includes the end date, because a lease ending on the 10th was there on the 10th', () => {
+      const days = occupiedDaysInPeriod(
+        [
+          {
+            startDate: d('2026-08-01T00:00:00Z'),
+            endDate: d('2026-08-10T00:00:00Z'),
+          },
+        ],
+        august,
+      );
+      expect(days).toBe(10);
+    });
+
+    it('unions overlapping tenancies rather than summing them', () => {
+      // A renewal recorded twice would otherwise report 62 days in a 31-day month
+      // and hand the unit a bigger share than one occupied every day.
+      const days = occupiedDaysInPeriod(
+        [
+          {
+            startDate: d('2026-08-01T00:00:00Z'),
+            endDate: d('2026-08-20T00:00:00Z'),
+          },
+          {
+            startDate: d('2026-08-15T00:00:00Z'),
+            endDate: d('2026-08-31T00:00:00Z'),
+          },
+        ],
+        august,
+      );
+      expect(days).toBe(31);
+    });
+
+    it('caps an open-ended tenancy at the length of the period', () => {
+      const days = occupiedDaysInPeriod(
+        [{ startDate: d('2019-01-01T00:00:00Z'), endDate: null }],
+        august,
+      );
+      expect(days).toBe(31);
+    });
+
+    it('reports zero for a unit with no tenancy at all', () => {
+      expect(occupiedDaysInPeriod([], august)).toBe(0);
+    });
+
+    it('reports zero for a tenancy entirely outside the period', () => {
+      const days = occupiedDaysInPeriod(
+        [
+          {
+            startDate: d('2026-01-01T00:00:00Z'),
+            endDate: d('2026-03-31T00:00:00Z'),
+          },
+        ],
+        august,
+      );
+      expect(days).toBe(0);
+    });
+
+    it('counts a tenancy that spans the whole period from outside it', () => {
+      const days = occupiedDaysInPeriod(
+        [
+          {
+            startDate: d('2025-06-01T00:00:00Z'),
+            endDate: d('2026-09-30T00:00:00Z'),
+          },
+        ],
+        august,
+      );
+      expect(days).toBe(31);
+    });
+  });
+
+  describe('daysInWindow', () => {
+    it('counts the days a billing period contains', () => {
+      expect(daysInWindow(utcPeriodWindow(2026, 8))).toBe(31);
+      expect(daysInWindow(utcPeriodWindow(2026, 9))).toBe(30);
+      expect(daysInWindow(utcPeriodWindow(2028, 2))).toBe(29);
     });
   });
 

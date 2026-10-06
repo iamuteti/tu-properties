@@ -229,6 +229,22 @@ export default function BillingPage() {
                                     </p>
                                 )}
 
+                                {runResult.skipped && runResult.skipped.length > 0 && (
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                        {runResult.skipped.length} voided as vacant:{' '}
+                                        {runResult.skipped.map((s) => s.unitCode ?? 'a unit').join(', ')} — this
+                                        organization does not bill vacant units, and the charge records that reason.
+                                    </p>
+                                )}
+
+                                {runResult.vacancyPolicy && (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                        Vacancy policy applied: {runResult.vacancyPolicy.replace('_', ' ').toLowerCase()}.
+                                        {runResult.vacancyPolicy === 'REDISTRIBUTE' &&
+                                            ' A redistribution has to be run deliberately rather than as a side effect of billing.'}
+                                    </p>
+                                )}
+
                                 {!runResult.invoices?.length && !runResult.unbilled?.length && (
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         Priced only — nothing has been invoiced. Review the figures, then run “Price and

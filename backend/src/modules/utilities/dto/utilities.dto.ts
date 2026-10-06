@@ -220,6 +220,21 @@ export class CreateReadingDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  /**
+   * The earlier reading on the same meter this figure was assumed from. Makes an
+   * estimate checkable rather than merely declared — "the same as last month" is a
+   * claim a reader can go and check.
+   */
+  @IsOptional()
+  @IsString()
+  estimatedFromReadingId?: string;
+
+  /** The basis in words, for the cases a reference cannot express. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  estimationMethod?: string;
 }
 
 /**
