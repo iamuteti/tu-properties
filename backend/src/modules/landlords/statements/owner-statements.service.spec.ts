@@ -10,6 +10,7 @@ import {
   PayoutStatus,
 } from '@prisma/client';
 import { OwnerStatementsService } from './owner-statements.service';
+import { LandlordNotificationsService } from '../landlord-notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
 /**
@@ -23,6 +24,9 @@ import { PrismaService } from '@/prisma/prisma.service';
  */
 describe('OwnerStatementsService', () => {
   let service: OwnerStatementsService;
+  let landlordNotifications: {
+    announceStatementIssued: jest.Mock;
+  };
 
   const landlord = {
     id: 'land-1',
@@ -109,10 +113,21 @@ describe('OwnerStatementsService', () => {
 
   beforeEach(async () => {
     prisma = mockPrisma();
+    landlordNotifications = {
+      announceStatementIssued: jest.fn().mockResolvedValue(undefined),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OwnerStatementsService,
         { provide: PrismaService, useValue: prisma },
+        // Telling the owner is Module 17's job and is best-effort — it swallows its
+        // own failures by design, so a stubbed mock here is not hiding a code path
+        // these tests would otherwise exercise. It is also asserted on directly, so
+        // the wiring is pinned rather than assumed.
+        {
+          provide: LandlordNotificationsService,
+          useValue: landlordNotifications,
+        },
       ],
     }).compile();
 
@@ -235,6 +250,15 @@ describe('OwnerStatementsService', () => {
         }),
       }),
     );
+
+    // Module 17: a **generated** statement is a DRAFT and the owner is not told.
+    // Announcing it would tell an owner their period is ready while somebody is still
+    // checking it, which is a false claim about their money. Asserted here rather than
+    // in a test of its own because this is the only place `generate()` actually runs -
+    // a separate test asserting an untouched mock was not called would pass forever.
+    expect(
+      landlordNotifications.announceStatementIssued,
+    ).not.toHaveBeenCalled();
   });
 
   it('refuses a period that has not finished yet', async () => {
@@ -310,6 +334,93 @@ describe('OwnerStatementsService', () => {
         data: expect.objectContaining({ status: OwnerStatementStatus.ISSUED }),
       }),
     );
+  });
+
+  // ── Module 17: the owner is told when a statement is issued ─────────────────
+
+  it('tells the owner once the statement is issued', async () => {
+    prisma.ownerStatement.findFirst.mockResolvedValue({
+      id: 'stm-1',
+      landlordId: 'land-1',
+      status: OwnerStatementStatus.DRAFT,
+      statementNumber: 'OST-202609-0001',
+      periodStart: new Date('2026-09-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-09-30T23:59:59.999Z'),
+      grossIncome: 0,
+      expenses: 0,
+      managementFee: 0,
+      carriedForward: 0,
+      netPayout: 45_000,
+      currency: 'KES',
+      notes: null,
+      issuedAt: null,
+      incomeLines: [],
+      expenseLines: [],
+      landlord,
+      payouts: [],
+      charges: [],
+    });
+
+    await service.issue('stm-1', 'org-1');
+
+    // Read the mock's argument directly rather than through `expect.objectContaining`,
+    // which returns `any` and adds one more `no-unsafe-assignment` to a file that
+    // already carries seventeen. Reading the typed argument also *checks* the fields:
+    // a renamed key here fails the test instead of silently matching `undefined`.
+    expect(landlordNotifications.announceStatementIssued).toHaveBeenCalledTimes(
+      1,
+    );
+    const [args] = landlordNotifications.announceStatementIssued.mock
+      .calls[0] as [
+      {
+        landlordId: string;
+        statementId: string;
+        reference: string;
+        netPayout: number;
+        currency: string;
+      },
+    ];
+    expect(args.landlordId).toBe('land-1');
+    expect(args.statementId).toBe('stm-1');
+    // `statementNumber`, not `reference` — the column is `statementNumber`, and this
+    // is the value the owner is shown.
+    expect(args.reference).toBe('OST-202609-0001');
+    expect(args.netPayout).toBe(45_000);
+    expect(args.currency).toBe('KES');
+  });
+
+  it('does not tell the owner again when an issued statement is re-issued', async () => {
+    // `issue()` returns early for an already-ISSUED statement, so the message goes
+    // out on the transition rather than on the call. Re-issuing is a normal thing for
+    // an operator to do, and "your statement is ready" twice is the kind of message
+    // that teaches a recipient to ignore the first one.
+    prisma.ownerStatement.findFirst.mockResolvedValue({
+      id: 'stm-1',
+      landlordId: 'land-1',
+      status: OwnerStatementStatus.ISSUED,
+      statementNumber: 'OST-202609-0001',
+      periodStart: new Date('2026-09-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-09-30T23:59:59.999Z'),
+      grossIncome: 0,
+      expenses: 0,
+      managementFee: 0,
+      carriedForward: 0,
+      netPayout: 45_000,
+      currency: 'KES',
+      notes: null,
+      issuedAt: new Date(),
+      incomeLines: [],
+      expenseLines: [],
+      landlord,
+      payouts: [],
+      charges: [],
+    });
+
+    await service.issue('stm-1', 'org-1');
+
+    expect(
+      landlordNotifications.announceStatementIssued,
+    ).not.toHaveBeenCalled();
   });
 
   it('refuses to void a statement that has already been paid out', async () => {

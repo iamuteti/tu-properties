@@ -30,6 +30,7 @@ import {
   renderStatementDocument,
   type StatementDocumentLine,
 } from './statement-document';
+import { LandlordNotificationsService } from '../landlord-notifications.service';
 
 /**
  * Owner statements (Module 6).
@@ -123,7 +124,10 @@ export interface StatementPreview {
 
 @Injectable()
 export class OwnerStatementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly landlordNotifications: LandlordNotificationsService,
+  ) {}
 
   // ------------------------------------------------------------ derivation
 
@@ -659,6 +663,25 @@ export class OwnerStatementsService {
     await this.prisma.ownerStatement.update({
       where: { id },
       data: { status: OwnerStatementStatus.ISSUED, issuedAt: new Date() },
+    });
+
+    // Tell the owner, *after* the update and outside it.
+    //
+    // Two deliberate choices. **After**, because a notification that announces an
+    // issued statement and then loses the race to write it would tell an owner
+    // something untrue. **Outside the transaction**, because the message is a courtesy
+    // about a fact already committed: making an issued statement wait on a mail server
+    // would mean an SMTP timeout failing the accounting department's work, and the
+    // failure is swallowed inside the notifications service anyway.
+    await this.landlordNotifications.announceStatementIssued({
+      organizationId,
+      landlordId: statement.landlordId,
+      statementId: statement.id,
+      reference: statement.statementNumber,
+      periodStart: statement.periodStart,
+      periodEnd: statement.periodEnd,
+      netPayout: Number(statement.netPayout ?? 0),
+      currency: statement.currency,
     });
 
     return this.findOne(id, organizationId);

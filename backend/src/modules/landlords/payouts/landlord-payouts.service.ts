@@ -14,6 +14,7 @@ import type {
 } from './dto/payout.dto';
 import { checkPayoutStatusChange } from './payout-status';
 import { computeStatementUnsettled } from '../statements/statement-calculator';
+import { LandlordNotificationsService } from '../landlord-notifications.service';
 import type {
   PaginationParams,
   PaginatedResult,
@@ -30,7 +31,10 @@ import type {
  */
 @Injectable()
 export class LandlordPayoutsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly landlordNotifications: LandlordNotificationsService,
+  ) {}
 
   async create(
     dto: CreatePayoutDto,
@@ -279,6 +283,36 @@ export class LandlordPayoutsService {
         }
       }
     });
+
+    // Tell the owner their money has actually left, after the transaction commits and
+    // only on the PENDING/FAILED -> PAID edge.
+    //
+    // **On the transition, not on the value.** `update()` accepts a DTO that may restate
+    // a status the payout already holds, and a re-save of an already-PAID payout must not
+    // produce a second "your money has been paid" email. Gating on `payout.status !== PAID`
+    // is what makes the edge explicit — and `dedupeKey` is per payout as a second line of
+    // defence rather than the first, because a dedupe key that hides a duplicate also
+    // hides a genuine second payment.
+    if (
+      dto.status === PayoutStatus.PAID &&
+      payout.status !== PayoutStatus.PAID
+    ) {
+      await this.landlordNotifications.announcePayoutPaid({
+        organizationId,
+        landlordId: payout.landlordId,
+        payoutId: payout.id,
+        amount: Number(payout.amount),
+        currency: payout.currency,
+        // Read from the DTO and the row rather than from `data`: `data` is a Prisma
+        // update input, so `data.reference` is typed as a string *or* an update
+        // operation object, and reading it would put that union in an email body.
+        // `dto.reference ?? payout.reference` is the same value the row will hold.
+        bankReference: dto.reference ?? payout.reference ?? null,
+        // The statement number is the identifier an owner recognises, and it is
+        // already on the payout's included relation.
+        statementNumber: payout.ownerStatement?.statementNumber ?? null,
+      });
+    }
 
     return this.findOne(id, organizationId);
   }

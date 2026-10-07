@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { OwnerStatementStatus, PayoutStatus } from '@prisma/client';
 import { LandlordPayoutsService } from './landlord-payouts.service';
+import { LandlordNotificationsService } from '../landlord-notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
 /**
@@ -18,6 +19,9 @@ import { PrismaService } from '@/prisma/prisma.service';
  */
 describe('LandlordPayoutsService', () => {
   let service: LandlordPayoutsService;
+  let landlordNotifications: {
+    announcePayoutPaid: jest.Mock;
+  };
   let prisma: ReturnType<typeof mockPrisma>;
 
   const statement = {
@@ -72,10 +76,19 @@ describe('LandlordPayoutsService', () => {
 
   beforeEach(async () => {
     prisma = mockPrisma();
+    landlordNotifications = {
+      announcePayoutPaid: jest.fn().mockResolvedValue(undefined),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LandlordPayoutsService,
         { provide: PrismaService, useValue: prisma },
+        // Best-effort delivery, swallowed by design, and asserted on directly so the
+        // PENDING -> PAID wiring is pinned rather than assumed.
+        {
+          provide: LandlordNotificationsService,
+          useValue: landlordNotifications,
+        },
       ],
     }).compile();
 
@@ -172,6 +185,83 @@ describe('LandlordPayoutsService', () => {
     expect(data.status).toBe(PayoutStatus.PAID);
     expect(data.reference).toBe('BNK-77881');
     expect(data.paidAt).toBeInstanceOf(Date);
+  });
+
+  // ── Module 17: the owner is told when their money actually leaves ───────────
+
+  it('tells the owner when a payout crosses into PAID', async () => {
+    prisma.landlordPayout.findFirst.mockResolvedValue({
+      id: 'po-1',
+      landlordId: 'land-1',
+      amount: 20_000,
+      currency: 'KES',
+      status: PayoutStatus.PROCESSING,
+      reference: null,
+      failureReason: null,
+      ownerStatement: null,
+    });
+
+    await service.updateStatus(
+      'po-1',
+      { status: PayoutStatus.PAID, reference: 'BNK-77881' },
+      'org-1',
+    );
+
+    expect(landlordNotifications.announcePayoutPaid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        landlordId: 'land-1',
+        payoutId: 'po-1',
+        amount: 20_000,
+        bankReference: 'BNK-77881',
+      }),
+    );
+  });
+
+  it('does NOT re-tell the owner when an already-PAID payout is re-saved', async () => {
+    // The edge, not the value. `updateStatus` accepts a DTO that may restate the
+    // status a payout already holds, and a second "your money has been paid" email
+    // for one payment is the kind of thing an owner stops trusting everything else
+    // over. `dedupeKey` would also catch it — but a dedupe key that hides a duplicate
+    // would equally hide a genuine second payment, so the state change is the guard.
+    prisma.landlordPayout.findFirst.mockResolvedValue({
+      id: 'po-1',
+      landlordId: 'land-1',
+      amount: 20_000,
+      currency: 'KES',
+      status: PayoutStatus.PAID,
+      reference: 'BNK-77881',
+      failureReason: null,
+      ownerStatement: null,
+    });
+
+    await service.updateStatus(
+      'po-1',
+      { status: PayoutStatus.PAID, reference: 'BNK-77881' },
+      'org-1',
+    );
+
+    expect(landlordNotifications.announcePayoutPaid).not.toHaveBeenCalled();
+  });
+
+  it('does not tell the owner about a payout that failed', async () => {
+    prisma.landlordPayout.findFirst.mockResolvedValue({
+      id: 'po-1',
+      landlordId: 'land-1',
+      amount: 20_000,
+      currency: 'KES',
+      status: PayoutStatus.PENDING,
+      reference: null,
+      failureReason: null,
+      ownerStatement: null,
+    });
+
+    await service.updateStatus(
+      'po-1',
+      { status: PayoutStatus.FAILED, failureReason: 'Account closed' },
+      'org-1',
+    );
+
+    expect(landlordNotifications.announcePayoutPaid).not.toHaveBeenCalled();
   });
 
   it('refuses to mark a payout paid without a reference', async () => {

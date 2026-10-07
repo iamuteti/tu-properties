@@ -15,7 +15,7 @@
 
 **Most of the trigger wiring this doc's Status Hint calls open is in fact already done**, which the table in `00-MASTER-ARCHITECTURE.md` §4b still gets wrong in the opposite direction to its usual error. Wired today: leases (request decisions), the notifications sweep itself (rent due, overdue rent, lease expiry, **contract expiry**), **maintenance** (new report, assignment, every status change to the resident), **inventory** (post-movement and daily reorder sweep), **facilities** (booking awaiting approval, booking decision, visitor arrival, card expiring), **workflow** (`APPROVAL_REQUESTED` / `_DECIDED` / `_ESCALATED`) and **procurement** (purchase-request approvals). Each owning module wraps `NotificationsService` in its own thin `*-notifications.service.ts` — so grepping for `NotificationType.X` finds almost nothing and is the wrong way to audit this. **Ask what each module's notifications service can do and who calls it.**
 
-**Genuinely still open: the two owner-facing triggers.** `OWNER_STATEMENT_READY` and `PAYOUT_PAID` exist in the enum and nothing sends them, because a `Landlord` is neither a `User` nor a `Tenant` — the `notifications` table has only `userId`/`tenantId`, `NotificationsService.notify()` requires one of those two, and there is no landlord login (the owner portal is Phase 2, issue 64). All 120 demo landlords have an email and a phone, so the contact details are not the obstacle; **the recipient model is.** See "Owner statements and payouts" below.
+**The two owner-facing triggers are now wired** — `OWNER_STATEMENT_READY` and `PAYOUT_PAID` were the last genuinely-open items, blocked for a month on the recipient model rather than on a missing call. Fixed by adding `landlordId` to `notifications` and to `NotificationRecipient` (migration `20261007120000_module17_landlord_notifications`), which is issue 123 below. **What remains open is narrower:** SMS has still never sent, there is no WhatsApp or push provider at all, and an owner cannot opt out of a channel (issue 124) because preferences are keyed on `userId` and there is no owner portal to record the choice in.
 
 **SMS is still unproven in the running app.** Both providers are implemented and unit-tested against stubbed HTTP, credentials round-trip encrypted, and a test-send reaches the vendor and reports the vendor's own rejection — but no SMS has left the building, because no SMS credentials are configured. The channel reports `SUPPRESSED` with the reason *"No SMS provider is active — configure one in the admin panel"*, which is the honest behaviour and is verified live.
 
@@ -51,17 +51,32 @@ npm run smtp:sink            # listens on 127.0.0.1:2525, writes /tmp/opencode/s
 
 `smtp-server` ships no types, which is why `backend/src/types/smtp-server.d.ts` declares the surface this repo actually uses. Adding it removed four now-obsolete `eslint-disable` directives from `email-smtp.integration.spec.ts` — those directives existed only because the import was `any`, and a disabled rule is a rule nobody reads.
 
-### Owner statements and payouts — blocked on the recipient model
+### Owner statements and payouts — DONE 2026-10-07 (issue 123)
 
-`OWNER_STATEMENT_READY` fires from `OwnerStatementsService.issue()` and `PAYOUT_PAID` from the payout `PAID` transition. Both are one call away, and the document an owner would receive already renders from the frozen statement snapshot, so there is nothing to build on the content side — **only the addressing question.** Three options, and they are not equivalent:
+Option A, as recommended: **`landlordId` added to `notifications` and to `NotificationRecipient`** by migration `20261007120000_module17_landlord_notifications`, with `contactFor()` learning a third branch. An owner is now a first-class recipient on exactly the footing a portal resident is.
 
-| Option | Cost | Consequence |
-|---|---|---|
-| **A. Add `landlordId` to `notifications` and to `NotificationRecipient`** | One migration; `contactFor()` learns a third branch | Matches the existing "addressed by `userId` or `tenantId`" design exactly. Keeps the audit trail, `dedupeKey` idempotency and the read/unread state that an owner's next notification will need. **Recommended.** |
-| B. Mail `Landlord.email` directly from the landlords module | None | Loses the notification row entirely — no audit trail, no dedupe, and no record that anything was sent. Re-introduces exactly the kind of side-channel this module exists to avoid. |
-| C. Notify internal staff instead of the owner | None | Defensible as an interim step (the accounts clerk *should* know a statement was issued), but it is not what the enum value means, and it would leave the owner-facing half of the module still unwired. |
+Four decisions in the migration and the wiring:
 
-Whichever is chosen, the trigger belongs in a `landlord-notifications.service.ts` alongside the existing per-module ones, so the landlords services stay about landlords.
+1. **`notifications_one_recipient` CHECK — `num_nonnolls("userId","tenantId","landlordId") >= 1`.** The service has always thrown on a recipient-less notification, but three nullable columns with no constraint is how a row becomes an orphan nobody can find. Probed with four inserts: landlord-only **accepted**, no recipient **refused by the CHECK**, landlord+user **accepted**, bogus landlord **refused by the FK**. The existing 2,924 rows were verified compliant before the constraint was added (0 with a NULL `organizationId`, 0 with no recipient).
+2. **`>= 1`, not `== 1`.** When the Phase 2 owner portal lands a landlord *will* also be a `User`, and a row may legitimately carry both. Writing it as `>= 1` means that transition needs no second migration — the same reasoning as Module 15's `contracts_one_related_entity`.
+3. **Owners are reached on EMAIL and SMS and deliberately *not* `IN_APP`.** In-app notifications are read out of a signed-in user's own list, and a landlord has no login, so an in-app row would sit unread in a list nobody can open — which makes the one screen an administrator *does* check look busy rather than making the owner informed. `IN_APP` comes back here and nowhere else when the portal lands.
+4. **Both triggers fire on the *transition*, not on the value.** `issue()` on a DRAFT only (an already-`ISSUED` statement returns early, so re-issuing does not re-notify), and `updateStatus` only when `payout.status !== PAID` — the DTO can restate a status the row already holds, and a second "your money has been paid" for one payment is what teaches a recipient to ignore the first. `dedupeKey` would also catch it, but a key that hides a duplicate would equally hide a genuine second payment, so the state change is the guard.
+
+**A consequence worth stating rather than discovering:** preferences are keyed on `userId`, so a landlord has no preference row and is therefore always "wanting" every channel. **An owner cannot currently opt out of SMS, and this module will send them one.** There is no owner portal in which to record the choice — recorded as **issue 124** rather than left as a surprise when the first owner complains.
+
+### Verified live, 2026-10-07 (owner triggers)
+
+| Check | Result |
+|---|---|
+| `POST /owner-statements` then `/issue` | 2 rows written, addressed by `landlordId` — SMS and EMAIL both `SUPPRESSED` with an accurate reason |
+| `/issue` twice more | rows for that statement stayed at **2** — the transition guard holds |
+| `PATCH /landlord-payouts/:id/status` → PAID | EMAIL **SENT**, SMS `SUPPRESSED`; the local sink captured the message at the landlord's real address |
+| Subject line | "Your payout of 3322883.05 KES has been paid" |
+| Every owner-facing row | 6 of 6 carry a non-null `landlordId` |
+
+Two real fixes came out of the live run rather than from review. The **first** payout message read *"Payout cmuxt37b6128pn1i09xm7lnnb has been paid"* — `LandlordPayout` has no payout number (its `reference` column is the *bank* reference), so the cuid was the only identifier available and an internal row id was in a sentence addressed to a person; the title now leads with the figure and the bank reference stays in the body where it belongs. The **second** was `535 Authentication not implemented` from the local sink — my sink's bug, and the application behaved correctly throughout by recording `FAILED` with the server's own reason rather than claiming a send that never happened.
+
+Every new statement is annotated with why, `LandlordsModule` imports `NotificationsModule` **one-directionally** (the issue-85 rule), and the new service swallows its own failures: failing an issued statement because a mail server was slow would be worse than an owner who finds out by looking.
 
 ## Module Goal
 Automated reminders and alerts across email, SMS, push, and WhatsApp.

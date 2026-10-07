@@ -582,11 +582,13 @@ model Landlord {
   receipts        Receipt[]
   credits         CustomerCredit[] @relation("LandlordCredits")
   creditNotes     CreditNote[]     @relation("LandlordCreditNotes")
-ownerStatements OwnerStatement[]
+  ownerStatements OwnerStatement[]
   payouts         LandlordPayout[]
   charges         LandlordCharge[]
   // Module 15 - Documents & Legal. The property management agreement.
   contracts       Contract[]
+  // Module 17 - Notifications. An owner's statement and their payout notices.
+  notifications Notification[] @relation("LandlordNotifications")
 
   // Audit fields
   createdAt DateTime  @default(now())
@@ -3042,6 +3044,15 @@ model Notification {
 
   tenantId String?
   tenant   Tenant? @relation("TenantNotifications", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// An owner recipient, on exactly the same footing as a portal resident: landlords
+  /// have no login of their own until the owner portal lands, so a statement issued
+  /// to an owner cannot be addressed to a `User`. Added for Module 17 rather than
+  /// mailing `Landlord.email` from the landlords module, because the row is the
+  /// audit trail, the `dedupeKey` is what makes the reminder sweep idempotent, and
+  /// both are lost the moment a notification is sent by any other route.
+  landlordId String?
+  landlord   Landlord? @relation("LandlordNotifications", fields: [landlordId], references: [id], onDelete: Cascade)
 
   type     NotificationType
   channel  NotificationChannel  @default(IN_APP)

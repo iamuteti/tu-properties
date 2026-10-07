@@ -54,6 +54,16 @@ describe('NotificationsService', () => {
           .fn()
           .mockResolvedValue({ email: 't@b.co', phone: '0701' }),
       },
+      // Module 17's third recipient. Present in the mock because `prisma` is typed
+      // from this object, which is the point of typing it: a new query that nobody
+      // anticipated fails to compile here instead of throwing `undefined.findUnique`
+      // at runtime — which is how the landlord path would otherwise have shipped
+      // untested (Module 12's note, and issue 112's lesson).
+      landlord: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ email: 'owner@b.co', phone: '0702' }),
+      },
     };
   }
 
@@ -105,7 +115,109 @@ describe('NotificationsService', () => {
         { type: NotificationType.CUSTOM, title: 'x', body: 'y' },
         {},
       ),
-    ).rejects.toThrow(/needs a userId or a tenantId/i);
+    ).rejects.toThrow(/needs a userId, tenantId or landlordId/i);
+  });
+
+  // ── The landlord recipient (Module 17) ──────────────────────────────────────
+  //
+  // An owner is addressed by `landlordId` for the same reason a portal resident is
+  // addressed by `tenantId`: neither has a login of their own. These pin the three
+  // things that made the addition non-trivial — the contact is resolved from the
+  // landlord row, the row is persisted with `landlordId` rather than a user, and an
+  // owner is still covered by the "always wanted" preference default because there is
+  // no owner portal to record an opt-out in.
+
+  /**
+   * The `data` of the one `notification.create()` call, typed.
+   *
+   * Narrowed here rather than with `expect.objectContaining`, which returns `any`:
+   * the cast has to happen on `mock.calls` as a whole, because *indexing* into an
+   * `any` is itself the `no-unsafe-member-access` the rule reports. The win over the
+   * matcher is that these assertions are checked against a declared shape, so renaming
+   * a column fails the test instead of quietly comparing `undefined`.
+   */
+  function createdNotification(): {
+    landlordId: string | null;
+    userId: string | null;
+    tenantId: string | null;
+  } {
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    const calls = prisma.notification.create.mock.calls as [
+      {
+        data: {
+          landlordId: string | null;
+          userId: string | null;
+          tenantId: string | null;
+        };
+      },
+    ][];
+    return calls[0][0].data;
+  }
+
+  it('resolves a landlord recipient’s contact from the landlord row', async () => {
+    prisma.landlord.findUnique.mockResolvedValue({
+      email: 'owner@example.test',
+      phone: '+254700000111',
+    });
+
+    const results = await service.notify(
+      {
+        type: NotificationType.OWNER_STATEMENT_READY,
+        title: 'Statement ready',
+        body: 'Your statement is ready',
+        channels: [NotificationChannel.EMAIL],
+      },
+      { landlordId: 'land-1' },
+    );
+
+    expect(prisma.landlord.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'land-1' } }),
+    );
+    expect(results[0].channel).toBe(NotificationChannel.EMAIL);
+  });
+
+  it('persists a landlord row rather than a user or tenant row', async () => {
+    prisma.landlord.findUnique.mockResolvedValue({
+      email: 'owner@example.test',
+      phone: null,
+    });
+
+    await service.notify(
+      {
+        type: NotificationType.PAYOUT_PAID,
+        title: 'Paid',
+        body: 'Your payout has been paid',
+        channels: [NotificationChannel.EMAIL],
+      },
+      { landlordId: 'land-2' },
+    );
+
+    // Read the typed argument rather than through `expect.objectContaining`, which
+    // returns `any` and adds a `no-unsafe-assignment` to a file that already carries
+    // several. It also *checks* the shape: a rename fails the test instead of quietly
+    // matching `undefined`.
+    const created = createdNotification();
+    expect(created.landlordId).toBe('land-2');
+    expect(created.userId).toBeNull();
+    expect(created.tenantId).toBeNull();
+  });
+
+  it('suppresses rather than fails when a landlord has no email', async () => {
+    prisma.landlord.findUnique.mockResolvedValue({ email: null, phone: null });
+
+    const results = await service.notify(
+      {
+        type: NotificationType.OWNER_STATEMENT_READY,
+        title: 'Statement ready',
+        body: 'Your statement is ready',
+        channels: [NotificationChannel.EMAIL],
+      },
+      { landlordId: 'land-3' },
+    );
+
+    // `SUPPRESSED` and not `FAILED`: nothing went wrong, there was simply nowhere to
+    // send it, and an operator needs to tell those two apart.
+    expect(results[0].status).toBe(NotificationStatus.SUPPRESSED);
   });
 
   it('records one row per channel', async () => {

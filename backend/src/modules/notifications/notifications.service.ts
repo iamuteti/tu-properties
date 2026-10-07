@@ -17,6 +17,24 @@ type Tx = Prisma.TransactionClient;
 export interface NotificationRecipient {
   userId?: string | null;
   tenantId?: string | null;
+  /**
+   * An owner recipient.
+   *
+   * Third addressing mode, and it exists for the same reason `tenantId` does: this
+   * product's counterparties mostly have no login of their own. A portal resident is
+   * a `Tenant`; an owner is a `Landlord`. Neither is a `User`, and an owner statement
+   * issued to a landlord cannot be delivered by addressing a user who does not exist.
+   *
+   * Added with migration `20261007120000_module17_landlord_notifications`, which also
+   * adds `notifications.landlordId` and a `notifications_one_recipient` CHECK so a row
+   * cannot be written with no recipient at all — previously that was only prevented by
+   * the throw two lines below `notify()`, which a direct insert could walk past.
+   *
+   * At least one of the three is required, and **more than one is allowed**: once the
+   * Phase 2 owner portal lands a landlord will also be a `User`, and the constraint is
+   * written `>= 1` so that transition needs no second migration.
+   */
+  landlordId?: string | null;
 }
 
 export interface NotificationRequest {
@@ -183,8 +201,10 @@ export class NotificationsService {
     request: NotificationRequest,
     recipient: NotificationRecipient,
   ): Promise<DeliveryResult[]> {
-    if (!recipient.userId && !recipient.tenantId) {
-      throw new Error('A notification needs a userId or a tenantId recipient');
+    if (!recipient.userId && !recipient.tenantId && !recipient.landlordId) {
+      throw new Error(
+        'A notification needs a userId, tenantId or landlordId recipient',
+      );
     }
 
     const channels = request.channels ?? [NotificationChannel.IN_APP];
@@ -273,6 +293,7 @@ export class NotificationsService {
           organizationId: request.organizationId ?? null,
           userId: recipient.userId ?? null,
           tenantId: recipient.tenantId ?? null,
+          landlordId: recipient.landlordId ?? null,
           type: request.type,
           channel,
           priority: request.priority ?? NotificationPriority.NORMAL,
@@ -334,6 +355,17 @@ export class NotificationsService {
       });
       return { email: tenant?.email ?? null, phone: tenant?.phone ?? null };
     }
+    if (recipient.landlordId) {
+      // `alternativePhone` is deliberately **not** folded in. A statement is
+      // something to read rather than something to be called about, so email is the
+      // route that matters; silently preferring a second number would mean an SMS
+      // arriving from a number the owner does not recognise.
+      const landlord = await this.prisma.landlord.findUnique({
+        where: { id: recipient.landlordId },
+        select: { email: true, phone: true },
+      });
+      return { email: landlord?.email ?? null, phone: landlord?.phone ?? null };
+    }
     return { email: null, phone: null };
   }
 
@@ -343,6 +375,16 @@ export class NotificationsService {
     type: NotificationType,
     channel: NotificationChannel,
   ): Promise<boolean> {
+    // Preferences are keyed on `userId` only, so a tenant or a landlord has none and
+    // is always "wanting" every channel. That is the right default for a tenant (who
+    // has no settings page to change) and a **deliberate one for a landlord**: there is
+    // no owner portal to opt out from, so the choice about whether an owner wants SMS
+    // has nowhere to be recorded yet.
+    //
+    // Consequence worth stating plainly, because it is not neutral: an owner cannot
+    // currently opt out of SMS, and this module will send them one. When the Phase 2
+    // owner portal lands, `notification_preferences` needs a landlord-keyed variant and
+    // this line needs a branch — recorded as issue 124 rather than left as a surprise.
     if (!recipient.userId) return true;
     const preference = await this.prisma.notificationPreference.findUnique({
       where: { userId_type: { userId: recipient.userId, type } },

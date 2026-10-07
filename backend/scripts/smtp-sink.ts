@@ -34,6 +34,23 @@ interface Captured {
 const server = new SMTPServer({
   authOptional: true,
   disabledCommands: ['STARTTLS'],
+  /**
+   * Accept whatever credentials are offered.
+   *
+   * `authOptional: true` alone is not enough: nodemailer offers AUTH whenever the
+   * server advertises it, and `smtp-server` rejects an AUTH it has no handler for, so
+   * the first live run failed with `535 EAUTH` against this sink. The application
+   * behaved correctly throughout — it recorded `FAILED` with the server's own reason
+   * rather than claiming a send that never happened — but the sink was wrong, so it
+   * now accepts.
+   *
+   * Rejection paths are not this script's job: `email-smtp.integration.spec.ts`
+   * already covers a bad password and an unreachable host against a server that *does*
+   * check credentials.
+   */
+  onAuth(_auth, _session, callback) {
+    callback(null, { user: 'sink' });
+  },
   onData(stream, _session, callback) {
     let raw = '';
     stream.on('data', (chunk) => (raw += chunk.toString()));
