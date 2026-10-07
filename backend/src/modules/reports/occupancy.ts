@@ -267,6 +267,46 @@ export function occupancyMetrics(
   };
 }
 
+/** Longest trend this endpoint will draw, in months. */
+export const MAX_TREND_MONTHS = 24;
+
+/**
+ * The window a trend of `months` points ending at `now` covers.
+ *
+ * **This function exists because of a bug.** The service called
+ * `monthEnds(new Date(), new Date(), months)` - `from` and `to` both *now* - so
+ * `monthEnds`' own guard (`end < startOfMonth(from)`) was true on the second iteration and
+ * the series came back with exactly one point whatever `months` was asked for. The
+ * parameter was inert: `?months=1` and `?months=12` both returned a single bar, and the
+ * pure function's own 34 tests all passed throughout, because every one of them supplied a
+ * real `from`. **The defect was in the composition, not the arithmetic.**
+ *
+ * So the range is now derived here rather than at the call site, and `monthEnds` is left
+ * doing only what it was written to do.
+ *
+ * The window *includes* the current month: `months: 6` ending in October covers May through
+ * October, which is six points. Starting from the month `months - 1` back is what makes the
+ * count come out right - counting back `months` and adding the current month gives seven.
+ */
+export function trendRange(
+  now: Date,
+  months: number,
+): { from: Date; to: Date; points: Date[] } {
+  const count = Math.min(
+    Math.max(Math.trunc(months) || 1, 1),
+    MAX_TREND_MONTHS,
+  );
+  const to = now;
+
+  // Year/month arithmetic in UTC, so a negative month index rolls the year over correctly
+  // and the series lines up with the UTC instants the dates are compared against.
+  const from = new Date(
+    Date.UTC(to.getUTCFullYear(), to.getUTCMonth() - (count - 1), 1),
+  );
+
+  return { from, to, points: monthEnds(from, to, count) };
+}
+
 /**
  * The month-ends a trend series covers, oldest first.
  *
@@ -283,8 +323,8 @@ export function monthEnds(from: Date, to: Date, maxMonths = 24): Date[] {
   // Walk **backwards** from `to`'s month, one month at a time, and unshift each. Going
   // backwards and prepending is what makes the cap trivial to honour and the order
   // ascending by construction rather than by a final `reverse()` that could be forgot.
-  let year = to.getFullYear();
-  let month = to.getMonth();
+  let year = to.getUTCFullYear();
+  let month = to.getUTCMonth();
 
   while (points.length < maxMonths) {
     const end = lastInstantOfMonth(year, month);
@@ -309,13 +349,22 @@ export function monthEnds(from: Date, to: Date, maxMonths = 24): Date[] {
  * silently rolls forward into March - so the series came out containing 2 January and
  * the wrong number of points. Arithmetic on a day-of-month is the whole hazard here.
  */
+/**
+ * The last instant of a month, in **UTC**.
+ *
+ * UTC because every `DateTime` in this schema is `timestamp without time zone` holding a
+ * UTC instant, and a local-time month-end on a UTC+3 server is three hours into the next
+ * month - which files the final day of October into November's bucket. This is issue 97
+ * arriving through the date layer rather than through SQL, and it gets the same answer
+ * Module 14 gave it in `utcPeriodWindow`: UTC, with no local-time sibling.
+ */
 function lastInstantOfMonth(year: number, month: number): Date {
-  return new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
 }
 
-/** The first instant of the month `date` falls in. */
+/** The first instant of the month `date` falls in, in UTC. Same reasoning as above. */
 function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
 /**

@@ -100,7 +100,15 @@ export class ReportsController {
     return this.service.maintenance({ from, to, propertyId }, req);
   }
 
-  /** One landlord's return. `null` rather than a 404 body when the id is not theirs. */
+  /**
+   * One landlord's return.
+   *
+   * A landlord belonging to another organization is a **404**, thrown by the service via
+   * the shared `requireRecord()` - the same as every other tenant-scoped read in this app.
+   * It used to answer `null`, which arrived at the client as a 200 with an empty body:
+   * indistinguishable from a landlord who genuinely has no activity, and issue 24 is the
+   * record of that shape being fixed everywhere else.
+   */
   @Get('landlords/:id/roi')
   @Roles(...REPORTS_VIEW_ROLES)
   @Permissions('reports.view')

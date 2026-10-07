@@ -1,18 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { getTenantId } from '@/common/utils';
+import { getTenantId, requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import {
   classifyUnit,
-  monthEnds,
   occupancyMetrics,
   percentage,
   type AgreementFacts,
   type UnitFacts,
   type UnitOccupancy,
   type UnitVerdict,
+  trendRange,
 } from './occupancy';
+import { resolvePeriod } from './period';
 
 /**
  * Module 16 - reports.
@@ -283,8 +284,9 @@ export class ReportsService {
     points: OccupancyTrendPoint[];
   }> {
     const tenantId = getTenantId(req);
-    const months = Math.min(Math.max(params.months ?? 12, 1), 24);
-    const dates = monthEnds(new Date(), new Date(), months);
+    // The window is *derived* here rather than passed as `monthEnds(now, now, months)`,
+    // which collapsed every request to a single point because `from` equalled `to`.
+    const { points: dates } = trendRange(new Date(), params.months ?? 12);
 
     const units = await this.prisma.unit.findMany({
       where: {
@@ -817,26 +819,39 @@ export class ReportsService {
     landlordId: string,
     params: { from?: string; to?: string },
     req: any,
-  ): Promise<LandlordRoiReport | null> {
+  ): Promise<LandlordRoiReport> {
     const tenantId = getTenantId(req);
     const { from, to, clamped } = resolvePeriod(params.from, params.to);
 
-    const landlord = await this.prisma.landlord.findFirst({
-      where: {
-        id: landlordId,
-        ...(tenantId ? { organizationId: tenantId } : {}),
-      },
-      select: { id: true, name: true },
-    });
-    if (!landlord) return null;
+    // A landlord that is not this organization's is **404**, not `null`.
+    //
+    // This was `return null`, with a comment saying that was deliberate - and the
+    // controller repeated it ("`null` rather than a 404 body when the id is not theirs").
+    // It leaks nothing, but it is a 200 with an empty body, which is the exact shape issue
+    // 24 describes and which `requireRecord()` was introduced to end: every other
+    // tenant-scoped read in this codebase 404s, so a frontend cannot tell "no such
+    // landlord" from "no data for the period" from "the request was refused", and a
+    // router that renders a report page on any 2xx gets an empty screen rather than a
+    // message. Scoping is in the query, so a filter that cannot match the wrong row
+    // cannot return it.
+    const landlord = await requireRecord(
+      this.prisma.landlord.findFirst({
+        where: {
+          id: landlordId,
+          ...(tenantId ? { organizationId: tenantId } : {}),
+        },
+        select: { id: true, name: true },
+      }),
+      'Landlord',
+    );
 
     const [invoices, charges] = await Promise.all([
       this.prisma.invoice.aggregate({
         where: {
           ...(tenantId ? { organizationId: tenantId } : {}),
-          landlordId,
           status: { not: 'DRAFT' },
           issueDate: { gte: from, lte: to },
+          ...landlordAttribution(landlordId),
         },
         _sum: { totalAmount: true },
         _count: { _all: true },
@@ -859,11 +874,20 @@ export class ReportsService {
       { month: string; billed: Prisma.Decimal | null }[]
     >(Prisma.sql`
       SELECT to_char("issueDate", 'YYYY-MM') AS "month", COALESCE(SUM("totalAmount"), 0) AS "billed"
-      FROM invoices
-      WHERE "landlordId" = ${landlordId}
-        AND "status" <> 'DRAFT'
-        AND "issueDate" >= ${from} AND "issueDate" <= ${to}
-        ${tenantId ? Prisma.sql`AND "organizationId" = ${tenantId}` : Prisma.sql``}
+      FROM invoices i
+      WHERE i."status" <> 'DRAFT'
+        AND i."issueDate" >= ${from} AND i."issueDate" <= ${to}
+        AND (
+          i."landlordId" = ${landlordId}
+          OR EXISTS (
+            SELECT 1
+            FROM rental_agreements ra
+            JOIN units u ON u.id = ra."unitId"
+            JOIN properties p ON p.id = u."propertyId"
+            WHERE ra.id = i."rentalAgreementId" AND p."landlordId" = ${landlordId}
+          )
+        )
+        ${tenantId ? Prisma.sql`AND i."organizationId" = ${tenantId}` : Prisma.sql``}
       GROUP BY 1 ORDER BY 1
     `);
 
@@ -930,14 +954,34 @@ export class ReportsService {
         { on: params.on, propertyId: params.propertyId },
         req,
       );
+      // Per property, which is what the report itself is organised by.
+      //
+      // This used to export `data.flagged` under unit-level columns, with `property`
+      // hard-coded to `''`. `flagged` is the **disagreement** list - units whose stored
+      // status contradicts their lease - so the file contained a header and nothing else
+      // on any estate where the data was clean, which is every estate most of the time.
+      // Verified on the demo data: 100 properties and 2,474 units in the JSON response,
+      // one line (the header) in the CSV.
+      //
+      // A unit-level export would need `occupancy()` to return per-unit rows rather than
+      // only the flagged subset; until it does, the honest export is the same grain the
+      // report is drawn at rather than a differently-shaped file that is nearly empty.
       return toCsv(
-        ['property', 'unit', 'unitStatus', 'effectiveStatus', 'disagreement'],
-        data.flagged.map((verdict) => ({
-          property: '',
-          unit: verdict.code,
-          unitStatus: '',
-          effectiveStatus: verdict.occupancy,
-          disagreement: verdict.disagreement ?? '',
+        [
+          'property',
+          'totalUnits',
+          'occupied',
+          'vacant',
+          'occupancyPercent',
+          'disagreements',
+        ],
+        data.byProperty.map((row) => ({
+          property: row.property,
+          totalUnits: row.total,
+          occupied: row.occupied,
+          vacant: row.vacant,
+          occupancyPercent: row.occupancyPercent,
+          disagreements: row.disagreements,
         })),
       );
     }
@@ -996,40 +1040,57 @@ function money(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** The default window, and the bounds a request may not exceed. */
-const DEFAULT_MONTHS_BACK = 12;
-const MAX_MONTHS_BACK = 36;
-
 /**
- * Resolve a requested window, clamped to something a report should be willing to run.
+ * Which invoices belong to a landlord.
  *
- * `clamped` is returned rather than silently applied so the response can say the
- * window was not the one asked for - a report covering 3 years when the reader asked
- * for 3 months is a different document from the one they requested, and the difference
- * belongs on the page.
+ * **This is the third bug this module's live run found, and the most consequential.**
+ * The obvious predicate is `where: { landlordId }` - `Invoice` *has* a `landlordId`
+ * column - and it is wrong, because nothing maintains it on the path that matters:
+ * `recurring-billing.service.ts` never sets it. Verified on the demo data: all 15,063
+ * invoices had `landlordId IS NULL`, including every one produced by the automated rent
+ * run, which is the overwhelming majority of invoices in production. So the ROI report
+ * returned `billed: 0` for *every* landlord, always, and `net` came out as the negative of
+ * the owner's charges - a report confidently stating that every owner in the estate is
+ * losing money.
+ *
+ * The fix is to attribute the way Module 6's owner statements already do, because those
+ * demonstrably reconcile against the payments they were generated from:
+ *
+ *     invoice -> rentalAgreement -> unit -> property -> landlordId
+ *
+ * The stored column is kept as a second route via `OR`, so an invoice raised directly
+ * against a landlord (no lease involved) is still counted. `OR` cannot double-count: it
+ * selects each matching row once, however many branches match it.
+ *
+ * **Deriving beats storing here for the same reason it does everywhere else in this
+ * codebase** - the column is a cache of a relationship that already exists, and the cache
+ * was never written. The alternative (backfill the column and have the rent run maintain
+ * it) would have introduced exactly the `Invoice.balanceAmount` trap the master doc records
+ * as an advisory stored derivation.
+ *
+ * Two forms are needed because this predicate is written twice: once as a Prisma `where`
+ * fragment and once as SQL. They are kept adjacent and commented so a change to one is
+ * visibly a change to the other.
  */
-function resolvePeriod(
-  from?: string,
-  to?: string,
-): {
-  from: Date;
-  to: Date;
-  clamped: boolean;
+function landlordAttribution(landlordId: string): {
+  OR: Record<string, unknown>[];
 } {
-  const end = to ? new Date(to) : new Date();
-  const earliest = new Date(end);
-  earliest.setMonth(earliest.getMonth() - MAX_MONTHS_BACK);
-  earliest.setDate(1);
-
-  const requested = from ? new Date(from) : new Date(end);
-  requested.setMonth(requested.getMonth() - DEFAULT_MONTHS_BACK);
-  requested.setDate(1);
-
-  const start = requested < earliest ? earliest : requested;
-
   return {
-    from: start,
-    to: end,
-    clamped: start.getTime() !== requested.getTime(),
+    OR: [
+      { landlordId },
+      { rentalAgreement: { unit: { property: { landlordId } } } },
+    ],
   };
 }
+
+/*
+ * `resolvePeriod`, `DEFAULT_MONTHS_BACK` and `MAX_MONTHS_BACK` used to live here.
+ *
+ * They moved to `./period` because this copy subtracted `DEFAULT_MONTHS_BACK` from `from`
+ * unconditionally: a caller asking for June-to-June was answered with the eighteen months
+ * before it, and `clamped` reported `false` because it compared a value it had already
+ * overwritten. A module-private function cannot be reached by a test, so nothing caught it.
+ * See the header comment on that file.
+ *
+ * Anything still importing them from here is importing the wrong copy.
+ */
