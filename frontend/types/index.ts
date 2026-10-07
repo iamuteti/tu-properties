@@ -4051,3 +4051,146 @@ export interface ContractExpiryReport {
     /** Ordered by urgency rather than by date, deliberately. */
     needsAttention: ContractRow[];
 }
+/* ── Module 16: Reports & Analytics ──────────────────────────────────────────
+ *
+ * These shapes are transcribed from the **live responses** of the six endpoints,
+ * captured 2026-10-07 against seeded demo data, rather than from the service
+ * signatures. That is deliberate: the module's own bug list (issues 114-118)
+ * includes a response whose `period.from` did not match the request that
+ * produced it, so the declaration and the payload have to be checked against
+ * each other rather than assumed to agree.
+ *
+ * `number` for money, not `string`: every figure is rounded at the edge by the
+ * service's `money()` and serialised as a JSON number. See the note on
+ * `ReportPeriod` for the one field that is deliberately not a number.
+ */
+
+/** The window a report actually covered, which is not always the one requested. */
+export interface ReportPeriod {
+    from: string;
+    to: string;
+    /**
+     * True when the window is not the one that was asked for.
+     *
+     * A report covering three years when the reader asked for three months is a
+     * different document, so this belongs on the page rather than in a log. It was
+     * previously reported as `false` while the window was twelve months too wide
+     * (issue 115), so it is worth rendering rather than ignoring.
+     */
+    clamped: boolean;
+}
+
+export interface OccupancyMetrics {
+    totalUnits: number;
+    occupied: number;
+    vacant: number;
+    maintenance: number;
+    reserved: number;
+    /**
+     * `null`, not 0, when the estate has no units.
+     *
+     * An empty estate was undefined, not empty - dividing by zero gives NaN,
+     * which renders as a blank cell and reads as "no data" rather than "nothing
+     * to measure". A UI that prints 0% here is asserting a falsehood.
+     */
+    occupancyPercent: number | null;
+    vacancyPercent: number | null;
+    /** Units whose stored status contradicts their lease. */
+    disagreements: number;
+    byOccupancy: Record<string, number>;
+}
+
+export interface OccupancyByProperty {
+    propertyId: string;
+    property: string;
+    total: number;
+    occupied: number;
+    vacant: number;
+    occupancyPercent: number | null;
+    disagreements: number;
+}
+
+/** A unit whose `Unit.status` disagrees with the leases that cover the date. */
+export interface OccupancyFlag {
+    code: string;
+    occupancy: string;
+    disagreement: string | null;
+}
+
+export interface OccupancyReport {
+    on: string;
+    metrics: OccupancyMetrics;
+    byProperty: OccupancyByProperty[];
+    flagged: OccupancyFlag[];
+}
+
+export interface OccupancyTrendPoint {
+    month: string;
+    occupied: number;
+    vacant: number;
+    occupancyPercent: number | null;
+}
+
+export interface OccupancyTrendReport {
+    points: OccupancyTrendPoint[];
+}
+
+export interface FinancialReport {
+    period: ReportPeriod;
+    currency: string;
+    invoiced: number;
+    collected: number;
+    outstanding: number;
+    net: number;
+    collectionRatePercent: number | null;
+    /**
+     * Invoices and payments with a NULL `organizationId`, excluded from every figure.
+     * Money with no organization belongs to no tenant - but the count is returned,
+     * because a revenue report whose denominator nobody can see is a number nobody
+     * should act on.
+     */
+    unattributedCount: number;
+    byClass: { transactionClass: string; invoiced: number; count: number }[];
+    byMonth: { month: string; invoiced: number; collected: number }[];
+}
+
+export interface SalesReport {
+    period: ReportPeriod;
+    transactions: number;
+    pipelineValue: number;
+    depositHeld: number;
+    wonValue: number;
+    cancelledCount: number;
+    leads: number;
+    wonLeads: number;
+    conversionPercent: number | null;
+    byStage: { stage: string; count: number; value: number }[];
+    byAgent: { name: string; count: number; value: number }[];
+}
+
+export interface MaintenanceReport {
+    period: ReportPeriod;
+    open: number;
+    inProgress: number;
+    completed: number;
+    completedCount: number;
+    averageCompletionDays: number | null;
+    recordedCost: number;
+    costsFromEstimates: number;
+    byPriority: { priority: string; count: number }[];
+    byProperty: { propertyId: string; property: string; open: number; cost: number }[];
+}
+
+export interface LandlordRoiReport {
+    period: ReportPeriod;
+    landlordId: string;
+    landlord: string;
+    currency: string;
+    billed: number;
+    collected: number;
+    expenses: number;
+    net: number;
+    /** `null` when nothing was billed - there is no denominator to divide by. */
+    roiPercent: number | null;
+    byMonth: { month: string; billed: number; expenses: number }[];
+}

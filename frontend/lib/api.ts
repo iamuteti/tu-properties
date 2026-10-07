@@ -22,6 +22,12 @@ import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, P
     ContractUpdatePayload,
     ContractRenewPayload,
     ContractType,
+    OccupancyReport,
+    OccupancyTrendReport,
+    FinancialReport,
+    SalesReport,
+    MaintenanceReport,
+    LandlordRoiReport,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
@@ -3535,4 +3541,59 @@ export const contractsApi = {
      */
     deleteContract: (id: string) =>
         api.delete<{ deleted: boolean; reference: string }>(`/contracts/${id}`),
+};
+/* ── Module 16: Reports ─────────────────────────────────────────────────────── */
+
+/**
+ * Reports are read-only, and the shape here reflects that: six GETs and four
+ * export URLs, no mutation of any kind. A report is a function of rows that
+ * already exist, so an endpoint that could write one would be a place to put a
+ * number nobody derived.
+ *
+ * **Every `from`/`to` here is sent exactly as typed.** The server used to widen a
+ * supplied `from` by twelve months while reporting `clamped: false` (issue 115),
+ * so the client must not pre-adjust a window either - it sends the dates the user
+ * chose and renders whatever `period` comes back, including a `clamped` warning.
+ * That is the whole reason `ReportPeriod` is in the response.
+ */
+export const reportsApi = {
+    occupancy: (params?: { on?: string; propertyId?: string }) =>
+        api.get<OccupancyReport>('/reports/occupancy', { params }),
+
+    occupancyTrend: (params?: { months?: number; propertyId?: string }) =>
+        api.get<OccupancyTrendReport>('/reports/occupancy/trend', { params }),
+
+    financial: (params?: { from?: string; to?: string }) =>
+        api.get<FinancialReport>('/reports/financial', { params }),
+
+    sales: (params?: { from?: string; to?: string }) =>
+        api.get<SalesReport>('/reports/sales', { params }),
+
+    maintenance: (params?: { from?: string; to?: string; propertyId?: string }) =>
+        api.get<MaintenanceReport>('/reports/maintenance', { params }),
+
+    /**
+     * One landlord's return. 404s for an id that is not the caller's, so a
+     * cross-tenant id and a nonexistent one are the same answer on purpose.
+     */
+    landlordRoi: (id: string, params?: { from?: string; to?: string }) =>
+        api.get<LandlordRoiReport>(`/reports/landlords/${id}/roi`, { params }),
+
+    /**
+     * CSV exports as plain links rather than axios calls.
+     *
+     * A link is right here for the reason `buildUrl` already documents: the browser
+     * has to *download* the file, and the auth cookie travels with a normal
+     * navigation. An axios call would hand the page a blob it then has to fake a
+     * filename for.
+     *
+     * The occupancy export is per property, not per unit - the service used to
+     * export the disagreement list, so the file was empty on any estate whose data
+     * was clean (issue 117). There is deliberately no ROI export: the endpoint does
+     * not exist, and a link that 404s is worse than an absent button.
+     */
+    exportUrl: (
+        report: 'occupancy' | 'financial' | 'sales' | 'maintenance',
+        params?: Record<string, string | number | boolean | undefined>,
+    ) => buildUrl(`/reports/${report}/export`, params),
 };

@@ -314,6 +314,21 @@ const navItems: NavItem[] = [
             { href: '/contracts/new', label: 'File a contract', icon: PlusCircle, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER'] },
         ],
     },
+    {
+        // Module 16. The role list is copied from `REPORTS_VIEW_ROLES` in
+        // `backend/src/modules/reports/reports-roles.ts` and must stay identical to it -
+        // the sidebar is only the first of two gates, and a role shown a nav item it
+        // cannot use is the exact parent/child inconsistency the UX standards call out.
+        //
+        // The four roles that are *absent* are absent on purpose: a leasing officer, a
+        // maintenance manager, a technician and a procurement officer each hold no report
+        // permission, because a report carries money across the whole organization. Their
+        // own figures are on the screens they already work in.
+        href: '/reports',
+        label: 'Reports',
+        icon: BarChart,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
+    },
     { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },

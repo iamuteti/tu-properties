@@ -10,9 +10,9 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status Hint
-**BACKEND COMPLETE AND VERIFIED LIVE, FRONTEND NOT STARTED** (verified against the tree and a running server 2026-10-07, not taken from this doc's own say-so). The backend is `backend/src/modules/reports/` — a controller with six read endpoints and four CSV exports, a 34 KB service, `occupancy.ts` and `period.ts` carrying the arithmetic with 59 passing tests. It is registered in `app.module.ts` and its `reports` permission is seeded. **There is no frontend at all**: no `/reports` route, no sidebar entry, no `reportsApi` in `frontend/lib/api.ts`. Every figure this module computes is currently unreachable from a browser. The dashboard is *not* hardcoded — it reads `dashboardApi.getStats()` from `/dashboard/stats`, which the Stabilization module built on 2026-10-03 — so the original Status Hint on this page is out of date on that point too.
+**BACKEND AND FRONTEND COMPLETE, VERIFIED LIVE IN A BROWSER (2026-10-07)** — not taken from this doc's own say-so. `/reports` is a five-tab screen over six read endpoints and four CSV exports; the backend is `backend/src/modules/reports/` with `occupancy.ts` and `period.ts` carrying the arithmetic (59 tests), registered in `app.module.ts`, its `reports` permission seeded, and 1369 backend tests green. The dashboard is *not* hardcoded — it reads `dashboardApi.getStats()` from `/dashboard/stats`, which the Stabilization module built on 2026-10-03 — so the original Status Hint on this page is out of date on that point too.
 
-**The backend was wrong in five places on arrival, and only a live run against seeded data found them.** All five are fixed; see "Bugs the live run found" below, because the shape of them is the most useful thing on this page. The remaining work is the frontend, plus the two open items in the checklist.
+**The backend was wrong in five places on arrival, and only a live run against seeded data found them.** All five are fixed; see "Bugs the live run found" below, because the shape of them is the most useful thing on this page. Two items remain open: landlord ROI has no CSV export, and the sales report's date attribution is a business decision rather than a bug (issue 120).
 
 ## Bugs the live run found (all fixed 2026-10-07)
 
@@ -25,6 +25,31 @@ The module shipped with **34 passing tests and a green typecheck**, and five def
 | 3 | **Landlord ROI returned `billed: 0` for every landlord, always** | The query used `where: { landlordId }` on `Invoice` — a column nothing maintains. `recurring-billing.service.ts` never sets it; all 15,063 demo invoices had it NULL. |
 | 4 | A cross-tenant landlord id returned **200 with an empty body** | Deliberate, and documented as deliberate in two places. It is the exact shape issue 24 fixed everywhere else. |
 | 5 | `GET /reports/occupancy/export` emitted **a header and no rows** | It exported `data.flagged` — the *disagreement* list — under unit columns, so on any estate whose data was clean (i.e. nearly always) the file was empty. |
+
+**One found and deliberately *not* fixed, because the answer is a business decision rather
+than a bug:** the sales report filters `sale_transactions` and `leads` on **`createdAt`** —
+when the row was typed in — while `sale_transactions` carries real business dates
+(`quotationDate`, `offerDate`, `reservationDate`, `agreementDate`, `paymentDate`,
+`handoverDate`) that the report ignores. So a sale agreed in March and keyed in in April
+counts in April's report, and re-running a fixed window gives different numbers depending on
+when the data was entered. For `leads`, `createdAt` is defensible — an enquiry arrived when
+it arrived. For sales it is not obviously right, and **which date should represent "when the
+sale happened" is the owner's call, not a bug fix**: the current stage's date, the earliest
+stage date, or the date value moved into. Recorded as issue 120 rather than guessed at.
+
+**Two display bugs the frontend work found in passing, both of which would have shipped as
+"the backend is wrong":**
+- A **date-only picker sends a bare `YYYY-MM-DD`, which a `timestamp` column reads as
+  midnight at the *start* of that day.** The window therefore excluded everything written
+  later the same day, and the sales tab rendered six empty figures against six real
+  transactions — because the demo sales are stamped at seed time and seed time was that
+  morning. `to` is now the last millisecond of the chosen day, which is what a person means
+  by "To: 7 October", and `from` the first.
+- **`report.net` is `collected − invoiced`**, so it arrives negative whenever a period is
+  under-collected. Labelling that "Uncollected" printed **−376,837,416** under a word that
+  implies a shortfall. It is now shown as a positive "Not collected in period" and is
+  deliberately distinct from "Outstanding", which carries every earlier unpaid invoice with
+  it rather than only this period's.
 
 Two of these are worth generalising, because the pattern will recur:
 
@@ -95,7 +120,7 @@ See `01-DATABASE-SCHEMA.md`, domain(s): Reporting. **Net-new: none.** This modul
 - [x] Build sales and maintenance report endpoints once those modules have real data — done 2026-10-07.
 - [x] Build landlord ROI report (depends on Landlord Management's OwnerStatement data) — done 2026-10-07 as `/reports/landlords/:id/roi`. It reads the landlord's invoices, payments and charges directly rather than `OwnerStatement`, because a statement is a frozen document for a settled period and a report asks about a live one.
 - [ ] Add CSV/PDF export on every report and on major list pages generally, per `00-UX-CROSS-CUTTING-STANDARDS.md` — **partly done 2026-10-07.** CSV exists on 4 of 5 reports and all four now emit real rows (the occupancy one did not — see the bug table). **Landlord ROI still has no export route**, and there is **no PDF anywhere in the app**. Major list pages export for properties, units, landlords, landlord charges, owner statements, landlord payouts, sales and leases (8 resources). **Still without export: finance (invoices, receipts, payments), tenants, HR, inventory, procurement, work orders, facilities, utilities and contracts** — so issue 31 is partly open, and this module's own scope says "on every report", which is one route short.
-- [ ] Frontend: replace hardcoded Recharts data with real API-driven data; keep Recharts as the charting library already in use — **not started.** The hardcoded data was already removed by Stabilization; what remains is the six endpoints and four exports with no route, no sidebar entry and no API client. Recharts is installed and in use elsewhere, so this is wiring, not a new dependency. **The data is now trustworthy**, which is the precondition this item was waiting on — see "Bugs the live run found".
+- [x] Frontend: replace hardcoded Recharts data with real API-driven data; keep Recharts as the charting library already in use — **done 2026-10-07.** `/reports` with five tabs (Occupancy, Financial, Sales, Maintenance, Owners), `reportsApi` in `frontend/lib/api.ts`, the six report types in `frontend/types/index.ts` transcribed from the **live** payloads, and a sidebar entry whose role list is copied from `REPORTS_VIEW_ROLES`. Recharts as specified — trend line, invoiced-vs-collected bars, pipeline-by-stage, priority bars and ROI bars, all inside `ResponsiveContainer`. Every tab owns its own request, its own loading state and its own error, because one shared `isLoading` makes the whole screen look broken when a single endpoint fails. CSV export on the four reports that have one, as a plain `<a download>` so the browser performs the download and the auth cookie travels with it; **no export button on Owners, deliberately**, because that route does not exist and a link that 404s is worse than an absent button. Three display decisions that exist because of a defect: `Percent` renders `null` as "—" and never `0%`; `ClampedNotice` states the window actually served; `ExclusionNote` surfaces `unattributedCount`. **Verified in a real browser** against both demo organizations — which is the first time a module's UI has been, since the guard is a client-side redirect rather than Next middleware. Occupancy 1635/2474 (66.1%) across 100 properties; Financial 1,675,232,372 invoiced against 1,375,894,956 collected (82.1%); Sales 352,500,000 across 6 transactions and 16.7% lead conversion; Maintenance 3 open and 0.5 days average; Owners ROI 45,858,945 billed at 99.7%, matching the API and the same join in raw SQL. A leasing officer is refused with a real error state and no sidebar item.
 
 ## Backend: NestJS Notes
 - New module: `backend/src/reports/`. *(Shipped at `backend/src/modules/reports/` — the doc's path predates the `modules/` convention used by every other module.)*
