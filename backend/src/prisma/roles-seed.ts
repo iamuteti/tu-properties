@@ -160,6 +160,28 @@ export interface ModulePermissions {
   /** Release the money. Always narrower than `approve`. */
   pay?: boolean;
   /**
+   * Module 17. **Operate the notification system**: configure a provider, activate a
+   * channel, send a test, and run the reminder sweep by hand.
+   *
+   * Added 2026-10-07 because the endpoints demanded it and nothing could supply it.
+   * `notification-config.controller.ts` carries `@Permissions('notifications.run')` on
+   * every route, but `run` was not a declared action, so `hasPermission` read
+   * `modules.notifications.run` - which no role's JSON contained and `full()` never
+   * emits - and returned false for everyone. The only way in was `SUPER_ADMIN`'s bypass.
+   *
+   * That left a three-way inconsistency, all three parts of it live at once: the sidebar
+   * showed `/settings/notifications` to `ADMIN`, the controller's `@Roles` listed
+   * `SUPER_ADMIN, ADMIN`, and the permission guard refused `ADMIN` with "Insufficient
+   * permissions". **This is the same defect as issues 51/54/67/75 and 76, inverted**:
+   * those were a role or an endpoint that did not exist, and this is a permission that
+   * no role could hold, so the feature was unreachable for every real customer.
+   *
+   * It is deliberately *not* folded into `full()`: `run` means nothing to the other
+   * sixteen modules, and a permission nobody has thought about is a permission nobody
+   * reviews.
+   */
+  run?: boolean;
+  /**
    * Module 12. **My own record only.**
    *
    * A separate action rather than a narrower reading of `view`, because "view"
@@ -235,6 +257,23 @@ const viewWrite = (): ModulePermissions => ({
   view: true,
   create: true,
   update: true,
+});
+
+/**
+ * Module 17's notifications, which need `.run` on top of the four CRUD actions.
+ *
+ * Same reasoning as `payrollFull` and `facilityBookingFull`: `.run` is the action that
+ * actually operates the system - it writes provider credentials, activates a live
+ * delivery channel and fires the reminder sweep - so it is kept separate from `.update`,
+ * which only edits descriptive fields. It is not folded into `full()`, because `run` means
+ * nothing to the other sixteen modules.
+ */
+const notificationsFull = (): ModulePermissions => ({
+  view: true,
+  create: true,
+  update: true,
+  delete: true,
+  run: true,
 });
 
 /**
@@ -364,8 +403,11 @@ export const SYSTEM_ROLES: {
       payables: full(),
       billing: full(),
       // Reading their own notifications needs no permission beyond signing in;
-      // running the reminder sweep does.
-      notifications: full(),
+      // running the reminder sweep does. `notificationsFull` is not `full()` — see its
+      // comment and issue 121, because until `run` existed these routes were
+      // SUPER_ADMIN-only despite this role being named in the controller's `@Roles` and
+      // the sidebar showing this role the settings page.
+      notifications: notificationsFull(),
       // Module 18: deciding what is waiting on them, plus the administrator's
       // separate power to rewrite the approval policy itself.
       workflows: full(),
@@ -790,7 +832,7 @@ export const SYSTEM_ROLES: {
       // ground truth; deciding what that costs a resident is not, and the two
       // being in the same hands is how a technician ends up responsible for the
       // accuracy of somebody's invoice.
-utility_meters: view(),
+      utility_meters: view(),
       meter_readings: view(),
       utility_rates: view(),
       utility_charges: view(),

@@ -1,4 +1,13 @@
-/* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
+/*
+ * Only `require-await` is still needed.
+ *
+ * The other four `no-unsafe-*` directives were here because `smtp-server` shipped no
+ * types, so every import of it was `any`. They are removed now that
+ * `src/types/smtp-server.d.ts` declares the surface this file actually uses — which
+ * is the better outcome, because a disabled rule is a rule nobody reads, and four of
+ * them were hiding that the file had no types at all.
+ */
+/* eslint-disable @typescript-eslint/require-await */
 import { NotificationStatus } from '@prisma/client';
 import { SMTPServer } from 'smtp-server';
 import { EmailChannelProvider, SmtpCredentials } from './email-provider';

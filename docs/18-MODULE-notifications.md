@@ -10,19 +10,58 @@
 4. Update the Tasks Checklist below as you go (check items off in this file) so a future session can resume without rediscovery.
 
 ## Status Hint
-Not started per owner description.
 
-> **Two triggers are already built and waiting for this module.** The Lease & Tenancy module
-> (`06-MODULE-lease-tenancy.md`) finished its work with the domain logic in place and the delivery deliberately
-> left to here — its doc has the full write-up under *Known Gaps → Blocked on other modules*:
-> 1. **Resident request decisions** — `TenantRequestsService.createFromPortal()` / `.decide()` / `.withdraw()`
->    already audit `TENANT_REQUEST_SUBMITTED` / `_APPROVED` / `_REJECTED`; each is a one-line notification call
->    away. The resident to notify is reached via `User.portalTenantId`.
-> 2. **Lease expiry reminders** — `RentalAgreementsService.expiring()` already returns the leases ending inside a
->    window together with the tenant contact details a reminder needs; it only needs a scheduled job over it
->    instead of the banner the dashboard currently shows.
->
-> Pick both up from that doc rather than re-deriving them.
+**Infrastructure complete and a message has now actually been sent — verified against a live SMTP relay on 2026-10-07.** This module's standing claim used to be that *no message had ever been sent by this app*: email and SMS both reported `SUPPRESSED` until a vendor was configured, and nothing had been configured. That is no longer true. Configuring Rohi's EMAIL channel with a real Brevo relay and running the sweep produced **145 lease-expiry emails recorded `SENT`**, plus a test send through the same path.
+
+**Most of the trigger wiring this doc's Status Hint calls open is in fact already done**, which the table in `00-MASTER-ARCHITECTURE.md` §4b still gets wrong in the opposite direction to its usual error. Wired today: leases (request decisions), the notifications sweep itself (rent due, overdue rent, lease expiry, **contract expiry**), **maintenance** (new report, assignment, every status change to the resident), **inventory** (post-movement and daily reorder sweep), **facilities** (booking awaiting approval, booking decision, visitor arrival, card expiring), **workflow** (`APPROVAL_REQUESTED` / `_DECIDED` / `_ESCALATED`) and **procurement** (purchase-request approvals). Each owning module wraps `NotificationsService` in its own thin `*-notifications.service.ts` — so grepping for `NotificationType.X` finds almost nothing and is the wrong way to audit this. **Ask what each module's notifications service can do and who calls it.**
+
+**Genuinely still open: the two owner-facing triggers.** `OWNER_STATEMENT_READY` and `PAYOUT_PAID` exist in the enum and nothing sends them, because a `Landlord` is neither a `User` nor a `Tenant` — the `notifications` table has only `userId`/`tenantId`, `NotificationsService.notify()` requires one of those two, and there is no landlord login (the owner portal is Phase 2, issue 64). All 120 demo landlords have an email and a phone, so the contact details are not the obstacle; **the recipient model is.** See "Owner statements and payouts" below.
+
+**SMS is still unproven in the running app.** Both providers are implemented and unit-tested against stubbed HTTP, credentials round-trip encrypted, and a test-send reaches the vendor and reports the vendor's own rejection — but no SMS has left the building, because no SMS credentials are configured. The channel reports `SUPPRESSED` with the reason *"No SMS provider is active — configure one in the admin panel"*, which is the honest behaviour and is verified live.
+
+### Verified live, 2026-10-07
+
+Against seeded demo data with a real SMTP relay configured, as `admin@rohi.co.ke` (a **Company Admin**, which is the point — see the permission defect below):
+
+| Check | Result |
+|---|---|
+| `GET /notifications/config/providers` | 200, both SMS providers with masked-field metadata |
+| `POST /notifications/config` (save) | 200, `credentialsEncrypted: "v1:…"`, **`isActive: false`** — saving does not activate |
+| `GET /notifications/config` | never returns the secret; only `settings.from` |
+| `POST /notifications/config/EMAIL/activate` | `isActive: true` |
+| `POST /notifications/config/EMAIL/test` | **`{"ok":true,"status":"SENT"}`** — a real message left the building |
+| `POST /notifications/triggers/run` | `{"leases":145,"due":0,"overdue":1105,"contracts":6}` |
+| Notifications written | `LEASE_EXPIRING` 145 IN_APP **SENT** + 145 EMAIL **SENT**; `RENT_OVERDUE` 1105 IN_APP SENT + 1105 SMS SUPPRESSED; `CONTRACT_EXPIRING` 30 IN_APP SENT |
+| Dedupe key shape | `lease-expiring:<leaseId>:60` — per lease **per band**, so a lease 20 days out gets one message and not four |
+| Second sweep, same day | `{"leases":0,"due":0,"overdue":0,"contracts":0}` and **2,530 rows before and after** — idempotent |
+| After deactivating EMAIL, sweep again | email rows recorded **SUPPRESSED**, reason *"No email provider is active — configure SMTP in the admin panel"* — not silently dropped and not falsely `SENT` |
+
+That last row is the module's central design decision working in the real application rather than only in a test: **`SUPPRESSED` is a status distinct from `FAILED`**, because "we chose not to send" and "it broke" are different facts an operator has to be able to tell apart.
+
+### Development note — do not send real mail while developing
+
+The relay used for the verification above is **deactivated again** (`isActive: false`, credentials still encrypted in the local database, nothing in the repository). That matters because the sweep is a `@Cron` at 06:15 daily: leaving the channel active would keep sending real mail on every run.
+
+For development, `backend/scripts/smtp-sink.ts` accepts mail and records it as JSON lines, so the whole path can be exercised with no vendor and no cost:
+
+```bash
+npm run smtp:sink            # listens on 127.0.0.1:2525, writes /tmp/opencode/smtp-sink.jsonl
+# then save an EMAIL/SMTP config pointing at 127.0.0.1:2525 and activate it
+```
+
+`smtp-server` ships no types, which is why `backend/src/types/smtp-server.d.ts` declares the surface this repo actually uses. Adding it removed four now-obsolete `eslint-disable` directives from `email-smtp.integration.spec.ts` — those directives existed only because the import was `any`, and a disabled rule is a rule nobody reads.
+
+### Owner statements and payouts — blocked on the recipient model
+
+`OWNER_STATEMENT_READY` fires from `OwnerStatementsService.issue()` and `PAYOUT_PAID` from the payout `PAID` transition. Both are one call away, and the document an owner would receive already renders from the frozen statement snapshot, so there is nothing to build on the content side — **only the addressing question.** Three options, and they are not equivalent:
+
+| Option | Cost | Consequence |
+|---|---|---|
+| **A. Add `landlordId` to `notifications` and to `NotificationRecipient`** | One migration; `contactFor()` learns a third branch | Matches the existing "addressed by `userId` or `tenantId`" design exactly. Keeps the audit trail, `dedupeKey` idempotency and the read/unread state that an owner's next notification will need. **Recommended.** |
+| B. Mail `Landlord.email` directly from the landlords module | None | Loses the notification row entirely — no audit trail, no dedupe, and no record that anything was sent. Re-introduces exactly the kind of side-channel this module exists to avoid. |
+| C. Notify internal staff instead of the owner | None | Defensible as an interim step (the accounts clerk *should* know a statement was issued), but it is not what the enum value means, and it would leave the owner-facing half of the module still unwired. |
+
+Whichever is chosen, the trigger belongs in a `landlord-notifications.service.ts` alongside the existing per-module ones, so the landlords services stay about landlords.
 
 ## Module Goal
 Automated reminders and alerts across email, SMS, push, and WhatsApp.

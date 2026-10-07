@@ -23,7 +23,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:undo:all": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
-    "db:seed:demo": "ts-node -r tsconfig-paths/register src/prisma/demo-data.ts"
+    "db:seed:demo": "ts-node -r tsconfig-paths/register src/prisma/demo-data.ts",
+    "smtp:sink": "ts-node -r tsconfig-paths/register scripts/smtp-sink.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
