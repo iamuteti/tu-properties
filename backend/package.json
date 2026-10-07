@@ -18,6 +18,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:drop": "bash scripts/db-drop.sh",
+    "db:create": "bash scripts/db-create.sh",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:undo:all": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
     "db:seed:demo": "ts-node -r tsconfig-paths/register src/prisma/demo-data.ts"
   },
