@@ -43,6 +43,7 @@ import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { UtilitiesModule } from './modules/utilities/utilities.module';
 import { LegalModule } from './modules/legal/legal.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
@@ -94,6 +95,9 @@ import { SecurityModule } from './security/security.module';
     UtilitiesModule,
   LegalModule,
   ReportsModule,
+  // Module 19 — SaaS Administration. The platform owner's surface: onboard tenants,
+  // suspend them, read the subscription. Lives behind `/platform/...` and SUPER_ADMIN.
+  PlatformModule,
   ],
   controllers: [AppController],
   providers: [

@@ -201,7 +201,8 @@ visitorVisits              VisitorVisit[]
   // Module 15 - Documents & Legal
   contracts                 Contract[]
   meterReadings              MeterReading[]
-
+  // Module 19 — SaaS Administration
+  subscription              Subscription?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -209,6 +210,52 @@ visitorVisits              VisitorVisit[]
   @@index([slug])
   @@index([subdomain])
   @@map("organizations")
+}
+
+// ---------------------------------------------------------------------------
+// SaaS administration (Module 19) - platform-facing, NOT tenant-scoped
+// ---------------------------------------------------------------------------
+
+enum SubscriptionStatus {
+  /** In the free evaluation window. The org is usable, no money changes hands yet. */
+  TRIALING
+  /** Converted from trial into a paid relationship. */
+  ACTIVE
+  /** Access blocked by the platform (non-payment, terms). Matches Organization.isActive. */
+  SUSPENDED
+  /** The relationship has ended. Kept for history rather than deleted. */
+  CANCELLED
+}
+
+model Subscription {
+  id             String             @id @default(cuid())
+  organizationId String             @unique
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /**
+   * The plan tier the org is on. Kept as a plain string rather than a foreign key
+   * because `Organization.plan` already carries this — inventing a `SubscriptionPlan`
+   * table to satisfy the target doc before its invoicing behaviour is designed is
+   * schema sprawl, not architecture. A plan table belongs with billing, not with
+   * subscription status.
+   */
+  plan         String   @default("FREE")
+  status       SubscriptionStatus @default(TRIALING)
+
+  startedAt    DateTime  @default(now())
+  /** When the free window ends. Null for plans with no trial. */
+  trialEndsAt  DateTime?
+  /** When the current paid period next renews. Null until a paid period. */
+  renewsAt     DateTime?
+
+  /// Why a subscription moved into SUSPENDED/CANCELLED. Auditible and operator-visible.
+  statusReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("subscriptions")
 }
 
 model User {

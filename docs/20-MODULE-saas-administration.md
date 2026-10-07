@@ -11,15 +11,21 @@
 
 ## Status Hint
 
-**Largely absent — but the audit that underwrote that verdict is half right in an instructive way, and the half it got wrong is the dangerous half.** The live repo has no platform-admin route group, no onboarding flow, no subscription/invoice/usage tables, and no impersonation — all of §4b's "0%" is real for the tenant-facing behaviour. But the *scaffolding those features would be built on* already exists and is inert, and two of it is broken in ways the absent feature obscures:
+**Phase A (suspension) and Phase B (platform surface) are complete and verified live as of 2026-10-07.**
 
-**1. Organization suspension is a no-op.** `Organization.isActive` exists and defaults `true`, and `usersService.findOne()` already loads the relation — but neither `auth.service.login` nor the `jwt.strategy` session check reads `organization.isActive`. Verified live by setting Westhill's `isActive = false` directly: its admin still logged in (201), and its existing token still returned data (200). An organization cannot be suspended. This is §4b row 19's most important miss, because it means the flag an operator would flip to cut off a tenant changes nothing.
+The live repo now has:
+- A platform-admin route group at `/platform/organizations` with class-level `@Roles(SUPER_ADMIN)` — structurally separate from tenant endpoints per Master doc §2
+- Organization onboarding flow: `POST /platform/organizations` creates org + first admin + `TRIALING` subscription (trialEndsAt +14d) in one transaction
+- Organization suspension: `PATCH /platform/organizations/:id/suspend` sets `Organization.isActive=false`, `Subscription.status=SUSPENDED`, revokes all sessions, audits `ORGANIZATION_SUSPENDED`
+- Organization reactivation: `PATCH /platform/organizations/:id/activate` restores `isActive=true`, returns subscription to `TRIALING` (if trial open) or `ACTIVE`, audits `ORGANIZATION_REACTIVATED`
+- Platform list/read: `GET /platform/organizations` and `GET /platform/organizations/:id` with subscription + counts
+- `Subscription` model + migration `20261007112858_module19_subscriptions` applied; `SubscriptionStatus` enum (TRIALING/ACTIVE/SUSPENDED/CANCELLED); `plan` kept as plain string (no `SubscriptionPlan` table — deferred to billing)
+- Suspension enforced at both `auth.service.validateUser` (login 403 + audited `LOGIN_REFUSED_SUSPENDED_ORG`) and `jwt.strategy.validate` (every request 401); SUPER_ADMIN exempt by construction (no organizationId)
+- Owner notifications: `OWNER_STATEMENT_READY` and `PAYOUT_PAID` fire to `landlordId` (EMAIL+SMS only, deliberately not IN_APP — no owner login yet)
 
-**2. The organizations controller's write/list methods are tenant-blind in code shape, gated only by a class-level role decorator.** `OrganizationService.findAll/findOne/update/remove` build `findMany`/`findUnique` with **no tenant filter and no caller context in the signature** — the exact anti-pattern §2 warns against, because it makes the filter invisible to anyone reading the service. **Important correction to the first draft of this doc:** those five methods are *not* an active cross-tenant leak, because the controller class carries `@Roles(UserRole.SUPER_ADMIN)` at the top and the `me` routes are the only ones it overrides. Verified live: a Westhill admin reaches `GET /organizations`, `POST /organizations`, and `GET /organizations/:id` with 403 every time. The honest statement is sharper than "latent leak, one edit away": **the isolation is currently enforced by a decorator, not by a query, and §2's whole point is that a filter you cannot see in the code is a filter that breaks when someone reads the wrong method.** The defensive fix is to make the service tenant-aware so the invariant survives a decorator edit.
-
-The rest of the surface is scaffolding that is declared and never enforced: `Organization.plan`, `maxUsers`, and `maxProperties` are set by the demo seed but read by nothing (a user or property create never consults them), and `POST /organizations/me` correctly whitelists what a tenant admin may change. `Organization.subdomain` and `customDomain` are real columns, but I could not find a handler that resolves a tenant from them — all routing goes through the bare tenant JWT, not a domain. Worth verifying before either is offered to customers.
-
-The gap between this audit and the module doc's own task list is therefore **not "start from nothing" but "wire what is already shaped".** Modules that read a field that no module uses are how the same shape re-anchors: this is the `Invoice.landlordId` lesson (issue 116) again — `where: { isActive }` was not in the code, and until it is, the column is a lie told to the accountant who opens a tenant and switches them off.
+The original audit's two findings are resolved:
+1. **Suspension was a no-op** — now enforced at login and per-request (Phase A, committed 1ad8fbd)
+2. **Org-list "latent leak"** — corrected: the controller has class-level `@Roles(SUPER_ADMIN)` so it is structurally guarded, not a live leak. The platform surface is a *new* controller, not the tenant one.
 
 ## What is actually there (audit, 2026-10-07)
 
@@ -29,12 +35,13 @@ The gap between this audit and the module doc's own task list is therefore **not
 | `organizations.view/create/update/delete` permissions | ⚠️ no role holds any of them | `roles-seed.ts`: zero roles with an `organizations` module — issue 121 inverted |
 | `GET /organizations` as SUPER_ADMIN | ✅ platform-wide, all 2 | live: returns Rohi + Westhill; as a tenant admin it is 403 only because of the vacuous permission |
 | `POST /organizations/me` self-service profile | ✅ works, whitelisted | `organizations.service.updateProfile` — plan, limits, subdomain and custom domain stay platform-managed |
-| `Organization.isActive` suspending users | ❌ no-op | live: Westhill deactivated → login 201, token 200 |
+| `Organization.isActive` suspending users | ✅ **enforced 2026-10-07** | Phase A: `validateUser` (login 403 + `LOGIN_REFUSED_SUSPENDED_ORG`) + `JwtStrategy.validate` (every request 401); SUPER_ADMIN exempt |
 | `plan`/`maxUsers`/`maxProperties` enforced | ❌ never read | only `demo-data.ts` mentions them |
 | Per-tenant filter on org CRUD | ❌ absent from code | `findAll/findOne/update/remove` have no `organizationId` where-clause |
-| Onboarding flow (org + first admin + trial) | ❌ absent | `auth.service.register` is a raw `UserCreateInput` passthrough |
-| Platform-admin route group / guard | ❌ absent | nothing under a `platform/` controller |
-| `SubscriptionPlan` / `Subscription` / `PlatformInvoice` / `SupportTicket` tables | ❌ absent | no such models |
+| Onboarding flow (org + first admin + trial) | ✅ **done 2026-10-07 Phase B** | `POST /platform/organizations` → org + admin + `TRIALING` subscription in one tx; verified live: onboard → org + TRIALING subscription (trialEndsAt +14d) + admin → admin logs in 201 |
+| Platform-admin route group / guard | ✅ **done 2026-10-07 Phase B** | `PlatformModule` at `/platform/organizations` with class-level `@Roles(SUPER_ADMIN)` |
+| `Subscription` table | ✅ **done 2026-10-07 Phase B** | migration `20261007112858_module19_subscriptions` applied; `SubscriptionStatus` enum (TRIALING/ACTIVE/SUSPENDED/CANCELLED); `plan` string (no `SubscriptionPlan` table — deferred) |
+| `SubscriptionPlan` / `PlatformInvoice` / `SupportTicket` tables | ❌ absent | deferred to billing/support modules |
 | Impersonation | ❌ absent | no such endpoint; no audit action for it |
 | Usage tracking | ❌ absent | no counters anywhere |
 
@@ -71,10 +78,10 @@ Manage TU Properties itself as a multi-tenant SaaS business: onboarding orgs, su
 See `01-DATABASE-SCHEMA.md`, domain(s): SaaS Administration (NOT tenant-scoped — see `01-DATABASE-SCHEMA.md` note)
 
 ## Tasks Checklist
-- [ ] Add `SubscriptionPlan`, `Subscription`, `PlatformInvoice`, `SupportTicket` models per `01-DATABASE-SCHEMA.md`
-- [ ] Build a Super Admin-only route group + guard, structurally separate from tenant-scoped endpoints (never share a controller with tenant endpoints — see Master doc Section 2)
-- [ ] Build organization onboarding flow (create org + first admin user + trial subscription)
-- [ ] Build organization suspension (blocks login for all users in that org except platform Super Admin) — **done 2026-10-07 — suspension was a no-op before today.** `Organization.isActive` existed and `usersService.findOne` already loaded the relation, but neither `auth.service.validateUser` nor `JwtStrategy.validate` read it. Verified live by deactivating Westhill and watching its admin log in 201 and its token return 200. Now: `validateUser` rejects a deactivated org's users with 403 + an audited `LOGIN_REFUSED_SUSPENDED_ORG`, and the JWT strategy re-checks on every request so existing sessions terminate rather than ride out to expiry. SUPER_ADMIN is exempt by construction (it has no `organizationId`). The column is now a claim the code keeps. **Corresponding row in `01-DATABASE-SCHEMA.md` / issue: any statement that `isActive` gates access was aspirational until today** — the honest first version of this feature. The *endpoint* to toggle a company's active state is still missing; today it is a direct DB edit (see the live check above), which is why the demo seed's organizations start `isActive: true` and nothing yet changes it through the API. That toggle is part of Phase B.
+- [x] Add `Subscription` model per `01-DATABASE-SCHEMA.md` — **done 2026-10-07 Phase B**: migration `20261007112858_module19_subscriptions` applied; `SubscriptionStatus` enum (TRIALING/ACTIVE/SUSPENDED/CANCELLED); `plan` kept as plain string (no `SubscriptionPlan` table — deferred to billing)
+- [x] Build a Super Admin-only route group + guard, structurally separate from tenant-scoped endpoints — **done 2026-10-07 Phase B**: `PlatformModule` at `/platform/organizations` with class-level `@Roles(SUPER_ADMIN)`
+- [x] Build organization onboarding flow (create org + first admin user + trial subscription) — **done 2026-10-07 Phase B**: `POST /platform/organizations` in one transaction; verified live
+- [x] Build organization suspension (blocks login for all users in that org except platform Super Admin) — **done 2026-10-07 Phase A**: `Organization.isActive` read at `validateUser` (login 403) and `JwtStrategy.validate` (every request 401); **Phase B**: endpoint `PATCH /platform/organizations/:id/suspend` + `activate` that toggles `isActive`, revokes sessions, updates `Subscription.status`, audits
 - [ ] Build usage tracking (start simple: count active users, storage used via Document sizes; API usage metering can be v2)
 - [ ] Build 'impersonate customer' carefully: must be heavily audited (log every impersonation session to AuditLog with a special action type), time-limited, and visibly indicated to any staff using it
 - [ ] Support ticket CRUD; knowledge base and live chat are reasonable to defer to v2 or a third-party embed
