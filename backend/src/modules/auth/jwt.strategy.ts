@@ -46,6 +46,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException();
       }
 
+      // The same suspension check as login, but here. Login is only the front door;
+      // a suspended organization must also have its *existing* sessions stop working,
+      // or deactivation would only affect the next login attempt and every already
+      // signed-in user would carry on indefinitely. This runs on every validated
+      // request, so the suspension takes effect on the next call rather than at some
+      // token-expiry boundary. `findOne` already includes the organization, and the
+      // platform Super Admin is exempt because it has no `organizationId`.
+      const org = user.organization as {
+        name: string;
+        isActive: boolean;
+      } | null;
+      if (org && org.isActive === false && user.role !== 'SUPER_ADMIN') {
+        this.logger.warn(
+          `Rejected request for ${org.name}: organization is suspended`,
+        );
+        throw new UnauthorizedException(
+          'This organization has been suspended — please log in again',
+        );
+      }
+
       // Session check: every issued token carries a jti that maps to a
       // server-side session row. A token whose session has been revoked
       // (logout / revoke-others / password reset) or expired is rejected

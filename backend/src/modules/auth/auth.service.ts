@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
@@ -37,6 +38,54 @@ export class AuthService {
       user.isActive &&
       (await bcrypt.compare(pass, user.passwordHash))
     ) {
+      // The flag every operator expects to suspend a tenant is on the
+      // *organization*, and `findOneByEmail` already loads it. Before Module 19
+      // nothing read it, so deactivating a company suspended nobody.
+      //
+      // The check throws rather than returning null, because the two outcomes are
+      // different facts and the caller gives a different reason for each: "wrong
+      // credentials" points at the account, "organization suspended" points at the
+      // tenancy. Collapsing them into null would tell a locked-out employee that their
+      // password was wrong. It also audits, because a suspension lockout is an account
+      // event, not an authentication failure.
+      //
+      // The guard is on `organization.isActive`, and only for users who *have* an
+      // organization. Platform Super Admin is a platform identity with no `organizationId`,
+      // so the check cannot reach it, which is the "except Super Admin" clause from the
+      // module doc made structural rather than a special-case branch.
+      const org = user.organization as {
+        id: string;
+        name: string;
+        isActive: boolean;
+      } | null;
+      if (org && org.isActive === false) {
+        this.logger.warn(
+          `Login refused for ${email}: organization ${org.name} is suspended`,
+        );
+        // Best-effort, and it must stay that way: a refused login that then 500s on its
+        // audit write would surface a database error to the person trying to sign in,
+        // which is a different tooling failure from the suspension they should hear
+        // about. The LOGIN_REFUSED_SUSPENDED_ORG action is what an auditor grep's for.
+        try {
+          await this.auditService.logAction({
+            user: { connect: { id: user.id } },
+            ...(user.organizationId
+              ? { organization: { connect: { id: user.organizationId } } }
+              : {}),
+            action: 'LOGIN_REFUSED_SUSPENDED_ORG',
+            entity: 'Organization',
+            entityId: org.id,
+            details: `Login refused: ${org.name} is suspended`,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Could not write suspension audit for ${user.id}: ${(err as Error).message}`,
+          );
+        }
+        throw new ForbiddenException(
+          'This organization has been suspended. Contact your administrator.',
+        );
+      }
       const { passwordHash, mfaSecret, ...result } = user;
       return result;
     }

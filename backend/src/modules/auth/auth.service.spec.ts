@@ -6,6 +6,17 @@ import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TOTP, Secret } from 'otpauth';
+import * as bcrypt from 'bcrypt';
+
+// The `compare` function is a read-only property on the bcrypt module, so it cannot
+// be `spyOn`'d — jest.mock replaces the whole module instead. Safe for the rest of this
+// file because `bcrypt` is only ever invoked through `validateUser`, and every other
+// test here passes a user object straight to `login()`.
+jest.mock('bcrypt', () => {
+  const actual = jest.requireActual<typeof import('bcrypt')>('bcrypt');
+  return { ...actual, compare: jest.fn() };
+});
+const mockCompare = bcrypt.compare as jest.Mock;
 
 /**
  * Auth flow tests — the pattern to follow for future modules:
@@ -88,6 +99,63 @@ describe('AuthService', () => {
     }).compile();
 
     service = moduleRef.get(AuthService);
+  });
+
+  describe('validateUser — suspended organization', () => {
+    // The flag that every operator expects to suspend a tenant is on the
+    // Organization, and it used to be a dead field: `usersService.findOneByEmail`
+    // loads the relation, and nothing read `organization.isActive`. Verified live by
+    // flipping Westhill's flag: before the fix, its admin logged in 201 and its token
+    // kept working; after, 403 at login and 401 mid-session.
+    beforeEach(() => {
+      // Make the password check succeed so the suspension branch is the one we exercise.
+      mockCompare.mockReset().mockResolvedValue(true);
+    });
+
+    it('rejects with Forbidden when the organization is suspended', async () => {
+      usersService.findOneByEmail.mockResolvedValue({
+        ...plainUser,
+        passwordHash: 'hash',
+        organization: { id: 'org-1', name: 'Rohi', isActive: false },
+      });
+
+      await expect(
+        service.validateUser('admin@rohi.co.ke', 'pw'),
+      ).rejects.toThrow(/suspended/i);
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'LOGIN_REFUSED_SUSPENDED_ORG',
+          entity: 'Organization',
+          entityId: 'org-1',
+        }),
+      );
+    });
+
+    it('lets the user in when the organization is active', async () => {
+      usersService.findOneByEmail.mockResolvedValue({
+        ...plainUser,
+        passwordHash: 'hash',
+        organization: { id: 'org-1', name: 'Rohi', isActive: true },
+      });
+
+      const result = await service.validateUser('admin@rohi.co.ke', 'pw');
+
+      expect(result.email).toBe(plainUser.email);
+      expect(auditService.logAction).not.toHaveBeenCalled();
+    });
+
+    it('lets a platform user (no organization) in', async () => {
+      usersService.findOneByEmail.mockResolvedValue({
+        ...plainUser,
+        passwordHash: 'hash',
+        organizationId: null,
+        organization: null,
+      });
+
+      const result = await service.validateUser('sup@tuproperties.co.ke', 'pw');
+
+      expect(result.email).toBe(plainUser.email);
+    });
   });
 
   describe('login (MFA disabled)', () => {
