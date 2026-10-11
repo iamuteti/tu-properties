@@ -35,6 +35,52 @@ import {
  *    one-thing failure this codebase has already paid for twice
  *    (`landlordId`/`tenantId` and `Supplier` beside `Contact`). One transaction.
  */
+/**
+ * Machine-readable cause attached to the `ConflictException` `onboard` throws
+ * for a unique-violation, so the in-process caller can branch on it.
+ */
+export interface OnboardConflictCause {
+  conflictField: 'slug' | 'email';
+}
+
+/**
+ * Field names behind a Prisma unique-violation (P2002), across client generations.
+ *
+ * Prisma 6 and earlier put them at `meta.target: string[]`. Under Prisma 7's
+ * driver adapter there is no `target` at all — the constraint arrives nested at
+ * `meta.driverAdapterError.cause.constraint.fields` (verified live: a duplicate
+ * `organizations.slug` reports `{modelName, driverAdapterError: {cause:
+ * {constraint: {fields: ['slug']}}}}`). Reading only the old shape silently
+ * classifies *every* conflict as the email fallback, which is how the signup
+ * retry learned to never retry: the message it matched on never named the slug.
+ *
+ * Exported so `TrialSignupService` and its spec decide retry-vs-surface on the
+ * same reading rather than string-matching a message that already lied once.
+ */
+export function p2002Fields(
+  err: Prisma.PrismaClientKnownRequestError,
+): string[] {
+  const meta = err.meta as
+    | { target?: unknown }
+    | {
+        driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } };
+      }
+    | undefined;
+  const direct =
+    meta && 'target' in meta ? (meta.target as unknown) : undefined;
+  if (Array.isArray(direct)) {
+    return direct.filter((t): t is string => typeof t === 'string');
+  }
+  const nested =
+    meta && 'driverAdapterError' in meta
+      ? meta.driverAdapterError?.cause?.constraint?.fields
+      : undefined;
+  if (Array.isArray(nested)) {
+    return nested.filter((t): t is string => typeof t === 'string');
+  }
+  return [];
+}
+
 @Injectable()
 export class PlatformService {
   private readonly logger = new Logger(PlatformService.name);
@@ -120,9 +166,16 @@ export class PlatformService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
-        const target = (err.meta?.target as string[] | undefined) ?? [];
+        const fields = p2002Fields(err);
+        const field = fields.some((t) => t.includes('slug'))
+          ? 'slug'
+          : 'email';
+        // `cause` carries the field machine-readably for the in-process caller
+        // (`TrialSignupService` retries slug clashes): the message is for humans
+        // and must stay free to be reworded without breaking the retry.
         throw new ConflictException(
-          `A record with this ${target.some((t) => t.includes('slug')) ? 'slug' : 'admin email'} already exists`,
+          `A record with this ${field} already exists`,
+          { cause: { conflictField: field } satisfies OnboardConflictCause },
         );
       }
       throw err;

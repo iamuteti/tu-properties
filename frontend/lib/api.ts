@@ -61,7 +61,21 @@ api.interceptors.response.use(
     // new information and the local state is cleared regardless. Skipping the dispatch
     // for this one request is the whole fix.
     const url: string | undefined = error.config?.url;
-    if (error.response?.status === 401 && !url?.includes('/auth/logout')) {
+    // **Never react to a 401 from the profile probe either.
+    //
+    // Same shape as the logout loop above, but it bites public pages instead of
+    // hammering an endpoint: `AuthProvider` asks `GET /auth/profile` on every
+    // mount to learn whether anyone is signed in, and logged-out is a normal
+    // answer, not an expiry. Dispatching `unauthorized` for it makes `logout()`
+    // `router.push('/auth/login')` — so no public route (notably `/`, the
+    // marketing site) can ever render for a visitor without a session.
+    // Protected routes do not need this event: `(dashboard)/layout.tsx` redirects
+    // on `!user` itself once loading settles.
+    if (
+      error.response?.status === 401 &&
+      !url?.includes('/auth/logout') &&
+      !url?.endsWith('/auth/profile')
+    ) {
       window.dispatchEvent(new CustomEvent('unauthorized'));
       if (process.env.NODE_ENV !== 'production') {
         console.warn('Unauthorized access - session expired');

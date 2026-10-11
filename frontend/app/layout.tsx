@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Space_Grotesk, Geist_Mono } from "next/font/google";
 import { Toaster } from 'sonner';
 import "./globals.css";
 import Providers from "./providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const jakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-brand-sans",
   subsets: ["latin"],
+});
+
+const groteskDisplay = Space_Grotesk({
+  variable: "--font-brand-display",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -15,8 +21,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tu Properties",
-  description: "Real Estate Property Management SaaS",
+  title: "TU Properties — Multi-Tenant Property Management Platform",
+  description:
+    "Multi-tenant SaaS platform for property management companies, landlords, and letting agents across Africa and beyond. Run properties, tenants, money, and staff from one system.",
 };
 
 export default function RootLayout({
@@ -27,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${jakartaSans.variable} ${groteskDisplay.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>{children}</Providers>
         <Toaster />

@@ -38,19 +38,21 @@
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
+  /* Brand navy (landing canvas #0A1020 family) for primary actions. */
+  --primary: oklch(0.22 0.05 265.755);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --secondary-foreground: oklch(0.22 0.05 265.755);
   --muted: oklch(0.968 0.007 247.896);
   --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  /* Brand gold (amber-400 family) for accents; navy text keeps it readable. */
+  --accent: oklch(0.93 0.05 85);
+  --accent-foreground: oklch(0.22 0.05 265.755);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --ring: oklch(0.45 0.08 265.755);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -59,12 +61,13 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  /* Active nav pill in brand gold with navy text — the one gold surface in chrome. */
+  --sidebar-primary: oklch(0.8 0.16 79);
+  --sidebar-primary-foreground: oklch(0.2 0.05 265.755);
+  --sidebar-accent: oklch(0.95 0.02 85);
+  --sidebar-accent-foreground: oklch(0.22 0.05 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --sidebar-ring: oklch(0.45 0.08 265.755);
 }
 
 .dark {
@@ -108,5 +111,54 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-brand-sans), system-ui, -apple-system,
+      'Segoe UI', Roboto, sans-serif;
   }
+}
+
+/* ── Landing (public marketing site) ─────────────────────────────────────────
+ * Scoped under `.landing` so none of this leaks into the dashboard: the dark
+ * navy canvas, the display face, the fade the trial modal uses, and the thin
+ * dark scrollbars. The dashboard keeps its light theme; only the brand tokens
+ * (primary navy, gold accent, sidebar) are shared, set on `:root` above.
+ */
+.landing {
+  font-family: var(--font-brand-sans), system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+}
+
+.landing .font-display {
+  font-family: var(--font-brand-display), var(--font-brand-sans),
+    system-ui, sans-serif;
+}
+
+.landing ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.landing ::-webkit-scrollbar-track {
+  background: #070b14;
+}
+
+.landing ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+.landing ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+@keyframes landing-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.landing .animate-fade-in {
+  animation: landing-fade-in 0.2s ease-out;
 }
