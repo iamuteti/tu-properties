@@ -144,13 +144,17 @@ describe('PlatformService', () => {
       0,
     ).data;
     expect(orgData.plan).toBe('PROFESSIONAL');
-    expect(orgData.subscription.create.status).toBe(SubscriptionStatus.TRIALING);
+    expect(orgData.subscription.create.status).toBe(
+      SubscriptionStatus.TRIALING,
+    );
     const trialEnd = orgData.subscription.create.trialEndsAt;
     // ~14 days from now, within a generous window — the point is that it *exists*.
     expect(trialEnd.getTime() - Date.now()).toBeGreaterThan(13 * 24 * 3600_000);
 
-    const userData = callArg<{ data: UserCreateData }>(prisma.user.create, 0)
-      .data;
+    const userData = callArg<{ data: UserCreateData }>(
+      prisma.user.create,
+      0,
+    ).data;
     expect(userData.role).toBe(UserRole.ADMIN);
     expect(userData.organizationId).toBe('org-new');
 
