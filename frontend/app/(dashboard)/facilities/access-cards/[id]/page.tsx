@@ -109,7 +109,7 @@ export default function AccessCardDetailPage() {
     }
 
     const statusStyle =
-        ACCESS_CARD_STATUS_STYLES[card.effectiveStatus] ?? 'bg-gray-100 text-gray-800';
+        ACCESS_CARD_STATUS_STYLES[card.effectiveStatus] ?? 'bg-gray-100 text-foreground';
     const derived = card.effectiveStatus !== card.status;
     const isHeld = card.holder !== 'NONE';
 

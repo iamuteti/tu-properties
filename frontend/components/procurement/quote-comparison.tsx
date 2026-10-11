@@ -276,7 +276,7 @@ function Flag({
         blue: "bg-blue-100 text-blue-700",
         violet: "bg-violet-100 text-violet-700",
         emerald: "bg-emerald-600 text-white",
-        slate: "bg-slate-100 text-slate-600",
+        slate: "bg-muted text-muted-foreground",
     };
     return (
         <span
@@ -304,7 +304,7 @@ export function ReceiptProgress({
                 <span className="font-medium">{pct}%</span>
             </div>
             <div
-                className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+                className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted"
                 role="progressbar"
                 aria-valuenow={pct}
                 aria-valuemin={0}

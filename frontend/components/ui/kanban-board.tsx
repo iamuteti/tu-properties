@@ -91,8 +91,8 @@ export function KanbanBoard<T>({
                         <section
                             key={column.id}
                             className={`flex w-72 shrink-0 flex-col rounded-lg border-t-4 ${
-                                column.color ?? 'border-slate-300'
-                            } bg-slate-50`}
+                                column.color ?? 'border-border'
+                            } bg-muted`}
                             onDragOver={(event) => {
                                 if (!droppable) return;
                                 event.preventDefault();
@@ -135,8 +135,8 @@ export function KanbanBoard<T>({
                                     <p
                                         className={`rounded-md border border-dashed px-3 py-6 text-center text-xs ${
                                             isTarget
-                                                ? 'border-slate-400 bg-white text-slate-600'
-                                                : 'border-slate-200 text-slate-400'
+                                                ? 'border-slate-400 bg-card text-muted-foreground'
+                                                : 'border-border text-slate-400'
                                         }`}
                                     >
                                         {droppable ? (isTarget ? 'Drop here' : 'No items') : 'Closed'}
@@ -159,7 +159,7 @@ export function KanbanBoard<T>({
                                                 setDraggingId(null);
                                                 setDropTarget(null);
                                             }}
-                                            className={`rounded-lg border bg-white shadow-sm transition-shadow ${
+                                            className={`rounded-lg border bg-card shadow-sm transition-shadow ${
                                                 draggable ? 'cursor-grab hover:shadow' : ''
                                             } ${draggingId === id ? 'opacity-50' : ''} ${
                                                 busyId === id ? 'animate-pulse' : ''

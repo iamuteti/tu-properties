@@ -258,10 +258,10 @@ function StatusPill({ status }: { status: FacilityBookingStatus }) {
         {
             PENDING: 'bg-amber-100 text-amber-800',
             CONFIRMED: 'bg-emerald-100 text-emerald-700',
-            CANCELLED: 'bg-slate-100 text-slate-500',
+            CANCELLED: 'bg-muted text-muted-foreground',
             REJECTED: 'bg-red-100 text-red-700',
             NO_SHOW: 'bg-orange-100 text-orange-800',
-        }[status] ?? 'bg-gray-100 text-gray-800';
+        }[status] ?? 'bg-gray-100 text-foreground';
     const label = status.charAt(0) + status.slice(1).toLowerCase();
     return (
         <span

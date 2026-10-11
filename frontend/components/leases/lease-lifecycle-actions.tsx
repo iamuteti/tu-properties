@@ -185,7 +185,7 @@ export function MoveOutPrompt({ lease, onCreated }: { lease: Lease; onCreated: (
     }
 
     return (
-        <div className="w-full space-y-3 rounded-lg border bg-slate-50 p-4">
+        <div className="w-full space-y-3 rounded-lg border bg-muted p-4">
             <div>
                 <label htmlFor="moveout-date" className="mb-1 block text-sm font-medium">
                     Move-out date

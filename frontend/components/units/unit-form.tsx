@@ -239,7 +239,7 @@ export function UnitForm({
                                         ? 'bg-slate-900 text-white'
                                         : index < stepIndex
                                           ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                          : 'bg-muted text-muted-foreground hover:bg-muted'
                                 }`}
                             >
                                 {index + 1}. {item.label}
@@ -439,7 +439,7 @@ export function UnitForm({
                                     <span className="font-medium">{feature.name}</span>
                                     <span className="flex items-center gap-3">
                                         {feature.featureType && (
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                                                 {feature.featureType}
                                             </span>
                                         )}

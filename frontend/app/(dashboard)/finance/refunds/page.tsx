@@ -269,7 +269,7 @@ export default function RefundsPage() {
                                             <TableCell>
                                                 <span
                                                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                                        meta?.className ?? "bg-slate-100"
+                                                        meta?.className ?? "bg-muted"
                                                     }`}
                                                 >
                                                     {meta?.label ?? request.status}

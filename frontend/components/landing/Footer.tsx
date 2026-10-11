@@ -7,7 +7,7 @@ export const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="bg-[#050811] border-t border-slate-800/80 text-slate-400 text-xs">
+    <footer className="bg-slate-100 dark:bg-[#050811] border-t border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           
@@ -17,29 +17,29 @@ export const Footer: React.FC = () => {
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 shadow-md">
                 <Building2 className="w-5 h-5 stroke-[2.5]" />
               </div>
-              <span className="font-extrabold text-xl tracking-tight text-white font-display">
+              <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white font-display">
                 TU Properties
               </span>
             </div>
 
-            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
+            <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
               The multi-tenant SaaS platform for property management companies, landlords, and letting agents across Africa and beyond. Run your properties, tenants, money, and staff from one audited system.
             </p>
 
-            <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
-              <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+            <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                 Nairobi
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                 Lagos
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                 Johannesburg
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                 Kigali
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                 Accra
               </span>
             </div>
@@ -47,37 +47,37 @@ export const Footer: React.FC = () => {
 
           {/* Col 1: Platform Modules */}
           <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono mb-3">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono mb-3">
               Core Modules
             </h4>
             <ul className="space-y-2">
               <li>
-                <a href="#features" className="hover:text-amber-400 transition-colors">
+                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Property & Units (100+)
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-amber-400 transition-colors">
+                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Leasing & Tenant Portal
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-amber-400 transition-colors">
+                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Derived Owner Statements
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-amber-400 transition-colors">
+                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   General Ledger & Multi-Country Tax
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-amber-400 transition-colors">
+                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   M-Pesa STK & FIFO Payments
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-amber-400 transition-colors">
+                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Maintenance & Response Tracking
                 </a>
               </li>
@@ -86,37 +86,42 @@ export const Footer: React.FC = () => {
 
           {/* Col 2: Architecture & Security */}
           <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono mb-3">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono mb-3">
               Architecture & Trust
             </h4>
             <ul className="space-y-2">
               <li>
-                <a href="#trust" className="hover:text-amber-400 transition-colors">
+                <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Derived Accounting Guarantee
                 </a>
               </li>
               <li>
-                <a href="#trust" className="hover:text-amber-400 transition-colors">
+                <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   12 Admin-Defined Roles
                 </a>
               </li>
               <li>
-                <a href="#trust" className="hover:text-amber-400 transition-colors">
+                <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Append-Only Audit Logs
                 </a>
               </li>
               <li>
-                <a href="#saas" className="hover:text-amber-400 transition-colors">
+                <a href="#saas" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Multi-Tenant DB Isolation
                 </a>
               </li>
               <li>
-                <a href="#saas" className="hover:text-amber-400 transition-colors">
+                <a href="#contact" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                  Contact Us
+                </a>
+              </li>
+              <li>
+                <a href="#saas" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Lease Expiry Schedules (60/30/14/7d)
                 </a>
               </li>
               <li>
-                <a href="#faq" className="hover:text-amber-400 transition-colors">
+                <a href="#faq" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   CSV Dry-Run Validation
                 </a>
               </li>
@@ -125,22 +130,22 @@ export const Footer: React.FC = () => {
 
           {/* Col 3: Company & Contact */}
           <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono mb-3">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono mb-3">
               Get Started
             </h4>
             <ul className="space-y-2">
               <li>
-                <a href="#pricing" className="hover:text-amber-400 transition-colors">
+                <a href="#pricing" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Pricing (14-Day Free Trial)
                 </a>
               </li>
               <li>
-                <a href="#how-it-works" className="hover:text-amber-400 transition-colors">
+                <a href="#how-it-works" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Interactive Simulator
                 </a>
               </li>
               <li>
-                <a href="#faq" className="hover:text-amber-400 transition-colors">
+                <a href="#faq" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Technical FAQ
                 </a>
               </li>
@@ -153,20 +158,20 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-slate-400">
+        <div className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
           <div>
             © {new Date().getFullYear()} TU Properties. All rights reserved. Numbers derived from transactional records.
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1 text-emerald-400">
+            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
               <ShieldCheck className="w-3.5 h-3.5" />
               Isolated Tenant DB
             </span>
             <span className="text-slate-500">•</span>
             <button
               onClick={scrollToTop}
-              className="hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
+              className="hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
             >
               <span>Back to top</span>
               <ArrowUp className="w-3.5 h-3.5" />

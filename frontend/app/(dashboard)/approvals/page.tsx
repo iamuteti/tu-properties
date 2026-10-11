@@ -170,7 +170,7 @@ export default function ApprovalsPage() {
                                                     </span>
                                                 )}
                                                 {task.viaOverride && (
-                                                    <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                                                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
                                                         Administrator override
                                                     </span>
                                                 )}
@@ -244,7 +244,7 @@ function ContextSummary({
     });
 
     return (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-3">
             {visible.map((key) => (
                 <div key={key}>
                     <dt className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -285,7 +285,7 @@ function RequestedList({ instances }: { instances: WorkflowInstance[] }) {
             {instances.map((instance) => {
                 const meta = WORKFLOW_STATUS_META[instance.status] ?? {
                     label: instance.status,
-                    className: "bg-slate-100 text-slate-600",
+                    className: "bg-muted text-muted-foreground",
                 };
                 const current = [...(instance.stepInstances ?? [])]
                     .sort((a, b) => a.stepIndex - b.stepIndex)

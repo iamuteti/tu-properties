@@ -9,7 +9,7 @@ export function StatementStatusBadge({ status }: { status: OwnerStatementStatus 
     return (
         <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                option?.className ?? 'bg-gray-100 text-gray-800'
+                option?.className ?? 'bg-gray-100 text-foreground'
             }`}
         >
             {option?.label ?? status}

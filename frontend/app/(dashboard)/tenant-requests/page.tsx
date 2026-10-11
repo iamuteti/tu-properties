@@ -146,7 +146,7 @@ export default function TenantRequestsPage() {
                                                 <span
                                                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                                         REQUEST_STATUS_STYLES[request.status] ??
-                                                        "bg-slate-100"
+                                                        "bg-muted"
                                                     }`}
                                                 >
                                                     {request.status.charAt(0) +
@@ -215,7 +215,7 @@ export default function TenantRequestsPage() {
                                     </div>
 
                                     {request.note && (
-                                        <p className="rounded bg-slate-50 px-3 py-2 text-sm">
+                                        <p className="rounded bg-muted px-3 py-2 text-sm">
                                             {request.note}
                                         </p>
                                     )}

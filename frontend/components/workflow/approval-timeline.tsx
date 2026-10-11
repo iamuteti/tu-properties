@@ -69,7 +69,7 @@ function TimelineRow({
 }) {
     const meta = WORKFLOW_STEP_STATUS_META[step.status] ?? {
         label: step.status,
-        className: "bg-slate-100 text-slate-600",
+        className: "bg-muted text-muted-foreground",
     };
     const overdue =
         (step.status === "ACTIVE" || step.status === "ESCALATED") &&
@@ -121,7 +121,7 @@ function TimelineRow({
                     {step.actedAt ? ` · decided ${new Date(step.actedAt).toLocaleString()}` : ""}
                 </p>
                 {step.comment && (
-                    <p className="mt-2 rounded bg-slate-50 px-3 py-2 text-sm">
+                    <p className="mt-2 rounded bg-muted px-3 py-2 text-sm">
                         “{step.comment}”
                     </p>
                 )}
@@ -149,7 +149,7 @@ function Marker({ status }: { status: WorkflowStep["status"] }) {
     }
     if (status === "SKIPPED") {
         return (
-            <span className={cn(base, "border-slate-200 bg-slate-100 text-slate-400")}>
+            <span className={cn(base, "border-border bg-muted text-slate-400")}>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </span>
         );
@@ -169,7 +169,7 @@ function Marker({ status }: { status: WorkflowStep["status"] }) {
         );
     }
     return (
-        <span className={cn(base, "border-slate-200 bg-white text-slate-300")}>
+        <span className={cn(base, "border-border bg-card text-slate-300")}>
             <Clock className="h-4 w-4" aria-hidden="true" />
         </span>
     );
@@ -213,7 +213,7 @@ export function ApprovalHistory({ instance }: { instance: WorkflowInstance }) {
                             </p>
                         )}
                         {event.comment && (
-                            <p className="mt-1 rounded bg-slate-50 px-3 py-2 text-sm">
+                            <p className="mt-1 rounded bg-muted px-3 py-2 text-sm">
                                 {event.comment}
                             </p>
                         )}

@@ -51,7 +51,7 @@ export default function PortalReceiptsPage() {
                     description="Once a payment is recorded against your lease, the receipt appears here."
                 />
             ) : (
-                <ul className="divide-y overflow-hidden rounded-lg border bg-white">
+                <ul className="divide-y overflow-hidden rounded-lg border bg-card">
                     {receipts.map((receipt) => (
                         <li
                             key={receipt.id}

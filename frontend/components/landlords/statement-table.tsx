@@ -47,7 +47,7 @@ export function OwnerStatementTable({
                     {statements.map((statement) => (
                         <tr
                             key={statement.id}
-                            className="cursor-pointer border-b last:border-0 hover:bg-slate-50"
+                            className="cursor-pointer border-b last:border-0 hover:bg-muted"
                             onClick={() => onSelect(statement)}
                         >
                             <td className="py-2 pr-3 font-medium">{statement.statementNumber}</td>

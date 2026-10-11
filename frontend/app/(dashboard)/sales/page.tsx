@@ -241,7 +241,7 @@ export default function SalesPage() {
                             type="button"
                             onClick={() => setView('list')}
                             className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium ${
-                                view === 'list' ? 'bg-slate-900 text-white' : 'text-slate-600'
+                                view === 'list' ? 'bg-slate-900 text-white' : 'text-muted-foreground'
                             }`}
                         >
                             <KanbanSquare className="h-4 w-4" aria-hidden="true" />
@@ -251,7 +251,7 @@ export default function SalesPage() {
                             type="button"
                             onClick={() => setView('board')}
                             className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium ${
-                                view === 'board' ? 'bg-slate-900 text-white' : 'text-slate-600'
+                                view === 'board' ? 'bg-slate-900 text-white' : 'text-muted-foreground'
                             }`}
                         >
                             <Columns3 className="h-4 w-4" aria-hidden="true" />
@@ -274,10 +274,10 @@ export default function SalesPage() {
                 </div>
             </div>
 
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 p-4 backdrop-blur-sm">
+            <div className="relative z-50 rounded-lg border border-border bg-card/50 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="sale-filter-stage" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="sale-filter-stage" className="mb-1.5 block text-sm font-medium text-foreground">
                             Stage
                         </label>
                         <Select
@@ -289,7 +289,7 @@ export default function SalesPage() {
                         />
                     </div>
                     <div className="min-w-[180px] max-w-xs flex-1">
-                        <label htmlFor="sale-filter-property" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="sale-filter-property" className="mb-1.5 block text-sm font-medium text-foreground">
                             Property
                         </label>
                         <Select
@@ -301,7 +301,7 @@ export default function SalesPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="sale-filter-agent" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="sale-filter-agent" className="mb-1.5 block text-sm font-medium text-foreground">
                             Agent
                         </label>
                         <Select

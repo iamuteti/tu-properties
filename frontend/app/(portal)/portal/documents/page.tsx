@@ -53,7 +53,7 @@ export default function PortalDocumentsPage() {
                     icon={<FileText className="h-10 w-10" aria-hidden="true" />}
                 />
             ) : (
-                <ul className="divide-y overflow-hidden rounded-lg border bg-white">
+                <ul className="divide-y overflow-hidden rounded-lg border bg-card">
                     {documents.map((document) => (
                         <li
                             key={document.id}
@@ -79,7 +79,7 @@ export default function PortalDocumentsPage() {
                             </div>
                             <a
                                 href={portalApi.downloadUrl(document.id)}
-                                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-50"
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
                             >
                                 <Download className="h-4 w-4" aria-hidden="true" />
                                 Download

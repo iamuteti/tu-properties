@@ -234,7 +234,7 @@ export default function LeaseDetailPage() {
                                             : ""}
                                     </span>
                                     <span className="flex items-center gap-2">
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+                                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
                                             {moveOut.status}
                                         </span>
                                         <Button
@@ -363,7 +363,7 @@ export default function LeaseDetailPage() {
                                         </TableCell>
                                         <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
                                         <TableCell>
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
                                                 {invoice.status}
                                             </span>
                                         </TableCell>
@@ -425,7 +425,7 @@ export default function LeaseDetailPage() {
                                             {new Date(inspection.scheduledDate).toLocaleDateString()}
                                         </TableCell>
                                         <TableCell>
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
                                                 {inspection.status}
                                             </span>
                                         </TableCell>

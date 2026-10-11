@@ -181,10 +181,10 @@ Weekend:{' '}
                                         }
                                         className={`rounded border p-1.5 text-center text-xs ${
                                             day.isWorkingDay
-                                                ? 'border-slate-200 bg-white'
+                                                ? 'border-border bg-card'
                                                 : day.holiday
                                                   ? 'border-red-200 bg-red-50 text-red-900'
-                                                  : 'border-slate-200 bg-slate-100 text-slate-500'
+                                                  : 'border-border bg-muted text-muted-foreground'
                                         }`}
                                     >
                                         <p className="font-medium">

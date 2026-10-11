@@ -90,7 +90,7 @@ export function SalesBoard({
                         <Link href={`/sales/${sale.id}`} className="text-sm font-medium hover:underline">
                             {sale.code}
                         </Link>
-                        <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                             {sale.currency}
                         </span>
                     </div>

@@ -35,13 +35,13 @@ export function RowActionsMenu<T>({
     return (
         <Menu as="div" className="relative inline-block text-left">
             <MenuButton
-                className="inline-flex items-center justify-center rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+                className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
                 aria-label={label}
                 onClick={(event) => event.stopPropagation()}
             >
                 <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
             </MenuButton>
-            <MenuItems className="absolute right-0 z-40 mt-1 w-52 origin-top-right rounded-md border border-slate-200 bg-white py-1 shadow-lg focus:outline-none">
+            <MenuItems className="absolute right-0 z-40 mt-1 w-52 origin-top-right rounded-md border border-border bg-card py-1 shadow-lg focus:outline-none">
                 {actions.map((action) => (
                     <MenuItem
                         key={action.label}
@@ -55,7 +55,7 @@ export function RowActionsMenu<T>({
                                         ? 'cursor-not-allowed text-slate-400'
                                         : action.variant === 'danger'
                                           ? 'text-red-600 hover:bg-red-50'
-                                          : 'text-slate-700 hover:bg-slate-100'
+                                          : 'text-foreground hover:bg-muted'
                                 }`}
                                 onClick={(event) => {
                                     event.stopPropagation();

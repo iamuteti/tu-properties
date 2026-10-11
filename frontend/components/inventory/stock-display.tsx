@@ -37,7 +37,7 @@ export function StockStatusBadge({
     return (
         <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                muted ? 'bg-slate-100 text-slate-600' : STATUS_STYLE[status]
+                muted ? 'bg-muted text-muted-foreground' : STATUS_STYLE[status]
             }`}
         >
             {text}
@@ -106,7 +106,7 @@ export function MovementAmount({
     return (
         <span
             className={`inline-flex items-center gap-0.5 font-medium tabular-nums ${
-                incoming ? 'text-emerald-700' : 'text-slate-900'
+                incoming ? 'text-emerald-700' : 'text-foreground'
             }`}
         >
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />

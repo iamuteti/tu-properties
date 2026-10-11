@@ -79,7 +79,7 @@ export default function OrganizationsPage() {
             )}
 
             {showForm && (
-                <div className="mb-6 p-6 bg-white rounded-lg shadow">
+                <div className="mb-6 p-6 bg-card rounded-lg shadow">
                     <h2 className="text-lg font-semibold mb-4">Create New Organization</h2>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
@@ -134,28 +134,28 @@ export default function OrganizationsPage() {
                 </div>
             )}
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-card rounded-lg shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-muted">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                 Name
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                 Slug
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                 Subdomain
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                 Status
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                 Plan
                             </th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-gray-200">
                         {organizations.map((org) => (
                             <tr key={org.id}>
                                 <td className="px-6 py-4 whitespace-nowrap">

@@ -33,7 +33,7 @@ const categoryLabel = (value: string) =>
 
 const statementTone = (status: string) =>
     OWNER_STATEMENT_STATUSES.find((option) => option.value === status)?.className ??
-    'bg-gray-100 text-gray-800';
+    'bg-gray-100 text-foreground';
 
 /**
  * Landlord detail (Module 6).

@@ -184,13 +184,13 @@ export default function NewReceiptPage() {
       )}
 
       {/* Receipt Form */}
-      <div className="bg-white border rounded-lg p-6 shadow-sm">
+      <div className="bg-card border rounded-lg p-6 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="space-y-4">
             {/* Received From */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Received From: <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-2">
@@ -216,7 +216,7 @@ export default function NewReceiptPage() {
 
             {/* Payment Method */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Payment Method: <span className="text-red-500">*</span>
               </label>
               <Select
@@ -237,7 +237,7 @@ export default function NewReceiptPage() {
 
             {/* Receipt Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Receipt Type:
               </label>
               <div className="flex gap-6">
@@ -268,7 +268,7 @@ export default function NewReceiptPage() {
 
             {/* Deposit Into Account */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Deposit Into A/c: <span className="text-red-500">*</span>
               </label>
               <Select
@@ -290,7 +290,7 @@ export default function NewReceiptPage() {
             {/* Reference Number */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Ref No.: <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -305,7 +305,7 @@ export default function NewReceiptPage() {
               {/* Cheque Date */}
               {formData.paymentMethod === "CHEQUE" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Cheque Date: <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -321,7 +321,7 @@ export default function NewReceiptPage() {
             {/* Recording Date */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Recording Date: <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -338,7 +338,7 @@ export default function NewReceiptPage() {
 
               {/* Amount Received */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Amount Received: <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -356,7 +356,7 @@ export default function NewReceiptPage() {
 
         {/* Notes */}
         <div className="mt-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Notes:
           </label>
           <Textarea
@@ -370,7 +370,7 @@ export default function NewReceiptPage() {
       </div>
 
       {/* Receipt Lines */}
-      <div className="bg-white border rounded-lg p-6 shadow-sm">
+      <div className="bg-card border rounded-lg p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Receipt Lines</h2>
           <Button onClick={() => setShowInvoicePicker((prev) => !prev)}>

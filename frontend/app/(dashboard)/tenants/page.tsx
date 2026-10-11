@@ -137,14 +137,14 @@ export default function TenantsPage() {
             header: () => null,
             cell: ({ row }) => (
                 <button
-                    className="p-1 hover:bg-slate-100 rounded transition-colors"
+                    className="p-1 hover:bg-muted rounded transition-colors"
                     onClick={() => row.toggleExpanded()}
                     aria-label={row.getIsExpanded() ? 'Collapse row' : 'Expand row'}
                 >
                     {row.getIsExpanded() ? (
-                        <ChevronDown className="h-4 w-4 text-slate-500" />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                 </button>
             ),
@@ -156,7 +156,7 @@ export default function TenantsPage() {
             accessorKey: 'tenantCode',
             header: 'Code',
             cell: ({ row }) => (
-                <span className="text-slate-500 font-mono text-sm">
+                <span className="text-muted-foreground font-mono text-sm">
                     {row.original.tenantCode}
                 </span>
             ),
@@ -169,11 +169,11 @@ export default function TenantsPage() {
                 const status = row.original.status;
                 const colorMap = {
                     active: 'bg-green-100 text-green-800',
-                    inactive: 'bg-gray-100 text-gray-800',
+                    inactive: 'bg-gray-100 text-foreground',
                     archived: 'bg-blue-100 text-blue-800',
                 };
                 return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-gray-800'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-foreground'}`}>
                         {status.charAt(0).toUpperCase() + status.slice(1)}
                     </span>
                 );
@@ -185,7 +185,7 @@ export default function TenantsPage() {
             header: 'Name',
             cell: ({ row }) => (
                 <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-slate-900">{row.original.tenantName}</span>
+                    <span className="font-medium text-foreground">{row.original.tenantName}</span>
                     {row.original.phone && (
                         <span className="text-xs text-muted-foreground">{row.original.phone}</span>
                     )}
@@ -198,8 +198,8 @@ export default function TenantsPage() {
             header: 'Property/Unit',
             cell: ({ row }) => (
                 <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-slate-900">{row.original.propertyName}</span>
-                    <span className="text-xs text-slate-500">{row.original.unitName}</span>
+                    <span className="font-medium text-foreground">{row.original.propertyName}</span>
+                    <span className="text-xs text-muted-foreground">{row.original.unitName}</span>
                 </div>
             ),
             size: 150,
@@ -247,19 +247,19 @@ export default function TenantsPage() {
     // Custom expanded row component for tenants
     const TenantExpandedDetails = ({ row }: { row: TenantTableData }) => {
         return (
-            <div className="bg-slate-50 p-4 border-l-4 border-cyan-500 ml-4">
+            <div className="bg-muted p-4 border-l-4 border-cyan-500 ml-4">
                 <div className="grid grid-cols-3 gap-4">
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wide">Tax PIN</p>
-                        <p className="text-sm font-medium text-slate-900">{row.taxPin || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Tax PIN</p>
+                        <p className="text-sm font-medium text-foreground">{row.taxPin || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wide">Tenant Type</p>
-                        <p className="text-sm font-medium text-slate-900">{row.agreementType || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Tenant Type</p>
+                        <p className="text-sm font-medium text-foreground">{row.agreementType || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wide">Town</p>
-                        <p className="text-sm font-medium text-slate-900">{row.tenancyType || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Town</p>
+                        <p className="text-sm font-medium text-foreground">{row.tenancyType || 'N/A'}</p>
                     </div>
                 </div>
             </div>

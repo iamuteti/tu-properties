@@ -359,10 +359,10 @@ export function PropertyForm({
                                             ? 'bg-slate-900 text-white'
                                             : isDone
                                               ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                              : 'bg-muted text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
-                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/70 text-[10px]">
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-card/70 text-[10px]">
                                         {isDone ? <Check className="h-3 w-3" aria-hidden="true" /> : index + 1}
                                     </span>
                                     {item.label}
@@ -585,7 +585,7 @@ export function PropertyForm({
                                     <span className="font-medium">{amenity.name}</span>
                                     <span className="flex items-center gap-3">
                                         {amenity.category && (
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                                                 {amenity.category}
                                             </span>
                                         )}

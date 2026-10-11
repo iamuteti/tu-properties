@@ -178,7 +178,7 @@ export default function NotificationsPage() {
                                             </span>
                                             {item.status === "SUPPRESSED" && (
                                                 <span
-                                                    className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
+                                                    className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-foreground"
                                                     title="No provider is configured for this channel, so it was not sent"
                                                 >
                                                     not sent

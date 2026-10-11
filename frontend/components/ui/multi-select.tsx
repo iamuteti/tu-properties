@@ -61,7 +61,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                 <button
                     type="button"
                     className={cn(
-                        "flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
+                        "flex h-10 w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
                         className,
                         error && "border-red-500 focus:ring-red-500",
                         disabled && "cursor-not-allowed opacity-50"
@@ -83,13 +83,13 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                 </button>
 
                 {isOpen && (
-                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-slate-200 bg-white text-slate-950 shadow-lg">
+                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-border bg-card text-slate-950 shadow-lg">
                         {search && (
                             <div className="relative p-2 border-b border-slate-100">
                                 <input
                                     type="text"
                                     placeholder="Search..."
-                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-slate-400 border border-slate-200 rounded-md"
+                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-slate-400 border border-border rounded-md"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     autoFocus
@@ -109,7 +109,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                                 filteredOptions.map((option) => (
                                     <div
                                         key={option.value}
-                                        className="relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 px-3 text-sm outline-none hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+                                        className="relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 px-3 text-sm outline-none hover:bg-muted hover:text-foreground cursor-pointer"
                                         onClick={() => toggleOption(option.value)}
                                     >
                                         <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
@@ -121,7 +121,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                                     </div>
                                 ))
                             ) : (
-                                <div className="px-3 py-2 text-sm text-slate-500">
+                                <div className="px-3 py-2 text-sm text-muted-foreground">
                                     {search ? "No options found" : "No options available"}
                                 </div>
                             )}
@@ -135,7 +135,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
 
         return (
             <div className="grid w-full items-center gap-1.5">
-                <label className="text-sm font-medium leading-none text-slate-700">
+                <label className="text-sm font-medium leading-none text-foreground">
                     {label}
                     {required && <span className="text-red-500"> *</span>}
                 </label>

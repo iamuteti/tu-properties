@@ -12,7 +12,7 @@ export function Toggle({ checked, onChange, disabled = false, className = "", la
   return (
     <div className="flex items-center space-x-2">
       {label && (
-        <label className="text-sm font-medium text-slate-700">
+        <label className="text-sm font-medium text-foreground">
           {label}
         </label>
       )}
@@ -25,7 +25,7 @@ export function Toggle({ checked, onChange, disabled = false, className = "", la
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${className}`}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+          className={`inline-block h-4 w-4 transform rounded-full bg-card transition-transform ${
             checked ? 'translate-x-6' : 'translate-x-1'
           }`}
         />

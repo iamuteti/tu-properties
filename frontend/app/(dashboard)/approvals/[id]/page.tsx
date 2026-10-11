@@ -87,7 +87,7 @@ export default function ApprovalDetailPage() {
 
     const meta = WORKFLOW_STATUS_META[instance.status] ?? {
         label: instance.status,
-        className: "bg-slate-100 text-slate-600",
+        className: "bg-muted text-muted-foreground",
     };
     const current = [...(instance.stepInstances ?? [])]
         .sort((a, b) => a.stepIndex - b.stepIndex)
@@ -156,7 +156,7 @@ export default function ApprovalDetailPage() {
                         context={instance.context ?? {}}
                     />
                     {instance.finalComment && (
-                        <p className="rounded bg-slate-50 px-3 py-2 text-sm">
+                        <p className="rounded bg-muted px-3 py-2 text-sm">
                             “{instance.finalComment}”
                         </p>
                     )}

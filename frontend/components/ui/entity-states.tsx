@@ -75,38 +75,38 @@ export function ErrorState({
 const STATUS_STYLES: Record<string, string> = {
     // Properties
     ACTIVE: 'bg-green-100 text-green-800',
-    INACTIVE: 'bg-gray-100 text-gray-800',
-    ARCHIVED: 'bg-gray-200 text-gray-700',
+    INACTIVE: 'bg-gray-100 text-foreground',
+    ARCHIVED: 'bg-gray-200 text-foreground',
     // Units
     VACANT: 'bg-green-100 text-green-800',
     OCCUPIED: 'bg-blue-100 text-blue-800',
     RESERVED: 'bg-purple-100 text-purple-800',
     MAINTENANCE: 'bg-yellow-100 text-yellow-800',
     // Unit types
-    two: 'bg-slate-100 text-slate-700',
-    one: 'bg-slate-100 text-slate-700',
+    two: 'bg-muted text-foreground',
+    one: 'bg-muted text-foreground',
     // Module 9: work-order pipeline. The order is the pipeline — grey while
     // nobody has looked at it, violet for the assessment, blue once it is
     // signed off, cyan when somebody owns it, amber while it is happening,
     // green when it is done and near-black when it is closed.
-    REQUESTED: 'bg-slate-100 text-slate-700',
+    REQUESTED: 'bg-muted text-foreground',
     INSPECTION: 'bg-violet-100 text-violet-700',
     APPROVED: 'bg-blue-100 text-blue-700',
     ASSIGNED: 'bg-cyan-100 text-cyan-700',
     IN_PROGRESS: 'bg-amber-100 text-amber-800',
     COMPLETED: 'bg-emerald-100 text-emerald-700',
     CLOSED: 'bg-slate-800 text-white',
-    CANCELLED: 'bg-slate-100 text-slate-500',
+    CANCELLED: 'bg-muted text-muted-foreground',
     // Module 9: asset service state.
     OPERATIONAL: 'bg-emerald-100 text-emerald-700',
     SERVICE_DUE: 'bg-amber-100 text-amber-800',
     OUT_OF_SERVICE: 'bg-red-100 text-red-700',
-    RETIRED: 'bg-slate-100 text-slate-500',
+    RETIRED: 'bg-muted text-muted-foreground',
     // Module 10: procurement. Three pipelines that read left to right, so the
     // colours go grey → amber (waiting on somebody) → violet → blue (agreed) →
     // green (delivered) → near-black (closed), with one amber exception for
     // "part of it arrived", which is the state that most needs to stand out.
-    DRAFT: 'bg-slate-100 text-slate-700',
+    DRAFT: 'bg-muted text-foreground',
     // NOTE: `PENDING` is shared deliberately. It is amber here for a purchase order
     // awaiting approval and it is the right colour for a contract whose term has not
     // started - both mean "real, but not running yet", and a second identical key would
@@ -125,10 +125,10 @@ const STATUS_STYLES: Record<string, string> = {
     SUBMITTED: 'bg-blue-100 text-blue-700',
     SHORTLISTED: 'bg-violet-100 text-violet-700',
     AWARDED: 'bg-emerald-100 text-emerald-700',
-    WITHDRAWN: 'bg-slate-100 text-slate-500',
+    WITHDRAWN: 'bg-muted text-muted-foreground',
     INVITED: 'bg-amber-100 text-amber-800',
     QUOTED: 'bg-blue-100 text-blue-700',
-    DECLINED: 'bg-slate-100 text-slate-500',
+    DECLINED: 'bg-muted text-muted-foreground',
     // Module 12: payroll runs. Grey → sky (figures exist, nobody signed off) →
     // violet (signed off, still nothing on the ledger) → emerald (posted *and*
     // paid) → red (superseded). Violet and emerald are deliberately far apart in
@@ -146,15 +146,15 @@ const STATUS_STYLES: Record<string, string> = {
     NOTICE_DUE: 'bg-red-100 text-red-700',
     EXPIRED: 'bg-red-50 text-red-600',
     EXPIRING_SOON: 'bg-amber-100 text-amber-800',
-    OPEN_ENDED: 'bg-slate-100 text-slate-600',
-    SUPERSEDED: 'bg-slate-200 text-slate-500',
+    OPEN_ENDED: 'bg-muted text-muted-foreground',
+    SUPERSEDED: 'bg-muted text-muted-foreground',
     UNDATED: 'bg-yellow-50 text-yellow-700',
 };
 
 /** Coloured status pill, shared by property and unit lists/details. */
 export function StatusBadge({ status }: { status?: string | null }) {
     if (!status) return <span className="text-muted-foreground">—</span>;
-    const style = STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-800';
+    const style = STATUS_STYLES[status] ?? 'bg-gray-100 text-foreground';
     const label = status.charAt(0) + status.slice(1).toLowerCase();
     return (
         <span

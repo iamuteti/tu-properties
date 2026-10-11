@@ -267,7 +267,7 @@ export default function NotificationSettingsPage() {
                                                 </span>
                                             )}
                                             {!channel.active && channel.configured && (
-                                                <span className="ml-3 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                                                <span className="ml-3 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-foreground">
                                                     configured, not active
                                                 </span>
                                             )}

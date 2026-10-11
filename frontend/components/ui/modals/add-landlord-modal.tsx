@@ -150,11 +150,11 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* General Information Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900 border-b border-slate-200 pb-2">
+          <h3 className="text-lg font-medium text-foreground border-b border-border pb-2">
             General Information
           </h3>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Name *
             </label>
             <Input
@@ -167,7 +167,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Email
               </label>
               <Input
@@ -180,7 +180,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Phone
               </label>
               <Input
@@ -189,7 +189,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Alternative Phone
               </label>
               <Input
@@ -202,12 +202,12 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
 
         {/* Address Information Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900 border-b border-slate-200 pb-2">
+          <h3 className="text-lg font-medium text-foreground border-b border-border pb-2">
             Address Information
           </h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Address
               </label>
               <Textarea
@@ -218,7 +218,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   City
                 </label>
                 <Input
@@ -227,7 +227,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Country
                 </label>
                 <Input
@@ -236,7 +236,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Postal Code
                 </label>
                 <Input
@@ -250,12 +250,12 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
 
         {/* Banking Details Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900 border-b border-slate-200 pb-2">
+          <h3 className="text-lg font-medium text-foreground border-b border-border pb-2">
             Banking Details
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Bank Name
               </label>
               <Input
@@ -264,7 +264,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Bank Branch
               </label>
               <Input
@@ -273,7 +273,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Account Name
               </label>
               <Input
@@ -282,7 +282,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Account Number
               </label>
               <Input
@@ -295,12 +295,12 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
 
         {/* Tax Information Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900 border-b border-slate-200 pb-2">
+          <h3 className="text-lg font-medium text-foreground border-b border-border pb-2">
             Tax Information
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Tax PIN
               </label>
               <Input
@@ -313,7 +313,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
                 checked={watch("vatRegistered")}
                 onCheckedChange={(checked) => setValue("vatRegistered", checked)}
               />
-              <label className="text-sm font-medium text-slate-700">
+              <label className="text-sm font-medium text-foreground">
                 VAT Registered
               </label>
             </div>
@@ -321,7 +321,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-border">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

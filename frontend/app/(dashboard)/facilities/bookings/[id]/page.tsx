@@ -95,7 +95,7 @@ export default function BookingDetailPage() {
     }
 
     const statusStyle =
-        FACILITY_BOOKING_STATUS_STYLES[booking.status] ?? 'bg-gray-100 text-gray-800';
+        FACILITY_BOOKING_STATUS_STYLES[booking.status] ?? 'bg-gray-100 text-foreground';
 
     return (
         <div className="space-y-6">

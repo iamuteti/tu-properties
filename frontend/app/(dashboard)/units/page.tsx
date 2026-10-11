@@ -247,10 +247,10 @@ export default function UnitsPage() {
                 </div>
             </div>
 
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 p-4 backdrop-blur-sm">
+            <div className="relative z-50 rounded-lg border border-border bg-card/50 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="min-w-[200px] max-w-xs flex-1">
-                        <label htmlFor="unit-filter-property" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="unit-filter-property" className="mb-1.5 block text-sm font-medium text-foreground">
                             Property
                         </label>
                         <Select
@@ -262,7 +262,7 @@ export default function UnitsPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="unit-filter-status" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="unit-filter-status" className="mb-1.5 block text-sm font-medium text-foreground">
                             Occupancy
                         </label>
                         <Select
@@ -274,7 +274,7 @@ export default function UnitsPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="unit-filter-branch" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="unit-filter-branch" className="mb-1.5 block text-sm font-medium text-foreground">
                             Branch
                         </label>
                         <Select
@@ -286,7 +286,7 @@ export default function UnitsPage() {
                         />
                     </div>
                     <div className="min-w-[140px] max-w-[160px]">
-                        <label htmlFor="unit-filter-bedrooms" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="unit-filter-bedrooms" className="mb-1.5 block text-sm font-medium text-foreground">
                             Bedrooms
                         </label>
                         <Input

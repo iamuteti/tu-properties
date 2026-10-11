@@ -122,7 +122,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                             <img
                                 src={documentsApi.downloadUrl(image.id)}
                                 alt={image.fileName}
-                                className="h-32 w-full bg-slate-100 object-cover"
+                                className="h-32 w-full bg-muted object-cover"
                             />
                             <div className="flex items-center justify-between gap-2 px-2 py-1.5">
                                 <span className="truncate text-xs text-muted-foreground">
@@ -131,7 +131,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                                 <span className="flex items-center gap-1">
                                     <a
                                         href={documentsApi.downloadUrl(image.id)}
-                                        className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                                        className="rounded p-1 text-muted-foreground hover:bg-muted"
                                         aria-label={`Download ${image.fileName}`}
                                     >
                                         <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -139,7 +139,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                                     <button
                                         type="button"
                                         onClick={() => handleDelete(image)}
-                                        className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                                        className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
                                         aria-label={`Delete ${image.fileName}`}
                                     >
                                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -165,7 +165,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                             <span className="flex shrink-0 items-center gap-1">
                                 <a
                                     href={documentsApi.downloadUrl(file.id)}
-                                    className="rounded p-1.5 text-slate-500 hover:bg-slate-100"
+                                    className="rounded p-1.5 text-muted-foreground hover:bg-muted"
                                     aria-label={`Download ${file.fileName}`}
                                 >
                                     <Download className="h-4 w-4" aria-hidden="true" />
@@ -173,7 +173,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(file)}
-                                    className="rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                                    className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600"
                                     aria-label={`Delete ${file.fileName}`}
                                 >
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />

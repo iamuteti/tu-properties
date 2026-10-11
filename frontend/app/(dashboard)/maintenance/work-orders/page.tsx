@@ -117,7 +117,7 @@ export default function WorkOrdersPage() {
                     );
                     return (
                         <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${priority?.className ?? 'bg-slate-100 text-slate-700'}`}
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${priority?.className ?? 'bg-muted text-foreground'}`}
                             title={`Response window: ${priority?.window ?? '7 days'}`}
                         >
                             {priority?.label ?? row.original.priority}
@@ -347,7 +347,7 @@ export default function WorkOrdersPage() {
             )}
 
             {/* Filters */}
-            <div className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="space-y-1.5 lg:col-span-2">
                     <Label htmlFor="wo-search">Search</Label>
                     <Input
@@ -547,10 +547,10 @@ function Counter({
             ? 'text-red-600'
             : tone === 'warn'
               ? 'text-amber-600'
-              : 'text-slate-900';
+              : 'text-foreground';
 
     return (
-        <div className="rounded-lg border border-slate-200 px-4 py-3">
+        <div className="rounded-lg border border-border px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
             <p className={`text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</p>
         </div>

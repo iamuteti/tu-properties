@@ -94,13 +94,13 @@ export function CsvImportModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={`Import ${entityLabel} from CSV`}>
-            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-card shadow-xl">
                 <header className="flex items-center justify-between border-b px-5 py-4">
                     <h2 className="text-lg font-semibold">Import {entityLabel.toLowerCase()}</h2>
                     <button
                         type="button"
                         onClick={close}
-                        className="rounded p-1 text-slate-400 hover:bg-slate-100"
+                        className="rounded p-1 text-slate-400 hover:bg-muted"
                         aria-label="Close"
                     >
                         ✕

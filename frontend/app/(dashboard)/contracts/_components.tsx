@@ -74,8 +74,8 @@ const STATUS_CLASS: Record<string, string> = {
     EXPIRED: 'bg-red-50 text-red-600',
     EXPIRING_SOON: 'bg-amber-100 text-amber-800',
     PENDING: 'bg-amber-100 text-amber-800',
-    OPEN_ENDED: 'bg-slate-100 text-slate-600',
-    SUPERSEDED: 'bg-slate-200 text-slate-500',
+    OPEN_ENDED: 'bg-muted text-muted-foreground',
+    SUPERSEDED: 'bg-muted text-muted-foreground',
     UNDATED: 'bg-yellow-50 text-yellow-700',
     ACTIVE: 'bg-green-100 text-green-800',
 };

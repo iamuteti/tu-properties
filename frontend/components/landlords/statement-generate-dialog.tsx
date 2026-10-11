@@ -187,7 +187,7 @@ export function StatementGenerateDialog({
                     </div>
                 </div>
 
-                <div className="rounded-lg border bg-slate-50 p-4">
+                <div className="rounded-lg border bg-muted p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-medium">
                         <Sparkles className="h-4 w-4 text-cyan-600" aria-hidden="true" />
                         What this period will produce
@@ -221,7 +221,7 @@ export function StatementGenerateDialog({
                             </div>
 
                             {preview.expenseLines.length > 0 && (
-                                <ul className="space-y-1 rounded border bg-white p-3 text-xs">
+                                <ul className="space-y-1 rounded border bg-card p-3 text-xs">
                                     {preview.expenseLines.map((line) => (
                                         <li key={line.ref} className="flex justify-between gap-4">
                                             <span className="truncate">

@@ -86,7 +86,7 @@ export function ConvertLeadDialog({
             aria-modal="true"
             aria-label="Convert lead to contact"
         >
-            <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-card shadow-xl">
                 <header className="border-b px-5 py-4">
                     <h2 className="text-lg font-semibold">
                         Convert {lead.firstName} {lead.lastName ?? ''}
@@ -102,7 +102,7 @@ export function ConvertLeadDialog({
                             type="button"
                             onClick={() => setMode('create')}
                             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                                mode === 'create' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                                mode === 'create' ? 'bg-slate-900 text-white' : 'bg-muted text-muted-foreground'
                             }`}
                         >
                             New contact
@@ -111,7 +111,7 @@ export function ConvertLeadDialog({
                             type="button"
                             onClick={() => setMode('link')}
                             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                                mode === 'link' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                                mode === 'link' ? 'bg-slate-900 text-white' : 'bg-muted text-muted-foreground'
                             }`}
                         >
                             Link existing contact
@@ -192,7 +192,7 @@ export function ConvertLeadDialog({
                         </Labeled>
                     )}
 
-                    <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2">
+                    <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
                         <Checkbox
                             id="convert-tenant"
                             checked={createTenant}

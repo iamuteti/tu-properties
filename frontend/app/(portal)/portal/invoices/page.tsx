@@ -51,7 +51,7 @@ export default function PortalInvoicesPage() {
                     description="When your manager raises rent, the invoice appears here."
                 />
             ) : (
-                <ul className="divide-y overflow-hidden rounded-lg border bg-white">
+                <ul className="divide-y overflow-hidden rounded-lg border bg-card">
                     {invoices.map((invoice) => {
                         const balance = Number(invoice.balanceAmount ?? 0);
                         const overdue =

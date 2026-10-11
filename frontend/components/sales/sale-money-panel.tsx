@@ -137,7 +137,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
                 )}
 
                 {installments.length === 0 && (
-                    <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-slate-50 p-4 sm:grid-cols-4">
+                    <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border bg-muted p-4 sm:grid-cols-4">
                         <Field label="Number of instalments" id="plan-count">
                             <Input
                                 id="plan-count"
@@ -177,7 +177,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
                 {installments.length > 0 && (
                     <div className="mt-3 overflow-x-auto rounded-lg border">
                         <table className="w-full text-sm">
-                            <thead className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                            <thead className="border-b bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>
                                     <th className="px-3 py-2">#</th>
                                     <th className="px-3 py-2">Description</th>
@@ -346,7 +346,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
                 {(sale.commissions ?? []).length > 0 && (
                     <div className="mt-4 overflow-x-auto rounded-lg border">
                         <table className="w-full text-sm">
-                            <thead className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                            <thead className="border-b bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>
                                     <th className="px-3 py-2">Agent</th>
                                     <th className="px-3 py-2 text-right">Share</th>
@@ -370,7 +370,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
                                             {currency} {Number(commission.amount).toLocaleString()}
                                         </td>
                                         <td className="px-3 py-2">
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
                                                 {commission.status.charAt(0) +
                                                     commission.status.slice(1).toLowerCase()}
                                             </span>
@@ -402,16 +402,16 @@ function Field({ label, id, children }: { label: string; id: string; children: R
 
 function InstalmentBadge({ status }: { status: string }) {
     const styles: Record<string, string> = {
-        SCHEDULED: 'bg-slate-100 text-slate-700',
+        SCHEDULED: 'bg-muted text-foreground',
         INVOICED: 'bg-amber-100 text-amber-800',
         PAID: 'bg-green-100 text-green-800',
         OVERDUE: 'bg-red-100 text-red-800',
-        WAIVED: 'bg-gray-200 text-gray-700',
+        WAIVED: 'bg-gray-200 text-foreground',
     };
     return (
         <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                styles[status] ?? 'bg-slate-100 text-slate-700'
+                styles[status] ?? 'bg-muted text-foreground'
             }`}
         >
             {status.charAt(0) + status.slice(1).toLowerCase()}

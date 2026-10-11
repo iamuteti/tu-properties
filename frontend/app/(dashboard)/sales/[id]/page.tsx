@@ -182,7 +182,7 @@ export default function SaleDetailPage() {
                                         className={`rounded-full px-2.5 py-1 font-medium ${
                                             reached
                                                 ? 'bg-slate-900 text-white'
-                                                : 'bg-slate-100 text-slate-500'
+                                                : 'bg-muted text-muted-foreground'
                                         }`}
                                     >
                                         {stage.label}

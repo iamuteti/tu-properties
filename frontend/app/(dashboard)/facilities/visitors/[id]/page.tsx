@@ -271,7 +271,7 @@ export default function VisitorDetailPage() {
                                     <span
                                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                             VISIT_STATE_STYLES[visit.state] ??
-                                            'bg-gray-100 text-gray-800'
+                                            'bg-gray-100 text-foreground'
                                         }`}
                                     >
                                         {visit.stateLabel}
@@ -302,7 +302,7 @@ export default function VisitorDetailPage() {
                                     <span
                                         className={`ml-auto inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                             ACCESS_CARD_STATUS_STYLES[card.status] ??
-                                            'bg-gray-100 text-gray-800'
+                                            'bg-gray-100 text-foreground'
                                         }`}
                                     >
                                         {card.status.toLowerCase()}

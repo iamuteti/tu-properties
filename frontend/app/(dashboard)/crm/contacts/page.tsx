@@ -198,10 +198,10 @@ export default function ContactsPage() {
                 </div>
             </div>
 
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 p-4 backdrop-blur-sm">
+            <div className="relative z-50 rounded-lg border border-border bg-card/50 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="min-w-[180px] max-w-xs flex-1">
-                        <label htmlFor="contact-filter-type" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="contact-filter-type" className="mb-1.5 block text-sm font-medium text-foreground">
                             Type
                         </label>
                         <Select
@@ -218,9 +218,9 @@ export default function ContactsPage() {
                             type="checkbox"
                             checked={engagedOnly}
                             onChange={(e) => setEngagedOnly(e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-4 w-4 rounded border-border"
                         />
-                        <label htmlFor="contact-filter-engaged" className="text-sm text-slate-700">
+                        <label htmlFor="contact-filter-engaged" className="text-sm text-foreground">
                             Only contacts with a lead or communication
                         </label>
                     </div>

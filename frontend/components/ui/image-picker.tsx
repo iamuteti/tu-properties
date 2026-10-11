@@ -37,7 +37,7 @@ export const ImagePicker: React.FC<ImagePickerProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-gray-700">Photo</label>
+      <label className="text-sm font-medium text-foreground">Photo</label>
       <div className="flex items-center gap-4">
         {preview ? (
           <div className="relative">
@@ -56,7 +56,7 @@ export const ImagePicker: React.FC<ImagePickerProps> = ({
             </button>
           </div>
         ) : (
-          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-muted">
             <Upload className="w-8 h-8 text-gray-400" />
           </div>
         )}
@@ -71,11 +71,11 @@ export const ImagePicker: React.FC<ImagePickerProps> = ({
           />
           <label
             htmlFor="image-input"
-            className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center px-4 py-2 bg-card border border-gray-300 rounded-md shadow-sm text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 cursor-pointer"
           >
             {preview ? 'Change Photo' : 'Upload Photo'}
           </label>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             SVG, PNG, JPG or GIF (max. 5MB)
           </p>
         </div>

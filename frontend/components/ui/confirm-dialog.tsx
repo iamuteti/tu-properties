@@ -35,11 +35,11 @@ export default function ConfirmDialog({
 
       {/* Dialog panel */}
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
+        <DialogPanel className="w-full max-w-md rounded-2xl bg-card p-6 shadow-xl">
+          <DialogTitle className="text-lg font-semibold text-foreground">
             {title}
           </DialogTitle>
-          <Description className="mt-2 text-sm text-gray-500">
+          <Description className="mt-2 text-sm text-muted-foreground">
             {message}
           </Description>
 
@@ -48,7 +48,7 @@ export default function ConfirmDialog({
           <div className="mt-6 flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-gray-100"
             >
               {cancelText}
             </button>

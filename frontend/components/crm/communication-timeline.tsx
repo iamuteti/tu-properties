@@ -117,7 +117,7 @@ export function CommunicationTimeline({
             </div>
 
             {isLogging && (
-                <div className="space-y-3 rounded-lg border bg-slate-50 p-4">
+                <div className="space-y-3 rounded-lg border bg-muted p-4">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
                             <label htmlFor="comm-channel" className="mb-1 block text-xs font-medium">
@@ -215,7 +215,7 @@ export function CommunicationTimeline({
                             <li key={entry.id} className="flex gap-3 rounded-lg border p-3">
                                 <span
                                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                        CHANNEL_STYLES[entry.channel] ?? 'bg-slate-100 text-slate-700'
+                                        CHANNEL_STYLES[entry.channel] ?? 'bg-muted text-foreground'
                                     }`}
                                 >
                                     <Icon className="h-4 w-4" aria-hidden="true" />
@@ -257,7 +257,7 @@ export function CommunicationTimeline({
                                         </p>
                                     )}
                                     {entry.outcome && (
-                                        <p className="mt-1 text-xs font-medium text-slate-600">
+                                        <p className="mt-1 text-xs font-medium text-muted-foreground">
                                             Outcome: {entry.outcome}
                                         </p>
                                     )}

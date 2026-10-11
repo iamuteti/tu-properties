@@ -189,7 +189,7 @@ export default function PmSchedulesPage() {
                                                 <span
                                                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                                                         !schedule.active
-                                                            ? 'bg-slate-100 text-slate-500'
+                                                            ? 'bg-muted text-muted-foreground'
                                                             : overdue
                                                               ? 'bg-amber-100 text-amber-800'
                                                               : 'bg-emerald-100 text-emerald-700'
@@ -359,11 +359,11 @@ function Counter({
     tone?: 'plain' | 'warn';
 }) {
     return (
-        <div className="rounded-lg border border-slate-200 px-4 py-3">
+        <div className="rounded-lg border border-border px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
             <p
                 className={`text-2xl font-semibold tabular-nums ${
-                    tone === 'warn' ? 'text-amber-600' : 'text-slate-900'
+                    tone === 'warn' ? 'text-amber-600' : 'text-foreground'
                 }`}
             >
                 {value}
@@ -450,7 +450,7 @@ function MonthCalendar({
                         <div
                             key={day}
                             className={`min-h-[3.25rem] rounded-md border p-1 ${
-                                isToday ? 'border-cyan-400 bg-cyan-50' : 'border-slate-200'
+                                isToday ? 'border-cyan-400 bg-cyan-50' : 'border-border'
                             }`}
                         >
                             <span className="text-xs text-muted-foreground">{day}</span>
@@ -465,7 +465,7 @@ function MonthCalendar({
                                         className={`block w-full truncate rounded px-1 text-left text-[10px] ${
                                             new Date(schedule.nextDueAt) < new Date()
                                                 ? 'bg-amber-100 text-amber-800'
-                                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                                : 'bg-muted text-foreground hover:bg-muted'
                                         }`}
                                         title={`${schedule.title} — ${schedule.asset?.name ?? ''}`}
                                     >

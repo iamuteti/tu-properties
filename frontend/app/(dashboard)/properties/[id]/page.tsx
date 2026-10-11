@@ -180,7 +180,7 @@ export default function PropertyDetailPage() {
                         className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                             tab === item.id
                                 ? "bg-slate-900 text-white"
-                                : "text-muted-foreground hover:bg-slate-100"
+                                : "text-muted-foreground hover:bg-muted"
                         }`}
                     >
                         {item.label}
@@ -229,11 +229,11 @@ export default function PropertyDetailPage() {
                                         {property.amenities.map((amenity) => (
                                             <li
                                                 key={amenity.id}
-                                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                                                className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground"
                                             >
                                                 {amenity.name}
                                                 {amenity.category && (
-                                                    <span className="ml-1 text-slate-500">({amenity.category})</span>
+                                                    <span className="ml-1 text-muted-foreground">({amenity.category})</span>
                                                 )}
                                             </li>
                                         ))}

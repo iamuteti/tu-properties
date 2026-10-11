@@ -194,7 +194,7 @@ export default function UnitDetailPage() {
                                 {unit.features.map((feature, index) => (
                                     <li
                                         key={feature.id ?? index}
-                                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                                        className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground"
                                     >
                                         {feature.name}
                                     </li>

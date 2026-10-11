@@ -53,7 +53,7 @@ const columns: ColumnDef<Receipt>[] = [
           methodColor = "bg-indigo-100 text-indigo-800";
           break;
         default:
-          methodColor = "bg-gray-100 text-gray-800";
+          methodColor = "bg-gray-100 text-foreground";
       }
       
       return (

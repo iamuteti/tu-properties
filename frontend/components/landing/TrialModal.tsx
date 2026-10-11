@@ -19,9 +19,9 @@ const API_BASE =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
 const inputClass =
-  'w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none';
+  'w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none';
 const labelClass =
-  'text-xs font-semibold text-slate-300 block mb-1';
+  'text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1';
 
 /**
  * Real trial signup — POSTs to the public `POST /platform/signup`, which creates
@@ -108,11 +108,11 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
       : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-lg bg-[#0A1020] border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 dark:bg-black/80 backdrop-blur-md">
+      <div className="relative w-full max-w-lg bg-white dark:bg-[#0A1020] border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white cursor-pointer"
+          className="absolute top-5 right-5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
@@ -121,14 +121,14 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
         {!created ? (
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                 <Building2 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white font-display">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white font-display">
                   Start 14-Day Free Trial
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   No credit card required. Your organization is created
                   immediately.
                 </p>
@@ -215,12 +215,12 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
               </div>
 
               {error && (
-                <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
                   {error}{' '}
                   {emailTaken && (
                     <a
                       href="/auth/login"
-                      className="underline font-semibold hover:text-white"
+                      className="underline font-semibold hover:text-slate-900 dark:hover:text-white"
                     >
                       Sign in instead
                     </a>
@@ -250,18 +250,18 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
           </div>
         ) : (
           <div className="text-center py-4">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mb-4">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-4">
               <CheckCircle2 className="w-7 h-7" />
             </div>
-            <h3 className="text-2xl font-bold text-white font-display">
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white font-display">
               {created.name} is live
             </h3>
-            <p className="text-sm text-slate-400 mt-2">
-              Workspace <span className="text-amber-400 font-bold">{created.slug}</span>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+              Workspace <span className="text-amber-600 dark:text-amber-400 font-bold">{created.slug}</span>
               {trialEnd != null && (
-                <> — trial runs to <span className="text-slate-200 font-semibold">{trialEnd}</span></>
+                <> — trial runs to <span className="text-slate-700 dark:text-slate-200 font-semibold">{trialEnd}</span></>
               )}
-              . Sign in with <span className="text-slate-200">{created.adminEmail}</span> and
+              . Sign in with <span className="text-slate-700 dark:text-slate-200">{created.adminEmail}</span> and
               the password you just chose.
             </p>
             <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
@@ -273,7 +273,7 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
               </a>
               <button
                 onClick={handleReset}
-                className="rounded-xl border border-slate-700 px-6 py-3 text-sm font-semibold text-slate-300 hover:text-white cursor-pointer"
+                className="rounded-xl border border-slate-300 dark:border-slate-700 px-6 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               >
                 Done
               </button>

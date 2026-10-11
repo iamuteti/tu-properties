@@ -11,6 +11,7 @@ import { SaaSSection } from '@/components/landing/SaaSSection';
 import { Testimonials } from '@/components/landing/Testimonials';
 import { PricingSection } from '@/components/landing/PricingSection';
 import { FAQSection } from '@/components/landing/FAQSection';
+import { ContactSection } from '@/components/landing/ContactSection';
 import { FinalCTA } from '@/components/landing/FinalCTA';
 import { Footer } from '@/components/landing/Footer';
 import { TrialModal } from '@/components/landing/TrialModal';
@@ -48,7 +49,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="landing min-h-screen bg-[#070B14] text-slate-100 flex flex-col selection:bg-amber-500/30 selection:text-amber-200">
+    <div className="landing min-h-screen bg-slate-50 dark:bg-[#070B14] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-amber-500/30 selection:text-amber-200">
       <Navbar
         onOpenTrialModal={handleOpenTrial}
         onOpenDemoModal={handleScrollToHowItWorks}
@@ -78,6 +79,8 @@ export default function LandingPage() {
         <PricingSection onStartTrial={handleOpenTrial} />
 
         <FAQSection />
+
+        <ContactSection />
 
         <FinalCTA
           onStartTrial={handleOpenTrial}

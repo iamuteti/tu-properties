@@ -110,7 +110,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                                     return (
                                         <div
                                             key={schedule.id}
-                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 p-3"
+                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border p-3"
                                         >
                                             <div>
                                                 <p className="font-medium">{schedule.title}</p>

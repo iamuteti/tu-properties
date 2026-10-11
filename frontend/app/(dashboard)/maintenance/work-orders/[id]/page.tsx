@@ -450,7 +450,7 @@ export default function WorkOrderDetailPage({
                                 </p>
                             )}
                             {workOrder.tenant && (
-                                <div className="space-y-1 rounded-md border border-slate-200 p-3">
+                                <div className="space-y-1 rounded-md border border-border p-3">
                                     <p className="flex items-center gap-2 font-medium">
                                         <User className="h-4 w-4" aria-hidden="true" />
                                         {workOrder.tenant.surname}{' '}

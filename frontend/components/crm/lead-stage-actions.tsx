@@ -73,7 +73,7 @@ export function LeadStageActions({
                         disabled={isBusy !== null}
                         onClick={() => move(stage, meta?.label ?? stage)}
                         title={meta?.description}
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                        className="rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-border hover:bg-muted disabled:opacity-50"
                     >
                         {isBusy === stage ? 'Moving…' : `Move to ${meta?.label ?? stage}`}
                     </button>

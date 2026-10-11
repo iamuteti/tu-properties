@@ -266,7 +266,7 @@ export default function FacilityDetailPage() {
                                             className={`min-w-[5.5rem] shrink-0 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
                                                 isSelected
                                                     ? 'border-cyan-600 bg-cyan-50'
-                                                    : 'border-slate-200 hover:bg-slate-50'
+                                                    : 'border-border hover:bg-muted'
                                             }`}
                                         >
                                             <span className="block font-medium">
@@ -322,7 +322,7 @@ export default function FacilityDetailPage() {
                                                     className={`rounded-lg border px-3 py-2 text-xs ${
                                                         slot.available
                                                             ? 'border-emerald-200 bg-emerald-50'
-                                                            : 'border-slate-200 bg-slate-50'
+                                                            : 'border-border bg-muted'
                                                     }`}
                                                 >
                                                     <p className="font-mono font-medium">
@@ -482,7 +482,7 @@ export default function FacilityDetailPage() {
  * table invites. Each module maps its own.
  */
 function StatusPill({ status }: { status: FacilityBookingStatus }) {
-    const style = FACILITY_BOOKING_STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-800';
+    const style = FACILITY_BOOKING_STATUS_STYLES[status] ?? 'bg-gray-100 text-foreground';
     const label = status.charAt(0) + status.slice(1).toLowerCase();
     return (
         <span

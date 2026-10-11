@@ -497,7 +497,7 @@ function Toggle({
                 type="checkbox"
                 checked={checked}
                 onChange={(event) => onChange(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300"
+                className="mt-1 h-4 w-4 rounded border-border"
             />
             <span>
                 <span className="text-sm font-medium">{label}</span>

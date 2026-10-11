@@ -21,6 +21,7 @@ npm run dev
 - Connection: `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` (see `backend/.env`).
 - Apply schema changes → `npx prisma db push --accept-data-loss` (dev workflow; regenerates the client).
 - Seed demo data → `npm run db:seed:demo` (ts-node demo-data script).
+- **Hand-maintained indexes are invisible to Prisma and `migrate dev` will try to DROP them.** `notifications_landlordId_readAt_idx` and `utility_charges_no_double_bill_bulk` (partial unique) exist only as raw SQL in their own migrations — the schema cannot express the partial predicate, so every generated migration proposes both DROPs. 2026-10-11: a generated migration was applied with the DROPs in it and both guards silently vanished (restored same day, no violating rows). Always delete those two DROP statements from a generated migration before applying, and verify with `SELECT indexname FROM pg_indexes WHERE indexname IN (...)` afterwards.
 
 ## Testing / verification
 - Typecheck: `npx tsc --noEmit` (from `backend/`).

@@ -92,7 +92,7 @@ export default function PortalOverviewPage() {
             </div>
 
             {summary.hasLease ? (
-                <div className="rounded-lg border bg-white p-5">
+                <div className="rounded-lg border bg-card p-5">
                     <h2 className="flex items-center gap-2 text-sm font-semibold">
                         <Building2 className="h-4 w-4" aria-hidden="true" />
                         Your home
@@ -124,7 +124,7 @@ export default function PortalOverviewPage() {
             <div className="grid gap-4 sm:grid-cols-2">
                 <Link
                     href="/portal/invoices"
-                    className="flex items-center gap-3 rounded-lg border bg-white p-5 transition-colors hover:bg-slate-50"
+                    className="flex items-center gap-3 rounded-lg border bg-card p-5 transition-colors hover:bg-muted"
                 >
                     <FileText className="h-5 w-5 text-slate-400" aria-hidden="true" />
                     <div>
@@ -136,7 +136,7 @@ export default function PortalOverviewPage() {
                 </Link>
                 <Link
                     href="/portal/receipts"
-                    className="flex items-center gap-3 rounded-lg border bg-white p-5 transition-colors hover:bg-slate-50"
+                    className="flex items-center gap-3 rounded-lg border bg-card p-5 transition-colors hover:bg-muted"
                 >
                     <Wallet className="h-5 w-5 text-slate-400" aria-hidden="true" />
                     <div>
@@ -165,7 +165,7 @@ function Card({
     icon?: React.ReactNode;
 }) {
     return (
-        <div className="rounded-lg border bg-white p-4">
+        <div className="rounded-lg border bg-card p-4">
             <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
                 {icon}
                 {label}

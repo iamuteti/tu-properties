@@ -283,10 +283,10 @@ export default function PropertiesPage() {
             </div>
 
             {/* Filters */}
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 p-4 backdrop-blur-sm">
+            <div className="relative z-50 rounded-lg border border-border bg-card/50 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="filter-code" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="filter-code" className="mb-1.5 block text-sm font-medium text-foreground">
                             Code
                         </label>
                         <Input
@@ -297,7 +297,7 @@ export default function PropertiesPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="filter-name" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="filter-name" className="mb-1.5 block text-sm font-medium text-foreground">
                             Name
                         </label>
                         <Input
@@ -308,7 +308,7 @@ export default function PropertiesPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="filter-status" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="filter-status" className="mb-1.5 block text-sm font-medium text-foreground">
                             Status
                         </label>
                         <Select
@@ -320,7 +320,7 @@ export default function PropertiesPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="filter-type" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="filter-type" className="mb-1.5 block text-sm font-medium text-foreground">
                             Type
                         </label>
                         <Select
@@ -332,7 +332,7 @@ export default function PropertiesPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="filter-branch" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="filter-branch" className="mb-1.5 block text-sm font-medium text-foreground">
                             Branch
                         </label>
                         <Select
@@ -344,7 +344,7 @@ export default function PropertiesPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="filter-landlord" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="filter-landlord" className="mb-1.5 block text-sm font-medium text-foreground">
                             Landlord
                         </label>
                         <Select

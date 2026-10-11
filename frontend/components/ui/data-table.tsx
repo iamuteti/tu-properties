@@ -334,17 +334,17 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="bg-white/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-slate-200">
+      <div className="bg-card/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-border">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {enableRowSelection && (
-                    <th className="px-6 py-3 text-left text-xs font-light text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-light text-muted-foreground uppercase tracking-wider">
                       <input
                         type="checkbox"
-                        className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                        className="rounded border-border text-cyan-600 focus:ring-cyan-500"
                         checked={table.getIsAllPageRowsSelected()}
                         onChange={table.getToggleAllPageRowsSelectedHandler()}
                       />
@@ -353,7 +353,7 @@ export function DataTable<T extends Record<string, any>>({
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className={`px-6 py-3 text-left text-xs font-light text-slate-500 uppercase tracking-wider ${header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-slate-100' : ''}`}
+                      className={`px-6 py-3 text-left text-xs font-light text-muted-foreground uppercase tracking-wider ${header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-muted' : ''}`}
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       <div className="flex items-center justify-between">
@@ -364,10 +364,10 @@ export function DataTable<T extends Record<string, any>>({
                         </span>
                         {header.column.getCanSort() && (
                           <div className="flex flex-col ml-1">
-                            <span className={`text-xs ${header.column.getIsSorted() === 'asc' ? 'text-black' : 'text-gray-400'}`}>
+                            <span className={`text-xs ${header.column.getIsSorted() === 'asc' ? 'text-foreground' : 'text-gray-400'}`}>
                               ▲
                             </span>
-                            <span className={`text-xs -mt-1 ${header.column.getIsSorted() === 'desc' ? 'text-black' : 'text-gray-400'}`}>
+                            <span className={`text-xs -mt-1 ${header.column.getIsSorted() === 'desc' ? 'text-foreground' : 'text-gray-400'}`}>
                               ▼
                             </span>
                           </div>
@@ -378,12 +378,12 @@ export function DataTable<T extends Record<string, any>>({
                 </tr>
               ))}
             </thead>
-            <tbody className="bg-white/50 divide-y divide-slate-200">
+            <tbody className="bg-card/50 divide-y divide-border">
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <tr 
                     key={row.id} 
-                    className="hover:bg-slate-50 transition-colors duration-150"
+                    className="hover:bg-muted transition-colors duration-150"
                     onClick={enableRowSelection ? () => row.toggleSelected() : undefined}
                     style={{ cursor: enableRowSelection ? 'pointer' : 'default' }}
                   >
@@ -391,14 +391,14 @@ export function DataTable<T extends Record<string, any>>({
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                          className="rounded border-border text-cyan-600 focus:ring-cyan-500"
                           checked={row.getIsSelected()}
                           onChange={row.getToggleSelectedHandler()}
                         />
                       </td>
                     )}
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                      <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -413,7 +413,7 @@ export function DataTable<T extends Record<string, any>>({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
                       )}
-                      <h3 className="mt-2 text-sm font-light text-slate-900">{emptyMessage}</h3>
+                      <h3 className="mt-2 text-sm font-light text-foreground">{emptyMessage}</h3>
                     </div>
                   </td>
                 </tr>
@@ -445,17 +445,17 @@ export function DataTable<T extends Record<string, any>>({
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <p className="text-sm text-slate-700 whitespace-nowrap">Show</p>
+                <p className="text-sm text-foreground whitespace-nowrap">Show</p>
                 <Select
                   options={pageSizeOptions.map(size => ({ value: size.toString(), label: size.toString() }))}
                   value={table.getState().pagination.pageSize.toString()}
                   onChange={(e) => table.setPageSize(Number(e.target.value))}
                   className="w-20"
                 />
-                <p className="text-sm text-slate-700 whitespace-nowrap">per page</p>
+                <p className="text-sm text-foreground whitespace-nowrap">per page</p>
               </div>
               <div className="h-5 w-px bg-slate-300"></div>
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-foreground">
                 Page{' '}
                 <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>
                 {' '}of{' '}

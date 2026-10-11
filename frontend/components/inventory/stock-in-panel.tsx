@@ -157,7 +157,7 @@ export function StockInPanel({ purchaseOrderId }: { purchaseOrderId: string }) {
 
     if (error) {
         return (
-            <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
+            <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {error}
             </p>
         );

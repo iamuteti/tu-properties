@@ -259,7 +259,7 @@ export default function BookFacilityPage() {
                                     className={`min-w-[5.5rem] shrink-0 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
                                         isSelected
                                             ? 'border-cyan-600 bg-cyan-50'
-                                            : 'border-slate-200 hover:bg-slate-50'
+                                            : 'border-border hover:bg-muted'
                                     }`}
                                 >
                                     <span className="block font-medium">
@@ -350,7 +350,7 @@ export default function BookFacilityPage() {
                                                       ? covered
                                                         ? 'border-cyan-300 bg-cyan-50/60 hover:border-cyan-500'
                                                         : 'border-emerald-200 bg-emerald-50 hover:border-emerald-400'
-                                                      : 'cursor-not-allowed border-slate-200 bg-slate-50 text-muted-foreground'
+                                                      : 'cursor-not-allowed border-border bg-muted text-muted-foreground'
                                             }`}
                                             title={
                                                 canPick

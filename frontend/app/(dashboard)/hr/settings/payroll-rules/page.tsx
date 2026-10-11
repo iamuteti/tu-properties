@@ -617,7 +617,7 @@ function RuleModal({
         >
             <div className="space-y-4">
                 {inForce && (
-                    <p className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                    <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
                         This rule is in force, so its rate, base and period are locked: a
                         payslip already used it, and changing the figure would leave that
                         payslip unexplainable. To change a rate, retire this rule and add a

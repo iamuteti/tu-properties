@@ -270,7 +270,7 @@ export default function HrMePage() {
                                             </TableCell>
                                             <TableCell>
                                                 <span
-                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${LEAVE_STATUS_LABELS[request.status]?.className ?? 'bg-gray-100 text-gray-800'}`}
+                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${LEAVE_STATUS_LABELS[request.status]?.className ?? 'bg-gray-100 text-foreground'}`}
                                                 >
                                                     {LEAVE_STATUS_LABELS[request.status]?.label ??
                                                         request.status}

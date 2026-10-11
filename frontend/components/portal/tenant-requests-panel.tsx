@@ -92,7 +92,7 @@ export function TenantRequestsPanel({ className }: { className?: string }) {
 
     return (
         <div className={`space-y-6 ${className ?? ""}`}>
-            <div className="rounded-lg border bg-white p-5">
+            <div className="rounded-lg border bg-card p-5">
                 <h2 className="text-sm font-semibold">Ask for something</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                     Every request is reviewed by your property manager before anything
@@ -196,7 +196,7 @@ export function TenantRequestsPanel({ className }: { className?: string }) {
                 ) : (
                     <ul className="mt-2 space-y-2">
                         {requests.map((request) => (
-                            <li key={request.id} className="rounded-lg border bg-white p-4 text-sm">
+                            <li key={request.id} className="rounded-lg border bg-card p-4 text-sm">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <p className="font-medium">
                                         {TENANT_REQUEST_TYPES.find(
@@ -205,7 +205,7 @@ export function TenantRequestsPanel({ className }: { className?: string }) {
                                     </p>
                                     <span
                                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                            REQUEST_STATUS_STYLES[request.status] ?? "bg-slate-100"
+                                            REQUEST_STATUS_STYLES[request.status] ?? "bg-muted"
                                         }`}
                                     >
                                         {request.status.charAt(0) +
@@ -228,7 +228,7 @@ export function TenantRequestsPanel({ className }: { className?: string }) {
                                 )}
 
                                 {request.decisionNote && (
-                                    <p className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs">
+                                    <p className="mt-2 rounded bg-muted px-3 py-2 text-xs">
                                         <span className="font-medium">
                                             {request.decidedBy
                                                 ? `${request.decidedBy.firstName}: `

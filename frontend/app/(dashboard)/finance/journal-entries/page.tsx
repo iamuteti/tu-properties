@@ -369,7 +369,7 @@ export default function JournalEntriesPage() {
                                                 <TableCell className="text-right">{money(total)}</TableCell>
                                                 <TableCell>
                                                     {entry.status === "REVERSED" ? (
-                                                        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
+                                                        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-foreground">
                                                             Reversed
                                                         </span>
                                                     ) : (

@@ -350,7 +350,7 @@ export default function InventoryItemsPage() {
                                                         muted={reorderLevel <= 0}
                                                     />
                                                     {!item.isActive && (
-                                                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                                                             Retired
                                                         </span>
                                                     )}

@@ -253,7 +253,7 @@ export default function AssetsPage() {
                 </div>
             )}
 
-            <div className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-1.5 lg:col-span-2">
                     <Label htmlFor="asset-search">Search</Label>
                     <Input
@@ -353,9 +353,9 @@ function Counter({
             ? 'text-red-600'
             : tone === 'warn'
               ? 'text-amber-600'
-              : 'text-slate-900';
+              : 'text-foreground';
     return (
-        <div className="rounded-lg border border-slate-200 px-4 py-3">
+        <div className="rounded-lg border border-border px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
             <p className={`text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</p>
         </div>

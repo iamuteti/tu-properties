@@ -45,8 +45,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            <header className="border-b bg-white">
+        <div className="min-h-screen bg-muted">
+            <header className="border-b bg-card">
                 <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4">
                     <div>
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -59,7 +59,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     <button
                         type="button"
                         onClick={logout}
-                        className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                        className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                     >
                         <LogOut className="h-4 w-4" aria-hidden="true" />
                         Sign out
@@ -80,7 +80,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                                 className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                                     active
                                         ? "bg-slate-900 text-white"
-                                        : "text-slate-600 hover:bg-slate-100"
+                                        : "text-muted-foreground hover:bg-muted"
                                 }`}
                             >
                                 <Icon className="h-4 w-4" aria-hidden="true" />

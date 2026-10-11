@@ -59,7 +59,7 @@ const DIRECTION_HEADING: Record<PayrollLineDirection, string> = {
 };
 
 const DIRECTION_ROW: Record<PayrollLineDirection, string> = {
-    EARNING: 'text-slate-900',
+    EARNING: 'text-foreground',
     EMPLOYEE_DEDUCTION: 'text-amber-800',
     EMPLOYER_CONTRIBUTION: 'text-sky-800',
 };

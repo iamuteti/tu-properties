@@ -11,17 +11,17 @@ import { financeApi } from "@/lib/api";
 import { Invoice } from "@/types";
 
 const STATUS_STYLES: Record<Invoice["status"], string> = {
-    DRAFT: "bg-gray-100 text-gray-800",
+    DRAFT: "bg-gray-100 text-foreground",
     PENDING: "bg-blue-100 text-blue-800",
     PARTIALLY_PAID: "bg-yellow-100 text-yellow-800",
     PAID: "bg-green-100 text-green-800",
     OVERDUE: "bg-red-100 text-red-800",
-    CANCELLED: "bg-gray-100 text-gray-800",
+    CANCELLED: "bg-gray-100 text-foreground",
 };
 
 function StatusBadge({ status }: { status: Invoice["status"] }) {
     return (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[status] || "bg-gray-100 text-gray-800"}`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[status] || "bg-gray-100 text-foreground"}`}>
             {status}
         </span>
     );

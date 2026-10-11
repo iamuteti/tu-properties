@@ -126,7 +126,7 @@ export default function PayslipDetailPage() {
                             {payslip.applied.map((rule) => (
                                 <li
                                     key={rule.ruleId}
-                                    className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                                    className="rounded-full bg-muted px-3 py-1 text-xs text-foreground"
                                 >
                                     {rule.code} — {rule.name}
                                 </li>

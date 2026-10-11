@@ -97,7 +97,7 @@ export function MaintenancePanel({ className }: { className?: string }) {
 
     return (
         <div className={`space-y-6 ${className ?? ''}`}>
-            <div className="rounded-lg border bg-white p-5">
+            <div className="rounded-lg border bg-card p-5">
                 <h2 className="text-sm font-semibold">Report something broken</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                     This goes to your property manager. Emergencies — no water, no power,
@@ -171,7 +171,7 @@ export function MaintenancePanel({ className }: { className?: string }) {
                 </Button>
             </div>
 
-            <div className="rounded-lg border bg-white p-5">
+            <div className="rounded-lg border bg-card p-5">
                 <h2 className="text-sm font-semibold">Your reports</h2>
                 {isLoading ? (
                     <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
@@ -184,7 +184,7 @@ export function MaintenancePanel({ className }: { className?: string }) {
                         {workOrders.map((workOrder) => (
                             <li
                                 key={workOrder.id}
-                                className="rounded-md border border-slate-200 p-3"
+                                className="rounded-md border border-border p-3"
                             >
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                     <div>
@@ -197,7 +197,7 @@ export function MaintenancePanel({ className }: { className?: string }) {
                                                 : ''}
                                         </p>
                                     </div>
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                                         {workOrder.statusLabel ??
                                             WORK_ORDER_STATUS_LABELS[workOrder.status] ??
                                             workOrder.status}

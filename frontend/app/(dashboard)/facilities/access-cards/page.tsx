@@ -297,7 +297,7 @@ function StatusPill({
     effective: AccessCardStatus;
     raw: AccessCardStatus;
 }) {
-    const style = ACCESS_CARD_STATUS_STYLES[effective] ?? 'bg-gray-100 text-gray-800';
+    const style = ACCESS_CARD_STATUS_STYLES[effective] ?? 'bg-gray-100 text-foreground';
     const label = effective.charAt(0) + effective.slice(1).toLowerCase();
     const derived = effective !== raw;
 

@@ -6522,3 +6522,40 @@ model Contract {
   @@index([renewalOfId])
   @@map("contracts")
 }
+
+// ---------------------------------------------------------------------------
+// Contact inquiries (landing site) — messages from visitors with no account.
+//
+// Deliberately NOT a SupportTicket: tickets are tenant-scoped rows raised by a
+// logged-in user about their own organization, and a prospect has neither. No
+// organization relation, no user relation — just the message and its handling
+// state. SUPER_ADMIN reads the queue at `GET /platform/contact`.
+//
+// Deliberately without email capture beyond the address itself: replying goes
+// through the operator's own mailbox until notification templates exist for it.
+// ---------------------------------------------------------------------------
+
+enum ContactInquiryStatus {
+  /** Received, nobody from the platform has read it yet. */
+  NEW
+  /** Seen by an operator; no reply sent. */
+  READ
+  /** Answered. Kept for history rather than deleted. */
+  REPLIED
+}
+
+model ContactInquiry {
+  id      String  @id @default(cuid())
+  name    String
+  email   String
+  subject String
+  message String  @db.Text
+
+  status ContactInquiryStatus @default(NEW)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("contact_inquiries")
+}

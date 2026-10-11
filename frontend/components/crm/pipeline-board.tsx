@@ -93,14 +93,14 @@ export function PipelineBoard({
                             {lead.firstName} {lead.lastName ?? ''}
                         </Link>
                         {lead.source !== 'OTHER' && (
-                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                 {lead.source.replace('_', ' ').toLowerCase()}
                             </span>
                         )}
                     </div>
 
                     {lead.interestedProperty && (
-                        <p className="mt-1 truncate rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
+                        <p className="mt-1 truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                             {lead.interestedProperty.name}
                         </p>
                     )}

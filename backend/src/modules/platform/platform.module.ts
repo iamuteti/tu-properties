@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PlatformOrganizationsController } from './platform-organizations.controller';
 import { PlatformSignupController } from './platform-signup.controller';
+import { PlatformContactController } from './platform-contact.controller';
 import { PlatformService } from './platform.service';
 import { TrialSignupService } from './trial-signup.service';
+import { ContactService } from './contact.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 
@@ -17,8 +19,16 @@ import { AuditModule } from '../audit/audit.module';
  */
 @Module({
   imports: [PrismaModule, AuditModule],
-  controllers: [PlatformOrganizationsController, PlatformSignupController],
-  providers: [PlatformService, TrialSignupService],
+  controllers: [
+    PlatformOrganizationsController,
+    PlatformSignupController,
+    PlatformContactController,
+  ],
+  providers: [
+    PlatformService,
+    TrialSignupService,
+    ContactService,
+  ],
   exports: [PlatformService],
 })
 export class PlatformModule {}

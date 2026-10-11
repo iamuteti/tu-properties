@@ -162,7 +162,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Property Selection */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Property *
           </label>
           <Select
@@ -179,7 +179,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
 
         {/* Tenant Selection */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Tenant *
           </label>
           <Select
@@ -197,7 +197,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
 
         {/* Rental Agreement Selection */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Rental Agreement *
           </label>
           <Select
@@ -215,7 +215,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
 
         {/* Move-out Date */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Move-out Date *
           </label>
           <Input
@@ -230,7 +230,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Notes
           </label>
           <Textarea
@@ -241,7 +241,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-border">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

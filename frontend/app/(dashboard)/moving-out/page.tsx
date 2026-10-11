@@ -123,7 +123,7 @@ export default function MovingOutPage() {
             accessorKey: 'tenantCode',
             header: 'Tenant Code',
             cell: ({ row }) => (
-                <span className="text-slate-500 font-mono text-sm">
+                <span className="text-muted-foreground font-mono text-sm">
                     {row.original.tenantCode}
                 </span>
             ),
@@ -140,7 +140,7 @@ export default function MovingOutPage() {
                     REJECTED: 'bg-red-100 text-red-800',
                 };
                 return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-gray-800'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-foreground'}`}>
                         {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
                     </span>
                 );
@@ -152,7 +152,7 @@ export default function MovingOutPage() {
             header: 'Tenant Name',
             cell: ({ row }) => (
                 <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-slate-900">{row.original.tenantName}</span>
+                    <span className="font-medium text-foreground">{row.original.tenantName}</span>
                 </div>
             ),
             size: 180,
@@ -162,8 +162,8 @@ export default function MovingOutPage() {
             header: 'Property/Unit',
             cell: ({ row }) => (
                 <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-slate-900">{row.original.propertyName}</span>
-                    <span className="text-xs text-slate-500">{row.original.unitName}</span>
+                    <span className="font-medium text-foreground">{row.original.propertyName}</span>
+                    <span className="text-xs text-muted-foreground">{row.original.unitName}</span>
                 </div>
             ),
             size: 150,
@@ -223,10 +223,10 @@ export default function MovingOutPage() {
             </div>
 
             {/* Filters */}
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 backdrop-blur-sm p-4">
+            <div className="relative z-50 rounded-lg border border-border bg-card/50 backdrop-blur-sm p-4">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label className="text-sm font-medium text-slate-700 mb-1.5 block">Tenant Code</label>
+                        <label className="text-sm font-medium text-foreground mb-1.5 block">Tenant Code</label>
                         <Input
                             placeholder="Filter by tenant code..."
                             value={filterTenantCode}
@@ -234,7 +234,7 @@ export default function MovingOutPage() {
                         />
                     </div>
                     <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label className="text-sm font-medium text-slate-700 mb-1.5 block">Tenant Name</label>
+                        <label className="text-sm font-medium text-foreground mb-1.5 block">Tenant Name</label>
                         <Input
                             placeholder="Filter by tenant name..."
                             value={filterTenantName}
@@ -242,7 +242,7 @@ export default function MovingOutPage() {
                         />
                     </div>
                     <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label className="text-sm font-medium text-slate-700 mb-1.5 block">Status</label>
+                        <label className="text-sm font-medium text-foreground mb-1.5 block">Status</label>
                         <Select
                             options={statusOptions}
                             value={filterStatus}

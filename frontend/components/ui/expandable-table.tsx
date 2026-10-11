@@ -215,7 +215,7 @@ export function ExpandableTable<TData extends TableData>({
             className="w-full"
           />
         </div>
-        <div className="text-sm text-slate-500">
+        <div className="text-sm text-muted-foreground">
           {serverSidePagination
             ? (paginationMeta?.total ?? table.getFilteredRowModel().rows.length)
             : table.getFilteredRowModel().rows.length} total records
@@ -223,17 +223,17 @@ export function ExpandableTable<TData extends TableData>({
       </div>
 
       {/* Table */}
-      <div className="bg-white/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-card/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className={`px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider ${
-                        header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-slate-100' : ''
+                      className={`px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider ${
+                        header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-muted' : ''
                       }`}
                       onClick={header.column.getToggleSortingHandler()}
                       style={{ width: header.getSize() }}
@@ -260,20 +260,20 @@ export function ExpandableTable<TData extends TableData>({
                 </tr>
               ))}
             </thead>
-            <tbody className="bg-white/50 divide-y divide-slate-200">
+            <tbody className="bg-card/50 divide-y divide-border">
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row, index) => (
                   <React.Fragment key={row.id}>
                     <tr 
-                      className={`hover:bg-slate-50 transition-colors duration-150 cursor-pointer ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                      className={`hover:bg-muted transition-colors duration-150 cursor-pointer ${
+                        index % 2 === 0 ? 'bg-card' : 'bg-muted/50'
                       }`}
                       onClick={() => onRowClick?.(row.original)}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td 
                           key={cell.id} 
-                          className="px-4 py-3 text-sm text-slate-900"
+                          className="px-4 py-3 text-sm text-foreground"
                           onClick={(e) => {
                             if (cell.column.id === 'actions') {
                               e.stopPropagation();
@@ -301,8 +301,8 @@ export function ExpandableTable<TData extends TableData>({
                   <td colSpan={columns.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <Info className="h-12 w-12 text-slate-400" />
-                      <h3 className="mt-2 text-sm font-light text-slate-900">No data found</h3>
-                      <p className="text-sm text-slate-500">Try adjusting your search or filters</p>
+                      <h3 className="mt-2 text-sm font-light text-foreground">No data found</h3>
+                      <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
                     </div>
                   </td>
                 </tr>
@@ -317,17 +317,17 @@ export function ExpandableTable<TData extends TableData>({
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <p className="text-sm text-slate-700 whitespace-nowrap">Show</p>
+              <p className="text-sm text-foreground whitespace-nowrap">Show</p>
               <Select
                 options={[10, 20, 30, 50].map(size => ({ value: size.toString(), label: size.toString() }))}
                 value={table.getState().pagination.pageSize.toString()}
                 onChange={(e) => table.setPageSize(Number(e.target.value))}
                 className="w-20"
               />
-              <p className="text-sm text-slate-700 whitespace-nowrap">per page</p>
+              <p className="text-sm text-foreground whitespace-nowrap">per page</p>
             </div>
             <div className="h-5 w-px bg-slate-300" />
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-foreground">
                 Page{' '}
                 <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>
                 {' '}of{' '}

@@ -54,10 +54,10 @@ export function LandlordFilters({
   };
 
   return (
-    <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 backdrop-blur-sm p-4">
+    <div className="relative z-50 rounded-lg border border-border bg-card/50 backdrop-blur-sm p-4">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex-1 min-w-[200px] max-w-xs">
-          <label className="text-sm font-medium text-slate-700 mb-1.5 block">Code</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">Code</label>
           <Input
             placeholder="Filter by code..."
             value={localFilters.code}
@@ -65,7 +65,7 @@ export function LandlordFilters({
           />
         </div>
         <div className="flex-1 min-w-[200px] max-w-xs">
-          <label className="text-sm font-medium text-slate-700 mb-1.5 block">Name</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">Name</label>
           <Input
             placeholder="Filter by name..."
             value={localFilters.name}
@@ -73,7 +73,7 @@ export function LandlordFilters({
           />
         </div>
         <div className="flex-1 min-w-[200px] max-w-xs">
-          <label className="text-sm font-medium text-slate-700 mb-1.5 block">Status</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">Status</label>
           <Select
             options={statusOptions}
             value={localFilters.status}

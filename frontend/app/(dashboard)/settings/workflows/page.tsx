@@ -161,7 +161,7 @@ export default function WorkflowSettingsPage() {
                                             <div>
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <p className="font-medium">{definition.name}</p>
-                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                                                         {definition.entityType}
                                                     </span>
                                                     {isPlatform && (
@@ -170,7 +170,7 @@ export default function WorkflowSettingsPage() {
                                                         </span>
                                                     )}
                                                     {!definition.isActive && (
-                                                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                                                             Switched off
                                                         </span>
                                                     )}
@@ -240,7 +240,7 @@ export default function WorkflowSettingsPage() {
                                             </div>
                                         </div>
 
-                                        <ol className="space-y-1 rounded-md bg-slate-50 p-3 text-sm">
+                                        <ol className="space-y-1 rounded-md bg-muted p-3 text-sm">
                                             {(definition.steps ?? []).map((level, index) => (
                                                 <li key={index}>{plainEnglish(level)}</li>
                                             ))}

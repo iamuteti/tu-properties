@@ -95,10 +95,10 @@ const columns: ColumnDef<Invoice>[] = [
           statusColor = "bg-blue-100 text-blue-800";
           break;
         case "DRAFT":
-          statusColor = "bg-gray-100 text-gray-800";
+          statusColor = "bg-gray-100 text-foreground";
           break;
         case "CANCELLED":
-          statusColor = "bg-gray-100 text-gray-800";
+          statusColor = "bg-gray-100 text-foreground";
           break;
       }
       

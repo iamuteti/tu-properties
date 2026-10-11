@@ -63,20 +63,20 @@ export function Modal({ isOpen, onClose, title, children, size = "md", className
     >
       <div
         className={cn(
-          "relative w-full mx-4 bg-white rounded-lg shadow-xl",
+          "relative w-full mx-4 bg-card rounded-lg shadow-xl",
           sizeClasses[size],
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-6 w-6 rounded-md hover:bg-slate-100"
+            className="h-6 w-6 rounded-md hover:bg-muted"
           >
             <X className="h-4 w-4" />
           </Button>

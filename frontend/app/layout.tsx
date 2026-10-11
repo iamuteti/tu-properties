@@ -32,7 +32,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // Theme class is applied by next-themes after hydration; suppress the
+    // mismatch warning it would otherwise log on every first paint.
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${jakartaSans.variable} ${groteskDisplay.variable} ${geistMono.variable} antialiased`}
       >

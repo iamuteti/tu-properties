@@ -244,7 +244,7 @@ export default function RentalAgreementsPage() {
                                 <Link
                                     key={lease.id}
                                     href={`/rental-agreements/${lease.id}`}
-                                    className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm hover:bg-amber-100"
+                                    className="rounded-md bg-card px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm hover:bg-amber-100"
                                 >
                                     {lease.tenant
                                         ? `${lease.tenant.surname} ${lease.tenant.otherNames ?? ""}`.trim()
@@ -259,10 +259,10 @@ export default function RentalAgreementsPage() {
                 </div>
             )}
 
-            <div className="relative z-50 rounded-lg border border-slate-200 bg-white/50 p-4 backdrop-blur-sm">
+            <div className="relative z-50 rounded-lg border border-border bg-card/50 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="lease-filter-status" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="lease-filter-status" className="mb-1.5 block text-sm font-medium text-foreground">
                             Status
                         </label>
                         <Select
@@ -274,7 +274,7 @@ export default function RentalAgreementsPage() {
                         />
                     </div>
                     <div className="min-w-[160px] max-w-xs flex-1">
-                        <label htmlFor="lease-filter-type" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        <label htmlFor="lease-filter-type" className="mb-1.5 block text-sm font-medium text-foreground">
                             Type
                         </label>
                         <Select

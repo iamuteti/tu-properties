@@ -270,7 +270,7 @@ export default function CommissionReportPage() {
                                                         {Number(commission.amount).toLocaleString()}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
                                                             {commission.status.charAt(0) +
                                                                 commission.status.slice(1).toLowerCase()}
                                                         </span>

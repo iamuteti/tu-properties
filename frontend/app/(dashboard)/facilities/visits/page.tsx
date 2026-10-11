@@ -235,7 +235,7 @@ export default function VisitorVisitsPage() {
                                             <span
                                                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                                     VISIT_STATE_STYLES[visit.state] ??
-                                                    'bg-gray-100 text-gray-800'
+                                                    'bg-gray-100 text-foreground'
                                                 }`}
                                             >
                                                 {visit.stateLabel}

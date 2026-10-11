@@ -93,7 +93,7 @@ export default function WarehousesPage() {
                         type="checkbox"
                         checked={includeInactive}
                         onChange={(event) => setIncludeInactive(event.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300"
+                        className="h-4 w-4 rounded border-border"
                     />
                     <Label htmlFor="include-inactive" className="text-sm font-normal">
                         Include deactivated
@@ -186,7 +186,7 @@ export default function WarehousesPage() {
 function StoreStatus({ store }: { store: WarehouseRow }) {
     if (!store.isActive) {
         return (
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                 Deactivated
             </span>
         );
