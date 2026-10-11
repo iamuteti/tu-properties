@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from './accounting/accounting.module';
 import { CreditsModule } from './credits/credits.module';
+import { CreditNotesModule } from './credit-notes/credit-notes.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { TaxModule } from './tax/tax.module';
 import { PayablesModule } from './payables/payables.module';
@@ -13,6 +14,7 @@ import { PaymentsModule } from './payments/payments.module';
   imports: [
     AccountingModule,
     CreditsModule,
+    CreditNotesModule,
     // Invoices need the tax engine to price themselves, so it goes first.
     TaxModule,
     PayablesModule,
@@ -27,6 +29,7 @@ import { PaymentsModule } from './payments/payments.module';
   exports: [
     AccountingModule,
     CreditsModule,
+    CreditNotesModule,
     TaxModule,
     PayablesModule,
     InvoicesModule,

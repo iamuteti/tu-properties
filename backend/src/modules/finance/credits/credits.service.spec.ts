@@ -90,6 +90,10 @@ describe('CreditsService', () => {
       groupBy: jest.fn().mockResolvedValue([]),
     };
 
+    const creditNote = {
+      aggregate: jest.fn().mockResolvedValue({ _sum: { totalAmount: 0 } }),
+    };
+
     const models = {
       customerCredit,
       invoice,
@@ -97,6 +101,7 @@ describe('CreditsService', () => {
       paymentAllocation,
       payment,
       paymentRefund,
+      creditNote,
     };
 
     return {

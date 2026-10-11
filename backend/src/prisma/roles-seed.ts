@@ -37,6 +37,7 @@ export const PERMISSION_MODULES = [
   'owner_payouts',
   'accounting',
   'credits',
+  'credit_notes',
   'refunds',
   'tax',
   'payables',
@@ -398,6 +399,7 @@ export const SYSTEM_ROLES: {
       // Module 7: the general ledger is finance work too.
       accounting: full(),
       credits: full(),
+      credit_notes: full(),
       refunds: full(),
       tax: full(),
       payables: full(),
@@ -562,6 +564,7 @@ export const SYSTEM_ROLES: {
       // not post or reverse entries.
       accounting: view(),
       credits: view(),
+      credit_notes: view(),
       refunds: view(),
       tax: view(),
       payables: view(),
@@ -686,6 +689,7 @@ export const SYSTEM_ROLES: {
       // Module 7: chart of accounts, journal entries and trial balance.
       accounting: full(),
       credits: full(),
+      credit_notes: full(),
       refunds: full(),
       tax: full(),
       payables: full(),

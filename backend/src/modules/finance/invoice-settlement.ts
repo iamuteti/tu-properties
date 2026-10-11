@@ -122,6 +122,27 @@ export async function taxWithheldSettled(
 }
 
 /**
+ * Credit notes issued against this invoice. A credit note is not cash — no money
+ * moves — but it *does* reduce what the customer owes, so it counts as settled.
+ *
+ * This is the standalone path (Module 7): a write-off or a billing correction
+ * issues a credit note with no refund behind it. The refund-driven path
+ * (`RefundsService`) creates the same row and is covered by the same sum, so the
+ * two cannot double-count — a credit note is a credit note regardless of how it
+ * was born.
+ */
+export async function creditNoteAppliedAmount(
+  tx: Tx,
+  invoiceId: string,
+): Promise<number> {
+  const applied = await tx.creditNote.aggregate({
+    where: { invoiceId, status: 'ISSUED' },
+    _sum: { totalAmount: true },
+  });
+  return Math.max(0, Number(applied._sum.totalAmount ?? 0));
+}
+
+/**
  * Recompute an invoice's money columns from payments, refunds and credit, and
  * write them back. `previousStatus` keeps an untouched OVERDUE invoice overdue.
  */
@@ -141,6 +162,7 @@ export async function syncInvoiceSettlement(
   const paid =
     (await livePaidAmountLegacySafe(tx, invoiceId)) +
     (await creditAppliedAmount(tx, invoiceId)) +
+    (await creditNoteAppliedAmount(tx, invoiceId)) +
     (await taxWithheldSettled(tx, invoiceId));
 
   const progress = deriveInvoiceProgress(

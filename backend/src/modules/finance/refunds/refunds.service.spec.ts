@@ -61,6 +61,7 @@ describe('RefundsService', () => {
         id: 'cn-1',
         ...data,
       })),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { totalAmount: 0 } }),
     };
 
     const invoice = {
