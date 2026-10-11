@@ -935,6 +935,32 @@ export class ReportsService {
     };
   }
 
+  /**
+   * ROI as a CSV: one row per month, the same grain as `byMonth`.
+   *
+   * This is deliberately **not** another branch of `exportCsv()`: that funnel takes
+   * `params: Record<string, string | undefined>`, on which a required `landlordId`
+   * cannot be expressed — a missing id would be a runtime `BadRequest` instead of a
+   * call that fails to compile. The signature mirrors `landlordRoi()` itself, and the
+   * cross-tenant 404 comes along for free because this just re-reads that report.
+   */
+  async exportLandlordRoiCsv(
+    landlordId: string,
+    params: { from?: string; to?: string },
+    req: any,
+  ): Promise<string> {
+    const data = await this.landlordRoi(landlordId, params, req);
+    return toCsv(
+      ['month', 'billed', 'expenses', 'net'],
+      data.byMonth.map((row) => ({
+        month: row.month,
+        billed: row.billed,
+        expenses: row.expenses,
+        net: money(row.billed - row.expenses),
+      })),
+    );
+  }
+
   // ── CSV ────────────────────────────────────────────────────────────────────
 
   /**

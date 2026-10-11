@@ -935,15 +935,19 @@ function OwnersView({ period }: { period: { from: string; to: string } }) {
 
             {listError && <ErrorState message={listError} onRetry={roi.reload} />}
 
-            {/*
-              No export button here on purpose: `/reports/landlords/:id/roi/export`
-              does not exist, and a link that 404s is worse than an absent button.
-              It is an open item on the module doc, not an oversight.
-            */}
             {selected && !listError && (
-                <ReportFrame isLoading={roi.isLoading} error={roi.error} onRetry={roi.reload}>
-                    {roi.data && <RoiView report={roi.data} />}
-                </ReportFrame>
+                <>
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                        <ExportButton
+                            href={reportsApi.landlordRoiExportUrl(selected, period)}
+                            label="Export by month"
+                            title="One row per month: billed, expenses, net."
+                        />
+                    </div>
+                    <ReportFrame isLoading={roi.isLoading} error={roi.error} onRetry={roi.reload}>
+                        {roi.data && <RoiView report={roi.data} />}
+                    </ReportFrame>
+                </>
             )}
         </div>
     );

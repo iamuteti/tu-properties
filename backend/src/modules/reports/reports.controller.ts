@@ -122,6 +122,26 @@ export class ReportsController {
   }
 
   /**
+   * The Owners tab's export. Declared beside the JSON route rather than with the
+   * other exports below, because its path carries the landlord id and the shared
+   * `exportCsv(report, params)` funnel cannot type a required parameter.
+   */
+  @Get('landlords/:id/roi/export')
+  @Roles(...REPORTS_VIEW_ROLES)
+  @Permissions('reports.view')
+  @Header('Content-Type', 'text/csv')
+  async landlordRoiCsv(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Request() req?: any,
+  ) {
+    const csv = await this.service.exportLandlordRoiCsv(id, { from, to }, req);
+    sendCsv(res, csv, `landlord-roi-${stamp()}.csv`);
+  }
+
+  /**
    * CSV export, one route per report.
    *
    * `text/csv` with a `Content-Disposition` filename rather than JSON, because the

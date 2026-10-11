@@ -3589,11 +3589,17 @@ export const reportsApi = {
      *
      * The occupancy export is per property, not per unit - the service used to
      * export the disagreement list, so the file was empty on any estate whose data
-     * was clean (issue 117). There is deliberately no ROI export: the endpoint does
-     * not exist, and a link that 404s is worse than an absent button.
+     * was clean (issue 117). The ROI export lives beside its JSON route rather
+     * than here, because its path carries the landlord id.
      */
     exportUrl: (
         report: 'occupancy' | 'financial' | 'sales' | 'maintenance',
         params?: Record<string, string | number | boolean | undefined>,
     ) => buildUrl(`/reports/${report}/export`, params),
+
+    /** One landlord's monthly return as a CSV: month, billed, expenses, net. */
+    landlordRoiExportUrl: (
+        id: string,
+        params?: { from?: string; to?: string },
+    ) => buildUrl(`/reports/landlords/${id}/roi/export`, params),
 };
