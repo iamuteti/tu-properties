@@ -61,6 +61,10 @@ describe('PropertiesService (tenant-scoped CRUD pattern)', () => {
       },
       landlord: { findFirst: jest.fn().mockResolvedValue({ id: 'land-1' }) },
       branch: { findFirst: jest.fn().mockResolvedValue({ id: 'branch-1' }) },
+      // Module 19 Phase C: plan-limit gate reads the org allowance first.
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({ maxProperties: 10 }),
+      },
       $transaction: jest.fn((fn: any) => fn(tx)),
     };
   }
@@ -105,6 +109,15 @@ describe('PropertiesService (tenant-scoped CRUD pattern)', () => {
       await expect(
         service.create({ code: 'PR-001', name: 'Duplicate' } as any, 'org-1'),
       ).rejects.toThrow(ConflictException);
+      expect(prisma.property.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a new property once the plan allowance is reached (Module 19)', async () => {
+      prisma.property.findFirst.mockResolvedValue(null);
+      prisma.property.count.mockResolvedValue(10);
+      await expect(
+        service.create({ code: 'PR-010', name: 'Over plan' } as any, 'org-1'),
+      ).rejects.toThrow(/Property limit reached.*max 10/);
       expect(prisma.property.create).not.toHaveBeenCalled();
     });
 

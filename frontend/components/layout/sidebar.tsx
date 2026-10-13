@@ -330,6 +330,20 @@ const navItems: NavItem[] = [
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
     },
     { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    {
+        // Module 19 Phase C — the platform owner's surface. Structurally
+        // separate from the tenant `/organizations` screen (which is the
+        // self-service view): these routes call `/platform/...` and only a
+        // SUPER_ADMIN ever sees them.
+        label: 'Platform',
+        icon: Shield,
+        roles: ['SUPER_ADMIN'],
+        children: [
+            { href: '/platform/organizations', label: 'Tenants', icon: Building, roles: ['SUPER_ADMIN'] },
+            { href: '/platform/support-tickets', label: 'Support tickets', icon: MessageSquare, roles: ['SUPER_ADMIN'] },
+        ],
+    },
+    { href: "/support", label: "Support", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
     { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
 

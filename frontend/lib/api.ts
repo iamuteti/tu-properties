@@ -28,6 +28,12 @@ import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, P
     SalesReport,
     MaintenanceReport,
     LandlordRoiReport,
+    PlatformOrganization,
+    PlatformOrgUser,
+    OrganizationUsage,
+    ImpersonationSession,
+    SupportTicket,
+    TicketStatus,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
@@ -60,8 +66,7 @@ api.interceptors.response.use(
     // The session is already invalid by the time logout runs, so the 401 carries no
     // new information and the local state is cleared regardless. Skipping the dispatch
     // for this one request is the whole fix.
-    const url: string | undefined = error.config?.url;
-    // **Never react to a 401 from the profile probe either.
+    // **Never react to a 401 from the profile probe either.**
     //
     // Same shape as the logout loop above, but it bites public pages instead of
     // hammering an endpoint: `AuthProvider` asks `GET /auth/profile` on every
@@ -71,6 +76,7 @@ api.interceptors.response.use(
     // marketing site) can ever render for a visitor without a session.
     // Protected routes do not need this event: `(dashboard)/layout.tsx` redirects
     // on `!user` itself once loading settles.
+    const url: string | undefined = error.config?.url;
     if (
       error.response?.status === 401 &&
       !url?.includes('/auth/logout') &&
@@ -187,6 +193,123 @@ export const organizationsApi = {
 
     updateMe: (data: OrganizationProfileInput) =>
         api.patch<Organization>('/organizations/me', data),
+};
+
+// Platform API (Module 19: SaaS Administration — SUPER_ADMIN only).
+//
+// Impersonation tokens are bearer tokens, not cookies: the operator's own
+// session stays intact underneath, and ending the impersonation is discarding
+// the token (plus revoking its session row server-side). The token lives in
+// sessionStorage — a tab that is closed forgets it, which is the correct
+// default for somebody else's session.
+const IMPERSONATION_KEY = 'tu_impersonation';
+
+export interface StoredImpersonation {
+    token: string;
+    expiresAt: string;
+    user: { id: string; email: string; firstName: string; lastName: string; role: string };
+    organizationId: string;
+}
+
+export function setImpersonation(session: ImpersonationSession, organizationId: string) {
+    if (typeof window === 'undefined') return;
+    const stored: StoredImpersonation = { ...session, organizationId };
+    window.sessionStorage.setItem(IMPERSONATION_KEY, JSON.stringify(stored));
+    api.defaults.headers.common['Authorization'] = `Bearer ${session.token}`;
+}
+
+export function getImpersonation(): StoredImpersonation | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = window.sessionStorage.getItem(IMPERSONATION_KEY);
+        if (!raw) return null;
+        const stored = JSON.parse(raw) as StoredImpersonation;
+        if (new Date(stored.expiresAt).getTime() < Date.now()) {
+            clearImpersonation();
+            return null;
+        }
+        return stored;
+    } catch {
+        return null;
+    }
+}
+
+export function clearImpersonation() {
+    if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(IMPERSONATION_KEY);
+    }
+    delete api.defaults.headers.common['Authorization'];
+}
+
+// Re-attach a surviving impersonation token after a page reload. Called once
+// from the dashboard layout: without it a reload silently drops back to the
+// operator's own session with no indication anything changed.
+export function restoreImpersonation() {
+    const stored = getImpersonation();
+    if (stored) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${stored.token}`;
+    }
+    return stored;
+}
+
+export const platformApi = {
+    list: () =>
+        api.get<PlatformOrganization[]>('/platform/organizations'),
+
+    get: (id: string) =>
+        api.get<PlatformOrganization>(`/platform/organizations/${id}`),
+
+    onboard: (data: { name: string; slug: string; subdomain?: string; plan?: string; adminEmail: string; adminFirstName: string; adminLastName: string; adminPassword: string; trialDays?: number; contactEmail?: string }) =>
+        api.post<PlatformOrganization>('/platform/organizations', data),
+
+    suspend: (id: string, reason: string) =>
+        api.patch<PlatformOrganization>(`/platform/organizations/${id}/suspend`, { reason }),
+
+    activate: (id: string, reason: string) =>
+        api.patch<PlatformOrganization>(`/platform/organizations/${id}/activate`, { reason }),
+
+    usage: (id: string) =>
+        api.get<OrganizationUsage>(`/platform/organizations/${id}/usage`),
+
+    users: (id: string) =>
+        api.get<PlatformOrgUser[]>(`/platform/organizations/${id}/users`),
+
+    impersonate: (id: string, data: { userId: string; reason: string }) =>
+        api.post<ImpersonationSession>(`/platform/organizations/${id}/impersonate`, data),
+
+    endImpersonation: () =>
+        api.post<{ ended: boolean }>('/platform/impersonate/end'),
+
+    tickets: (params?: { status?: TicketStatus; page?: number; limit?: number }) =>
+        api.get<{ data: SupportTicket[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/platform/support-tickets', { params }),
+
+    ticket: (id: string) =>
+        api.get<SupportTicket>(`/platform/support-tickets/${id}`),
+
+    setTicketStatus: (id: string, data: { status: TicketStatus; resolution?: string }) =>
+        api.patch<SupportTicket>(`/platform/support-tickets/${id}/status`, data),
+};
+
+// Support tickets, tenant side (Module 19 Phase C) — any authenticated user,
+// scoped to their own organization server-side.
+export const supportTicketsApi = {
+    create: (data: { subject: string; description: string; priority?: string }) =>
+        api.post<SupportTicket>('/support-tickets', data),
+
+    list: (params?: { status?: TicketStatus; page?: number; limit?: number }) =>
+        api.get<{ data: SupportTicket[]; meta: { total: number; page: number; limit: number; totalPages: number } }>('/support-tickets', { params }),
+
+    get: (id: string) =>
+        api.get<SupportTicket>(`/support-tickets/${id}`),
+
+    update: (id: string, data: { subject?: string; description?: string }) =>
+        api.patch<SupportTicket>(`/support-tickets/${id}`, data),
+
+    close: (id: string) =>
+        api.post<SupportTicket>(`/support-tickets/${id}/close`),
+
+    remove: (id: string) =>
+        api.delete<{ deleted: boolean }>(`/support-tickets/${id}`),
 };
 
 // Branches API (Module 1: Core Platform)

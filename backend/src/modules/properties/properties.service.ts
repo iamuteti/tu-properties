@@ -100,6 +100,7 @@ export class PropertiesService {
     await this.assertRelationsBelongToTenant(landlordId, branchId, tenantId);
 
     if (tenantId) {
+      await this.assertWithinPropertyLimit(tenantId);
       const duplicate = await this.prisma.property.findFirst({
         where: { organizationId: tenantId, code: scalars.code },
         select: { id: true },
@@ -607,6 +608,31 @@ export class PropertiesService {
    * organization — otherwise tenant A could attach its property to tenant B's
    * landlord record.
    */
+  /**
+   * Module 19 Phase C — plan-limit enforcement.
+   *
+   * `Organization.maxProperties` was set in seed data and never read (master
+   * doc audit row 39): an org on a 10-property plan could register unlimited
+   * buildings. Soft-deleted rows do not consume the allowance — an archived
+   * property is not a property the org is running.
+   */
+  private async assertWithinPropertyLimit(tenantId: string): Promise<void> {
+    const [org, count] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: tenantId },
+        select: { maxProperties: true },
+      }),
+      this.prisma.property.count({
+        where: { organizationId: tenantId, deletedAt: null },
+      }),
+    ]);
+    if (org && count >= org.maxProperties) {
+      throw new ConflictException(
+        `Property limit reached for this organization (max ${org.maxProperties}). Upgrade the plan to add more properties.`,
+      );
+    }
+  }
+
   private async assertRelationsBelongToTenant(
     landlordId: string | null | undefined,
     branchId: string | null | undefined,

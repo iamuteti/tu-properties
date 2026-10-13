@@ -11,12 +11,14 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
+import { RateLimit } from '@/common/decorators/rate-limit.decorator';
 import { UserRole } from '@prisma/client';
 import { getUserId } from '@/common/utils';
 import {
   OnboardOrganizationDto,
   SuspendOrganizationDto,
 } from './dto/onboarding.dto';
+import { ImpersonateDto } from './dto/impersonate.dto';
 import { PlatformService } from './platform.service';
 
 /**
@@ -50,6 +52,43 @@ export class PlatformOrganizationsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.platformService.findOne(id);
+  }
+
+  /**
+   * Derived usage for one tenant (Module 19 Phase C) — counts, never stored.
+   * The dashboard reads this rather than a column nobody maintains.
+   */
+  @Get(':id/usage')
+  usage(@Param('id') id: string) {
+    return this.platformService.usage(id);
+  }
+
+  /** User directory for one tenant — the impersonation dialog's picker. */
+  @Get(':id/users')
+  listUsers(@Param('id') id: string) {
+    return this.platformService.listUsers(id);
+  }
+
+  /**
+   * Start a time-limited impersonation of one tenant user (Module 19 Phase C).
+   * Returns a bearer token carrying the *target's* role — so this very
+   * endpoint is unreachable while impersonating, and there is no second hop.
+   */
+  @Post(':id/impersonate')
+  @RateLimit({
+    limit: 10,
+    ttl: 5 * 60 * 1000,
+    message: 'Too many impersonation attempts. Try again in a few minutes.',
+  })
+  impersonate(
+    @Param('id') id: string,
+    @Body() dto: ImpersonateDto,
+    @Request() req: any,
+  ) {
+    return this.platformService.impersonate(id, dto, getUserId(req)!, {
+      ip: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    });
   }
 
   @Patch(':id/suspend')

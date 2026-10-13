@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { assertTenantRecord } from '@/common/utils';
@@ -138,10 +138,39 @@ export class UsersService {
       };
     }
 
+    if (tenantId) {
+      await this.assertWithinUserLimit(tenantId);
+    }
+
     return this.prisma.user.create({
       data: userData as Prisma.UserCreateInput,
       include: { organization: true },
     });
+  }
+
+  /**
+   * Module 19 Phase C — plan-limit enforcement.
+   *
+   * `Organization.maxUsers` was set in seed data and never read (master doc
+   * audit row 39): an org on a 3-seat plan could invite unlimited users. The
+   * check lives here rather than the controller so every creation path —
+   * invites, portal logins, the platform's own flows — meets the same gate.
+   * SUPER_ADMIN writes without a tenant skip it: there is no plan to enforce
+   * against. Portal logins count: they occupy a seat like any other login.
+   */
+  async assertWithinUserLimit(tenantId: string): Promise<void> {
+    const [org, count] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: tenantId },
+        select: { maxUsers: true },
+      }),
+      this.prisma.user.count({ where: { organizationId: tenantId } }),
+    ]);
+    if (org && count >= org.maxUsers) {
+      throw new ConflictException(
+        `User limit reached for this organization (max ${org.maxUsers}). Upgrade the plan to invite more users.`,
+      );
+    }
   }
 
   async findOneByEmail(email: string) {

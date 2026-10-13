@@ -4194,3 +4194,72 @@ export interface LandlordRoiReport {
     roiPercent: number | null;
     byMonth: { month: string; billed: number; expenses: number }[];
 }
+
+/** Module 19 Phase C — platform-owned SaaS administration (SUPER_ADMIN only). */
+export interface PlatformOrganization {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain?: string | null;
+    isActive: boolean;
+    plan: string;
+    maxUsers: number;
+    maxProperties: number;
+    contactEmail?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    subscription?: {
+        id: string;
+        plan: string;
+        status: 'TRIALING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED';
+        trialEndsAt?: string | null;
+        renewsAt?: string | null;
+        statusReason?: string | null;
+    } | null;
+    _count?: { users: number; properties: number; tenants: number };
+}
+
+export interface PlatformOrgUser {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    isActive: boolean;
+}
+
+export interface OrganizationUsage {
+    organizationId: string;
+    subscription?: PlatformOrganization['subscription'];
+    users: { total: number; active: number; max: number; overLimit: boolean };
+    properties: { total: number; max: number; overLimit: boolean };
+    tenants: number;
+    units: number;
+    storage: { documents: number; bytes: number };
+}
+
+export interface ImpersonationSession {
+    token: string;
+    expiresAt: string;
+    user: { id: string; email: string; firstName: string; lastName: string; role: string };
+}
+
+export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
+/** Module 19 Phase C — a support ticket between a tenant and the platform team. */
+export interface SupportTicket {
+    id: string;
+    organizationId: string;
+    organization?: { id: string; name: string; slug: string };
+    raisedByUserId?: string | null;
+    raisedBy?: { id: string; email: string; firstName: string; lastName: string } | null;
+    subject: string;
+    description: string;
+    status: TicketStatus;
+    priority: TicketPriority;
+    resolution?: string | null;
+    resolvedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}

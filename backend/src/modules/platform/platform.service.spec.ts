@@ -1,6 +1,11 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, SubscriptionStatus, UserRole } from '@prisma/client';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { PlatformService } from './platform.service';
@@ -28,8 +33,12 @@ describe('PlatformService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    user: { create: jest.Mock };
-    session: { updateMany: jest.Mock };
+    user: { create: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock };
+    property: { count: jest.Mock };
+    tenant: { count: jest.Mock };
+    unit: { count: jest.Mock };
+    document: { aggregate: jest.Mock };
+    session: { create: jest.Mock; updateMany: jest.Mock };
     subscription: {
       findUnique: jest.Mock;
       update: jest.Mock;
@@ -38,6 +47,7 @@ describe('PlatformService', () => {
     $transaction: jest.Mock;
   };
   let audit: { logAction: jest.Mock };
+  let jwt: { sign: jest.Mock };
 
   // ── Onboard ──────────────────────────────────────────────────────────────────
   //
@@ -68,6 +78,7 @@ describe('PlatformService', () => {
 
   beforeEach(async () => {
     audit = { logAction: jest.fn().mockResolvedValue({}) };
+    jwt = { sign: jest.fn().mockReturnValue('impersonation-token') };
     prisma = {
       organization: {
         create: jest.fn().mockResolvedValue(createdOrg),
@@ -75,8 +86,24 @@ describe('PlatformService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
-      user: { create: jest.fn().mockResolvedValue({ id: 'u-1' }) },
-      session: { updateMany: jest.fn().mockResolvedValue({ count: 3 }) },
+      user: {
+        create: jest.fn().mockResolvedValue({ id: 'u-1' }),
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      property: { count: jest.fn().mockResolvedValue(0) },
+      tenant: { count: jest.fn().mockResolvedValue(0) },
+      unit: { count: jest.fn().mockResolvedValue(0) },
+      document: {
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _count: 0, _sum: { sizeBytes: 0 } }),
+      },
+      session: {
+        create: jest.fn().mockResolvedValue({ id: 's-1' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 3 }),
+      },
       subscription: {
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -97,6 +124,7 @@ describe('PlatformService', () => {
         PlatformService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: audit },
+        { provide: JwtService, useValue: jwt },
       ],
     }).compile();
 
@@ -186,6 +214,44 @@ describe('PlatformService', () => {
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     // And explicitly: the error names the slug, not a constraint name.
+    await expect(
+      service.onboard(
+        {
+          name: 'T',
+          slug: 'taken',
+          adminEmail: 'o@t.co',
+          adminFirstName: 'A',
+          adminLastName: 'B',
+          adminPassword: 'Str0ngPass!2026',
+        },
+        'sup-1',
+      ),
+    ).rejects.toThrow(/slug/i);
+  });
+
+  it('names the slug under the Prisma 7 meta shape, which has no `target`', async () => {
+    // Regression: the old reader looked only at `meta.target`, which the driver
+    // adapter never sends — every conflict was reported as "admin email" while
+    // this suite stayed green on the Prisma 6 shape. This is the exact `meta`
+    // a duplicate `organizations.slug` produces live (captured 2026-10-11).
+    prisma.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('dup', {
+        code: 'P2002',
+        clientVersion: '7.4.0',
+        meta: {
+          modelName: 'Organization',
+          driverAdapterError: {
+            name: 'DriverAdapterError',
+            cause: {
+              originalCode: '23505',
+              kind: 'UniqueConstraintViolation',
+              constraint: { fields: ['slug'] },
+            },
+          },
+        },
+      }),
+    );
+
     await expect(
       service.onboard(
         {
@@ -308,5 +374,199 @@ describe('PlatformService', () => {
     await expect(service.findOne('nope')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  // ── Usage (Phase C) ──────────────────────────────────────────────────────
+  //
+  // Derived, never stored: six parallel reads, one shaped answer. The test
+  // pins the shape (limits beside totals, over-limit flags) rather than the
+  // queries, because the queries are Prisma and the shape is the contract.
+
+  it('usage derives counts beside plan limits and flags over-limit orgs', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      slug: 'test',
+      plan: 'STARTER',
+      maxUsers: 3,
+      maxProperties: 10,
+      isActive: true,
+      subscription: { status: SubscriptionStatus.ACTIVE },
+    });
+    prisma.user.count
+      .mockResolvedValueOnce(5) // total users — over the 3-seat plan
+      .mockResolvedValueOnce(4); // active
+    prisma.property.count.mockResolvedValue(2);
+    prisma.tenant.count.mockResolvedValue(7);
+    prisma.unit.count.mockResolvedValue(20);
+    prisma.document.aggregate.mockResolvedValue({
+      _count: 9,
+      _sum: { sizeBytes: 1024 },
+    });
+
+    const usage = await service.usage('org-new');
+
+    expect(usage.users).toEqual({
+      total: 5,
+      active: 4,
+      max: 3,
+      overLimit: true,
+    });
+    expect(usage.properties).toEqual({ total: 2, max: 10, overLimit: false });
+    expect(usage.tenants).toBe(7);
+    expect(usage.units).toBe(20);
+    expect(usage.storage).toEqual({ documents: 9, bytes: 1024 });
+  });
+
+  it('usage 404s for an unknown org before counting anything', async () => {
+    prisma.organization.findUnique.mockResolvedValue(null);
+    await expect(service.usage('nope')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.user.count).not.toHaveBeenCalled();
+  });
+
+  // ── Impersonation (Phase C) ──────────────────────────────────────────────
+  //
+  // The safety story in four refusals: a suspended org, a user from another
+  // org, a deactivated user, and yourself. The happy path mints a 15-minute
+  // bearer token carrying the *target's* role and audits the start.
+
+  const targetUser = {
+    id: 'u-target',
+    email: 'manager@rohi.co.ke',
+    firstName: 'M',
+    lastName: 'N',
+    role: UserRole.ADMIN,
+    isActive: true,
+    organizationId: 'org-new',
+    portalTenantId: null,
+  };
+
+  function mockImpersonationTargets() {
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(targetUser);
+  }
+
+  it('impersonate mints a short-lived target-role token and audits the start', async () => {
+    mockImpersonationTargets();
+
+    const result = await service.impersonate(
+      'org-new',
+      { userId: 'u-target', reason: 'reproduce the missing receipt' },
+      'sup-1',
+    );
+
+    expect(result.token).toBe('impersonation-token');
+    expect(result.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(
+      15 * 60 * 1000,
+    );
+    interface SignPayload {
+      sub: string;
+      role: UserRole;
+      impersonatedBy: string;
+      impersonation: boolean;
+      jti: string;
+    }
+    const payload = callArg<SignPayload>(jwt.sign, 0);
+    expect(payload.sub).toBe('u-target');
+    expect(payload.role).toBe(UserRole.ADMIN);
+    expect(payload.impersonatedBy).toBe('sup-1');
+    expect(payload.impersonation).toBe(true);
+    expect(prisma.session.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'u-target',
+        organizationId: 'org-new',
+        jti: payload.jti,
+      }),
+    });
+    expect(callArg<{ action: string }>(audit.logAction, 0).action).toBe(
+      'IMPERSONATION_STARTED',
+    );
+  });
+
+  it('impersonate refuses a suspended organization', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      isActive: false,
+    });
+    await expect(
+      service.impersonate(
+        'org-new',
+        { userId: 'u-target', reason: 'reproduce the missing receipt' },
+        'sup-1',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(jwt.sign).not.toHaveBeenCalled();
+  });
+
+  it('impersonate 404s when the user is not in that organization', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(
+      service.impersonate(
+        'org-new',
+        { userId: 'u-stranger', reason: 'reproduce the missing receipt' },
+        'sup-1',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(jwt.sign).not.toHaveBeenCalled();
+  });
+
+  it('impersonate refuses a deactivated user and yourself', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue({ ...targetUser, isActive: false });
+    await expect(
+      service.impersonate(
+        'org-new',
+        { userId: 'u-target', reason: 'reproduce the missing receipt' },
+        'sup-1',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    prisma.user.findFirst.mockResolvedValue(targetUser);
+    prisma.user.findFirst.mockResolvedValueOnce({ ...targetUser, id: 'sup-1' });
+    await expect(
+      service.impersonate(
+        'org-new',
+        { userId: 'sup-1', reason: 'reproduce the missing receipt' },
+        'sup-1',
+      ),
+    ).rejects.toThrow(/already yourself/);
+  });
+
+  it('endImpersonation revokes the impersonation session and audits the end', async () => {
+    const result = await service.endImpersonation(
+      { userId: 'u-target', jti: 'jti-1', impersonatedBy: 'sup-1' },
+      'sup-1',
+    );
+    expect(result).toEqual({ ended: true });
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { jti: 'jti-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(callArg<{ action: string }>(audit.logAction, 0).action).toBe(
+      'IMPERSONATION_ENDED',
+    );
+  });
+
+  it('endImpersonation refuses a normal session with nothing to end', async () => {
+    await expect(
+      service.endImpersonation({ userId: 'u-1', jti: 'jti-1' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -203,6 +203,8 @@ visitorVisits              VisitorVisit[]
   meterReadings              MeterReading[]
   // Module 19 — SaaS Administration
   subscription              Subscription?
+  // Module 19 — support tickets raised by this tenant.
+  supportTickets            SupportTicket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -256,6 +258,64 @@ model Subscription {
 
   @@index([organizationId])
   @@map("subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Support tickets (Module 19) — tenant-scoped: raised by a tenant user about
+// their own organization, visible platform-wide to SUPER_ADMIN.
+//
+// Deliberately without a comments table: the reply is the status transition
+// plus the `resolution` note, which is the whole support interaction most
+// tickets need. A knowledge base and live chat are deferred per the module doc.
+// ---------------------------------------------------------------------------
+
+enum TicketStatus {
+  /** Raised, nobody from the platform has picked it up yet. */
+  OPEN
+  /** A platform operator is working on it. */
+  IN_PROGRESS
+  /** Answered/fixed; kept visible so the tenant can confirm before close. */
+  RESOLVED
+  /** Terminal. Reopening means a new ticket referencing this one. */
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model SupportTicket {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Who raised it. Nullable SetNull so deleting the user preserves the ticket
+  // (the same reason AuditLog.userId is nullable).
+  raisedByUserId String?
+  raisedBy       User?   @relation("UserRaisedTickets", fields: [raisedByUserId], references: [id], onDelete: SetNull)
+
+  subject     String
+  description String         @db.Text
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(NORMAL)
+
+  // Written by the platform operator when the ticket moves to RESOLVED — what
+  // was done, or why nothing needed doing. The tenant reads this, not a thread.
+  resolution   String?
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?   @relation("UserResolvedTickets", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([raisedByUserId])
+  @@map("support_tickets")
 }
 
 model User {
@@ -315,6 +375,10 @@ model User {
   decidedTenantRequests   TenantRequest[]          @relation("UserDecidedTenantRequests")
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  // Module 19 — support tickets this login raised, and ones they resolved
+  // (the second only happens for platform operators).
+  raisedSupportTickets   SupportTicket[] @relation("UserRaisedTickets")
+  resolvedSupportTickets SupportTicket[] @relation("UserResolvedTickets")
 
   // Module 18 — Workflow Engine: every "who did what to this approval" pointer.
   startedWorkflows       WorkflowInstance[]   @relation("UserStartedWorkflows")

@@ -98,6 +98,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         // their next request instead of persisting until the token expires.
         portalTenantId: user.portalTenantId ?? null,
         isTenantPortal: Boolean(user.portalTenantId),
+        // Module 19 Phase C — impersonation. Signed into the token, so it is
+        // as trustworthy as the role claim beside it: an impersonated session
+        // acts as the target user, and this is how the UI (banner) and the
+        // audit trail tell it apart from a real login.
+        isImpersonated: payload.impersonation === true,
+        impersonatedBy:
+          typeof payload.impersonatedBy === 'string'
+            ? payload.impersonatedBy
+            : null,
         jti,
       };
     } catch (error: any) {

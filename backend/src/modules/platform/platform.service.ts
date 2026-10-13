@@ -1,17 +1,26 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma, SubscriptionStatus, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import {
   OnboardOrganizationDto,
   SuspendOrganizationDto,
 } from './dto/onboarding.dto';
+import { ImpersonateDto } from './dto/impersonate.dto';
+
+/** An impersonation session lasts 15 minutes — long enough to reproduce a
+ * tenant's problem, short enough that a forgotten tab stops working. */
+const IMPERSONATION_TTL_MS = 15 * 60 * 1000;
 
 /**
  * SaaS administration (Module 19) — the code that runs the platform, not a tenant.
@@ -46,16 +55,16 @@ export interface OnboardConflictCause {
 /**
  * Field names behind a Prisma unique-violation (P2002), across client generations.
  *
- * Prisma 6 and earlier put them at `meta.target: string[]`. Under Prisma 7's
- * driver adapter there is no `target` at all — the constraint arrives nested at
+ * Prisma ≤6 put them at `meta.target: string[]`. Under Prisma 7's driver adapter
+ * there is no `target` at all — the constraint arrives nested at
  * `meta.driverAdapterError.cause.constraint.fields` (verified live: a duplicate
  * `organizations.slug` reports `{modelName, driverAdapterError: {cause:
  * {constraint: {fields: ['slug']}}}}`). Reading only the old shape silently
- * classifies *every* conflict as the email fallback, which is how the signup
- * retry learned to never retry: the message it matched on never named the slug.
+ * classifies *every* conflict as "admin email", which is how the signup retry
+ * below learned to never retry: the message it matched on never named the slug.
  *
- * Exported so `TrialSignupService` and its spec decide retry-vs-surface on the
- * same reading rather than string-matching a message that already lied once.
+ * Exported so `TrialSignupService` decides retry-vs-surface on the same reading
+ * rather than string-matching a message that already lied once.
  */
 export function p2002Fields(
   err: Prisma.PrismaClientKnownRequestError,
@@ -66,8 +75,7 @@ export function p2002Fields(
         driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } };
       }
     | undefined;
-  const direct =
-    meta && 'target' in meta ? (meta.target as unknown) : undefined;
+  const direct = meta && 'target' in meta ? meta.target : undefined;
   if (Array.isArray(direct)) {
     return direct.filter((t): t is string => typeof t === 'string');
   }
@@ -88,6 +96,7 @@ export class PlatformService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private jwtService: JwtService,
   ) {}
 
   /**
@@ -167,9 +176,7 @@ export class PlatformService {
         err.code === 'P2002'
       ) {
         const fields = p2002Fields(err);
-        const field = fields.some((t) => t.includes('slug'))
-          ? 'slug'
-          : 'email';
+        const field = fields.some((t) => t.includes('slug')) ? 'slug' : 'email';
         // `cause` carries the field machine-readably for the in-process caller
         // (`TrialSignupService` retries slug clashes): the message is for humans
         // and must stay free to be reworded without breaking the retry.
@@ -321,5 +328,240 @@ export class PlatformService {
         `audit write failed for ${input.action}: ${(err as Error).message}`,
       );
     }
+  }
+
+  /**
+   * Derived usage for one tenant — counts, never a stored counter.
+   *
+   * Nothing here is written anywhere: a usage figure that lives in a column
+   * rots the moment the thing it counts changes, which is the stored-
+   * derivation failure this codebase refuses on invoice balances, stock
+   * levels and received quantities alike. The platform dashboard reads this
+   * endpoint instead.
+   */
+  async usage(id: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        plan: true,
+        maxUsers: true,
+        maxProperties: true,
+        isActive: true,
+        subscription: true,
+      },
+    });
+    if (!org) throw new NotFoundException(`Organization ${id} not found`);
+
+    const [
+      usersTotal,
+      usersActive,
+      propertiesTotal,
+      tenantsTotal,
+      unitsTotal,
+      docs,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { organizationId: id } }),
+      this.prisma.user.count({
+        where: { organizationId: id, isActive: true },
+      }),
+      this.prisma.property.count({
+        where: { organizationId: id, deletedAt: null },
+      }),
+      this.prisma.tenant.count({
+        where: { organizationId: id, deletedAt: null },
+      }),
+      this.prisma.unit.count({
+        where: { property: { organizationId: id }, deletedAt: null },
+      }),
+      this.prisma.document.aggregate({
+        where: { organizationId: id },
+        _count: true,
+        _sum: { sizeBytes: true },
+      }),
+    ]);
+
+    return {
+      organizationId: id,
+      subscription: org.subscription,
+      users: {
+        total: usersTotal,
+        active: usersActive,
+        max: org.maxUsers,
+        overLimit: usersTotal > org.maxUsers,
+      },
+      properties: {
+        total: propertiesTotal,
+        max: org.maxProperties,
+        overLimit: propertiesTotal > org.maxProperties,
+      },
+      tenants: tenantsTotal,
+      units: unitsTotal,
+      storage: {
+        documents: docs._count,
+        bytes: docs._sum.sizeBytes ?? 0,
+      },
+    };
+  }
+
+  /**
+   * Minimal user directory for one tenant — the picker the impersonation
+   * dialog offers. Separate from `findOne` (which stays a summary) so the
+   * org list never pays for rows it does not show.
+   */
+  async listUsers(id: string) {
+    await this.findOne(id);
+    return this.prisma.user.findMany({
+      where: { organizationId: id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+      },
+      orderBy: { email: 'asc' },
+    });
+  }
+
+  /**
+   * Start an impersonation session: a short-lived bearer token that acts as
+   * one tenant user.
+   *
+   * Three properties make this safe rather than merely convenient:
+   * - the token carries the *target's* role, so every `@Roles(SUPER_ADMIN)`
+   *   platform endpoint — including this one — is structurally unreachable
+   *   while impersonating. There is no nested impersonation to forbid because
+   *   the token cannot get back here.
+   * - the token is a bearer token returned in the body, never a cookie: the
+   *   operator's own session stays intact underneath, and ending the
+   *   impersonation is discarding the token (plus revoking its session row).
+   * - the start is audited with actor, target and reason before the token is
+   *   returned — an impersonation nobody recorded is indistinguishable from
+   *   a compromised account.
+   */
+  async impersonate(
+    orgId: string,
+    dto: ImpersonateDto,
+    actorId: string,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true, isActive: true },
+    });
+    if (!org) throw new NotFoundException(`Organization ${orgId} not found`);
+    if (!org.isActive) {
+      throw new ForbiddenException(
+        `Cannot impersonate into ${org.name}: the organization is suspended`,
+      );
+    }
+
+    const target = await this.prisma.user.findFirst({
+      where: { id: dto.userId, organizationId: orgId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        organizationId: true,
+        portalTenantId: true,
+      },
+    });
+    if (!target) {
+      throw new NotFoundException(
+        'That user does not exist in this organization',
+      );
+    }
+    if (!target.isActive) {
+      throw new ForbiddenException('Cannot impersonate a deactivated user');
+    }
+    if (target.id === actorId) {
+      throw new ForbiddenException('You are already yourself');
+    }
+
+    const jti = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + IMPERSONATION_TTL_MS);
+    const payload = {
+      email: target.email,
+      sub: target.id,
+      role: target.role,
+      organizationId: target.organizationId,
+      portalTenantId: target.portalTenantId ?? null,
+      impersonatedBy: actorId,
+      impersonation: true,
+      jti,
+    };
+    const token = this.jwtService.sign(payload, {
+      expiresIn: IMPERSONATION_TTL_MS / 1000,
+    });
+
+    await this.prisma.session.create({
+      data: {
+        jti,
+        userId: target.id,
+        organizationId: orgId,
+        expiresAt,
+        ipAddress: meta?.ip,
+        userAgent: meta?.userAgent,
+      },
+    });
+
+    this.logger.warn(
+      `IMPERSONATION started by ${actorId} as ${target.email} (${target.id}): ${dto.reason}`,
+    );
+    try {
+      await this.auditService.logAction({
+        user: { connect: { id: actorId } },
+        organization: { connect: { id: orgId } },
+        action: 'IMPERSONATION_STARTED',
+        entity: 'User',
+        entityId: target.id,
+        details: `Impersonating ${target.email}: ${dto.reason}. Expires ${expiresAt.toISOString()}`,
+        ipAddress: meta?.ip,
+        userAgent: meta?.userAgent,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `audit write failed for IMPERSONATION_STARTED: ${(err as Error).message}`,
+      );
+    }
+
+    const { ...safeTarget } = target;
+    return { token, expiresAt, user: safeTarget };
+  }
+
+  /**
+   * End the caller's impersonation: revoke the impersonation session row so
+   * the bearer token stops working immediately, and audit the end. A normal
+   * (non-impersonated) session calling this has nothing to end.
+   */
+  async endImpersonation(
+    caller: { userId: string; jti?: string; impersonatedBy?: string | null },
+    actorId?: string,
+  ) {
+    if (!caller.jti || !caller.impersonatedBy) {
+      throw new ForbiddenException('This session is not an impersonation');
+    }
+    await this.prisma.session.updateMany({
+      where: { jti: caller.jti, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.logger.warn(
+      `IMPERSONATION ended for ${caller.userId} (started by ${caller.impersonatedBy})`,
+    );
+    await this.safeAudit({
+      action: 'IMPERSONATION_ENDED',
+      entity: 'User',
+      entityId: caller.userId,
+      details: `Impersonation session ended (started by ${caller.impersonatedBy})`,
+      actorId,
+    });
+    return { ended: true };
   }
 }
