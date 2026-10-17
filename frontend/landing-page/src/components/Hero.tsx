@@ -387,11 +387,11 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                           M-Pesa STK Push & Smart FIFO Allocation Engine
                         </div>
                         <p className="mt-1 text-xs text-slate-300 max-w-xl">
-                          Every incoming mobile or Stripe payment resolves the tenant's oldest invoice balance first. Any remaining surplus is instantly booked to the tenant's spendable wallet credit balance.
+                          Every incoming mobile or Stripe payment resolves the tenant&apos;s oldest invoice balance first. Any remaining surplus is instantly booked to the tenant&apos;s spendable wallet credit balance.
                         </p>
                       </div>
                       <div className="bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 text-right">
-                        <span className="text-[10px] text-slate-400 block">Today's STK Success Rate</span>
+                        <span className="text-[10px] text-slate-400 block">Today&apos;s STK Success Rate</span>
                         <span className="text-sm font-extrabold text-emerald-400 font-mono">99.4% (214/215)</span>
                       </div>
                     </div>

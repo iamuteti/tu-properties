@@ -84,7 +84,7 @@ export const FeaturesList: React.FC<FeaturesListProps> = ({ onOpenTrialModal, on
             </span>
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-600 dark:text-slate-300">
-            No mock screenshots, no generic buzzwords. Here is how each module operates in production for real African portfolios.
+            Whether managing a boutique 12-unit residential apartment, a gated community, or a 50-story commercial tower — each module scales with zero configuration changes.
           </p>
         </div>
 

@@ -47,7 +47,7 @@ export const SaaSSection: React.FC<SaaSSectionProps> = ({ onStartTrial }) => {
               14-Day Free Trial Per Organization
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Every newly created organization receives full unconstrained access to all 10 modules, multi-branch provisioning, and real M-Pesa sandbox/live hooks. No credit card required to begin.
+              Every newly created organization receives full unconstrained access to all 10 modules, multi-branch provisioning, and live payment gateway hooks. No credit card required to begin.
             </p>
             <div className="pt-2 flex items-center gap-2 text-xs font-mono text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />

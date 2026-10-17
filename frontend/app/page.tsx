@@ -9,6 +9,7 @@ import { InteractiveShowcase } from '@/components/landing/InteractiveShowcase';
 import { TrustSection } from '@/components/landing/TrustSection';
 import { SaaSSection } from '@/components/landing/SaaSSection';
 import { Testimonials } from '@/components/landing/Testimonials';
+import { DemoAccountsSection } from '@/components/landing/DemoAccountsSection';
 import { PricingSection } from '@/components/landing/PricingSection';
 import { FAQSection } from '@/components/landing/FAQSection';
 import { ContactSection } from '@/components/landing/ContactSection';
@@ -75,6 +76,8 @@ export default function LandingPage() {
         <SaaSSection onStartTrial={handleOpenTrial} />
 
         <Testimonials />
+
+        <DemoAccountsSection />
 
         <PricingSection onStartTrial={handleOpenTrial} />
 

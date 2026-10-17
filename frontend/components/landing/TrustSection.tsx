@@ -217,7 +217,7 @@ export const TrustSection: React.FC = () => {
                 <span>Live Immutable Audit Trail Sample (Tenant ID: org_4892)</span>
               </div>
               <p className="text-slate-600 dark:text-slate-300 pt-1">
-                <span className="text-emerald-600 dark:text-emerald-400">[2026-10-11 11:04:12 UTC]</span> ACTOR: usr_fd_8192 (Finance Director) | ACTION: APPROVE_PAYOUT | ENTITY: payout_8819 | TARGET: Landlord KCB Acc (KES 4,358,700) | STATUS: COMMITTED
+                <span className="text-emerald-600 dark:text-emerald-400">[2026-10-11 11:04:12 UTC]</span> ACTOR: usr_fd_8192 (Finance Director) | ACTION: APPROVE_PAYOUT | ENTITY: payout_8819 | TARGET: Client Escrow Barclays (GBP 147,020.00) | STATUS: COMMITTED
               </p>
               <p className="text-slate-600 dark:text-slate-300">
                 <span className="text-emerald-600 dark:text-emerald-400">[2026-10-11 11:08:45 UTC]</span> ACTOR: usr_la_1042 (Letting Agent) | ACTION: RENEW_LEASE | ENTITY: lease_0042 | PREV_EXPIRY: 2026-12-31 | NEW_EXPIRY: 2027-12-31 | STATUS: COMMITTED

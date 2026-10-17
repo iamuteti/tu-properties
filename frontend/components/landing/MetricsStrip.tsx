@@ -8,10 +8,10 @@ export const MetricsStrip: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-6">
           <p className="text-xs uppercase tracking-widest text-amber-600 dark:text-amber-400 font-bold">
-            Simulated Scale & Engine Load
+            Architectural Scale & Portfolio Flexibility
           </p>
           <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
-            Engineered to handle dense African multi-tenant portfolios with zero lag
+            Engineered for all portfolio sizes — from boutique 12-unit buildings to high-rise towers
           </h3>
         </div>
 
@@ -60,7 +60,7 @@ export const MetricsStrip: React.FC = () => {
               Invoices Processed & Reconciled
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Settled via M-Pesa STK push & Stripe cards
+              Settled via multi-rail gateways & cards
             </div>
           </div>
         </div>

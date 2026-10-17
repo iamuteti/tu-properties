@@ -135,7 +135,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
                   {/* Feature Checkmarks */}
                   <div className="mt-8 space-y-3">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block font-mono">
-                      What's Included:
+                      What&apos;s Included:
                     </span>
                     <ul className="space-y-2.5">
                       {plan.features.map((feature, fIdx) => (

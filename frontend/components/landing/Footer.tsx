@@ -23,24 +23,24 @@ export const Footer: React.FC = () => {
             </div>
 
             <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              The multi-tenant SaaS platform for property management companies, landlords, and letting agents across Africa and beyond. Run your properties, tenants, money, and staff from one audited system.
+              The modern multi-entity SaaS platform for property management companies, landlords, and institutional trusts worldwide. Run your properties, tenants, money, and staff from one audited system.
             </p>
 
             <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
               <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                London
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                New York
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                Dubai
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                 Nairobi
               </span>
               <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Lagos
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Johannesburg
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Kigali
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Accra
+                Singapore
               </span>
             </div>
           </div>
@@ -137,6 +137,12 @@ export const Footer: React.FC = () => {
               <li>
                 <a href="#pricing" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                   Pricing (14-Day Free Trial)
+                </a>
+              </li>
+              <li>
+                <a href="#demo-accounts" className="text-amber-600 dark:text-amber-400 hover:text-amber-500 font-semibold transition-colors flex items-center gap-1.5">
+                  <span>Demo / Test Accounts</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 </a>
               </li>
               <li>

@@ -1,11 +1,12 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { Eye, EyeOff, KeyRound, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
     const { login } = useAuth();
+    const searchParams = useSearchParams();
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [mfa, setMfa] = useState<{ mfaToken: string; email: string } | null>(null);
@@ -29,10 +31,19 @@ export default function LoginPage() {
     const {
         register,
         handleSubmit,
+        setValue,
         formState: { errors, isSubmitting },
     } = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema),
     });
+
+    useEffect(() => {
+        const emailParam = searchParams.get('email');
+        if (emailParam) {
+            setValue('email', emailParam);
+            setValue('password', 'Password123!');
+        }
+    }, [searchParams, setValue]);
 
     const onSubmit = async (data: LoginFormValues) => {
         setError(null);
@@ -209,6 +220,35 @@ export default function LoginPage() {
                     {isSubmitting ? "Signing in..." : "Sign in"}
                 </Button>
             </form>
+
+            {/* Quick Demo Fill Buttons */}
+            <div className="pt-4 border-t border-border space-y-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Quick Fill Demo Personas (Password123!):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                    {[
+                        { label: 'Admin', email: 'admin@westhill.co.ke' },
+                        { label: 'Manager', email: 'manager@westhill.co.ke' },
+                        { label: 'Accountant', email: 'accountant@westhill.co.ke' },
+                        { label: 'Maintenance', email: 'maintenance@rohi.co.ke' },
+                        { label: 'Super Admin', email: 'admin@tuproperties.co.ke' },
+                    ].map((demo) => (
+                        <button
+                            key={demo.email}
+                            type="button"
+                            onClick={() => {
+                                setValue('email', demo.email);
+                                setValue('password', 'Password123!');
+                            }}
+                            className="px-2.5 py-1 text-xs rounded-md bg-secondary hover:bg-amber-500/10 hover:text-amber-500 hover:border-amber-500/30 border border-border text-secondary-foreground font-mono transition-colors"
+                        >
+                            {demo.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
             <div className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}

@@ -18,13 +18,13 @@ export const FEATURES: FeatureItem[] = [
     id: 'property-units',
     number: '01',
     title: 'Property & Units',
-    tagline: 'Multi-branch portfolio hierarchy with live lease synchronization',
-    proofPoint: '100+ properties, occupancy tracking synced live from leases, CSV import with dry-run preview.',
+    tagline: 'From boutique 12-unit residential apartments to multi-story commercial towers',
+    proofPoint: 'Supports single-building landlords with 12 units up to multi-branch portfolios with 100+ properties; live occupancy tracking synced directly from leases.',
     category: 'Asset Management',
     iconName: 'Building2',
     architectureBadge: 'Live Lease State Machine',
     details: [
-      { label: 'Scale Capacity', value: '100+ properties per organization with branch grouping' },
+      { label: 'Scale Range', value: 'Seamlessly accommodates 12-unit walk-ups to 100+ multi-story commercial complexes' },
       { label: 'Occupancy Sync', value: 'Derived automatically from active leases; zero manual toggle lag' },
       { label: 'Data Onboarding', value: 'CSV import engine with dry-run preview and per-row error isolation' }
     ]
@@ -79,12 +79,12 @@ export const FEATURES: FeatureItem[] = [
     number: '05',
     title: 'Payments & Smart Allocation',
     tagline: 'Mobile money collection, card gateways, and mathematical settlement',
-    proofPoint: 'M-Pesa STK push for mobile collection, card payments via Stripe, smart allocation (overpayments become spendable credit, oldest invoice settled first), multi-currency support, receipt PDFs, credit notes, approval-gated refunds.',
+    proofPoint: 'Direct debit, bank transfer (ACH/BACS/SWIFT), card payments via Stripe, and regional mobile rails; FIFO waterfall allocation resolves oldest invoice first, with overpayments instantly converted to spendable wallet credit.',
     category: 'Payment Infrastructure',
     iconName: 'CreditCard',
     architectureBadge: 'FIFO Waterfall Allocation',
     details: [
-      { label: 'African Mobile Money', value: 'Native M-Pesa STK push with instant C2B/B2C webhook reconciliation' },
+      { label: 'Multi-Rail Gateways', value: 'Instant settlement via Stripe cards, bank direct debits, and regional mobile rails' },
       { label: 'Smart Waterfall', value: 'Oldest outstanding invoice knocked off first; surplus converts to spendable credit' },
       { label: 'Refund Security', value: 'Approval-gated refund workflow with audit trail and automated credit notes' }
     ]
@@ -129,7 +129,7 @@ export const FEATURES: FeatureItem[] = [
     iconName: 'Users2',
     architectureBadge: 'Tax & Labor Config Engine',
     details: [
-      { label: 'Statutory Presets', value: 'Pre-configured for Kenya (PAYE, NSSF, SHIF, Housing Levy 1.5%), customizable for other regions' },
+      { label: 'Statutory Presets', value: 'Pre-configured rulesets adaptable for US, UK, EU, Kenya, Nigeria, South Africa, or custom tax rules' },
       { label: 'Leave Management', value: 'Annual, sick, and compassionate leave accruals with caretaker coverage handovers' },
       { label: 'Property Allocation', value: 'Caretaker and security guard payroll costs allocated directly to property P&Ls' }
     ]
@@ -209,7 +209,7 @@ export const NOTIFICATION_SCHEDULE = [
   { days: '30 Days', trigger: 'Formal Renewal Offer Prompt', channel: 'Tenant Portal + Email + SMS', target: 'Tenant & Letting Agent' },
   { days: '14 Days', trigger: 'Intent Notice Deadline', channel: 'SMS + Push Alert', target: 'Letting Agent & Branch Manager' },
   { days: '7 Days', trigger: 'Move-Out Inspection Scheduling', channel: 'Automated Calendar Dispatch', target: 'Caretaker & Tenant' },
-  { days: 'Day 1 of Month', trigger: 'Rent Due Notification', channel: 'M-Pesa STK Link + Email Invoice', target: 'Active Tenant' },
+  { days: 'Day 1 of Month', trigger: 'Rent Due Notification', channel: 'Direct Link + Email Invoice', target: 'Active Tenant' },
   { days: 'Day 5 of Month', trigger: 'Overdue Arrears Escalation', channel: 'Escalation Notice to Property Lead', target: 'Finance & Tenant' }
 ];
 
@@ -222,20 +222,20 @@ export const METRICS = {
 
 export const TESTIMONIALS = [
   {
-    quote: 'Before TU Properties, reconciling monthly rent across 420 units in Kilimani and Westlands meant matching paper bank slips and M-Pesa statements for days. Now every payment auto-settles against the oldest invoice and owners receive verified statements without a single manual calculation.',
-    author: 'Wanjiru Kamau',
+    quote: 'Before TU Properties, reconciling monthly rent across 420 units in prime metropolitan corridors meant matching paper bank slips and manual spreadsheets for days. Now every payment auto-settles against the oldest invoice and owners receive verified statements without a single manual calculation.',
+    author: 'Eleanor Vance',
     role: 'Principal Managing Partner',
-    company: 'Apex Crest Realty Partners',
-    city: 'Nairobi, Kenya',
+    company: 'Apex Prime Property Partners',
+    city: 'London, United Kingdom',
     unitsManaged: '420 Residential & Commercial Units',
     mandatoryLabel: 'Illustrative example'
   },
   {
-    quote: 'Handling multi-branch property portfolios in Victoria Island and Ikeja requires uncompromising accounting. TU Properties gives us double-entry ledgers where withholding tax and VAT are clean configuration rows, not Excel guesswork. Our landlords trust the numbers implicitly.',
-    author: 'Babatunde Adeleke',
+    quote: 'Handling multi-branch property portfolios across high-growth international metros requires uncompromising accounting. TU Properties gives us double-entry ledgers where withholding tax, sales tax, and VAT are clean configuration rows, not Excel guesswork. Our landlords trust the numbers implicitly.',
+    author: 'Marcus Sterling',
     role: 'Director of Asset Management',
-    company: 'Lekki Metropolitan Letting Agency',
-    city: 'Lagos, Nigeria',
+    company: 'Metropolitan Real Estate Trust',
+    city: 'New York, United States',
     unitsManaged: '680 Managed Units',
     mandatoryLabel: 'Illustrative example'
   }
@@ -244,8 +244,8 @@ export const TESTIMONIALS = [
 export const PRICING_PLANS = [
   {
     name: 'Starter',
-    badge: 'Independent Landlords & Small Firms',
-    description: 'For private landlords and emerging letting agents managing up to 50 units across a single branch.',
+    badge: 'Boutique Apartments & Private Landlords',
+    description: 'Perfect for boutique 12-unit walk-ups, residential apartments, or emerging portfolios up to 50 active units.',
     pricing: {
       USD: { monthly: 49, annual: 39 },
       KES: { monthly: 6500, annual: 5200 },
@@ -253,7 +253,7 @@ export const PRICING_PLANS = [
       ZAR: { monthly: 900, annual: 720 }
     },
     features: [
-      'Up to 50 active units across 1 branch',
+      'Ideal for 12 to 50 active rental units',
       'Digital lease lifecycle with renewal guards',
       'Tenant self-service portal (invoices & tickets)',
       'M-Pesa & Stripe automated payment logging',
@@ -320,11 +320,15 @@ export const FAQS = [
   },
   {
     question: 'Can tenants and owners log in?',
-    answer: 'Tenants get their own dedicated self-service web portal today where they can review active leases, settle rent via M-Pesa STK push or card, view past invoice receipts, download tax statements, and submit maintenance tickets with photos. The Owner Portal is currently in active private preview and coming shortly — in the meantime, property owners receive automated, verified income statements and payout receipts with bank transfer references directly via email PDF and SMS summary.'
+    answer: 'Tenants get their own dedicated self-service web portal today where they can review active leases, settle rent via card, bank transfer, or local mobile rails, view past invoice receipts, download tax statements, and submit maintenance tickets with photos. The Owner Portal is currently in active private preview and coming shortly — in the meantime, property owners receive automated, verified income statements and payout receipts with bank transfer references directly via email PDF and SMS summary.'
   },
   {
     question: 'Does it handle my country\'s taxes?',
-    answer: 'Yes. TU Properties treats tax rules and statutory payroll deductions as modular configuration rows rather than hardcoded logic. Kenya ships completely out of the box with KRA-compliant 16% VAT, 10% Withholding Tax (WHT), PAYE, NSSF, SHIF, and the Affordable Housing Levy (1.5%). You can configure or tweak rates for Nigeria (FIRS VAT & WHT), South Africa (SARS), Ghana (GRA), Rwanda, or any target tax regime through simple admin configuration panels without touching a line of code.'
+    answer: 'Yes. TU Properties treats tax rules and statutory payroll deductions as modular configuration rows rather than hardcoded logic. The system comes pre-configured with rulesets for the US, UK, EU, Kenya, Nigeria, South Africa, Ghana, UAE, and others. You can configure or tweak rates for any target tax regime (VAT, sales tax, WHT, payroll brackets) through intuitive admin configuration panels without touching a single line of code.'
+  },
+  {
+    question: 'What property and portfolio sizes does TU Properties support?',
+    answer: 'The system is architected to scale without friction from boutique 12-unit residential apartments and small multi-family walk-ups, all the way to multi-story apartment towers, mixed-use commercial plazas, and large multi-branch corporate real estate trusts with thousands of units. Whether you are an independent landlord managing a single building or an agency operating across multiple international branches, the exact same mathematical ledger, audit trail, and tenant workflows apply.'
   },
   {
     question: 'Can I import my existing data?',

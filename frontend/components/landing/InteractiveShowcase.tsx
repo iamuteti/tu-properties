@@ -37,17 +37,33 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
   const totalOutstandingRemaining = (oldestInvoice - oldestSettled) + (currentInvoice - currentSettled);
 
   // Multi-Country Tax Simulator
-  const [selectedCountry, setSelectedCountry] = useState<'KE' | 'NG' | 'ZA' | 'GH'>('KE');
-  const [grossRent, setGrossRent] = useState<number>(500000);
+  const [selectedCountry, setSelectedCountry] = useState<'US' | 'UK' | 'KE' | 'NG' | 'ZA'>('US');
+  const [grossRent, setGrossRent] = useState<number>(100000);
 
   const TAX_PRESETS = {
+    US: {
+      name: 'United States (IRS / Federal & State)',
+      currency: 'USD',
+      vatRate: 0,
+      whtRate: 0,
+      statutoryStaff: ['FICA (Social Security & Medicare)', 'Federal Withholding (W-4)', 'State Unemployment (SUTA)', 'FUTA'],
+      note: 'Configured for federal and state property tax withholdings and vendor 1099-MISC reporting.'
+    },
+    UK: {
+      name: 'United Kingdom (HMRC Compliant)',
+      currency: 'GBP',
+      vatRate: 20,
+      whtRate: 0,
+      statutoryStaff: ['PAYE Income Tax', 'Class 1 National Insurance (NIC)', 'Workplace Auto-Enrolment Pension (5% + 3%)'],
+      note: 'Option to Tax (OTT) toggle for commercial properties with automated digital VAT returns.'
+    },
     KE: {
       name: 'Kenya (KRA Compliant)',
       currency: 'KES',
       vatRate: 16,
       whtRate: 10,
       statutoryStaff: ['PAYE', 'NSSF Tier I & II', 'SHIF (2.75%)', 'Housing Levy (1.5%)'],
-      note: 'Ships out of the box with auto-calculated eTIMS compatibility.'
+      note: 'Ships out of the box with auto-calculated eTIMS compatibility and 10% rent withholding.'
     },
     NG: {
       name: 'Nigeria (FIRS Compliant)',
@@ -64,14 +80,6 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
       whtRate: 0, // Commercial rent standard VAT
       statutoryStaff: ['PAYE (SARS Brackets)', 'UIF (1% + 1%)', 'SDL (1%)', 'Workmen Compensation'],
       note: 'Configured via tax schedules with time validity windows.'
-    },
-    GH: {
-      name: 'Ghana (GRA Compliant)',
-      currency: 'GHS',
-      vatRate: 15, // Standard VAT + NHIL/GETFund
-      whtRate: 8,
-      statutoryStaff: ['PAYE (GRA)', 'SSNIT (5.5% + 13%)', 'Tier 2 Pension (5%)'],
-      note: 'Configured as JSON tax rulesets per branch.'
     }
   };
 
@@ -114,7 +122,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
             }`}
           >
             <Smartphone className="w-4 h-4" />
-            <span>1. M-Pesa & FIFO Smart Allocation</span>
+            <span>1. Instant Pay & FIFO Allocation</span>
           </button>
 
           <button
@@ -164,7 +172,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Smartphone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    M-Pesa STK Push Collection & Waterfall Settlement
+                    Multi-Rail Payment Collection & Waterfall Settlement
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                     Rule: Oldest invoice settled first. Overpayments automatically become spendable credit.
@@ -172,7 +180,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                 </div>
                 <div className="flex items-center gap-2 text-xs font-mono bg-emerald-950/60 text-emerald-600 dark:text-emerald-300 border border-emerald-800 px-3 py-1.5 rounded-lg">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  STK Push Webhook Verified
+                  Payment Webhook Verified
                 </div>
               </div>
 
@@ -185,7 +193,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
 
                   <div>
                     <label className="text-xs text-slate-600 dark:text-slate-300 font-semibold block mb-1">
-                      Tenant Phone (M-Pesa STK Target)
+                      Tenant Reference / Phone / Card
                     </label>
                     <input
                       type="text"
@@ -201,12 +209,12 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                         Invoice #1 (Oldest Arrears)
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2 text-xs text-slate-500 font-mono">KES</span>
+                        <span className="absolute left-3 top-2 text-xs text-slate-500 font-mono">$</span>
                         <input
                           type="number"
                           value={oldestInvoice}
                           onChange={(e) => setOldestInvoice(Number(e.target.value) || 0)}
-                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-12 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
                         />
                       </div>
                     </div>
@@ -216,12 +224,12 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                         Invoice #2 (Current Rent)
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2 text-xs text-slate-500 font-mono">KES</span>
+                        <span className="absolute left-3 top-2 text-xs text-slate-500 font-mono">$</span>
                         <input
                           type="number"
                           value={currentInvoice}
                           onChange={(e) => setCurrentInvoice(Number(e.target.value) || 0)}
-                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-12 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
                         />
                       </div>
                     </div>
@@ -232,12 +240,12 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       Simulated Amount Paid by Tenant
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-slate-500 dark:text-slate-400 font-mono font-bold">KES</span>
+                      <span className="absolute left-3 top-2.5 text-xs text-slate-500 dark:text-slate-400 font-mono font-bold">$</span>
                       <input
                         type="number"
                         value={paymentAmount}
                         onChange={(e) => setPaymentAmount(Number(e.target.value) || 0)}
-                        className="w-full bg-white dark:bg-slate-900 border-2 border-amber-500/50 rounded-xl pl-12 pr-3 py-2 text-base text-amber-600 dark:text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
+                        className="w-full bg-white dark:bg-slate-900 border-2 border-amber-500/50 rounded-xl pl-8 pr-3 py-2 text-base text-amber-600 dark:text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -276,15 +284,15 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                           Oldest Invoice (#INV-001)
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                          Original Balance: KES {oldestInvoice.toLocaleString()}
+                          Original Balance: ${oldestInvoice.toLocaleString()}
                         </div>
                       </div>
                       <div className="text-right">
                         <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">
-                          -KES {oldestSettled.toLocaleString()} Settled
+                          -${oldestSettled.toLocaleString()} Settled
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                          Remaining: KES {(oldestInvoice - oldestSettled).toLocaleString()}
+                          Remaining: ${(oldestInvoice - oldestSettled).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -297,15 +305,15 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                           Current Month Invoice (#INV-002)
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                          Original Balance: KES {currentInvoice.toLocaleString()}
+                          Original Balance: ${currentInvoice.toLocaleString()}
                         </div>
                       </div>
                       <div className="text-right">
                         <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">
-                          -KES {currentSettled.toLocaleString()} Settled
+                          -${currentSettled.toLocaleString()} Settled
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                          Remaining: KES {(currentInvoice - currentSettled).toLocaleString()}
+                          Remaining: ${(currentInvoice - currentSettled).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -322,7 +330,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       </div>
                       <div className="text-right">
                         <span className="text-base font-extrabold text-amber-600 dark:text-amber-400 font-mono">
-                          +KES {spendableCredit.toLocaleString()}
+                          +${spendableCredit.toLocaleString()}
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
                           Auto-applied to next cycle
@@ -354,8 +362,8 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                     Tax laws are not hardcoded. Withholding tax, VAT, and staff statutory levies are configurable JSON rows per jurisdiction.
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  {(['KE', 'NG', 'ZA', 'GH'] as const).map((cc) => (
+                <div className="flex flex-wrap gap-2">
+                  {(['US', 'UK', 'KE', 'NG', 'ZA'] as const).map((cc) => (
                     <button
                       key={cc}
                       onClick={() => setSelectedCountry(cc)}
@@ -578,12 +586,12 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       Initial Tenant Security Deposit Held
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-xs text-slate-500 dark:text-slate-400 font-mono">KES</span>
+                      <span className="absolute left-3 top-2 text-xs text-slate-500 dark:text-slate-400 font-mono">$</span>
                       <input
                         type="number"
                         value={securityDeposit}
                         onChange={(e) => setSecurityDeposit(Number(e.target.value) || 0)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-12 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -593,27 +601,27 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       Approved Move-out Repairs (Linked Work Order #WO-419)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-xs text-slate-500 dark:text-slate-400 font-mono">KES</span>
+                      <span className="absolute left-3 top-2 text-xs text-slate-500 dark:text-slate-400 font-mono">$</span>
                       <input
                         type="number"
                         value={paintRepairs}
                         onChange={(e) => setPaintRepairs(Number(e.target.value) || 0)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-12 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   <div>
                     <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">
-                      Outstanding Water Submeter Reading (Bill #UT-883)
+                      Outstanding Utility Submeter Reading (Bill #UT-883)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-xs text-slate-500 dark:text-slate-400 font-mono">KES</span>
+                      <span className="absolute left-3 top-2 text-xs text-slate-500 dark:text-slate-400 font-mono">$</span>
                       <input
                         type="number"
                         value={unpaidWater}
                         onChange={(e) => setUnpaidWater(Number(e.target.value) || 0)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-12 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-white font-mono focus:border-amber-400 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -627,22 +635,22 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                   <div className="space-y-2 border-b border-slate-200 dark:border-slate-800 pb-3 text-slate-600 dark:text-slate-300">
                     <div className="flex justify-between">
                       <span>Total Deposit in Trust Account:</span>
-                      <span className="text-slate-900 dark:text-white font-bold">KES {securityDeposit.toLocaleString()}</span>
+                      <span className="text-slate-900 dark:text-white font-bold">${securityDeposit.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-rose-400">
                       <span>Less Approved Work Order:</span>
-                      <span>- KES {paintRepairs.toLocaleString()}</span>
+                      <span>- ${paintRepairs.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-rose-400">
                       <span>Less Unpaid Submeter Apportionment:</span>
-                      <span>- KES {unpaidWater.toLocaleString()}</span>
+                      <span>- ${unpaidWater.toLocaleString()}</span>
                     </div>
                   </div>
 
                   <div className="pt-2 flex justify-between items-center text-sm font-bold font-sans">
                     <span className="text-slate-900 dark:text-white">Net Derived Refund to Tenant:</span>
                     <span className="text-emerald-600 dark:text-emerald-400 font-mono text-lg">
-                      KES {netRefund.toLocaleString()}
+                      ${netRefund.toLocaleString()}
                     </span>
                   </div>
 
