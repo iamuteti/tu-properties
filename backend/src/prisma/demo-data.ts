@@ -49,6 +49,13 @@ import {
   PayFrequency,
   PayrollLineDirection,
   PayrollRunStatus,
+  // Module 17 — Notifications.
+  NotificationType,
+  NotificationChannel,
+  NotificationPriority,
+  NotificationStatus,
+  // Module 5 — Move-outs.
+  MoveOutStatus,
   // Module 13 — Facilities
   AccessCardHolder,
   AccessCardStatus,
@@ -98,9 +105,130 @@ const randomString = (length: number): string => {
   return result;
 };
 
-// Generate random phone number
+// Generate random Kenyan phone number. Safaricom/Airtel/Telkom mobile
+// prefixes all start with 7 (e.g. +254 700 XXX XXX); a leading 1 is a
+// landline. Anything else is not a real Kenyan subscriber number.
 const randomPhone = (): string => {
-  return `+254${Math.floor(Math.random() * 900000000) + 100000000}`;
+  const prefixes = [
+    '700',
+    '701',
+    '702',
+    '703',
+    '704',
+    '705',
+    '706',
+    '707',
+    '708',
+    '709',
+    '710',
+    '711',
+    '712',
+    '713',
+    '714',
+    '715',
+    '716',
+    '717',
+    '718',
+    '719',
+    '720',
+    '721',
+    '722',
+    '723',
+    '724',
+    '725',
+    '726',
+    '727',
+    '728',
+    '729',
+    '730',
+    '731',
+    '732',
+    '733',
+    '734',
+    '735',
+    '736',
+    '737',
+    '738',
+    '739',
+    '740',
+    '741',
+    '742',
+    '743',
+    '744',
+    '745',
+    '746',
+    '747',
+    '748',
+    '749',
+    '750',
+    '751',
+    '752',
+    '753',
+    '754',
+    '755',
+    '756',
+    '757',
+    '758',
+    '759',
+    '760',
+    '761',
+    '762',
+    '763',
+    '764',
+    '765',
+    '766',
+    '767',
+    '768',
+    '769',
+    '770',
+    '771',
+    '772',
+    '773',
+    '774',
+    '775',
+    '776',
+    '777',
+    '778',
+    '779',
+    '780',
+    '781',
+    '782',
+    '783',
+    '784',
+    '785',
+    '786',
+    '787',
+    '788',
+    '789',
+    '790',
+    '791',
+    '792',
+    '793',
+    '794',
+    '795',
+    '796',
+    '797',
+    '798',
+    '799',
+  ];
+  return `+254${prefixes[Math.floor(Math.random() * prefixes.length)]}${Math.floor(
+    Math.random() * 1000000,
+  )
+    .toString()
+    .padStart(6, '0')}`;
+};
+
+// Generate a KRA tax PIN. Real PINs are 11 characters: a leading letter,
+// nine digits/letters, and a trailing letter (e.g. A000000000B).
+const randomKraPin = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const middle = Array.from({ length: 9 }, () =>
+    chars.charAt(Math.floor(Math.random() * chars.length)),
+  ).join('');
+  const suffix = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(
+    Math.floor(Math.random() * 26),
+  );
+  return `A${middle}${suffix}`;
 };
 
 // Generate random email
@@ -347,7 +475,7 @@ export async function generateDemoData(
         ][Math.floor(Math.random() * 7)],
         accountNumber: String(Math.floor(Math.random() * 10000000000)),
         accountName: name,
-        taxPin: `A${randomString(9)}`,
+        taxPin: randomKraPin(),
         vatRegistered: Math.random() > 0.7,
         organizationId,
       },
@@ -3273,11 +3401,14 @@ async function generateInventoryData(
         { quantity: 18, daysAgo: 5 },
       ],
       // The count came up short and the books now disagree with the shelf.
+      // Opening 64, issued 54 across three movements → books say 10; the stock
+      // take found 4. Six are unaccounted for, taken for the Blue Ridge job
+      // without being signed out — hence the -6 adjustment.
       adjustment: {
         quantity: -6,
         daysAgo: 3,
         reason:
-          'Stock take at the main store: counted 58, books said 64. Two taken for the Blue Ridge job without being signed out.',
+          'Stock take at the main store: counted 4, books said 10. Six taken for the Blue Ridge job without being signed out.',
       },
     },
     {
@@ -3801,6 +3932,17 @@ export async function seedDemoData() {
     });
     await prisma.organization.deleteMany();
 
+    // Item 6 — Clean contract scans written to disk by a previous seed run.
+    // `attachScan` writes real files under uploads/<org>/CONTRACT/<id>/; the DB
+    // clean above drops the Document rows but leaves the bytes behind, so remove
+    // the whole uploads root so re-seeding never serves stale scans.
+    const uploadRoot = path.join(process.cwd(), 'uploads');
+    try {
+      await fsp.rm(uploadRoot, { recursive: true, force: true });
+    } catch {
+      // Directory may not exist yet — that's fine.
+    }
+
     // Create organizations
     console.log('Creating organizations...');
     const defaultOrg = await prisma.organization.create({
@@ -4074,6 +4216,10 @@ export async function seedDemoData() {
       });
     }
 
+    // Item 7 — Minimal Westhill business data so both demo orgs have something
+    // to look at (Westhill stays a "starter" dataset, not a clone of Rohi).
+    await generateWesthillData(prisma, defaultOrg.id);
+
     // Generate demo data for Rohi Estate Management
     await generateDemoData(prisma, rohiOrg.id);
 
@@ -4108,6 +4254,17 @@ export async function seedDemoData() {
     // and sale contracts point at rows Finance and Sales have already created, and
     // because the signed scans it writes are the only thing on disk this seed owns.
     await generateContractsData(prisma, rohiOrg.id);
+
+    // Item 5 — Move-out requests (Module 5). Needs rental agreements, which exist
+    // after generateDemoData.
+    await generateMoveOutData(prisma, rohiOrg.id);
+
+    // Item 1 — Notifications (Module 17). Needs invoices, tenants, landlords and
+    // staff users, all of which exist by now.
+    await generateNotificationsData(prisma, rohiOrg.id);
+
+    // Item 2 — Audit log. Needs real entities and actors to write against.
+    await generateAuditData(prisma, rohiOrg.id);
 
     // Approval policies and sample requests (Module 18). After the data, so a
     // real payment exists for the refund requests to point at.
@@ -6554,4 +6711,674 @@ async function generateContractsData(
   console.log(
     `  Contracts: ${created} (${leasePlans.length} lease, ${suppliers.length > 0 ? Math.min(suppliers.length, 5) : 0} vendor, ${Math.min(landlords.length, 4)} management, ${sales.length} sale, ${certificates.length} compliance, 1 renewal)`,
   );
+}
+
+/**
+ * Item 7 — Minimal Westhill business data.
+ *
+ * Westhill is intentionally a "fresh organization" for reviewers to build from
+ * scratch, but a completely empty org makes multi-tenancy comparisons flat. Seed
+ * a small, self-consistent set (one property, two units, two tenants, two
+ * invoices) so both orgs have something to look at while remaining clearly a
+ * "starter" dataset rather than a full clone of Rohi.
+ */
+async function generateWesthillData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const property = await prisma.property.create({
+    data: {
+      organizationId,
+      code: 'WESTHILL-PROP-001',
+      name: 'Westhill Gardens',
+      estateArea: 'Westlands',
+      country: 'Kenya',
+      category: 'residential',
+      type: 'apartment',
+      mpesaPropertyPayNumber: '123456',
+    },
+  });
+
+  const units = await Promise.all(
+    [1, 2].map((n) =>
+      prisma.unit.create({
+        data: {
+          propertyId: property.id,
+          code: `WG-0${n}`,
+          name: `Unit 0${n}`,
+          type: 'two-bedroom',
+          baseRent: n === 1 ? 85000 : 95000,
+          status: n === 1 ? UnitStatus.OCCUPIED : UnitStatus.VACANT,
+        },
+      }),
+    ),
+  );
+
+  // Prisma returns baseRent as Decimal | null; coerce to a plain number for the
+  // agreement/invoice/payment writes below.
+  const unitRent = Number(units[0].baseRent ?? 0);
+
+  const tenants = await Promise.all(
+    [
+      {
+        accountNumber: 'WESTHILL-TEN-0001',
+        code: 'WESTHILL-T0001',
+        surname: 'Otieno',
+        otherNames: 'Brian',
+        email: 'brian.otieno@example.co.ke',
+        phone: randomPhone(),
+        town: 'Nairobi',
+        status: TenantStatus.ACTIVE,
+      },
+      {
+        accountNumber: 'WESTHILL-TEN-0002',
+        code: 'WESTHILL-T0002',
+        surname: 'Wanjiku',
+        otherNames: 'Esther',
+        email: 'esther.wanjiku@example.co.ke',
+        phone: randomPhone(),
+        town: 'Nairobi',
+        status: TenantStatus.ACTIVE,
+      },
+    ].map((t) =>
+      prisma.tenant.create({
+        data: { ...t, organizationId },
+      }),
+    ),
+  );
+
+  // One active agreement on the occupied unit, one invoice paid, one pending.
+  const agreement = await prisma.rentalAgreement.create({
+    data: {
+      organizationId,
+      code: 'WESTHILL-RA-0001',
+      unitId: units[0].id,
+      tenantId: tenants[0].id,
+      agreementType: AgreementType.RENTAL,
+      startDate: new Date(Date.UTC(2026, 7, 1)),
+      endDate: new Date(Date.UTC(2027, 7, 31)),
+      termMonths: 12,
+      rentAmount: unitRent,
+      currency: 'KES',
+      paymentDay: 1,
+      securityDeposit: unitRent,
+      noticePeriodDays: 30,
+      status: AgreementStatus.ACTIVE,
+    },
+  });
+
+  const now = new Date();
+  const paidInvoice = await prisma.invoice.create({
+    data: {
+      organizationId,
+      rentalAgreementId: agreement.id,
+      invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0001`,
+      issueDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+      dueDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 6)),
+      amount: unitRent,
+      totalAmount: unitRent,
+      balanceAmount: 0,
+      paidAmount: unitRent,
+      status: InvoiceStatus.PAID,
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      organizationId,
+      rentalAgreementId: agreement.id,
+      invoiceId: paidInvoice.id,
+      paymentDate: new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 3),
+      ),
+      amount: unitRent,
+      currency: 'KES',
+      paymentMethod: PaymentMethod.MPESA,
+      paymentReference: `MPESA-${randomString(10)}`,
+      payee: `${tenants[0].surname} ${tenants[0].otherNames}`,
+      paidFrom: 'M-PESA',
+      paidTo: 'Operating Account',
+      paymentType: PaymentType.ApplyToBill,
+      recordedBy: 'Rohi Admin',
+    },
+  });
+
+  await prisma.invoice.create({
+    data: {
+      organizationId,
+      rentalAgreementId: agreement.id,
+      invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0002`,
+      issueDate: new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+      ),
+      dueDate: new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 6),
+      ),
+      amount: unitRent,
+      totalAmount: unitRent,
+      balanceAmount: unitRent,
+      paidAmount: 0,
+      status: InvoiceStatus.PENDING,
+    },
+  });
+
+  console.log(
+    `  Westhill: 1 property, ${units.length} units, ${tenants.length} tenants, 1 agreement, 2 invoices`,
+  );
+}
+
+/**
+ * Item 5 — Move-out requests (Module 5).
+ *
+ * Seed a few move-outs across the statuses so the move-out queue, deposit
+ * refund calculations and deduction screens are demonstrable rather than empty.
+ */
+async function generateMoveOutData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const agreements = await prisma.rentalAgreement.findMany({
+    where: { organizationId, status: AgreementStatus.ACTIVE },
+    include: { tenant: true, unit: true },
+    take: 6,
+  });
+  if (agreements.length === 0) return;
+
+  const now = new Date();
+  const propertyManager = await prisma.user.findFirst({
+    where: { organizationId, role: UserRole.PROPERTY_MANAGER },
+    select: { id: true },
+  });
+
+  const moveOutPlans: {
+    agreement: (typeof agreements)[number];
+    moveoutDate: Date;
+    status: MoveOutStatus;
+    depositRefunded: boolean;
+    notes: string;
+    approvedBy?: string | null;
+  }[] = [
+    {
+      agreement: agreements[0],
+      moveoutDate: new Date(now.getTime() + 14 * 86_400_000), // in 2 weeks
+      status: MoveOutStatus.PENDING,
+      depositRefunded: false,
+      notes: 'Tenant relocating to Mombasa; 30 days notice served.',
+    },
+    {
+      agreement: agreements[1] ?? agreements[0],
+      moveoutDate: new Date(now.getTime() - 7 * 86_400_000), // last week
+      status: MoveOutStatus.APPROVED,
+      depositRefunded: false,
+      notes: 'Approved; unit handed over, deposit being processed.',
+      ...(propertyManager ? { approvedBy: propertyManager.id } : {}),
+    },
+    {
+      agreement: agreements[2] ?? agreements[0],
+      moveoutDate: new Date(now.getTime() - 30 * 86_400_000), // a month ago
+      status: MoveOutStatus.COMPLETED,
+      depositRefunded: true,
+      notes: 'Deposit refunded in full after final inspection.',
+    },
+    {
+      agreement: agreements[3] ?? agreements[0],
+      moveoutDate: new Date(now.getTime() - 60 * 86_400_000), // 2 months ago
+      status: MoveOutStatus.REJECTED,
+      depositRefunded: false,
+      notes: 'Rejected — notice period not met; tenant to remain.',
+    },
+  ];
+
+  let count = 0;
+  for (const plan of moveOutPlans) {
+    if (!plan.agreement) continue;
+    await prisma.moveOutRequest.create({
+      data: {
+        organizationId,
+        tenantId: plan.agreement.tenant.id,
+        rentalAgreementId: plan.agreement.id,
+        moveoutDate: plan.moveoutDate,
+        status: plan.status,
+        depositRefunded: plan.depositRefunded,
+        notes: plan.notes,
+        ...(plan.approvedBy ? { approvedBy: plan.approvedBy } : {}),
+        ...(plan.status === MoveOutStatus.APPROVED && propertyManager
+          ? { approvalDate: new Date(now.getTime() - 3 * 86_400_000) }
+          : {}),
+        ...(plan.status === MoveOutStatus.COMPLETED
+          ? {
+              refundedAt: new Date(now.getTime() - 2 * 86_400_000),
+              refundedById: propertyManager?.id ?? null,
+            }
+          : {}),
+      },
+    });
+    count += 1;
+  }
+
+  console.log(`  Move-outs: ${count} requests across statuses`);
+}
+
+/**
+ * Item 1 — Notifications demo data (Module 17).
+ *
+ * Covers channel configs, preferences, and a spread of notification
+ * types/statuses/channels so the notification centre, the reminder sweep and
+ * the dedupe behaviour all have something real to show.
+ */
+async function generateNotificationsData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: { id: true, email: true, role: true },
+  });
+  const admin = users.find((u) => u.role === UserRole.ADMIN);
+  const accountant = users.find((u) => u.role === UserRole.ACCOUNTANT);
+  const propertyManager = users.find(
+    (u) => u.role === UserRole.PROPERTY_MANAGER,
+  );
+
+  const tenants = await prisma.tenant.findMany({
+    where: { organizationId },
+    take: 3,
+    select: {
+      id: true,
+      surname: true,
+      otherNames: true,
+      email: true,
+      phone: true,
+    },
+  });
+  const landlords = await prisma.landlord.findMany({
+    where: { organizationId },
+    take: 3,
+    select: { id: true, name: true, email: true, phone: true },
+  });
+
+  // ── Channel configs (one per channel, provider credentials encrypted) ─────
+  await prisma.notificationChannelConfig.create({
+    data: {
+      organizationId,
+      channel: NotificationChannel.EMAIL,
+      provider: 'SMTP',
+      credentialsEncrypted:
+        'U2FsdGVkX1+demo-email-credentials-ciphertext-not-for-production',
+      settings: {
+        host: 'smtp.example.co.ke',
+        port: 587,
+        from: 'noreply@rohi.co.ke',
+      },
+      isActive: true,
+      updatedBy: admin?.id ?? null,
+    },
+  });
+  await prisma.notificationChannelConfig.create({
+    data: {
+      organizationId,
+      channel: NotificationChannel.SMS,
+      provider: 'AFRICAS_TALKING',
+      credentialsEncrypted:
+        'U2FsdGVkX1+demo-sms-credentials-ciphertext-not-for-production',
+      settings: { senderId: 'ROHIEST', username: 'demo' },
+      isActive: true,
+      updatedBy: admin?.id ?? null,
+    },
+  });
+  await prisma.notificationChannelConfig.create({
+    data: {
+      organizationId,
+      channel: NotificationChannel.WHATSAPP,
+      provider: 'TWILIO',
+      credentialsEncrypted:
+        'U2FsdGVkX1+demo-whatsapp-credentials-ciphertext-not-for-production',
+      settings: { from: '+254700000000' },
+      isActive: false,
+      updatedBy: admin?.id ?? null,
+    },
+  });
+
+  // ── Preferences for staff (a few opted out of SMS to show suppression) ───
+  for (const user of users.slice(0, 4)) {
+    await prisma.notificationPreference.upsert({
+      where: {
+        userId_type: { userId: user.id, type: NotificationType.RENT_DUE },
+      },
+      update: {},
+      create: {
+        userId: user.id,
+        organizationId,
+        type: NotificationType.RENT_DUE,
+        inApp: true,
+        email: true,
+        sms: user.role !== UserRole.TECHNICIAN,
+        push: true,
+      },
+    });
+  }
+
+  const now = new Date();
+  let notificationCount = 0;
+
+  const notify = (data: {
+    userId?: string | null;
+    tenantId?: string | null;
+    landlordId?: string | null;
+    type: NotificationType;
+    channel: NotificationChannel;
+    status: NotificationStatus;
+    title: string;
+    body: string;
+    dedupeKey?: string | null;
+    sentAt?: Date | null;
+  }) => {
+    notificationCount += 1;
+    return prisma.notification.create({
+      data: {
+        organizationId,
+        ...(data.userId ? { userId: data.userId } : {}),
+        ...(data.tenantId ? { tenantId: data.tenantId } : {}),
+        ...(data.landlordId ? { landlordId: data.landlordId } : {}),
+        type: data.type,
+        channel: data.channel,
+        priority: NotificationPriority.NORMAL,
+        title: data.title,
+        body: data.body,
+        actionUrl: '/notifications',
+        entityType: 'INVOICE',
+        entityId: null,
+        status: data.status,
+        dedupeKey: data.dedupeKey ?? null,
+        sentAt: data.sentAt ?? null,
+      },
+    });
+  };
+
+  // Rent-due reminders — one delivered, one pending, one suppressed (opted out).
+  if (tenants[0]) {
+    await notify({
+      tenantId: tenants[0].id,
+      type: NotificationType.RENT_DUE,
+      channel: NotificationChannel.IN_APP,
+      status: NotificationStatus.SENT,
+      title: 'Rent due tomorrow',
+      body: 'Your rent is due on the 1st. Pay via M-PESA or bank transfer.',
+      dedupeKey: `RENT_DUE:${tenants[0].id}:2026-10`,
+      sentAt: new Date(now.getTime() - 86_400_000),
+    });
+    await notify({
+      tenantId: tenants[1]?.id ?? tenants[0].id,
+      type: NotificationType.RENT_DUE,
+      channel: NotificationChannel.SMS,
+      status: NotificationStatus.PENDING,
+      title: 'Rent due reminder',
+      body: 'Kindly settle this month’s rent by the 5th to avoid late fees.',
+      dedupeKey: `RENT_DUE:${(tenants[1] ?? tenants[0]).id}:2026-10`,
+    });
+  }
+
+  // Lease-expiring (critical, ignores opt-outs).
+  if (tenants[2]) {
+    await notify({
+      tenantId: tenants[2].id,
+      type: NotificationType.LEASE_EXPIRING,
+      channel: NotificationChannel.EMAIL,
+      status: NotificationStatus.SENT,
+      title: 'Lease expiring in 30 days',
+      body: 'Your tenancy agreement ends on 31 October 2026. Contact the office to renew.',
+      dedupeKey: `LEASE_EXPIRING:${tenants[2].id}`,
+      sentAt: new Date(now.getTime() - 2 * 86_400_000),
+    });
+  }
+
+  // Owner statement ready (landlord recipient — no login, addressed by landlordId).
+  if (landlords[0]) {
+    await notify({
+      landlordId: landlords[0].id,
+      type: NotificationType.OWNER_STATEMENT_READY,
+      channel: NotificationChannel.EMAIL,
+      status: NotificationStatus.SENT,
+      title: 'October owner statement ready',
+      body: 'Your statement for the period ending 31 October 2026 is available for download.',
+      dedupeKey: `OWNER_STATEMENT_READY:${landlords[0].id}:2026-10`,
+      sentAt: new Date(now.getTime() - 3 * 86_400_000),
+    });
+  }
+
+  // Payout paid.
+  if (landlords[1]) {
+    await notify({
+      landlordId: landlords[1].id,
+      type: NotificationType.PAYOUT_PAID,
+      channel: NotificationChannel.IN_APP,
+      status: NotificationStatus.SENT,
+      title: 'Payout of KES 142,500 sent',
+      body: 'Your October payout has been transferred to your bank account.',
+      dedupeKey: `PAYOUT_PAID:${landlords[1].id}:2026-10`,
+      sentAt: new Date(now.getTime() - 4 * 86_400_000),
+    });
+  }
+
+  // Maintenance update (staff recipient).
+  if (propertyManager) {
+    await notify({
+      userId: propertyManager.id,
+      type: NotificationType.MAINTENANCE_UPDATE,
+      channel: NotificationChannel.IN_APP,
+      status: NotificationStatus.SENT,
+      title: 'Work order WO-2026-0001 completed',
+      body: 'The shower mixer leak in Unit 001 has been repaired and tested.',
+      dedupeKey: `MAINTENANCE_UPDATE:WO-2026-0001`,
+      sentAt: new Date(now.getTime() - 5 * 86_400_000),
+    });
+  }
+
+  // Visitor arrival (gate log).
+  if (admin) {
+    await notify({
+      userId: admin.id,
+      type: NotificationType.VISITOR_ARRIVAL,
+      channel: NotificationChannel.IN_APP,
+      status: NotificationStatus.SENT,
+      title: 'Visitor on site — Grace Muthoni',
+      body: 'Grace Muthoni (Brightpath Fit-Outs) is at the gate for a kitchen measurement.',
+      dedupeKey: `VISITOR_ARRIVAL:Grace-Muthoni:${now.toISOString().slice(0, 10)}`,
+      sentAt: new Date(now.getTime() - 2 * 3600_000),
+    });
+  }
+
+  // Access card expiring (warning).
+  if (tenants[0]) {
+    await notify({
+      tenantId: tenants[0].id,
+      type: NotificationType.ACCESS_CARD_EXPIRING,
+      channel: NotificationChannel.SMS,
+      status: NotificationStatus.PENDING,
+      title: 'Access card expires in 21 days',
+      body: 'Your unit access card expires on 7 November 2026. Visit the office to renew.',
+      dedupeKey: `ACCESS_CARD_EXPIRING:${tenants[0].id}`,
+    });
+  }
+
+  // Stock low (procurement trigger).
+  if (accountant) {
+    await notify({
+      userId: accountant.id,
+      type: NotificationType.STOCK_LOW,
+      channel: NotificationChannel.EMAIL,
+      status: NotificationStatus.PENDING,
+      title: 'Stock below reorder: White emulsion paint',
+      body: 'White emulsion paint, 20 litres is below its reorder level of 4 tins.',
+      dedupeKey: `STOCK_LOW:PNT-WHT-001`,
+    });
+  }
+
+  // A failed delivery to show the status is real.
+  if (admin) {
+    await notify({
+      userId: admin.id,
+      type: NotificationType.CUSTOM,
+      channel: NotificationChannel.SMS,
+      status: NotificationStatus.FAILED,
+      title: 'SMS delivery failed',
+      body: 'The provider returned an insufficient balance error; message was not delivered.',
+      dedupeKey: `CUSTOM:SMS-FAIL:${admin.id}`,
+    });
+    await prisma.notification.update({
+      where: {
+        id: (await prisma.notification.findFirst({
+          where: { organizationId, dedupeKey: `CUSTOM:SMS-FAIL:${admin.id}` },
+          select: { id: true },
+        }))!.id,
+      },
+      data: { errorMessage: '402 Insufficient balance from provider.' },
+    });
+  }
+
+  console.log(
+    `  Notifications: ${notificationCount} messages across channels and statuses`,
+  );
+}
+
+/**
+ * Item 2 — Audit log demo data.
+ *
+ * Writes a realistic audit trail so the audit screen (ADMIN/SUPER_ADMIN only)
+ * shows CREATE/UPDATE/DELETE/LOGIN events against real entities with real
+ * actors, rather than an empty table.
+ */
+async function generateAuditData(prisma: PrismaClient, organizationId: string) {
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+    },
+  });
+  const admin = users.find((u) => u.role === UserRole.ADMIN);
+  const accountant = users.find((u) => u.role === UserRole.ACCOUNTANT);
+  const propertyManager = users.find(
+    (u) => u.role === UserRole.PROPERTY_MANAGER,
+  );
+
+  const properties = await prisma.property.findMany({
+    where: { organizationId },
+    take: 3,
+    select: { id: true, code: true, name: true },
+  });
+  const units = await prisma.unit.findMany({
+    where: { property: { organizationId } },
+    take: 3,
+    select: { id: true, code: true, propertyId: true },
+  });
+  const tenants = await prisma.tenant.findMany({
+    where: { organizationId },
+    take: 3,
+    select: { id: true, code: true, surname: true, otherNames: true },
+  });
+  const invoices = await prisma.invoice.findMany({
+    where: { organizationId },
+    take: 3,
+    select: { id: true, invoiceNumber: true, amount: true, status: true },
+  });
+
+  const now = new Date();
+  const actor = (u: { id: string } | undefined) => u?.id ?? null;
+
+  const entries: {
+    action: string;
+    entity: string;
+    entityId: string;
+    details: string;
+    userId: string | null;
+    createdAt: Date;
+  }[] = [];
+
+  if (properties[0]) {
+    entries.push({
+      action: 'CREATE',
+      entity: 'Property',
+      entityId: properties[0].id,
+      details: JSON.stringify({
+        code: properties[0].code,
+        name: properties[0].name,
+      }),
+      userId: actor(admin),
+      createdAt: new Date(now.getTime() - 45 * 86_400_000),
+    });
+  }
+  if (units[0]) {
+    entries.push({
+      action: 'UPDATE',
+      entity: 'Unit',
+      entityId: units[0].id,
+      details: JSON.stringify({
+        code: units[0].code,
+        status: 'VACANT → OCCUPIED',
+      }),
+      userId: actor(propertyManager),
+      createdAt: new Date(now.getTime() - 30 * 86_400_000),
+    });
+  }
+  if (tenants[0]) {
+    entries.push({
+      action: 'CREATE',
+      entity: 'Tenant',
+      entityId: tenants[0].id,
+      details: JSON.stringify({
+        code: tenants[0].code,
+        name: `${tenants[0].otherNames} ${tenants[0].surname}`,
+      }),
+      userId: actor(propertyManager),
+      createdAt: new Date(now.getTime() - 25 * 86_400_000),
+    });
+  }
+  if (invoices[0]) {
+    entries.push({
+      action: 'UPDATE',
+      entity: 'Invoice',
+      entityId: invoices[0].id,
+      details: JSON.stringify({
+        invoiceNumber: invoices[0].invoiceNumber,
+        status: 'PENDING → PAID',
+      }),
+      userId: actor(accountant),
+      createdAt: new Date(now.getTime() - 10 * 86_400_000),
+    });
+  }
+  entries.push({
+    action: 'LOGIN',
+    entity: 'User',
+    entityId: admin?.id ?? 'system',
+    details: JSON.stringify({
+      email: admin?.email ?? 'admin@rohi.co.ke',
+      ip: '192.168.1.42',
+    }),
+    userId: actor(admin),
+    createdAt: new Date(now.getTime() - 2 * 3600_000),
+  });
+
+  let count = 0;
+  for (const entry of entries) {
+    await prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: entry.userId,
+        action: entry.action,
+        entity: entry.entity,
+        entityId: entry.entityId,
+        details: entry.details,
+        ipAddress: '192.168.1.42',
+        userAgent: 'Mozilla/5.0 (Demo Seed)',
+        createdAt: entry.createdAt,
+      },
+    });
+    count += 1;
+  }
+
+  console.log(`  Audit log: ${count} entries`);
 }
