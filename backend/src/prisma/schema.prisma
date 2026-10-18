@@ -241,6 +241,16 @@ model Subscription {
    * schema sprawl, not architecture. A plan table belongs with billing, not with
    * subscription status.
    */
+  /**
+   * The module keys this organization has enabled. Chosen when the subscription
+   * is created/edited by a SUPER_ADMIN; toggleable at any time. Drives the
+   * dynamic sidebar: a sidebar NavItem shows only if its `module` key is in
+   * this list (and the user's role allows it). Empty means no modules enabled.
+   * Stored as a plain string array rather than a join table to keep the
+   * SUPER_ADMIN toggle UI simple.
+   */
+  enabledModules String[] @default([])
+
   plan         String   @default("FREE")
   status       SubscriptionStatus @default(TRIALING)
 

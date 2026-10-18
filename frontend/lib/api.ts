@@ -268,6 +268,12 @@ export const platformApi = {
     activate: (id: string, reason: string) =>
         api.patch<PlatformOrganization>(`/platform/organizations/${id}/activate`, { reason }),
 
+    /** Module enablement */
+    getEnabledModules: (id: string) =>
+        api.get<string[]>(`/platform/organizations/${id}/modules`),
+    setEnabledModules: (id: string, enabledModules: string[]) =>
+        api.patch<string[]>(`/platform/organizations/${id}/modules`, { enabledModules }),
+
     usage: (id: string) =>
         api.get<OrganizationUsage>(`/platform/organizations/${id}/usage`),
 

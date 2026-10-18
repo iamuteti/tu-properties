@@ -213,6 +213,12 @@ export interface Organization {
      */
     vacancyPolicy?: VacancyPolicy | null;
     utilityBillingMode?: UtilityBillingMode | null;
+    /**
+     * Module keys this organization has enabled (from `Subscription.enabledModules`).
+     * Drives the dynamic sidebar: a NavItem shows only if its `module` key is in
+     * this list (and the user's role allows it). SUPER_ADMIN sees all regardless.
+     */
+    subscription?: { enabledModules: string[] } | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -4215,6 +4221,8 @@ export interface PlatformOrganization {
         trialEndsAt?: string | null;
         renewsAt?: string | null;
         statusReason?: string | null;
+        /** Module keys this organization has enabled (drives the dynamic sidebar). */
+        enabledModules: string[];
     } | null;
     _count?: { users: number; properties: number; tenants: number };
 }

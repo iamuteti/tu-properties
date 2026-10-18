@@ -87,6 +87,8 @@ interface NavItem {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     roles: UserRole[];
+    /** Module key used for per-organization enablement. Undefined = always-on (role-gated only). */
+    module?: string;
     /** Show a live count on this item (Module 18's approvals inbox). */
     badge?: 'approvals';
     children?: NavItem[];
@@ -94,7 +96,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
-    { href: "/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'] },
+    { href: "/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'], module: 'organizations' },
 // Module 9 — Maintenance. The queue is where the work is; the register and the
     // service calendar are what the queue is judged against, so a technician gets
     // all three but a leasing officer only needs to see that the queue exists.
@@ -102,11 +104,12 @@ const navItems: NavItem[] = [
         label: 'Maintenance',
         icon: Wrench,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'],
+        module: 'maintenance',
         children: [
-            { href: '/maintenance/work-orders', label: 'Work orders', icon: Wrench, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'] },
-            { href: '/maintenance/work-orders/board', label: 'Board', icon: KanbanSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
-            { href: '/maintenance/assets', label: 'Plant register', icon: Settings2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
-            { href: '/maintenance/schedules', label: 'Service schedule', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
+            { href: '/maintenance/work-orders', label: 'Work orders', icon: Wrench, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'], module: 'maintenance/work-orders' },
+            { href: '/maintenance/work-orders/board', label: 'Board', icon: KanbanSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'], module: 'maintenance/work-orders/board' },
+            { href: '/maintenance/assets', label: 'Plant register', icon: Settings2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'], module: 'maintenance/assets' },
+            { href: '/maintenance/schedules', label: 'Service schedule', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'], module: 'maintenance/schedules' },
         ],
     },
 {
@@ -118,11 +121,12 @@ const navItems: NavItem[] = [
         label: 'Procurement',
         icon: ShoppingCart,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'],
+        module: 'procurement',
         children: [
-            { href: '/procurement/purchase-requests', label: 'Purchase requests', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'] },
-            { href: '/procurement/rfqs', label: 'Quotations', icon: FileStack, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
-            { href: '/procurement/purchase-orders', label: 'Purchase orders', icon: Truck, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
-            { href: '/procurement/suppliers', label: 'Suppliers', icon: Award, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'] },
+            { href: '/procurement/purchase-requests', label: 'Purchase requests', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'], module: 'procurement/purchase-requests' },
+            { href: '/procurement/rfqs', label: 'Quotations', icon: FileStack, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'procurement/rfqs' },
+            { href: '/procurement/purchase-orders', label: 'Purchase orders', icon: Truck, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'procurement/purchase-orders' },
+            { href: '/procurement/suppliers', label: 'Suppliers', icon: Award, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'], module: 'procurement/suppliers' },
         ],
     },
     {
@@ -134,77 +138,84 @@ const navItems: NavItem[] = [
         label: 'Inventory',
         icon: Package,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'],
+        module: 'inventory',
         children: [
-            { href: '/inventory/items', label: 'Items', icon: Package, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
-            { href: '/inventory/warehouses', label: 'Stores', icon: Warehouse, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
-            { href: '/inventory/stock-movements', label: 'Stock ledger', icon: ArrowLeftRight, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'] },
+            { href: '/inventory/items', label: 'Items', icon: Package, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'inventory/items' },
+            { href: '/inventory/warehouses', label: 'Stores', icon: Warehouse, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'inventory/warehouses' },
+            { href: '/inventory/stock-movements', label: 'Stock ledger', icon: ArrowLeftRight, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'inventory/stock-movements' },
         ],
     },
     {
         label: 'Landlords',
         icon: Landmark,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
+        module: 'landlords',
         children: [
-            { href: "/landlords", label: "Owners", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
-            { href: "/landlords/statements", label: "Owner statements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
-            { href: "/landlords/payouts", label: "Owner payouts", icon: Banknote, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
+            { href: "/landlords", label: "Owners", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'landlords' },
+            { href: "/landlords/statements", label: "Owner statements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'landlords/statements' },
+            { href: "/landlords/payouts", label: "Owner payouts", icon: Banknote, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'landlords/payouts' },
         ]
     },
     {
         label: "Properties",
         icon: Building2,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        module: 'properties',
         children: [
-            { href: "/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'properties' },
+            { href: "/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'properties/units' },
         ]
     },
     {
         label: "CRM",
         icon: Handshake,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        module: 'crm',
         children: [
-            { href: "/crm/leads", label: "Leads & pipeline", icon: Kanban, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/crm/contacts", label: "Contacts", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/crm/leads", label: "Leads & pipeline", icon: Kanban, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'crm/leads' },
+            { href: "/crm/contacts", label: "Contacts", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'crm/contacts' },
         ]
     },
     {
         label: "Sales",
         icon: Handshake,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        module: 'sales',
         children: [
-            { href: "/sales", label: "Sales pipeline", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/sales/commissions", label: "Commissions", icon: HandCoins, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: "/sales", label: "Sales pipeline", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'sales' },
+            { href: "/sales/commissions", label: "Commissions", icon: HandCoins, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'sales/commissions' },
         ]
     },
     {
         label: "Tenants & Leases",
         icon: Users,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
+        module: 'tenants',
         children: [
-            { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/rental-agreements", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
-            { href: "/tenant-requests", label: "Tenant requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
-            { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] }
+            { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
+            { href: "/rental-agreements", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'leases' },
+            { href: "/tenant-requests", label: "Tenant requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'tenant-requests' },
+            { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
         ]
     },
     {
         label: "Billing & Finance",
         icon: CreditCard,
         roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
+        module: 'billing',
         children: [
-            { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/arrears", label: "Arrears", icon: TrendingDown, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/payables", label: "Payables", icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/suppliers", label: "Suppliers", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/refunds", label: "Refunds", icon: Undo2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/credits", label: "Customer Credits", icon: PiggyBank, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/journal-entries", label: "Journal Entries", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-            { href: "/finance/trial-balance", label: "Trial Balance", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] }
+            { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'invoices' },
+            { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'payments' },
+            { href: "/finance/arrears", label: "Arrears", icon: TrendingDown, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'arrears' },
+            { href: "/finance/payables", label: "Payables", icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'payables' },
+            { href: "/finance/suppliers", label: "Suppliers", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'finance/suppliers' },
+            { href: "/finance/refunds", label: "Refunds", icon: Undo2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'refunds' },
+            { href: "/finance/credits", label: "Customer Credits", icon: PiggyBank, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'credits' },
+            { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'receipts' },
+            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'rent-receipts' },
+            { href: "/finance/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'chart-of-accounts' },
+            { href: "/finance/journal-entries", label: "Journal Entries", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'journal-entries' },
+            { href: "/finance/trial-balance", label: "Trial Balance", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'trial-balance' }
         ]
     },
 
@@ -227,12 +238,13 @@ const navItems: NavItem[] = [
         label: 'HR & Payroll',
         icon: UserRound,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'],
+        module: 'hr',
         children: [
-            { href: '/hr/employees', label: 'Employees', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'] },
-            { href: '/hr/leave', label: 'Leave', icon: Calendar, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'] },
-            { href: '/hr/payroll', label: 'Payroll runs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'] },
-            { href: '/hr/settings/payroll-rules', label: 'Statutory rules', icon: Calculator, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'] },
-            { href: '/hr/me', label: 'My account', icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'] },
+            { href: '/hr/employees', label: 'Employees', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'], module: 'hr/employees' },
+            { href: '/hr/leave', label: 'Leave', icon: Calendar, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'], module: 'hr/leave' },
+            { href: '/hr/payroll', label: 'Payroll runs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'], module: 'hr/payroll' },
+            { href: '/hr/settings/payroll-rules', label: 'Statutory rules', icon: Calculator, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'], module: 'hr/settings/payroll-rules' },
+            { href: '/hr/me', label: 'My account', icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'], module: 'hr/me' },
         ],
     },
     /**
@@ -256,12 +268,13 @@ const navItems: NavItem[] = [
         label: 'Facilities',
         icon: DoorOpen,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'],
+        module: 'facilities',
         children: [
-            { href: '/facilities', label: 'Facility register', icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'] },
-            { href: '/facilities/bookings', label: 'Bookings', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'LEASING_OFFICER', 'ACCOUNTANT'] },
-            { href: '/facilities/visits', label: 'The gate book', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
-            { href: '/facilities/visitors', label: 'Visitors', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
-            { href: '/facilities/access-cards', label: 'Access cards', icon: KeyRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'] },
+            { href: '/facilities', label: 'Facility register', icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'], module: 'facilities' },
+            { href: '/facilities/bookings', label: 'Bookings', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'LEASING_OFFICER', 'ACCOUNTANT'], module: 'facilities/bookings' },
+            { href: '/facilities/visits', label: 'The gate book', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'], module: 'facilities/visits' },
+            { href: '/facilities/visitors', label: 'Visitors', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'], module: 'facilities/visitors' },
+            { href: '/facilities/access-cards', label: 'Access cards', icon: KeyRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'], module: 'facilities/access-cards' },
         ],
     },
     /**
@@ -283,10 +296,12 @@ const navItems: NavItem[] = [
         label: 'Utilities',
         icon: Gauge,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'],
+        module: 'utilities',
         children: [
-            { href: '/utilities', label: 'Meter register', icon: Gauge, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
-            { href: '/utilities/readings', label: 'Readings', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
-            { href: '/utilities/tariffs', label: 'Tariffs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'] },
+            { href: '/utilities', label: 'Meter register', icon: Gauge, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'], module: 'utilities' },
+            { href: '/utilities/readings', label: 'Readings', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'], module: 'utilities/readings' },
+            { href: '/utilities/tariffs', label: 'Tariffs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'utilities/tariffs' },
+            { href: '/utilities/billing', label: 'Billing', icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'utilities/billing' },
             { href: '/utilities/billing', label: 'Billing', icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
         ],
     },
@@ -328,8 +343,9 @@ const navItems: NavItem[] = [
         label: 'Reports',
         icon: BarChart,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
+        module: 'reports',
     },
-    { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'], module: 'users' },
     {
         // Module 19 Phase C — the platform owner's surface. Structurally
         // separate from the tenant `/organizations` screen (which is the
@@ -344,11 +360,11 @@ const navItems: NavItem[] = [
         ],
     },
     { href: "/support", label: "Support", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
-    { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'] },
-    { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
+    { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'], module: 'branches' },
+    { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'], module: 'documents' },
 
-{ href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
-    { href: "/approvals", label: "Approvals", icon: CheckSquare, badge: 'approvals', roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'] },
+{ href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'notifications' },
+    { href: "/approvals", label: "Approvals", icon: CheckSquare, badge: 'approvals', roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'approvals' },
     { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { href: "/settings/tax", label: "Tax Settings", icon: Globe2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
     { href: "/settings/notifications", label: "Notification Settings", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN'] },
@@ -382,6 +398,12 @@ export function Sidebar() {
     // and this is only there so somebody does not have to open it to find out.
     const [pendingApprovals, setPendingApprovals] = React.useState<number | null>(null);
 
+    // Module keys enabled for this user's organization (from Subscription.enabledModules).
+    // SUPER_ADMIN has no organization and sees everything, so this is [] for them.
+    const enabledModules: string[] =
+        user?.organization?.subscription?.enabledModules ?? [];
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
     React.useEffect(() => {
         if (!user) return;
         let active = true;
@@ -402,10 +424,17 @@ export function Sidebar() {
         };
     }, [user]);
 
-    // Filter nav items based on user role
-    const filteredNavItems = navItems.filter(
-        (item) => user && item.roles.includes(user.role)
-    );
+    /** A NavItem shows if the user's role allows it AND (no module key, or the module is enabled for the org, or SUPER_ADMIN). */
+    const itemVisible = (item: NavItem) => {
+        if (!user) return false;
+        if (!item.roles.includes(user.role)) return false;
+        if (isSuperAdmin) return true;
+        if (!item.module) return true; // always-on (Dashboard, Settings, Support)
+        return enabledModules.includes(item.module);
+    };
+
+    // Filter nav items based on user role + module enablement
+    const filteredNavItems = navItems.filter(itemVisible);
 
     const toggleItem = (label: string) => {
         setExpandedItems(prev =>
@@ -419,13 +448,14 @@ export function Sidebar() {
         const isActive = item.href
             ? (pathname === item.href || pathname.startsWith(item.href + '/'))
             : false;
-        const children = (item.children ?? []).filter(
-            (child) => user && child.roles.includes(user.role),
-        );
+        const children = (item.children ?? []).filter(itemVisible);
         const hasChildren = children.length > 0;
         const isExpanded = expandedItems.includes(item.label);
         const badgeCount =
             item.badge === 'approvals' ? pendingApprovals : null;
+
+        // Hide a group entirely if all its children are filtered out.
+        if (item.children && !hasChildren) return null;
 
         if (hasChildren) {
             // A parent group is "active" if any child route matches, so the
@@ -508,7 +538,10 @@ export function Sidebar() {
                 </span>
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-                {filteredNavItems.map(renderNavItem)}
+                {filteredNavItems.map(item => {
+                    const rendered = renderNavItem(item);
+                    return rendered;
+                })}
             </nav>
             <div className="border-t p-4">
                 <div className="flex items-center justify-between">

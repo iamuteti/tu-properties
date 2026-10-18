@@ -187,9 +187,16 @@ export class AuthService {
     return this.login(newUser, res);
   }
 
-  /** Fetch the full user (incl. organization) for the current session. */
+  /** Fetch the full user (incl. organization + subscription.enabledModules) for the current session. */
   async getProfile(userId: string) {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        organization: {
+          include: { subscription: true },
+        },
+      },
+    });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

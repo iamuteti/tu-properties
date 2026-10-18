@@ -6,6 +6,176 @@ import { useAuth } from "@/context/auth-context";
 import { platformApi, setImpersonation } from "@/lib/api";
 import { PlatformOrganization, PlatformOrgUser, OrganizationUsage } from "@/types";
 
+/** Module keys organized by sidebar group, for the per-org toggle UI.
+ *  Keys match `NavItem.module` in `components/layout/sidebar.tsx` and
+ *  `Subscription.enabledModules` on the backend. Always-on items
+ *  (Dashboard, Settings, Support) and Platform (SUPER_ADMIN only) are
+ *  intentionally absent — they are not togglable.
+ */
+const MODULE_GROUPS = [
+    {
+        label: 'Maintenance',
+        key: 'maintenance',
+        children: [
+            { key: 'maintenance/work-orders', label: 'Work orders' },
+            { key: 'maintenance/work-orders/board', label: 'Board' },
+            { key: 'maintenance/assets', label: 'Plant register' },
+            { key: 'maintenance/schedules', label: 'Service schedule' },
+        ],
+    },
+    {
+        label: 'Procurement',
+        key: 'procurement',
+        children: [
+            { key: 'procurement/purchase-requests', label: 'Purchase requests' },
+            { key: 'procurement/rfqs', label: 'Quotations' },
+            { key: 'procurement/purchase-orders', label: 'Purchase orders' },
+            { key: 'procurement/suppliers', label: 'Suppliers' },
+        ],
+    },
+    {
+        label: 'Inventory',
+        key: 'inventory',
+        children: [
+            { key: 'inventory/items', label: 'Items' },
+            { key: 'inventory/warehouses', label: 'Stores' },
+            { key: 'inventory/stock-movements', label: 'Stock ledger' },
+        ],
+    },
+    {
+        label: 'Landlords',
+        key: 'landlords',
+        children: [
+            { key: 'landlords', label: 'Owners' },
+            { key: 'landlords/statements', label: 'Owner statements' },
+            { key: 'landlords/payouts', label: 'Owner payouts' },
+        ],
+    },
+    {
+        label: 'Properties',
+        key: 'properties',
+        children: [
+            { key: 'properties', label: 'All Properties' },
+            { key: 'properties/units', label: 'All Units' },
+        ],
+    },
+    {
+        label: 'CRM',
+        key: 'crm',
+        children: [
+            { key: 'crm/leads', label: 'Leads & pipeline' },
+            { key: 'crm/contacts', label: 'Contacts' },
+        ],
+    },
+    {
+        label: 'Sales',
+        key: 'sales',
+        children: [
+            { key: 'sales', label: 'Sales pipeline' },
+            { key: 'sales/commissions', label: 'Commissions' },
+        ],
+    },
+    {
+        label: 'Tenants & Leases',
+        key: 'tenants',
+        children: [
+            { key: 'tenants', label: 'Tenants' },
+            { key: 'leases', label: 'Leases' },
+            { key: 'tenant-requests', label: 'Tenant requests' },
+            { key: 'moving-out', label: 'Moving Out' },
+        ],
+    },
+    {
+        label: 'Billing & Finance',
+        key: 'billing',
+        children: [
+            { key: 'invoices', label: 'Invoices' },
+            { key: 'payments', label: 'Payments' },
+            { key: 'arrears', label: 'Arrears' },
+            { key: 'payables', label: 'Payables' },
+            { key: 'finance/suppliers', label: 'Suppliers' },
+            { key: 'refunds', label: 'Refunds' },
+            { key: 'credits', label: 'Customer Credits' },
+            { key: 'receipts', label: 'Receipts' },
+            { key: 'rent-receipts', label: 'Rent Receipts' },
+            { key: 'chart-of-accounts', label: 'Chart of Accounts' },
+            { key: 'journal-entries', label: 'Journal Entries' },
+            { key: 'trial-balance', label: 'Trial Balance' },
+        ],
+    },
+    {
+        label: 'HR & Payroll',
+        key: 'hr',
+        children: [
+            { key: 'hr/employees', label: 'Employees' },
+            { key: 'hr/leave', label: 'Leave' },
+            { key: 'hr/payroll', label: 'Payroll runs' },
+            { key: 'hr/settings/payroll-rules', label: 'Statutory rules' },
+            { key: 'hr/me', label: 'My account' },
+        ],
+    },
+    {
+        label: 'Facilities',
+        key: 'facilities',
+        children: [
+            { key: 'facilities', label: 'Facility register' },
+            { key: 'facilities/bookings', label: 'Bookings' },
+            { key: 'facilities/visits', label: 'The gate book' },
+            { key: 'facilities/visitors', label: 'Visitors' },
+            { key: 'facilities/access-cards', label: 'Access cards' },
+        ],
+    },
+    {
+        label: 'Utilities',
+        key: 'utilities',
+        children: [
+            { key: 'utilities', label: 'Meter register' },
+            { key: 'utilities/readings', label: 'Readings' },
+            { key: 'utilities/tariffs', label: 'Tariffs' },
+            { key: 'utilities/billing', label: 'Billing' },
+        ],
+    },
+    {
+        label: 'Contracts',
+        key: 'contracts',
+        children: [
+            { key: 'contracts', label: 'Contract register' },
+            { key: 'contracts/expiry-report', label: 'Expiry report' },
+            { key: 'contracts/new', label: 'File a contract' },
+        ],
+    },
+    {
+        label: 'Reports',
+        key: 'reports',
+        children: [],
+    },
+    {
+        label: 'Users',
+        key: 'users',
+        children: [],
+    },
+    {
+        label: 'Branches',
+        key: 'branches',
+        children: [],
+    },
+    {
+        label: 'Documents',
+        key: 'documents',
+        children: [],
+    },
+    {
+        label: 'Notifications',
+        key: 'notifications',
+        children: [],
+    },
+    {
+        label: 'Approvals',
+        key: 'approvals',
+        children: [],
+    },
+] as const;
+
 function UsageBar({ used, max }: { used: number; max: number }) {
     const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 100;
     const over = used > max;
@@ -31,6 +201,8 @@ export default function PlatformOrganizationDetailPage() {
     const [org, setOrg] = useState<PlatformOrganization | null>(null);
     const [usage, setUsage] = useState<OrganizationUsage | null>(null);
     const [users, setUsers] = useState<PlatformOrgUser[]>([]);
+    const [enabledModules, setEnabledModules] = useState<string[]>([]);
+    const [modulesSaving, setModulesSaving] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [reason, setReason] = useState("");
@@ -40,14 +212,16 @@ export default function PlatformOrganizationDetailPage() {
 
     const load = useCallback(async () => {
         try {
-            const [orgRes, usageRes, usersRes] = await Promise.all([
+            const [orgRes, usageRes, usersRes, modulesRes] = await Promise.all([
                 platformApi.get(id),
                 platformApi.usage(id),
                 platformApi.users(id),
+                platformApi.getEnabledModules(id),
             ]);
             setOrg(orgRes.data);
             setUsage(usageRes.data);
             setUsers(usersRes.data);
+            setEnabledModules(modulesRes.data);
         } catch (err: any) {
             setError(err.response?.data?.message || err.message || "Failed to load tenant");
         } finally {
@@ -98,6 +272,26 @@ export default function PlatformOrganizationDetailPage() {
             router.refresh();
         } catch (err: any) {
             setError(err.response?.data?.message || err.message || "Impersonation failed");
+        }
+    };
+
+    /** Toggle one module key on/off in the local set. */
+    const toggleModule = (key: string) => {
+        setEnabledModules(prev =>
+            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+        );
+    };
+
+    /** Persist the enabled modules for this organization. */
+    const saveModules = async () => {
+        setModulesSaving(true);
+        setError("");
+        try {
+            await platformApi.setEnabledModules(id, enabledModules);
+        } catch (err: any) {
+            setError(err.response?.data?.message || err.message || "Failed to save modules");
+        } finally {
+            setModulesSaving(false);
         }
     };
 
@@ -178,6 +372,57 @@ export default function PlatformOrganizationDetailPage() {
                         </button>
                     )}
                 </div>
+            </div>
+
+            {/* Module enablement */}
+            <div className="p-6 bg-card rounded-lg shadow">
+                <h2 className="text-lg font-semibold mb-4">Manage modules</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                    Toggle which modules are enabled for {org.name}. Disabled modules are
+                    hidden from that organization's sidebar. Changes are saved immediately.
+                </p>
+                {modulesSaving ? (
+                    <div className="text-sm text-muted-foreground">Saving...</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {MODULE_GROUPS.map((group) => (
+                            <div key={group.label} className="border rounded-lg p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={enabledModules.includes(group.key)}
+                                        onChange={() => toggleModule(group.key)}
+                                        className="rounded bg:text-blue-600"
+                                    />
+                                    <span className="font-semibold">{group.label}</span>
+                                    {group.key && enabledModules.includes(group.key) && (
+                                        <span className="ml-auto text-xs text-green-600">enabled</span>
+                                    )}
+                                </div>
+                                <div className="space-y-1 ml-4">
+                                    {group.children.map((child) => (
+                                        <label key={child.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={enabledModules.includes(child.key)}
+                                                onChange={() => toggleModule(child.key)}
+                                                className="rounded bg:text-blue-600"
+                                            />
+                                            <span>{child.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <button
+                    onClick={saveModules}
+                    disabled={modulesSaving}
+                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                    Save module changes
+                </button>
             </div>
 
             <div className="p-6 bg-card rounded-lg shadow">

@@ -133,6 +133,7 @@ export class PlatformService {
                 plan: dto.plan ?? 'STARTER',
                 status: SubscriptionStatus.TRIALING,
                 trialEndsAt,
+                enabledModules: dto.enabledModules ?? [],
               },
             },
           },
@@ -404,6 +405,43 @@ export class PlatformService {
         bytes: docs._sum.sizeBytes ?? 0,
       },
     };
+  }
+
+  /**
+   * Set the enabled modules for one organization. Replaces the whole list —
+   * the caller sends the full desired set each time. Audited.
+   */
+  async setEnabledModules(
+    id: string,
+    enabledModules: string[],
+    actorId?: string,
+  ) {
+    await this.findOne(id); // 404 if unknown
+
+    const subscription = await this.prisma.subscription.update({
+      where: { organizationId: id },
+      data: { enabledModules: { set: enabledModules } },
+    });
+
+    await this.safeAudit({
+      action: 'ORGANIZATION_MODULES_UPDATED',
+      entity: 'Subscription',
+      entityId: subscription.id,
+      details: `Enabled modules: ${enabledModules.join(', ') || '(none)'}`,
+      actorId,
+    });
+
+    return subscription.enabledModules;
+  }
+
+  /** Read the enabled modules for one organization. */
+  async getEnabledModules(id: string) {
+    await this.findOne(id); // 404 if unknown
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { organizationId: id },
+      select: { enabledModules: true },
+    });
+    return subscription?.enabledModules ?? [];
   }
 
   /**

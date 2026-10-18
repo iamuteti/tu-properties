@@ -102,7 +102,35 @@ Status markers: ✅ = resolved (date), ⚠️ = partially resolved, ❌ = still 
 4. ✅ (2026-10-03, verified) Leases-new link points to `/rental-agreements/new` (`leases/page.tsx:268`).
 5. ✅ (2026-10-03, verified) Properties parent + children now consistently exclude ACCOUNTANT.
 
+## Navigation / dynamic sidebar — per-organization module enablement
+
+**As of 2026-10-18:** the sidebar is **no longer hardcoded to show everything for admin.** It is dynamic per organization:
+every sidebar leaf item carries a `module` key (see `frontend/components/layout/sidebar.tsx`), and a NavItem renders only if
+the user's role allows it **and** the module key is present in the organization's `Subscription.enabledModules`.
+
+### Data model
+- `Subscription.enabledModules String[] @default([])` — added to `backend/src/prisma/schema.prisma` (2026-10-18, `prisma db push` applied).
+- Chosen when a SUPER_ADMIN creates/edits a subscription (`OnboardOrganizationDto.enabledModules`, `PATCH /platform/organizations/:id/modules`).
+- Default for existing/demo organizations: **all modules enabled** (`ALL_MODULE_KEYS` in `backend/src/prisma/demo-data.ts`), so the seeded Westhill, Rohi and International orgs show the full sidebar.
+- `GET /auth/profile` now includes `organization.subscription.enabledModules`, so the frontend reads it from `useAuth()`.
+
+### Frontend behavior
+- `NavItem.module` is set on every leaf item; always-on items (Dashboard, Settings, Support) and the Platform group (SUPER_ADMIN only) have no module key and are role-gated only.
+- Sidebar filter (`sidebar.tsx`): `roles.includes(user.role) && (!item.module || enabledModules.includes(item.module) || isSuperAdmin)`. SUPER_ADMIN bypasses all module checks.
+- A group header is hidden if all its children are filtered out (`renderNavItem` returns `null`).
+- `ModuleGuard` (`frontend/components/layout/module-guard.tsx`) wraps `DashboardLayout` children: if a user navigates directly to a URL whose module is disabled (e.g. typing `/hr/payroll`), they are redirected to `/dashboard` instead of hitting a backend 403. Backend `@Permissions('module.action')` guards remain the authoritative enforcement.
+
+### Admin UI
+- SUPER_ADMIN module-toggle screen at `/platform/organizations/:id/modules` ("Manage modules" card on the org detail page): checkboxes per module group/leaf, save → `PATCH /platform/organizations/:id/modules` → `Subscription.enabledModules` replaced in full. Audited as `ORGANIZATION_MODULES_UPDATED`.
+
+### Always-on vs togglable
+| Always-on (role-gated only, no module key) | Togglable per organization |
+|---|---|
+| Dashboard, Settings (+ tax/notifications/workflows), Support | Maintenance, Procurement, Inventory, Landlords, Properties & Units, CRM, Sales, Tenants & Leases, Billing & Finance, HR & Payroll, Facilities, Utilities, Contracts, Reports, Users, Branches, Documents, Notifications, Approvals |
+| Platform (SUPER_ADMIN only) | — |
+
 **Dead / incomplete code:**
+
 6. ✅ (2026-10-03) Dashboard stats/charts now driven by `GET /dashboard/stats` (`dashboard/page.tsx`): live totals cards, units-by-status pie, monthly charged-vs-collected, top-7 units-by-property; loading/error/retry + empty-chart states.
 7. ✅ (2026-10-03) Rent-receipt form now calls the real `POST /finance/receipts` (receipt + lines + per-invoice `Payment` + invoice balance/status update in one transaction; sum-of-payments vs amount-received validated with 400). Live-verified end-to-end; "Apply to Invoices" is populated via `rental-agreements.findAll` now including `invoices`.
 8. ✅ (2026-10-03) Receipt "Add Invoice" is a searchable picker over open invoices with outstanding balance; per-line payment amount is editable; general receipts save as `receiptCategory: General`.

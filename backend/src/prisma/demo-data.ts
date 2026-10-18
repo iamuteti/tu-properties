@@ -146,8 +146,14 @@ export async function generateDemoData(
         email: randomEmail(name),
         phone: randomPhone(),
         address: randomAddress(),
-        bankName: activeProfile.banks[Math.floor(Math.random() * activeProfile.banks.length)],
-        bankBranch: activeProfile.bankBranches[Math.floor(Math.random() * activeProfile.bankBranches.length)],
+        bankName:
+          activeProfile.banks[
+            Math.floor(Math.random() * activeProfile.banks.length)
+          ],
+        bankBranch:
+          activeProfile.bankBranches[
+            Math.floor(Math.random() * activeProfile.bankBranches.length)
+          ],
         accountNumber: String(Math.floor(Math.random() * 10000000000)),
         accountName: name,
         taxPin: randomKraPin(),
@@ -3501,6 +3507,75 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
   ).toUpperCase();
   activeProfile = setActiveProfile(country);
   const multiBranch = options.multiBranch ?? process.env.DEMO_MODE === 'multi';
+
+  /** Every togglable module key — demo orgs get all modules enabled. */
+  const ALL_MODULE_KEYS = [
+    'maintenance',
+    'maintenance/work-orders',
+    'maintenance/work-orders/board',
+    'maintenance/assets',
+    'maintenance/schedules',
+    'procurement',
+    'procurement/purchase-requests',
+    'procurement/rfqs',
+    'procurement/purchase-orders',
+    'procurement/suppliers',
+    'inventory',
+    'inventory/items',
+    'inventory/warehouses',
+    'inventory/stock-movements',
+    'landlords',
+    'landlords/statements',
+    'landlords/payouts',
+    'properties',
+    'properties/units',
+    'crm',
+    'crm/leads',
+    'crm/contacts',
+    'sales',
+    'sales/commissions',
+    'tenants',
+    'leases',
+    'tenant-requests',
+    'moving-out',
+    'invoices',
+    'payments',
+    'arrears',
+    'payables',
+    'finance/suppliers',
+    'refunds',
+    'credits',
+    'receipts',
+    'rent-receipts',
+    'chart-of-accounts',
+    'journal-entries',
+    'trial-balance',
+    'hr',
+    'hr/employees',
+    'hr/leave',
+    'hr/payroll',
+    'hr/settings/payroll-rules',
+    'hr/me',
+    'facilities',
+    'facilities/bookings',
+    'facilities/visits',
+    'facilities/visitors',
+    'facilities/access-cards',
+    'utilities',
+    'utilities/readings',
+    'utilities/tariffs',
+    'utilities/billing',
+    'contracts',
+    'contracts/expiry-report',
+    'contracts/new',
+    'reports',
+    'users',
+    'branches',
+    'documents',
+    'notifications',
+    'approvals',
+  ];
+
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     console.error('DATABASE_URL environment variable is not set');
@@ -3649,6 +3724,15 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
       },
     });
 
+    // Demo orgs get every module enabled so the full sidebar is visible.
+    await prisma.subscription.create({
+      data: {
+        organizationId: defaultOrg.id,
+        plan: 'PROFESSIONAL',
+        enabledModules: ALL_MODULE_KEYS,
+      },
+    });
+
     const rohiOrg = await prisma.organization.create({
       data: {
         name: 'Rohi Estate Management',
@@ -3664,6 +3748,14 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         weekendDays: activeProfile.weekendDays,
         currency: activeProfile.currency,
         timezone: activeProfile.timezone,
+      },
+    });
+
+    await prisma.subscription.create({
+      data: {
+        organizationId: rohiOrg.id,
+        plan: 'ENTERPRISE',
+        enabledModules: ALL_MODULE_KEYS,
       },
     });
 
@@ -3686,10 +3778,23 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
           weekendDays: [6, 7],
         },
       });
+
+      await prisma.subscription.create({
+        data: {
+          organizationId: intlOrg.id,
+          plan: 'ENTERPRISE',
+          enabledModules: ALL_MODULE_KEYS,
+        },
+      });
+
       const branches = [
         { name: 'London Branch', city: 'London', currency: 'GBP' },
         { name: 'New York Branch', city: 'New York', currency: 'USD' },
-        { name: 'Nairobi Branch', city: 'Nairobi', currency: activeProfile.currency },
+        {
+          name: 'Nairobi Branch',
+          city: 'Nairobi',
+          currency: activeProfile.currency,
+        },
         { name: 'Dubai Branch', city: 'Dubai', currency: 'AED' },
       ];
       for (const b of branches) {

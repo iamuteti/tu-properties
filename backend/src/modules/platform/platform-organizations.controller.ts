@@ -20,6 +20,7 @@ import {
 } from './dto/onboarding.dto';
 import { ImpersonateDto } from './dto/impersonate.dto';
 import { PlatformService } from './platform.service';
+import { SetEnabledModulesDto } from './dto/set-enabled-modules.dto';
 
 /**
  * The platform-admin surface (Module 19).
@@ -112,5 +113,26 @@ export class PlatformOrganizationsController {
     // one; it is accepted here too and stored off the subscription status cleanup,
     // because reactivation should likewise be a deliberate, note-worthy action.
     return this.platformService.setSuspended(id, false, dto, getUserId(req));
+  }
+
+  /** Which modules are enabled for this organization. */
+  @Get(':id/modules')
+  getEnabledModules(@Param('id') id: string) {
+    return this.platformService.getEnabledModules(id);
+  }
+
+  /** Replace the enabled modules for this organization. */
+  @Patch(':id/modules')
+  @HttpCode(200)
+  setEnabledModules(
+    @Param('id') id: string,
+    @Body() dto: SetEnabledModulesDto,
+    @Request() req: any,
+  ) {
+    return this.platformService.setEnabledModules(
+      id,
+      dto.enabledModules,
+      getUserId(req),
+    );
   }
 }

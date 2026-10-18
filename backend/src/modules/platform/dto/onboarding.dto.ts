@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsIn,
   IsInt,
@@ -74,6 +75,12 @@ export class OnboardOrganizationDto {
   @Min(0)
   @Max(90)
   trialDays?: number;
+
+  /** Module keys this organization starts with enabled. Defaults to none ([]). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabledModules?: string[];
 
   @IsOptional()
   @IsEmail()

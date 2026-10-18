@@ -3,9 +3,10 @@ import { Prisma, InvoiceStatus } from '@prisma/client';
 type MockTx = {
   invoice: {
     findFirst: jest.Mock;
+    findUnique: jest.Mock;
     update: jest.Mock;
   };
-  paymentAllocation: { aggregate: jest.Mock };
+  paymentAllocation: { findMany: jest.Mock };
   payment: { findMany: jest.Mock; aggregate: jest.Mock };
   paymentRefund: { groupBy: jest.Mock };
   creditApplication: { aggregate: jest.Mock };
@@ -62,7 +63,10 @@ describe('invoiceSettlement', () => {
       },
     });
 
-    const result = await creditNoteAppliedAmount(tx, 'inv-1');
+    const result = await creditNoteAppliedAmount(
+      tx as unknown as Prisma.TransactionClient,
+      'inv-1',
+    );
     expect(result).toBe(25_000);
     expect(tx.creditNote.aggregate).toHaveBeenCalledWith({
       where: { invoiceId: 'inv-1', status: 'ISSUED' },
@@ -94,7 +98,11 @@ describe('invoiceSettlement', () => {
       },
     });
 
-    await syncInvoiceSettlement(tx, 'inv-1', 'org-1');
+    await syncInvoiceSettlement(
+      tx as unknown as Prisma.TransactionClient,
+      'inv-1',
+      'org-1',
+    );
 
     expect(tx.invoice.update).toHaveBeenCalled();
   });
