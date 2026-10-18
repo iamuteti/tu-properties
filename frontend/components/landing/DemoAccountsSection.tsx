@@ -173,7 +173,8 @@ export const DemoAccountsSection: React.FC = () => {
         </div>
 
         {/* Bottom Banner with Super Admin & Registration link */}
-        <div className="mt-10 p-5 rounded-2xl bg-white dark:bg-[#0C1222] border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+        {false && (
+          <div className="mt-10 p-5 rounded-2xl bg-white dark:bg-[#0C1222] border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
               <Sparkles className="w-5 h-5" />
@@ -198,6 +199,7 @@ export const DemoAccountsSection: React.FC = () => {
             </Link>
           </div>
         </div>
+        )}
       </div>
     </section>
   );
