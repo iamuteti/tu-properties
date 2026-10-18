@@ -1,10 +1,10 @@
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma, SubscriptionStatus, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -12,6 +12,10 @@ import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import {
+  FILE_STORAGE,
+  FileStorage,
+} from '@/modules/documents/storage/file-storage.interface';
 import {
   OnboardOrganizationDto,
   SuspendOrganizationDto,
@@ -97,6 +101,7 @@ export class PlatformService {
     private prisma: PrismaService,
     private auditService: AuditService,
     private jwtService: JwtService,
+    @Inject(FILE_STORAGE) private storage: FileStorage,
   ) {}
 
   /**
@@ -306,6 +311,83 @@ export class PlatformService {
       actorId,
     });
     return result;
+  }
+
+  async remove(id: string, actorId?: string) {
+    await this.findOne(id);
+
+    // Capture document storage keys before anything is deleted, so the actual
+    // files can be removed from disk/S3 after the transaction commits.
+    const documents = await this.prisma.document.findMany({
+      where: { organizationId: id },
+      select: { fileUrl: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      // Org-`SetNull` children survive `organization.delete()` as null-orphans,
+      // so delete them explicitly. Agreements go first: they hold `Restrict`
+      // foreign keys to Unit/Tenant, so tenants/properties cannot be removed
+      // while an agreement still references them.
+      await tx.agreement.deleteMany({ where: { organizationId: id } });
+      await tx.tenant.deleteMany({ where: { organizationId: id } });
+      await tx.property.deleteMany({ where: { organizationId: id } });
+      await tx.invoice.deleteMany({ where: { organizationId: id } });
+      await tx.payment.deleteMany({ where: { organizationId: id } });
+      await tx.receipt.deleteMany({ where: { organizationId: id } });
+      await tx.account.deleteMany({ where: { organizationId: id } });
+      await tx.journalEntry.deleteMany({ where: { organizationId: id } });
+      await tx.supplier.deleteMany({ where: { organizationId: id } });
+      await tx.supplierBill.deleteMany({ where: { organizationId: id } });
+      await tx.billPayment.deleteMany({ where: { organizationId: id } });
+      await tx.supplierCredit.deleteMany({ where: { organizationId: id } });
+      await tx.customerCredit.deleteMany({ where: { organizationId: id } });
+      await tx.paymentRefund.deleteMany({ where: { organizationId: id } });
+      await tx.creditNote.deleteMany({ where: { organizationId: id } });
+      await tx.taxRule.deleteMany({ where: { organizationId: id } });
+      await tx.notification.deleteMany({ where: { organizationId: id } });
+      await tx.notificationPreference.deleteMany({
+        where: { organizationId: id },
+      });
+      await tx.ownerStatement.deleteMany({ where: { organizationId: id } });
+      await tx.landlordPayout.deleteMany({ where: { organizationId: id } });
+      await tx.landlordCharge.deleteMany({ where: { organizationId: id } });
+      await tx.recurringBillingRun.deleteMany({
+        where: { organizationId: id },
+      });
+      await tx.landlord.deleteMany({ where: { organizationId: id } });
+      await tx.auditLog.deleteMany({ where: { organizationId: id } });
+      await tx.user.deleteMany({ where: { organizationId: id } });
+      await tx.moveOutRequest.deleteMany({ where: { organizationId: id } });
+      await tx.inspectionReport.deleteMany({ where: { organizationId: id } });
+
+      // Session denormalizes the org id without a relation; clear it directly.
+      await tx.session.deleteMany({ where: { organizationId: id } });
+
+      // Documents are org-Cascade, but delete explicitly so storage keys were
+      // captured above and no document rows survive.
+      await tx.document.deleteMany({ where: { organizationId: id } });
+
+      // Finally the organization itself; cascades every `onDelete: Cascade`
+      // child (units, invoice items, allocations, work orders, …) in Prisma's
+      // internally-correct order.
+      await tx.organization.delete({ where: { id } });
+    });
+
+    // Best-effort removal of the stored files. A storage failure must not roll
+    // back the transaction or fail the API response.
+    for (const doc of documents) {
+      await this.storage.remove(doc.fileUrl).catch(() => undefined);
+    }
+
+    await this.safeAudit({
+      action: 'ORGANIZATION_DELETED',
+      entity: 'Organization',
+      entityId: id,
+      details: 'Organization and all related data deleted',
+      actorId,
+    });
+
+    return { deleted: true };
   }
 
   /** A tenant must not hear about its suspension from nobody — audit only, no user in the event. */

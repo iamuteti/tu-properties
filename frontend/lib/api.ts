@@ -294,6 +294,9 @@ export const platformApi = {
 
     setTicketStatus: (id: string, data: { status: TicketStatus; resolution?: string }) =>
         api.patch<SupportTicket>(`/platform/support-tickets/${id}/status`, data),
+
+    remove: (id: string) =>
+        api.delete(`/platform/organizations/${id}`),
 };
 
 // Support tickets, tenant side (Module 19 Phase C) — any authenticated user,

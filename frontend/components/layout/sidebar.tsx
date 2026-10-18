@@ -20,6 +20,8 @@ import {
     Landmark,
     Building,
     LogOut,
+    ChevronLeft,
+    ChevronRight,
     Handshake,
     Kanban,
     UserRound,
@@ -187,17 +189,18 @@ const navItems: NavItem[] = [
         ]
     },
     {
-        label: "Tenants & Agreements",
+        label: "Tenants",
         icon: Users,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         module: 'tenants',
         children: [
             { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
-            { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'leases' },
-            { href: "/tenant-requests", label: "Tenant requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'tenant-requests' },
-            { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
+            { href: "/tenant-requests", label: "Tenant Requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'tenant-requests' },
+            { href: "/security-deposits", label: "Security Deposits", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'security-deposits' },
+            { href: "/moving-out", label: "Move Out Processings", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
         ]
     },
+    { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'leases' },
     {
         label: "Billing & Finance",
         icon: CreditCard,
@@ -393,6 +396,7 @@ export function Sidebar() {
     const pathname = usePathname();
     const { user, isLoading, logout } = useAuth();
     const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+    const [collapsed, setCollapsed] = React.useState(false);
     // How many approvals are waiting on this person. Polled rather than pushed
     // because it is a count, not an event: the inbox itself is the notification,
     // and this is only there so somebody does not have to open it to find out.
@@ -478,13 +482,13 @@ export function Sidebar() {
                     >
                         <div className="flex items-center gap-3">
                             <item.icon className="h-4 w-4" />
-                            {item.label}
+                            {!collapsed && <span>{item.label}</span>}
                         </div>
-                        <svg
-                            className={cn(
-                                "h-4 w-4 transition-transform",
-                                isExpanded || groupActive ? "rotate-180" : ""
-                            )}
+                            <svg
+                                className={cn(
+                                    "h-4 w-4 transition-transform",
+                                    isExpanded ? "rotate-180" : ""
+                                )}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -492,7 +496,7 @@ export function Sidebar() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {isExpanded && (
+                    {isExpanded && !collapsed && (
                         <div className="ml-4 space-y-1 border-l border-muted pl-3">
                             {children.map((child) => renderNavItem(child))}
                         </div>
@@ -513,7 +517,7 @@ export function Sidebar() {
                 )}
             >
                 <item.icon className="h-4 w-4" />
-                <span className="flex-1">{item.label}</span>
+                {!collapsed && <span className="flex-1">{item.label}</span>}
                 {badgeCount ? (
                     <span
                         className={cn(
@@ -531,11 +535,22 @@ export function Sidebar() {
     };
 
     return (
-        <aside className="hidden h-screen w-64 flex-col border-r bg-card text-card-foreground md:flex">
-            <div className="flex h-16 items-center border-b px-6">
-                <span className="text-xl font-bold tracking-tight text-primary">
+        <aside className={`hidden h-screen flex-col border-r bg-card text-card-foreground md:flex ${collapsed ? 'w-16' : 'w-64'}`}>
+            <div className="flex h-16 items-center border-b px-6 justify-between">
+                <span className={`${collapsed ? 'hidden' : 'text-xl font-bold tracking-tight text-primary'}`}>
                     Tu Properties
                 </span>
+                <button
+                    onClick={() => setCollapsed((prev) => !prev)}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                >
+                    {collapsed ? (
+                        <ChevronRight className="h-5 w-5" />
+                    ) : (
+                        <ChevronLeft className="h-5 w-5" />
+                    )}
+                </button>
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto p-4">
                 {filteredNavItems.map(item => {
@@ -549,14 +564,16 @@ export function Sidebar() {
                         <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
                             {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || ''}
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium">
-                                {user ? `${user.firstName} ${user.lastName}` : 'User Name'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                {user ? roleLabels[user.role] || user.role : 'Admin'}
-                            </span>
-                        </div>
+                        {!collapsed && (
+                            <div className="flex flex-col">
+                                <span className="text-sm font-medium">
+                                    {user ? `${user.firstName} ${user.lastName}` : 'User Name'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {user ? roleLabels[user.role] || user.role : 'Admin'}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <NotificationBell />
                     <button

@@ -8,6 +8,7 @@ import { Prisma, SubscriptionStatus, UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { FILE_STORAGE } from '@/modules/documents/storage/file-storage.interface';
 import { PlatformService } from './platform.service';
 
 /**
@@ -53,6 +54,7 @@ describe('PlatformService', () => {
   };
   let audit: { logAction: jest.Mock };
   let jwt: { sign: jest.Mock };
+  let storage: { remove: jest.Mock };
 
   // ── Onboard ──────────────────────────────────────────────────────────────────
   //
@@ -84,6 +86,7 @@ describe('PlatformService', () => {
   beforeEach(async () => {
     audit = { logAction: jest.fn().mockResolvedValue({}) };
     jwt = { sign: jest.fn().mockReturnValue('impersonation-token') };
+    storage = { remove: jest.fn().mockResolvedValue(undefined) };
     prisma = {
       organization: {
         create: jest.fn().mockResolvedValue(createdOrg),
@@ -128,9 +131,10 @@ describe('PlatformService', () => {
       providers: [
         PlatformService,
         { provide: PrismaService, useValue: prisma },
-        { provide: AuditService, useValue: audit },
-        { provide: JwtService, useValue: jwt },
-      ],
+      { provide: AuditService, useValue: audit },
+      { provide: JwtService, useValue: jwt },
+      { provide: FILE_STORAGE, useValue: storage },
+    ],
     }).compile();
 
     service = module.get(PlatformService);

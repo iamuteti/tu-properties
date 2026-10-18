@@ -13,6 +13,7 @@ import { ContactService } from './contact.service';
 import { SupportTicketsService } from './support-tickets.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
+import { StorageModule } from '../documents/storage.module';
 
 /**
  * SaaS administration (Module 19) — the platform owner's surface, kept separate from
@@ -30,6 +31,7 @@ import { AuditModule } from '../audit/audit.module';
   imports: [
     PrismaModule,
     AuditModule,
+    StorageModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

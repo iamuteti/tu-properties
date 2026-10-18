@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -113,6 +114,11 @@ export class PlatformOrganizationsController {
     // one; it is accepted here too and stored off the subscription status cleanup,
     // because reactivation should likewise be a deliberate, note-worthy action.
     return this.platformService.setSuspended(id, false, dto, getUserId(req));
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @Request() req: any) {
+    return this.platformService.remove(id, getUserId(req));
   }
 
   /** Which modules are enabled for this organization. */
