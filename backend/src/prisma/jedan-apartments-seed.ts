@@ -44,9 +44,10 @@ const FLOORS = [
   { floor: 3, label: 'D' },
 ];
 
-// Billing window: 18 months, April 2025 → October 2026
-const WINDOW_START = new Date(2025, 3, 1); // April 2025
-const WINDOW_END = new Date(2026, 9, 31); // October 2026
+// Billing window: 18 months, March 2025 → end of current month
+const WINDOW_START = new Date(2025, 2, 1); // March 2025
+const now = new Date();
+const WINDOW_END = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
 // Kenyan name pools (from KE jurisdiction profile)
 const KE_FIRST_NAMES = [
@@ -840,7 +841,7 @@ async function main() {
 
   console.log(
     `Jedan Apartments seeded: ${units.length} units (12×2BR @ KES ${RENT_2B}, 32×1BR @ KES ${RENT_1B}), ` +
-      `${leases.length} leases, ${billingMonths.length} billing months (Apr 2025–Oct 2026), ` +
+      `${leases.length} leases, ${billingMonths.length} billing months (Mar 2025–${monthLabel(WINDOW_END)}), ` +
       `${invoiceCount} invoices. Rent due by the ${PAYMENT_DAY}th. Garbage: KES ${GARBAGE}/unit/month.`,
   );
 }

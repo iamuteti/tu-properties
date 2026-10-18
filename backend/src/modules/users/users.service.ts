@@ -180,7 +180,12 @@ export class UsersService {
   async findOneByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
-      include: { organization: true },
+      // Include the organization's Subscription so callers that build a client-visible
+      // user object (e.g. AuthService.validateUser -> login response) carry
+      // `organization.subscription.enabledModules`. Without this the login response omits
+      // it, so the sidebar's module-gated items stay hidden until the next reload
+      // (when `/auth/profile` rehydrates it via getProfile). Mirrors AuthService.getProfile.
+      include: { organization: { include: { subscription: true } } },
     });
   }
 

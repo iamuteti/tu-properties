@@ -159,7 +159,7 @@ npm test
 1. **Multi-tenancy**: tenant-scoping is per-organization (`Organization`). Scope queries by `organizationId` where applicable; never trust client-supplied tenant IDs.
 2. **Validation**: Every controller input = `class-validator` DTO. Global `ValidationPipe` with `whitelist: true` strips unknown fields.
 3. **Guards order** (`main.ts`): `JwtAuthGuard` → `RolesGuard` → `RightsGuard` → `ModuleGuard` → `TenantScopeGuard` (last).
-4. **CORS**: `CorsAllowlistService` drives `enableCors` origin from `NODE_ENV`/`FRONTEND_URL`. Production `FRONTEND_URL` must be the exact `https://` origin; an HTTP origin is rejected.
+4. **CORS**: `CorsAllowlistService` drives `enableCors` origin from `CORS_ORIGINS`. Production origins must be the exact `https://` origin; an HTTP origin is rejected.
 5. **Tests**: Add `*.service.spec.ts` next to service. Run `npm test` (unit) and `npm run test:e2e` separately.
 6. **Migrations**: Immutable. Add new, never edit committed ones.
 7. **Response DTOs**: Field-accurate with explicit `@ApiProperty` types (no `Record<string, unknown>`).
@@ -254,7 +254,8 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 |----------|-------------------|----------|-------|
 | `PORT` | `3003` | No | Single source of truth; nginx proxies to this |
 | `NODE_ENV` | `development` | No | `production` disables dev-only behaviour |
-| `FRONTEND_URL` | `https://app.tu-properties.co.ke` | Yes | Exact production origin; drives CORS allowlist |
+| `FRONTEND_URL` | `https://app.tu-properties.co.ke` | Yes | Exact production origin; used by the frontend / nginx proxying |
+| `CORS_ORIGINS` | `https://app.tu-properties.co.ke` | Yes | Comma-separated origins allowed by CORS; drives the allowlist in `src/security/cors.ts` |
 | `DATABASE_URL` | `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` | Yes | |
 | `SHADOW_DATABASE_URL` | `postgresql://.../tu-properies-shadow` | No | Only for `prisma migrate diff --from-migrations` |
 | `JWT_SECRET` | — | **Yes** | `openssl rand -base64 48`; rotate per environment |
@@ -304,7 +305,7 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | Prisma schema path | Schema is `backend/src/prisma/schema.prisma` — run prisma from `backend/` |
 | `declare` on model fields | Every `@Column()`/`@Field()` property needs `declare` (copy style from existing models) |
 | Hand-maintained indexes | Delete DROP statements for `notifications_landlordId_readAt_idx` and `utility_charges_no_double_bill_bulk` from generated migrations |
-| CORS rejects HTTP origin | `FRONTEND_URL` must be exact `https://` production origin |
+| CORS rejects HTTP origin | `CORS_ORIGINS` must list exact `https://` production origins |
 | `NEXT_PUBLIC_*` changes need rebuild | Frontend env vars are baked in at build time |
 | Silent storage fallback | Wrong S3/MinIO credentials fall back to local `uploads/`; verify first real upload |
 
@@ -491,7 +492,7 @@ sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d app.tu-properties.co.ke -d www.app.tu-properties.co.ke -d api.tu-properties.co.ke
 ```
 
-Then replace with full HTTPS config (redirect 80→443, ssl_certificate paths from certbot, gzip, `/_next/static/` caching, 25M body limit). Enforce HTTPS — `FRONTEND_URL` is `https://` and CORS compares exact origins.
+Then replace with full HTTPS config (redirect 80→443, ssl_certificate paths from certbot, gzip, `/_next/static/` caching, 25M body limit). Enforce HTTPS — `CORS_ORIGINS` must list exact `https://` origins and CORS compares exact origins.
 
 ### 7. Firewall
 

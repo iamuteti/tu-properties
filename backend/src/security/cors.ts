@@ -1,11 +1,9 @@
 /**
  * Resolve the CORS allowlist from the environment.
  *
- * - In development, localhost on any port is always allowed.
- * - In production/staging, an explicit list must be provided via
- *   `CORS_ORIGINS` (comma-separated). If none is provided in a
- *   non-local environment, we fall back to a strict empty allowlist
- *   rather than opening the wildcard.
+ * - Allowed origins are read from `CORS_ORIGINS` (comma-separated).
+ * - In production/staging without an explicit allowlist, we deny
+ *   everything rather than silently allowing `'*'`.
  *
  * Returns a function `(origin) => boolean` so that the browser receives a
  * real `false` rejection for disallowed origins instead of silently
@@ -20,15 +18,6 @@ export function resolveAllowlist(nodeEnv: string) {
     .filter(Boolean);
 
   const allowlist: string[] = [];
-
-  if (isLocal) {
-    // Allow any localhost port during local development.
-    allowlist.push(
-      'http://localhost:3002',
-      'http://localhost:3000',
-      'http://localhost:3001',
-    );
-  }
 
   for (const origin of configured) {
     if (!allowlist.includes(origin)) {

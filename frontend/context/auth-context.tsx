@@ -11,8 +11,8 @@ interface AuthContextType {
   login: (user: User) => void;
   logout: () => void;
   isLoading: boolean;
-  /** Re-fetch the profile (e.g. after saving organization settings). */
-  refreshProfile: () => Promise<void>;
+    /** Re-fetch the profile (e.g. after saving organization settings). */
+    refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
