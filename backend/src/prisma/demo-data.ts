@@ -17,7 +17,6 @@ import {
   UnitStatus,
   AgreementStatus,
   AgreementType,
-  Invoice,
   UserRole,
   ManagementFeeType,
   ChargeCategory,
@@ -67,7 +66,6 @@ import {
   MeterReadingSource,
   MeterScope,
   MeterStatus,
-  UtilityChargeStatus,
   UtilityType,
   // Module 15 - Documents & Legal
   ContractType,
@@ -92,10 +90,24 @@ import {
   type PayEarning,
 } from '../modules/hr/payroll-calc';
 import { DEFAULT_CHART_OF_ACCOUNTS } from '../modules/finance/accounting/chart-of-accounts';
+import {
+  setActiveProfile,
+  getActiveProfile,
+  randomPhone as profileRandomPhone,
+  randomName as profileRandomName,
+  randomAddress as profileRandomAddress,
+  randomEmail as profileRandomEmail,
+  randomTaxId as profileRandomTaxId,
+  randomPropertyName as profileRandomPropertyName,
+} from './jurisdictions';
 
 dotenv.config();
 
-// Generate random string
+// Active jurisdiction profile (defaults to Kenya). Set by seedDemoData() before any
+// data generation runs; helpers below delegate to it so country-specific values
+// (phones, names, addresses, tax IDs, property names) follow the chosen profile.
+let activeProfile = getActiveProfile();
+
 const randomString = (length: number): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -105,334 +117,14 @@ const randomString = (length: number): string => {
   return result;
 };
 
-// Generate random Kenyan phone number. Safaricom/Airtel/Telkom mobile
-// prefixes all start with 7 (e.g. +254 700 XXX XXX); a leading 1 is a
-// landline. Anything else is not a real Kenyan subscriber number.
-const randomPhone = (): string => {
-  const prefixes = [
-    '700',
-    '701',
-    '702',
-    '703',
-    '704',
-    '705',
-    '706',
-    '707',
-    '708',
-    '709',
-    '710',
-    '711',
-    '712',
-    '713',
-    '714',
-    '715',
-    '716',
-    '717',
-    '718',
-    '719',
-    '720',
-    '721',
-    '722',
-    '723',
-    '724',
-    '725',
-    '726',
-    '727',
-    '728',
-    '729',
-    '730',
-    '731',
-    '732',
-    '733',
-    '734',
-    '735',
-    '736',
-    '737',
-    '738',
-    '739',
-    '740',
-    '741',
-    '742',
-    '743',
-    '744',
-    '745',
-    '746',
-    '747',
-    '748',
-    '749',
-    '750',
-    '751',
-    '752',
-    '753',
-    '754',
-    '755',
-    '756',
-    '757',
-    '758',
-    '759',
-    '760',
-    '761',
-    '762',
-    '763',
-    '764',
-    '765',
-    '766',
-    '767',
-    '768',
-    '769',
-    '770',
-    '771',
-    '772',
-    '773',
-    '774',
-    '775',
-    '776',
-    '777',
-    '778',
-    '779',
-    '780',
-    '781',
-    '782',
-    '783',
-    '784',
-    '785',
-    '786',
-    '787',
-    '788',
-    '789',
-    '790',
-    '791',
-    '792',
-    '793',
-    '794',
-    '795',
-    '796',
-    '797',
-    '798',
-    '799',
-  ];
-  return `+254${prefixes[Math.floor(Math.random() * prefixes.length)]}${Math.floor(
-    Math.random() * 1000000,
-  )
-    .toString()
-    .padStart(6, '0')}`;
-};
-
-// Generate a KRA tax PIN. Real PINs are 11 characters: a leading letter,
-// nine digits/letters, and a trailing letter (e.g. A000000000B).
-const randomKraPin = (): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const middle = Array.from({ length: 9 }, () =>
-    chars.charAt(Math.floor(Math.random() * chars.length)),
-  ).join('');
-  const suffix = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.charAt(
-    Math.floor(Math.random() * 26),
-  );
-  return `A${middle}${suffix}`;
-};
-
-// Generate random email
-const randomEmail = (name: string): string => {
-  const domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'example.co.ke'];
-  return `${name.toLowerCase().replace(/\s+/g, '.')}@${domains[Math.floor(Math.random() * domains.length)]}`;
-};
-
-// Kenyan names for more realistic data
-const kenyanFirstNames = [
-  'John',
-  'Mary',
-  'Peter',
-  'Sarah',
-  'David',
-  'Jane',
-  'Michael',
-  'Emma',
-  'James',
-  'Lisa',
-  'Daniel',
-  'Grace',
-  'Joseph',
-  'Ruth',
-  'Samuel',
-  'Elizabeth',
-  'Paul',
-  'Martha',
-  'Andrew',
-  'Hannah',
-  'William',
-  'Rebecca',
-  'Thomas',
-  'Rachel',
-  'Charles',
-  'Esther',
-  'Robert',
-  'Deborah',
-  'George',
-  'Miriam',
-  'Edward',
-  'Sarah',
-  'Henry',
-  'Naomi',
-  'Walter',
-  'Abigail',
-  'Arthur',
-  'Lydia',
-  'Harold',
-  'Anna',
-  'Mwangi',
-  'Wanjiku',
-  'Kamau',
-  'Nyambura',
-  'Njoroge',
-  'Wambui',
-  'Kariuki',
-  'Njeri',
-  'Gichuki',
-  'Wangari',
-  'Ochieng',
-  'Akinyi',
-  'Omondi',
-  'Adhiambo',
-  'Otieno',
-  'Anyango',
-  'Odinga',
-  'Atieno',
-  'Ouma',
-  'Awuor',
-];
-
-const kenyanLastNames = [
-  'Smith',
-  'Brown',
-  'Johnson',
-  'Williams',
-  'Jones',
-  'Garcia',
-  'Miller',
-  'Davis',
-  'Rodriguez',
-  'Martinez',
-  'Mwangi',
-  'Kamau',
-  'Njoroge',
-  'Kariuki',
-  'Gichuki',
-  'Wainaina',
-  'Ngugi',
-  'Mugo',
-  'Kibet',
-  'Kipchoge',
-  'Ochieng',
-  'Omondi',
-  'Otieno',
-  'Odinga',
-  'Ouma',
-  'Owino',
-  'Okoth',
-  'Onyango',
-  'Odhiambo',
-  'Oloo',
-  'Kimani',
-  'Ndungu',
-  'Gatheru',
-  'Macharia',
-  'Maina',
-  'Ndegwa',
-  'Gichuhi',
-  'Muriuki',
-  'Mutiso',
-  'Musyoka',
-];
-
-// Generate random name
-const randomName = (): string => {
-  return `${kenyanFirstNames[Math.floor(Math.random() * kenyanFirstNames.length)]} ${kenyanLastNames[Math.floor(Math.random() * kenyanLastNames.length)]}`;
-};
-
-// Generate random address
-const randomAddress = (): string => {
-  const streets = [
-    'Main St',
-    'First Ave',
-    'Park Rd',
-    'High St',
-    'Oak St',
-    'Kenyatta Ave',
-    'Moi Ave',
-    'Uhuru Hwy',
-  ];
-  const cities = [
-    'Nairobi',
-    'Mombasa',
-    'Kisumu',
-    'Nakuru',
-    'Eldoret',
-    'Thika',
-    'Malindi',
-    'Kitale',
-  ];
-  return `${Math.floor(Math.random() * 1000) + 1} ${streets[Math.floor(Math.random() * streets.length)]}, ${cities[Math.floor(Math.random() * cities.length)]}`;
-};
-
-// Property names for more realistic data
-const propertyPrefixes = [
-  'Riverside',
-  'Westlands',
-  'Kilimani',
-  'Lavington',
-  'Karen',
-  'Langata',
-  'Kileleshwa',
-  'Parklands',
-  'Spring Valley',
-  'Muthaiga',
-  'Runda',
-  'Gigiri',
-  'Rosslyn',
-  'Loresho',
-  'Mountain View',
-  'Embakasi',
-  'South B',
-  'South C',
-  'Eastleigh',
-  'Westlands',
-  'Industrial Area',
-  'CBD',
-  'Upper Hill',
-  'Nairobi West',
-];
-
-const propertySuffixes = [
-  'Heights',
-  'Plaza',
-  'Gardens',
-  'Towers',
-  'Mall',
-  'Complex',
-  'Court',
-  'Terrace',
-  'Villas',
-  'Apartments',
-  'Suites',
-  'Residence',
-  'House',
-  'Mansion',
-  'Estate',
-  'Village',
-  'Cottage',
-  'Manor',
-  'Lodge',
-  'Studio',
-];
-
-// Generate random property name
-const randomPropertyName = (index: number): string => {
-  const prefix =
-    propertyPrefixes[Math.floor(Math.random() * propertyPrefixes.length)];
-  const suffix =
-    propertySuffixes[Math.floor(Math.random() * propertySuffixes.length)];
-  return `${prefix} ${suffix} ${index}`;
-};
+const randomPhone = (): string => profileRandomPhone(activeProfile);
+const randomKraPin = (): string => profileRandomTaxId(activeProfile);
+const randomEmail = (name: string): string =>
+  profileRandomEmail(name, activeProfile);
+const randomName = (): string => profileRandomName(activeProfile);
+const randomAddress = (): string => profileRandomAddress(activeProfile);
+const randomPropertyName = (index: number): string =>
+  profileRandomPropertyName(index, activeProfile);
 
 // Generate demo data for Rohi Estate Management
 export async function generateDemoData(
@@ -454,25 +146,8 @@ export async function generateDemoData(
         email: randomEmail(name),
         phone: randomPhone(),
         address: randomAddress(),
-        bankName: [
-          'Equity Bank',
-          'KCB Bank',
-          'Co-op Bank',
-          'Absa Bank',
-          'Standard Chartered',
-          'NCBA Bank',
-          'I&M Bank',
-          'Stanbic Bank',
-        ][Math.floor(Math.random() * 8)],
-        bankBranch: [
-          'Nairobi CBD',
-          'Westlands',
-          'Kilimani',
-          'Mombasa Rd',
-          'Thika Rd',
-          'Junction',
-          'Sarit Centre',
-        ][Math.floor(Math.random() * 7)],
+        bankName: activeProfile.banks[Math.floor(Math.random() * activeProfile.banks.length)],
+        bankBranch: activeProfile.bankBranches[Math.floor(Math.random() * activeProfile.bankBranches.length)],
         accountNumber: String(Math.floor(Math.random() * 10000000000)),
         accountName: name,
         taxPin: randomKraPin(),
@@ -527,8 +202,10 @@ export async function generateDemoData(
         code: `${orgPrefix}-PROP-${String(i).padStart(3, '0')}`,
         name: randomPropertyName(i),
         estateArea:
-          propertyPrefixes[Math.floor(Math.random() * propertyPrefixes.length)],
-        country: 'Kenya',
+          activeProfile.propertyPrefixes[
+            Math.floor(Math.random() * activeProfile.propertyPrefixes.length)
+          ],
+        country: activeProfile.name,
         landlordId: landlord.id,
         category: category.value,
         type: propertyType.value,
@@ -638,9 +315,7 @@ export async function generateDemoData(
         otherNames: name.split(' ')[0],
         email: randomEmail(name),
         phone: randomPhone(),
-        town: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret'][
-          Math.floor(Math.random() * 5)
-        ],
+        town: activeProfile.cities[Math.floor(Math.random() * 5)],
         status: TenantStatus.ACTIVE,
         organizationId,
       },
@@ -710,7 +385,7 @@ export async function generateDemoData(
         endDate,
         termMonths,
         rentAmount: Number(unit.baseRent),
-        currency: 'KES',
+        currency: activeProfile.currency,
         paymentDay: 1,
         securityDeposit,
         // A standard notice period on every tenancy, so the portal's
@@ -818,7 +493,7 @@ export async function generateDemoData(
             invoiceId: invoice.id,
             paymentDate,
             amount: paidAmount,
-            currency: 'KES',
+            currency: activeProfile.currency,
             paymentMethod,
             paymentReference:
               paymentMethod === PaymentMethod.MPESA
@@ -852,7 +527,7 @@ export async function generateDemoData(
             paymentMethod,
             recordingDate: paymentDate,
             amountReceived: paidAmount,
-            currency: 'KES',
+            currency: activeProfile.currency,
             tenantId: tenant.id,
             landlordId: property.landlordId,
             receiptTo: ReceiptTo.Landlord,
@@ -1258,7 +933,7 @@ async function generateOwnerData(
               landlordId: landlord.id,
               ownerStatementId: statement.id,
               amount: payoutAmount,
-              currency: 'KES',
+              currency: activeProfile.currency,
               method: PaymentMethod.BANK_TRANSFER,
               status: paidInFull ? PayoutStatus.PAID : PayoutStatus.PROCESSING,
               reference: paidInFull ? `BNK-RTGS-${randomString(6)}` : null,
@@ -1292,7 +967,7 @@ async function generateOwnerData(
                 organizationId,
                 landlordId: landlord.id,
                 amount: Math.round(Math.random() * 20_000 * 100) / 100,
-                currency: 'KES',
+                currency: activeProfile.currency,
                 method: PaymentMethod.MPESA,
                 status: PayoutStatus.FAILED,
                 failureReason:
@@ -1524,7 +1199,7 @@ async function generateSalesData(
             agentUserId: participant.agentUserId,
             amount,
             splitPercentage: participant.share,
-            currency: 'KES',
+            currency: activeProfile.currency,
             basis: 'SALE',
             status: isHandover
               ? 'PAID'
@@ -2691,7 +2366,7 @@ async function generateProcurementData(
         email: plan.email,
         phone: plan.phone,
         city: 'Nairobi',
-        country: 'Kenya',
+        country: activeProfile.name,
         category: plan.category,
         paymentTermsDays: plan.paymentTermsDays,
         vatRegistered: true,
@@ -2727,7 +2402,7 @@ async function generateProcurementData(
       department: 'Maintenance',
       neededBy: new Date(now + 45 * day),
       estimatedAmount: 210000,
-      currency: 'KES',
+      currency: activeProfile.currency,
       approvalRequestedAt: new Date(now - 40 * day),
       decidedAt: new Date(now - 39 * day),
       decidedById: requester,
@@ -2766,7 +2441,7 @@ async function generateProcurementData(
       title: 'Lift ropes and door roller seals',
       notes: 'Delivery to site; installation quoted separately.',
       status: RfqStatus.AWARDED,
-      currency: 'KES',
+      currency: activeProfile.currency,
       quotesDueAt: new Date(now - 32 * day),
       issuedAt: new Date(now - 38 * day),
       closedAt: new Date(now - 30 * day),
@@ -2800,7 +2475,7 @@ async function generateProcurementData(
       supplierId: hoist.id,
       status: QuoteStatus.AWARDED,
       totalAmount: 196000,
-      currency: 'KES',
+      currency: activeProfile.currency,
       leadTimeDays: 10,
       validUntil: new Date(now + 30 * day),
       notes: 'Includes delivery; ropes certified.',
@@ -2828,7 +2503,7 @@ async function generateProcurementData(
       supplierId: lifts.id,
       status: QuoteStatus.REJECTED,
       totalAmount: 188000,
-      currency: 'KES',
+      currency: activeProfile.currency,
       leadTimeDays: 35,
       validUntil: new Date(now + 20 * day),
       submittedAt: new Date(now - 34 * day),
@@ -2874,7 +2549,7 @@ async function generateProcurementData(
       supplierId: hoist.id,
       status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
       category: PurchaseCategory.MAINTENANCE_PARTS,
-      currency: 'KES',
+      currency: activeProfile.currency,
       subtotal: 196000,
       taxAmount: 0,
       totalAmount: 196000,
@@ -2940,7 +2615,7 @@ async function generateProcurementData(
       priority: PurchasePriority.NORMAL,
       status: PurchaseRequestStatus.APPROVED,
       department: 'Front Office',
-      currency: 'KES',
+      currency: activeProfile.currency,
       estimatedAmount: 60000,
       decidedAt: new Date(now - 60 * day),
       decidedById: requester,
@@ -2968,7 +2643,7 @@ async function generateProcurementData(
       supplierId: furniture.id,
       status: PurchaseOrderStatus.RECEIVED,
       category: PurchaseCategory.FURNITURE,
-      currency: 'KES',
+      currency: activeProfile.currency,
       subtotal: 58000,
       taxAmount: 0,
       totalAmount: 58000,
@@ -3029,7 +2704,7 @@ async function generateProcurementData(
       priority: PurchasePriority.LOW,
       status: PurchaseRequestStatus.APPROVED,
       department: 'Operations',
-      currency: 'KES',
+      currency: activeProfile.currency,
       estimatedAmount: 240000,
       decidedAt: new Date(now - 12 * day),
       decidedById: requester,
@@ -3058,7 +2733,7 @@ async function generateProcurementData(
       title: 'Quarterly deep clean, 12 buildings',
       notes: 'Quotes to include chemicals and a supervisor.',
       status: RfqStatus.QUOTES_RECEIVED,
-      currency: 'KES',
+      currency: activeProfile.currency,
       quotesDueAt: new Date(now + 7 * day),
       issuedAt: new Date(now - 10 * day),
       purchaseRequestId: thirdRequest.id,
@@ -3086,7 +2761,7 @@ async function generateProcurementData(
       supplierId: cleaning.id,
       status: QuoteStatus.SUBMITTED,
       totalAmount: 228000,
-      currency: 'KES',
+      currency: activeProfile.currency,
       leadTimeDays: 14,
       validUntil: new Date(now + 45 * day),
       submittedAt: new Date(now - 4 * day),
@@ -3144,7 +2819,7 @@ async function generateProcurementData(
       priority: PurchasePriority.NORMAL,
       status: PurchaseRequestStatus.REJECTED,
       department: 'Maintenance',
-      currency: 'KES',
+      currency: activeProfile.currency,
       estimatedAmount: 180000,
       rejectionReason:
         'Deferred to next financial year — the guard houses have fans for now.',
@@ -3180,7 +2855,7 @@ async function generateProcurementData(
       priority: PurchasePriority.LOW,
       status: PurchaseRequestStatus.DRAFT,
       department: 'Administration',
-      currency: 'KES',
+      currency: activeProfile.currency,
       requestedById: requester,
       createdAt: new Date(now - 1 * day),
       lines: {
@@ -3203,7 +2878,7 @@ async function generateProcurementData(
       supplierId: electrical.id,
       status: PurchaseOrderStatus.SENT,
       category: PurchaseCategory.MAINTENANCE_PARTS,
-      currency: 'KES',
+      currency: activeProfile.currency,
       subtotal: 42000,
       taxAmount: 0,
       totalAmount: 42000,
@@ -3235,7 +2910,7 @@ async function generateProcurementData(
       supplierId: plumbing.id,
       status: PurchaseOrderStatus.ACCEPTED,
       category: PurchaseCategory.MAINTENANCE_PARTS,
-      currency: 'KES',
+      currency: activeProfile.currency,
       subtotal: 78000,
       taxAmount: 0,
       totalAmount: 78000,
@@ -3813,7 +3488,19 @@ async function generateInventoryData(
 }
 
 // Main function to run demo data generation standalone
-export async function seedDemoData() {
+export interface SeedDemoDataOptions {
+  country?: string; // ISO-3166-1 alpha-2 jurisdiction code
+  multiBranch?: boolean; // create an international enterprise org with branches
+}
+
+export async function seedDemoData(options: SeedDemoDataOptions = {}) {
+  const country = (
+    options.country ??
+    process.env.DEMO_COUNTRY ??
+    'KE'
+  ).toUpperCase();
+  activeProfile = setActiveProfile(country);
+  const multiBranch = options.multiBranch ?? process.env.DEMO_MODE === 'multi';
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     console.error('DATABASE_URL environment variable is not set');
@@ -3954,6 +3641,11 @@ export async function seedDemoData() {
         maxUsers: 10,
         maxProperties: 100,
         isActive: true,
+        currency: activeProfile.currency,
+        timezone: activeProfile.timezone,
+        taxCountryCode: activeProfile.code,
+        defaultLocale: activeProfile.locale,
+        weekendDays: activeProfile.weekendDays,
       },
     });
 
@@ -3966,18 +3658,55 @@ export async function seedDemoData() {
         maxUsers: 50,
         maxProperties: 500,
         isActive: true,
-        // Module 12: this organization's payroll jurisdiction is inherited from its
-        // tax country rather than restated on the payroll columns — so the demo
-        // actually exercises the fallback instead of skipping past it.
-        taxCountryCode: 'KE',
-        taxRegionCode: '47',
-        defaultLocale: 'en-KE',
-        // Saturday and Sunday. Stored rather than assumed, because "Saturday is a
-        // weekend" is false in a large part of the world and a leave balance
-        // computed against the wrong one is wrong invisibly.
-        weekendDays: [6, 7],
+        taxCountryCode: activeProfile.code,
+        taxRegionCode: null,
+        defaultLocale: activeProfile.locale,
+        weekendDays: activeProfile.weekendDays,
+        currency: activeProfile.currency,
+        timezone: activeProfile.timezone,
       },
     });
+
+    // Multi-branch international enterprise organization (optional).
+    if (multiBranch) {
+      console.log('Creating international enterprise organization...');
+      const intlOrg = await prisma.organization.create({
+        data: {
+          name: 'Global Properties International',
+          slug: 'global-properties-international',
+          subdomain: 'global',
+          plan: 'ENTERPRISE',
+          maxUsers: 200,
+          maxProperties: 5000,
+          isActive: true,
+          taxCountryCode: 'GB',
+          defaultLocale: 'en-GB',
+          currency: 'GBP',
+          timezone: 'Europe/London',
+          weekendDays: [6, 7],
+        },
+      });
+      const branches = [
+        { name: 'London Branch', city: 'London', currency: 'GBP' },
+        { name: 'New York Branch', city: 'New York', currency: 'USD' },
+        { name: 'Nairobi Branch', city: 'Nairobi', currency: activeProfile.currency },
+        { name: 'Dubai Branch', city: 'Dubai', currency: 'AED' },
+      ];
+      for (const b of branches) {
+        await prisma.branch.create({
+          data: {
+            organizationId: intlOrg.id,
+            name: b.name,
+            city: b.city,
+            code: b.city.substring(0, 3).toUpperCase(),
+            isActive: true,
+          },
+        });
+      }
+      console.log(
+        `Created international organization with ${branches.length} branches.`,
+      );
+    }
 
     // Seed the 12 system roles (idempotent; organization-scoped roles were
     // cleaned above)
@@ -4318,7 +4047,7 @@ export async function seedDemoData() {
 }
 
 if (require.main === module) {
-  seedDemoData();
+  void seedDemoData();
 }
 
 /**
@@ -4742,13 +4471,13 @@ async function generateHrData(prisma: PrismaClient, organizationId: string) {
       reference: reference(2026, '08'),
       period: paidPeriod,
       finalStatus: PayrollRunStatus.PAID,
-      currency: 'KES',
+      currency: activeProfile.currency,
     },
     {
       reference: reference(2026, '09'),
       period: draftPeriod,
       finalStatus: PayrollRunStatus.DRAFT,
-      currency: 'KES',
+      currency: activeProfile.currency,
     },
     // A **second currency means a second run**, which is the whole point of
     // `Employee.salaryCurrency`: the euro consultant cannot share a total with
@@ -5064,7 +4793,7 @@ async function generateFacilitiesData(
       // The one facility that needs a person to agree, so PENDING is reachable.
       requiresApproval: true,
       bookingFee: 15000,
-      currency: 'KES',
+      currency: activeProfile.currency,
       description:
         'Main hall, kitchen and terrace. Bookable in two-hour blocks; the caretaker needs the key by 08:00.',
     },
@@ -5075,7 +4804,7 @@ async function generateFacilitiesData(
       hours: hours('08:00', '18:00', 60),
       capacity: 14,
       bookingFee: 2500,
-      currency: 'KES',
+      currency: activeProfile.currency,
       description:
         'Seats 14 around one table. The projector needs its own adapter.',
     },
@@ -5105,7 +4834,7 @@ async function generateFacilitiesData(
       hours: hours('05:00', '22:00', 60),
       capacity: 20,
       bookingFee: 1000,
-      currency: 'KES',
+      currency: activeProfile.currency,
       description: 'Residents only. Induction required before first use.',
     },
     {
@@ -6152,7 +5881,7 @@ async function generateUtilitiesData(
       data: {
         organizationId,
         type: d.type,
-        currency: 'KES',
+        currency: activeProfile.currency,
         ratePerUnit: d.rate,
         standingCharge: d.standing,
         vatRate: d.vat,
@@ -6186,7 +5915,7 @@ async function generateUtilitiesData(
       data: {
         organizationId,
         type: UtilityType.WATER,
-        currency: 'KES',
+        currency: activeProfile.currency,
         ratePerUnit: 62.4,
         standingCharge: 250,
         vatRate: null,
@@ -6732,7 +6461,7 @@ async function generateWesthillData(
       code: 'WESTHILL-PROP-001',
       name: 'Westhill Gardens',
       estateArea: 'Westlands',
-      country: 'Kenya',
+      country: activeProfile.name,
       category: 'residential',
       type: 'apartment',
       mpesaPropertyPayNumber: '123456',
@@ -6799,7 +6528,7 @@ async function generateWesthillData(
       endDate: new Date(Date.UTC(2027, 7, 31)),
       termMonths: 12,
       rentAmount: unitRent,
-      currency: 'KES',
+      currency: activeProfile.currency,
       paymentDay: 1,
       securityDeposit: unitRent,
       noticePeriodDays: 30,
@@ -6832,7 +6561,7 @@ async function generateWesthillData(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 3),
       ),
       amount: unitRent,
-      currency: 'KES',
+      currency: activeProfile.currency,
       paymentMethod: PaymentMethod.MPESA,
       paymentReference: `MPESA-${randomString(10)}`,
       payee: `${tenants[0].surname} ${tenants[0].otherNames}`,

@@ -13,7 +13,9 @@ function mockPrisma() {
     findFirst: jest.fn(),
     findMany: jest.fn().mockResolvedValue([]),
     aggregate: jest.fn().mockResolvedValue({ _sum: { totalAmount: 0 } }),
-    findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'cn-1', status: 'VOID' }),
+    findUniqueOrThrow: jest
+      .fn()
+      .mockResolvedValue({ id: 'cn-1', status: 'VOID' }),
     update: jest.fn().mockImplementation(({ data }: any) => data),
     count: jest.fn().mockResolvedValue(0),
   };

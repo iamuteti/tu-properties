@@ -9,9 +9,7 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { money } from './format';
-import {
-  CONTRACT_REMINDER_ROLE_NAMES,
-} from '@/modules/legal/legal-roles';
+import { CONTRACT_REMINDER_ROLE_NAMES } from '@/modules/legal/legal-roles';
 import {
   daysUntil,
   nextReminderBand,
@@ -168,9 +166,12 @@ export class NotificationTriggersService {
     for (const contract of contracts) {
       // The same lease fallback the service applies: the register does not hold a
       // second copy of the lease's end date.
-      const expiresAt = contract.expiresAt ?? contract.rentalAgreement?.endDate ?? null;
+      const expiresAt =
+        contract.expiresAt ?? contract.rentalAgreement?.endDate ?? null;
       const noticeDays =
-        contract.noticeDays ?? contract.rentalAgreement?.noticePeriodDays ?? null;
+        contract.noticeDays ??
+        contract.rentalAgreement?.noticePeriodDays ??
+        null;
       if (!expiresAt) continue;
 
       const remainingDays = daysUntil(expiresAt, onDate);
@@ -178,9 +179,7 @@ export class NotificationTriggersService {
       if (band === null) continue;
 
       const pastNotice =
-        noticeDays !== null &&
-        remainingDays <= noticeDays &&
-        remainingDays > 0;
+        noticeDays !== null && remainingDays <= noticeDays && remainingDays > 0;
 
       // An auto-renewing contract does not need the generic ladder - it renews by
       // itself, and nagging about it trains people to ignore the report. What it does

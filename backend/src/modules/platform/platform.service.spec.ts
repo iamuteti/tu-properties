@@ -33,7 +33,12 @@ describe('PlatformService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    user: { create: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock };
+    user: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+    };
     property: { count: jest.Mock };
     tenant: { count: jest.Mock };
     unit: { count: jest.Mock };

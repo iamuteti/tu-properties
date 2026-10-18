@@ -93,11 +93,11 @@ import { SecurityModule } from './security/security.module';
     // Module 14 — Utilities. Imports Finance because it *writes into* Finance:
     // consumption invoices go through `InvoicesService`, never a direct insert.
     UtilitiesModule,
-  LegalModule,
-  ReportsModule,
-  // Module 19 — SaaS Administration. The platform owner's surface: onboard tenants,
-  // suspend them, read the subscription. Lives behind `/platform/...` and SUPER_ADMIN.
-  PlatformModule,
+    LegalModule,
+    ReportsModule,
+    // Module 19 — SaaS Administration. The platform owner's surface: onboard tenants,
+    // suspend them, read the subscription. Lives behind `/platform/...` and SUPER_ADMIN.
+    PlatformModule,
   ],
   controllers: [AppController],
   providers: [

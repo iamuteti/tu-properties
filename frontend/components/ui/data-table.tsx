@@ -334,7 +334,7 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="bg-card/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-border">
+      <div className="bg-card/50 backdrop-blur-sm shadow-lg rounded-xl border border-border">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
@@ -364,10 +364,10 @@ export function DataTable<T extends Record<string, any>>({
                         </span>
                         {header.column.getCanSort() && (
                           <div className="flex flex-col ml-1">
-                            <span className={`text-xs ${header.column.getIsSorted() === 'asc' ? 'text-foreground' : 'text-gray-400'}`}>
+                            <span className={`text-xs ${header.column.getIsSorted() === 'asc' ? 'text-foreground' : 'text-muted-foreground'}`}>
                               ▲
                             </span>
-                            <span className={`text-xs -mt-1 ${header.column.getIsSorted() === 'desc' ? 'text-foreground' : 'text-gray-400'}`}>
+                            <span className={`text-xs -mt-1 ${header.column.getIsSorted() === 'desc' ? 'text-foreground' : 'text-muted-foreground'}`}>
                               ▼
                             </span>
                           </div>
@@ -391,7 +391,7 @@ export function DataTable<T extends Record<string, any>>({
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          className="rounded border-border text-cyan-600 focus:ring-cyan-500"
+                        className="rounded border-border text-primary focus:ring-ring"
                           checked={row.getIsSelected()}
                           onChange={row.getToggleSelectedHandler()}
                         />
@@ -409,7 +409,7 @@ export function DataTable<T extends Record<string, any>>({
                   <td colSpan={columns.length + (enableRowSelection ? 1 : 0)} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
                       {emptyIcon || (
-                        <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
                       )}
@@ -454,7 +454,7 @@ export function DataTable<T extends Record<string, any>>({
                 />
                 <p className="text-sm text-foreground whitespace-nowrap">per page</p>
               </div>
-              <div className="h-5 w-px bg-slate-300"></div>
+              <div className="h-5 w-px bg-border"></div>
               <p className="text-sm text-foreground">
                 Page{' '}
                 <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>

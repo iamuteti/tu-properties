@@ -9,10 +9,10 @@ import { dashboardApi } from "@/lib/api";
 import { DashboardStats } from "@/types";
 
 const STATUS_COLORS: Record<string, string> = {
-    OCCUPIED: "#8884d8",
-    VACANT: "#82ca9d",
-    MAINTENANCE: "#f59e0b",
-    RESERVED: "#ec4899",
+    OCCUPIED: "var(--chart-2)",
+    VACANT: "var(--chart-1)",
+    MAINTENANCE: "var(--chart-4)",
+    RESERVED: "var(--chart-5)",
 };
 
 export default function DashboardPage() {
@@ -155,7 +155,7 @@ export default function DashboardPage() {
                                         labelLine={false}
                                         label={(entry: any) => `${entry.name} ${entry.value}`}
                                         outerRadius={80}
-                                        fill="#8884d8"
+                                        fill="var(--chart-1)"
                                         dataKey="value"
                                     />
                                     <Tooltip />
@@ -182,8 +182,8 @@ export default function DashboardPage() {
                                 <YAxis />
                                 <Tooltip />
                                 <Legend />
-                                <Bar dataKey="charged" fill="#8884d8" name="Charged" />
-                                <Bar dataKey="collected" fill="#82ca9d" name="Collected" />
+                                <Bar dataKey="charged" fill="var(--chart-1)" name="Charged" />
+                                <Bar dataKey="collected" fill="var(--chart-2)" name="Collected" />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -207,7 +207,7 @@ export default function DashboardPage() {
                                         payload?.[0]?.payload?.property ?? value
                                     }
                                 />
-                                <Bar dataKey="units" fill="#8884d8" name="Units" />
+                                <Bar dataKey="units" fill="var(--chart-1)" name="Units" />
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (

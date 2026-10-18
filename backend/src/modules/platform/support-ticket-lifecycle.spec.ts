@@ -31,9 +31,7 @@ describe('support-ticket-lifecycle', () => {
     [TicketStatus.CLOSED, TicketStatus.IN_PROGRESS],
   ])('refuses %s → %s', (from, to) => {
     expect(canTransitionTicket(from, to)).toBe(false);
-    expect(() => assertTicketTransition(from, to)).toThrow(
-      /cannot move from/,
-    );
+    expect(() => assertTicketTransition(from, to)).toThrow(/cannot move from/);
   });
 
   it('treats a no-op move as allowed (a restated status is not an error)', () => {

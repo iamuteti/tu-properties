@@ -14,22 +14,27 @@ type MockTx = {
 
 function mockTx(overrides: Partial<MockTx> = {}): MockTx {
   const mock: MockTx = {
-      invoice: {
-        findFirst: jest.fn().mockResolvedValue({
-          totalAmount: 100_000,
-          status: InvoiceStatus.PENDING,
-        }),
-        findUnique: jest.fn().mockResolvedValue({ taxWithheldAmount: 0 }),
-        update: jest.fn().mockResolvedValue({}),
-      },
+    invoice: {
+      findFirst: jest.fn().mockResolvedValue({
+        totalAmount: 100_000,
+        status: InvoiceStatus.PENDING,
+      }),
+      findUnique: jest.fn().mockResolvedValue({ taxWithheldAmount: 0 }),
+      update: jest.fn().mockResolvedValue({}),
+    },
     paymentAllocation: {
-      findMany: jest.fn().mockResolvedValue([
-        { paymentId: 'pay-1', amount: 30_000 },
-      ]),
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ paymentId: 'pay-1', amount: 30_000 }]),
     },
     payment: {
       findMany: jest.fn().mockResolvedValue([
-        { id: 'pay-1', amount: 30_000, invoiceId: 'inv-1', isReversed: false },
+        {
+          id: 'pay-1',
+          amount: 30_000,
+          invoiceId: 'inv-1',
+          isReversed: false,
+        },
       ]),
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
     },
@@ -75,7 +80,12 @@ describe('invoiceSettlement', () => {
       },
       payment: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'pay-1', amount: 50_000, invoiceId: 'inv-1', isReversed: false },
+          {
+            id: 'pay-1',
+            amount: 50_000,
+            invoiceId: 'inv-1',
+            isReversed: false,
+          },
         ]),
         aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
       },

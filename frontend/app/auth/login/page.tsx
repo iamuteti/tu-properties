@@ -45,6 +45,12 @@ export default function LoginPage() {
         }
     }, [searchParams, setValue]);
 
+    useEffect(() => {
+        if (!error) return;
+        const timer = setTimeout(() => setError(null), 5000);
+        return () => clearTimeout(timer);
+    }, [error]);
+
     const onSubmit = async (data: LoginFormValues) => {
         setError(null);
         try {

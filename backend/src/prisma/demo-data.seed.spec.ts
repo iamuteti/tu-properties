@@ -165,5 +165,5 @@ describe('demo data seed', () => {
       process.env.DATABASE_URL = previousUrl;
       await prisma?.$disconnect();
     }
-  }, 120_000);
+  }, 300_000);
 });

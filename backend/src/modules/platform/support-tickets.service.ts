@@ -174,9 +174,7 @@ export class SupportTicketsService {
       where: { id },
       data: {
         status: dto.status,
-        ...(dto.resolution !== undefined
-          ? { resolution: dto.resolution }
-          : {}),
+        ...(dto.resolution !== undefined ? { resolution: dto.resolution } : {}),
         ...(dto.status === TicketStatus.RESOLVED
           ? { resolvedAt: new Date(), resolvedById: actor.userId }
           : {}),

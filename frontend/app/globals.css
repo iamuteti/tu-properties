@@ -37,26 +37,27 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
+  /* Landing page light canvas: slate-50 (#f8fafc) / slate-900 (#0f172a). */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #f8fafc;
+  --card-foreground: #0f172a;
+  --popover: #f8fafc;
+  --popover-foreground: #0f172a;
   /* Brand navy (landing canvas #0A1020 family) for primary actions. */
   --primary: oklch(0.22 0.05 265.755);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.22 0.05 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
   /* Brand gold (amber-400 family) for accents; navy text keeps it readable. */
   --accent: oklch(0.93 0.05 85);
   --accent-foreground: oklch(0.22 0.05 265.755);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
+  --border: #e2e8f0;
+  --input: #e2e8f0;
   --ring: oklch(0.45 0.08 265.755);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -64,50 +65,50 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
   /* Active nav pill in brand gold with navy text — the one gold surface in chrome. */
   --sidebar-primary: oklch(0.8 0.16 79);
   --sidebar-primary-foreground: oklch(0.2 0.05 265.755);
   --sidebar-accent: oklch(0.95 0.02 85);
   --sidebar-accent-foreground: oklch(0.22 0.05 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-border: #e2e8f0;
   --sidebar-ring: oklch(0.45 0.08 265.755);
 }
 
 .dark {
-  /* Dark canvas in the landing family (#070B14), gold primary like its CTAs. */
-  --background: oklch(0.19 0.03 265.755);
-  --foreground: oklch(0.93 0.01 255.508);
-  --card: oklch(0.23 0.035 265.755);
-  --card-foreground: oklch(0.93 0.01 255.508);
-  --popover: oklch(0.23 0.035 265.755);
-  --popover-foreground: oklch(0.93 0.01 255.508);
+  /* Landing page dark canvas: #070B14 / slate-100 (#f1f5f9). */
+  --background: #070B14;
+  --foreground: #f1f5f9;
+  --card: #070B14;
+  --card-foreground: #f1f5f9;
+  --popover: #070B14;
+  --popover-foreground: #f1f5f9;
   --primary: oklch(0.8 0.16 79);
   --primary-foreground: oklch(0.2 0.05 265.755);
-  --secondary: oklch(0.28 0.04 265.755);
-  --secondary-foreground: oklch(0.93 0.01 255.508);
-  --muted: oklch(0.28 0.04 265.755);
-  --muted-foreground: oklch(0.71 0.03 257.417);
+  --secondary: #1e293b;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
   --accent: oklch(0.32 0.05 265.755);
   --accent-foreground: oklch(0.93 0.01 255.508);
   --destructive: oklch(0.65 0.2 25.723);
   --destructive-foreground: oklch(0.97 0 0);
-  --border: oklch(0.32 0.04 265.755);
-  --input: oklch(0.32 0.04 265.755);
+  --border: #334155;
+  --input: #334155;
   --ring: oklch(0.8 0.16 79);
   --chart-1: oklch(0.8 0.16 79);
   --chart-2: oklch(0.6 0.12 184.704);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.035 265.755);
-  --sidebar-foreground: oklch(0.93 0.01 255.508);
+  --sidebar: #070B14;
+  --sidebar-foreground: #f1f5f9;
   --sidebar-primary: oklch(0.8 0.16 79);
   --sidebar-primary-foreground: oklch(0.2 0.05 265.755);
-  --sidebar-accent: oklch(0.28 0.04 265.755);
-  --sidebar-accent-foreground: oklch(0.93 0.01 255.508);
-  --sidebar-border: oklch(0.32 0.04 265.755);
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f1f5f9;
+  --sidebar-border: #334155;
   --sidebar-ring: oklch(0.8 0.16 79);
 }
 
@@ -119,6 +120,11 @@
     @apply bg-background text-foreground;
     font-family: var(--font-brand-sans), system-ui, -apple-system,
       'Segoe UI', Roboto, sans-serif;
+    /* Landing page amber selection, applied to every dashboard surface. */
+    ::selection {
+      background: oklch(0.93 0.05 85 / 0.3);
+      color: oklch(0.8 0.16 79);
+    }
   }
 }
 

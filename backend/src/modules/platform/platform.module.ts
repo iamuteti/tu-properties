@@ -47,7 +47,12 @@ import { AuditModule } from '../audit/audit.module';
     PlatformSupportController,
     SupportTicketsController,
   ],
-  providers: [PlatformService, TrialSignupService, ContactService, SupportTicketsService],
+  providers: [
+    PlatformService,
+    TrialSignupService,
+    ContactService,
+    SupportTicketsService,
+  ],
   exports: [PlatformService, SupportTicketsService],
 })
 export class PlatformModule {}

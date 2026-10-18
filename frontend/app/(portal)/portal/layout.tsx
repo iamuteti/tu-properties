@@ -79,7 +79,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                                 aria-current={active ? "page" : undefined}
                                 className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                                     active
-                                        ? "bg-slate-900 text-white"
+                                        ? "bg-primary text-primary-foreground"
                                         : "text-muted-foreground hover:bg-muted"
                                 }`}
                             >
