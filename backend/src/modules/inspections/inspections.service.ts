@@ -13,7 +13,7 @@ import { assertTenantRecord, requireRecord } from '@/common/utils';
 import type {
   CreateInspectionDto,
   UpdateInspectionItemDto,
-} from '@/modules/leases/dto/lease.dto';
+} from '@/modules/agreements/dto/agreement.dto';
 
 /**
  * Move-in / periodic / move-out condition reports (Module 5).
@@ -33,9 +33,9 @@ export class InspectionsService {
       property: { organizationId: tenantId },
     });
 
-    if (dto.rentalAgreementId) {
-      await assertTenantRecord(this.prisma.rentalAgreement, {
-        id: dto.rentalAgreementId,
+    if (dto.agreementId) {
+      await assertTenantRecord(this.prisma.agreement, {
+        id: dto.agreementId,
         OR: [{ organizationId: tenantId }, { organizationId: null }],
       });
     }
@@ -43,8 +43,8 @@ export class InspectionsService {
     return this.prisma.inspectionReport.create({
       data: {
         unit: { connect: { id: dto.unitId } },
-        ...(dto.rentalAgreementId
-          ? { rentalAgreement: { connect: { id: dto.rentalAgreementId } } }
+        ...(dto.agreementId
+          ? { agreement: { connect: { id: dto.agreementId } } }
           : {}),
         ...(tenantId ? { organization: { connect: { id: tenantId } } } : {}),
         type: dto.type as InspectionType,
@@ -259,7 +259,7 @@ export class InspectionsService {
           property: { select: { id: true, name: true } },
         },
       },
-      rentalAgreement: {
+      agreement: {
         select: {
           id: true,
           code: true,

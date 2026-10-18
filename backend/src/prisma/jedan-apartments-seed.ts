@@ -365,7 +365,7 @@ async function main() {
     await prisma.invoice.deleteMany({ where: { organizationId: orgId } });
     await prisma.payment.deleteMany({ where: { organizationId: orgId } });
     await prisma.receipt.deleteMany({ where: { organizationId: orgId } });
-    await prisma.rentalAgreement.deleteMany({
+    await prisma.agreement.deleteMany({
       where: { organizationId: orgId },
     });
     await prisma.tenant.deleteMany({ where: { organizationId: orgId } });
@@ -610,7 +610,7 @@ async function main() {
         termMonths = 12;
       }
 
-      const agreement = await prisma.rentalAgreement.create({
+      const agreement = await prisma.agreement.create({
         data: {
           code: `JEDAN-RA-${String(r(999999) + 1).padStart(6, '0')}`,
           unitId: unit.id,
@@ -749,7 +749,7 @@ async function main() {
       const invoice = await prisma.invoice.create({
         data: {
           invoiceNumber: `INV-JEDAN-${bm.label}-${lease.unitCode.replace('JEDAN-', '').replace('-', '')}-${invoiceCount}`,
-          rentalAgreementId: lease.agreementId,
+          agreementId: lease.agreementId,
           issueDate,
           dueDate,
           amount: totalAmount,
@@ -788,7 +788,7 @@ async function main() {
           r(100) < 70 ? PaymentMethod.MPESA : PaymentMethod.BANK_TRANSFER;
         const payment = await prisma.payment.create({
           data: {
-            rentalAgreementId: lease.agreementId,
+            agreementId: lease.agreementId,
             invoiceId: invoice.id,
             paymentDate,
             amount: paidAmount,

@@ -26,7 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
     RECEIPT: "Receipt",
     PAYMENT: "Payment",
     PAYOUT: "Landlord payout",
-    LEASE: "Lease",
+    LEASE: "Agreement",
     MANUAL: "Manual",
 };
 

@@ -9,21 +9,21 @@ import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import { UnitsService } from '@/modules/units/units.service';
 import type {
-  CreateRentalAgreementDto,
-  ExtendLeaseDto,
-  LeaseFilters,
-  RenewLeaseDto,
-  TerminateLeaseDto,
-  UpdateRentalAgreementDto,
-} from './dto/lease.dto';
+  CreateAgreementDto,
+  ExtendAgreementDto,
+  AgreementFilters,
+  RenewAgreementDto,
+  TerminateAgreementDto,
+  UpdateAgreementDto,
+} from './dto/agreement.dto';
 import {
-  availableLeaseActions,
-  checkLeaseAction,
+  availableAgreementActions,
+  checkAgreementAction,
   daysUntilEnd,
   RENEWAL_WINDOW_DAYS,
-  type LeaseAction,
-  type LeaseGateContext,
-} from './lease-lifecycle';
+  type AgreementAction,
+  type AgreementGateContext,
+} from './agreement-lifecycle';
 
 export interface PaginationParams {
   page?: number;
@@ -48,7 +48,7 @@ const SORTABLE_FIELDS = new Set([
   'rentAmount',
 ]);
 
-const LEASE_EXPORT_HEADERS = [
+const AGREEMENT_EXPORT_HEADERS = [
   'code',
   'status',
   'type',
@@ -66,7 +66,7 @@ const LEASE_EXPORT_HEADERS = [
   'outstanding',
 ];
 
-interface LeaseListRow {
+interface AgreementListRow {
   code: string;
   status: string;
   agreementType: string;
@@ -91,7 +91,7 @@ interface LeaseListRow {
 }
 
 @Injectable()
-export class RentalAgreementsService {
+export class AgreementsService {
   constructor(
     private prisma: PrismaService,
     private unitsService: UnitsService,
@@ -99,7 +99,7 @@ export class RentalAgreementsService {
 
   // ------------------------------------------------------------------- CRUD
 
-  async create(dto: CreateRentalAgreementDto, tenantId: string) {
+  async create(dto: CreateAgreementDto, tenantId: string) {
     const { unitId, tenantId: _tenantId, ...scalars } = dto;
     void _tenantId;
 
@@ -113,7 +113,7 @@ export class RentalAgreementsService {
     });
 
     // One live agreement per unit: two tenants cannot hold the same flat.
-    const existing = await this.prisma.rentalAgreement.findFirst({
+    const existing = await this.prisma.agreement.findFirst({
       where: {
         unitId,
         status: { in: [AgreementStatus.DRAFT, AgreementStatus.ACTIVE] },
@@ -125,7 +125,7 @@ export class RentalAgreementsService {
     });
     if (existing) {
       throw new ConflictException(
-        `This unit already has an open lease (${existing.code}). Terminate or expire it before creating another.`,
+        `This unit already has an open agreement (${existing.code}). Terminate or expire it before creating another.`,
       );
     }
 
@@ -136,11 +136,11 @@ export class RentalAgreementsService {
 
     if (endDate && endDate <= startDate) {
       throw new BadRequestException(
-        'The lease end date must be after its start date.',
+        'The agreement end date must be after its start date.',
       );
     }
 
-    return this.prisma.rentalAgreement.create({
+    return this.prisma.agreement.create({
       data: {
         ...scalars,
         code: await this.nextCode(tenantId),
@@ -149,7 +149,7 @@ export class RentalAgreementsService {
         unit: { connect: { id: unitId } },
         tenant: { connect: { id: dto.tenantId } },
         ...(tenantId ? { organization: { connect: { id: tenantId } } } : {}),
-      } as Prisma.RentalAgreementCreateInput,
+      } as Prisma.AgreementCreateInput,
       include: this.listInclude(),
     });
   }
@@ -157,7 +157,7 @@ export class RentalAgreementsService {
   findAll(
     tenantId: string,
     params?: PaginationParams,
-    filters?: LeaseFilters,
+    filters?: AgreementFilters,
   ): Promise<PaginatedResult<unknown>> {
     const {
       page = 1,
@@ -169,7 +169,7 @@ export class RentalAgreementsService {
     const skip = (page - 1) * limit;
     const orderField = SORTABLE_FIELDS.has(sortBy) ? sortBy : 'createdAt';
 
-    const where: Prisma.RentalAgreementWhereInput = {
+    const where: Prisma.AgreementWhereInput = {
       OR: [{ organizationId: tenantId }, { organizationId: null }],
     };
 
@@ -227,14 +227,14 @@ export class RentalAgreementsService {
 
     return this.prisma.$transaction(async (tx) => {
       const [data, total] = await Promise.all([
-        tx.rentalAgreement.findMany({
+        tx.agreement.findMany({
           where,
           skip,
           take: limit,
           include: this.listInclude(),
           orderBy: { [orderField]: sortOrder },
         }),
-        tx.rentalAgreement.count({ where }),
+        tx.agreement.count({ where }),
       ]);
 
       return {
@@ -253,7 +253,7 @@ export class RentalAgreementsService {
     const horizon = new Date();
     horizon.setDate(horizon.getDate() + days);
 
-    const leases = await this.prisma.rentalAgreement.findMany({
+    const leases = await this.prisma.agreement.findMany({
       where: {
         OR: [{ organizationId: tenantId }, { organizationId: null }],
         status: AgreementStatus.ACTIVE,
@@ -282,7 +282,7 @@ export class RentalAgreementsService {
    */
   async findOne(id: string, tenantId: string) {
     const lease = await requireRecord(
-      this.prisma.rentalAgreement.findFirst({
+      this.prisma.agreement.findFirst({
         where: {
           id,
           OR: [{ organizationId: tenantId }, { organizationId: null }],
@@ -310,7 +310,7 @@ export class RentalAgreementsService {
           payments: { orderBy: { paymentDate: 'desc' } },
         },
       }),
-      'Lease',
+      'Agreement',
     );
 
     const money = this.leaseMoney(lease);
@@ -321,14 +321,14 @@ export class RentalAgreementsService {
       money,
       timeline: {
         daysRemaining: daysUntilEnd(lease.endDate),
-        availableActions: availableLeaseActions(lease.status, context),
+        availableActions: availableAgreementActions(lease.status, context),
         notices: this.leaseNotices(lease, context),
       },
     };
   }
 
-  async update(id: string, dto: UpdateRentalAgreementDto, tenantId: string) {
-    await assertTenantRecord(this.prisma.rentalAgreement, {
+  async update(id: string, dto: UpdateAgreementDto, tenantId: string) {
+    await assertTenantRecord(this.prisma.agreement, {
       id,
       OR: [{ organizationId: tenantId }, { organizationId: null }],
     });
@@ -337,44 +337,44 @@ export class RentalAgreementsService {
 
     if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
       throw new BadRequestException(
-        'The lease end date must be after its start date.',
+        'The agreement end date must be after its start date.',
       );
     }
 
-    return this.prisma.rentalAgreement.update({
+    return this.prisma.agreement.update({
       where: { id },
       data: {
         ...scalars,
         ...(startDate ? { startDate: new Date(startDate) } : {}),
         ...(endDate ? { endDate: new Date(endDate) } : {}),
-      } as Prisma.RentalAgreementUpdateInput,
+      } as Prisma.AgreementUpdateInput,
       include: this.listInclude(),
     });
   }
 
   async remove(id: string, tenantId: string) {
-    await assertTenantRecord(this.prisma.rentalAgreement, {
+    await assertTenantRecord(this.prisma.agreement, {
       id,
       OR: [{ organizationId: tenantId }, { organizationId: null }],
     });
 
-    const lease = await this.prisma.rentalAgreement.findUniqueOrThrow({
+    const lease = await this.prisma.agreement.findUniqueOrThrow({
       where: { id },
       select: { status: true, invoices: { select: { id: true } } },
     });
 
     if (lease.status === AgreementStatus.ACTIVE) {
       throw new ConflictException(
-        'An active lease cannot be deleted — terminate it so the history and the unit occupancy stay correct.',
+        'An active agreement cannot be deleted — terminate it so the history and the unit occupancy stay correct.',
       );
     }
     if (lease.invoices.length > 0) {
       throw new ConflictException(
-        `This lease has ${lease.invoices.length} invoice(s) attached. Terminate it instead of deleting it.`,
+        `This agreement has ${lease.invoices.length} invoice(s) attached. Terminate it instead of deleting it.`,
       );
     }
 
-    return this.prisma.rentalAgreement.delete({ where: { id } });
+    return this.prisma.agreement.delete({ where: { id } });
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -388,7 +388,7 @@ export class RentalAgreementsService {
       await this.gateContext(lease, tenantId),
     );
 
-    const updated = await this.prisma.rentalAgreement.update({
+    const updated = await this.prisma.agreement.update({
       where: { id },
       data: { status: AgreementStatus.ACTIVE, activatedAt: new Date() },
       include: this.listInclude(),
@@ -406,14 +406,14 @@ export class RentalAgreementsService {
    * deposit and term may all change — and because occupancy history should show
    * the tenancies, not the paperwork edits.
    */
-  async renew(id: string, dto: RenewLeaseDto, tenantId: string) {
+  async renew(id: string, dto: RenewAgreementDto, tenantId: string) {
     const lease = await this.loadForAction(id, tenantId);
     const context = await this.gateContext(lease, tenantId);
     this.assertAction(lease, 'RENEW', context);
 
     if (lease.renewedToId) {
       throw new ConflictException(
-        'This lease has already been renewed. Renew the newest agreement in the chain instead.',
+        'This agreement has already been renewed. Renew the newest agreement in the chain instead.',
       );
     }
 
@@ -423,7 +423,7 @@ export class RentalAgreementsService {
 
     if (!start) {
       throw new BadRequestException(
-        'This lease has no end date, so the renewal needs an explicit start date.',
+        'This agreement has no end date, so the renewal needs an explicit start date.',
       );
     }
 
@@ -441,7 +441,7 @@ export class RentalAgreementsService {
       );
     }
 
-    const successor = await this.prisma.rentalAgreement.create({
+    const successor = await this.prisma.agreement.create({
       data: {
         code: await this.nextCode(tenantId),
         unit: { connect: { id: lease.unitId } },
@@ -463,11 +463,11 @@ export class RentalAgreementsService {
         status: AgreementStatus.ACTIVE,
         activatedAt: new Date(),
         renewedFrom: { connect: { id: lease.id } },
-      } as Prisma.RentalAgreementCreateInput,
+      } as Prisma.AgreementCreateInput,
       include: this.listInclude(),
     });
 
-    await this.prisma.rentalAgreement.update({
+    await this.prisma.agreement.update({
       where: { id: lease.id },
       data: { status: AgreementStatus.RENEWED, renewedToId: successor.id },
     });
@@ -479,7 +479,7 @@ export class RentalAgreementsService {
   }
 
   /** Extend in place — used for rolling monthlies with no fixed end date. */
-  async extend(id: string, dto: ExtendLeaseDto, tenantId: string) {
+  async extend(id: string, dto: ExtendAgreementDto, tenantId: string) {
     const lease = await this.loadForAction(id, tenantId);
     this.assertAction(lease, 'EXTEND', await this.gateContext(lease, tenantId));
 
@@ -490,7 +490,7 @@ export class RentalAgreementsService {
       );
     }
 
-    const updated = await this.prisma.rentalAgreement.update({
+    const updated = await this.prisma.agreement.update({
       where: { id },
       data: { endDate: newEnd },
       include: this.listInclude(),
@@ -506,12 +506,12 @@ export class RentalAgreementsService {
    * a tenant leaving owing money is ordinary, so termination is not blocked, but
    * the caller always learns what is outstanding.
    */
-  async terminate(id: string, dto: TerminateLeaseDto, tenantId: string) {
+  async terminate(id: string, dto: TerminateAgreementDto, tenantId: string) {
     const lease = await this.loadForAction(id, tenantId);
     const context = await this.gateContext(lease, tenantId);
     this.assertAction(lease, 'TERMINATE', context);
 
-    const updated = await this.prisma.rentalAgreement.update({
+    const updated = await this.prisma.agreement.update({
       where: { id },
       data: {
         status: AgreementStatus.TERMINATED,
@@ -523,13 +523,13 @@ export class RentalAgreementsService {
 
     const money = this.leaseMoney({
       invoices: await this.prisma.invoice.findMany({
-        where: { rentalAgreementId: id },
+        where: { agreementId: id },
         include: { payments: { select: { amount: true } } },
       }),
     });
 
     // Vacate the unit only if no successor agreement took over.
-    const successor = await this.prisma.rentalAgreement.findFirst({
+    const successor = await this.prisma.agreement.findFirst({
       where: {
         unitId: lease.unitId,
         status: { in: [AgreementStatus.DRAFT, AgreementStatus.ACTIVE] },
@@ -545,7 +545,7 @@ export class RentalAgreementsService {
     }
 
     // The tenant is no longer a current occupier of anything.
-    const stillActive = await this.prisma.rentalAgreement.count({
+    const stillActive = await this.prisma.agreement.count({
       where: {
         tenantId: lease.tenantId,
         status: AgreementStatus.ACTIVE,
@@ -573,7 +573,7 @@ export class RentalAgreementsService {
     const context = await this.gateContext(lease, tenantId);
     this.assertAction(lease, 'EXPIRE', context);
 
-    const updated = await this.prisma.rentalAgreement.update({
+    const updated = await this.prisma.agreement.update({
       where: { id },
       data: { status: AgreementStatus.EXPIRED, expiredAt: new Date() },
       include: this.listInclude(),
@@ -589,7 +589,7 @@ export class RentalAgreementsService {
     const context = await this.gateContext(lease, tenantId);
     this.assertAction(lease, 'REACTIVATE', context);
 
-    const updated = await this.prisma.rentalAgreement.update({
+    const updated = await this.prisma.agreement.update({
       where: { id },
       data: { status: AgreementStatus.ACTIVE, expiredAt: null },
       include: this.listInclude(),
@@ -606,7 +606,7 @@ export class RentalAgreementsService {
     const lease = await this.loadForAction(id, tenantId);
 
     const invoices = await this.prisma.invoice.findMany({
-      where: { rentalAgreementId: id },
+      where: { agreementId: id },
       orderBy: { dueDate: 'desc' },
       include: { payments: { orderBy: { paymentDate: 'desc' } } },
     });
@@ -645,7 +645,7 @@ export class RentalAgreementsService {
         where: { id: unitId },
         include: {
           property: { select: { id: true, name: true, code: true } },
-          rentalAgreements: {
+          agreements: {
             orderBy: { startDate: 'asc' },
             include: {
               tenant: {
@@ -663,7 +663,7 @@ export class RentalAgreementsService {
       'Unit',
     );
 
-    const periods = unit.rentalAgreements.map((agreement) => {
+    const periods = unit.agreements.map((agreement) => {
       const start = agreement.startDate;
       const end =
         agreement.terminatedAt ??
@@ -736,14 +736,18 @@ export class RentalAgreementsService {
 
   // ------------------------------------------------------------------ export
 
-  async exportCsv(tenantId: string, filters?: LeaseFilters, search?: string) {
+  async exportCsv(
+    tenantId: string,
+    filters?: AgreementFilters,
+    search?: string,
+  ) {
     const { data } = await this.findAll(
       tenantId,
       { limit: 10000, search },
       filters,
     );
 
-    const rows = (data as unknown as LeaseListRow[]).map((lease) => {
+    const rows = (data as unknown as AgreementListRow[]).map((lease) => {
       const money = this.leaseMoney(lease as never);
       return {
         code: lease.code,
@@ -766,7 +770,7 @@ export class RentalAgreementsService {
       };
     });
 
-    return toCsv(LEASE_EXPORT_HEADERS, rows);
+    return toCsv(AGREEMENT_EXPORT_HEADERS, rows);
   }
 
   // ---------------------------------------------------------------- helpers
@@ -799,7 +803,7 @@ export class RentalAgreementsService {
 
   private async loadForAction(id: string, tenantId: string) {
     return requireRecord(
-      this.prisma.rentalAgreement.findFirst({
+      this.prisma.agreement.findFirst({
         where: {
           id,
           OR: [{ organizationId: tenantId }, { organizationId: null }],
@@ -818,10 +822,10 @@ export class RentalAgreementsService {
       startDate: Date;
       endDate: Date | null;
     },
-    action: LeaseAction,
-    context: LeaseGateContext,
+    action: AgreementAction,
+    context: AgreementGateContext,
   ) {
-    const check = checkLeaseAction(lease.status, action, context);
+    const check = checkAgreementAction(lease.status, action, context);
     if (!check.allowed) {
       throw new ConflictException(check.reason);
     }
@@ -836,8 +840,8 @@ export class RentalAgreementsService {
       status: AgreementStatus;
     },
     tenantId: string,
-  ): Promise<LeaseGateContext> {
-    const otherActive = await this.prisma.rentalAgreement.findFirst({
+  ): Promise<AgreementGateContext> {
+    const otherActive = await this.prisma.agreement.findFirst({
       where: {
         unitId: lease.unitId,
         id: { not: (lease as { id?: string }).id ?? '' },
@@ -851,7 +855,7 @@ export class RentalAgreementsService {
 
     const moveOut = await this.prisma.moveOutRequest.findFirst({
       where: {
-        rentalAgreementId: (lease as { id?: string }).id ?? '',
+        agreementId: (lease as { id?: string }).id ?? '',
         status: { in: ['PENDING', 'APPROVED'] },
       },
       select: { id: true },
@@ -866,9 +870,9 @@ export class RentalAgreementsService {
   }
 
   /**
-   * Lease money. Unpaid rent is measured from the recorded payments, not from
+   * Agreement money. Unpaid rent is measured from the recorded payments, not from
    * `Invoice.balanceAmount` — finance never reconciles that column (see the
-   * known-issues list), so trusting it would report every lease as fully
+   * known-issues list), so trusting it would report every agreement as fully
    * outstanding.
    */
   private leaseMoney(lease: {
@@ -911,7 +915,7 @@ export class RentalAgreementsService {
       endDate: Date | null;
       terminatedReason?: string | null;
     },
-    context: LeaseGateContext,
+    context: AgreementGateContext,
   ): string[] {
     const notices: string[] = [];
     const remaining = daysUntilEnd(lease.endDate);
@@ -923,7 +927,7 @@ export class RentalAgreementsService {
       lease.status === AgreementStatus.ACTIVE
     ) {
       notices.push(
-        'This lease has passed its end date — expire it to free the unit.',
+        'This agreement has passed its end date — expire it to free the unit.',
       );
     } else if (
       remaining !== null &&
@@ -937,7 +941,7 @@ export class RentalAgreementsService {
       context.hasOtherActiveAgreement &&
       lease.status !== AgreementStatus.RENEWED
     ) {
-      notices.push('Another lease is already open on this unit.');
+      notices.push('Another agreement is already open on this unit.');
     }
     if (context.moveOutRequested) {
       notices.push('A move-out request is open against this tenancy.');
@@ -950,7 +954,7 @@ export class RentalAgreementsService {
   }
 
   private async nextCode(tenantId: string) {
-    const count = await this.prisma.rentalAgreement.count({
+    const count = await this.prisma.agreement.count({
       where: { OR: [{ organizationId: tenantId }, { organizationId: null }] },
     });
     return `RA-${String(count + 1).padStart(6, '0')}`;

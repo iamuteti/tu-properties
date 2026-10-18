@@ -338,7 +338,7 @@ export class CreditsService {
         where: {
           id: { in: invoiceIds },
           ...(credit.tenantId && {
-            rentalAgreement: { tenantId: credit.tenantId },
+            agreement: { tenantId: credit.tenantId },
           }),
           ...(credit.landlordId && { landlordId: credit.landlordId }),
         },
@@ -355,7 +355,7 @@ export class CreditsService {
         status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
         balanceAmount: { gt: 0 },
         ...(credit.tenantId
-          ? { rentalAgreement: { tenantId: credit.tenantId } }
+          ? { agreement: { tenantId: credit.tenantId } }
           : {}),
         ...(credit.landlordId ? { landlordId: credit.landlordId } : {}),
       },

@@ -89,7 +89,7 @@ export const CONTRACT_EXPIRY_WARNING_DAYS = [1, 7, 14, 30, 60, 90] as const;
 
 /** The four counterparty-bearing columns. `COMPLIANCE` uses none of them. */
 export interface RelatedEntityFlags {
-  rentalAgreementId?: string | null;
+  agreementId?: string | null;
   saleTransactionId?: string | null;
   supplierId?: string | null;
   landlordId?: string | null;
@@ -293,7 +293,7 @@ const REQUIRED_ENTITY: Record<
   Exclude<ContractType, 'COMPLIANCE'>,
   keyof RelatedEntityFlags
 > = {
-  LEASE: 'rentalAgreementId',
+  LEASE: 'agreementId',
   SALE: 'saleTransactionId',
   VENDOR: 'supplierId',
   MANAGEMENT: 'landlordId',

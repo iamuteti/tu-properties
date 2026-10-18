@@ -58,7 +58,7 @@ describe('UnitsService', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'prop-1' }),
         count: jest.fn().mockResolvedValue(0),
       },
-      rentalAgreement: {
+      agreement: {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -161,7 +161,7 @@ describe('UnitsService', () => {
       prisma.unit.findFirst.mockResolvedValue({
         ...unit,
         status: UnitStatus.OCCUPIED,
-        rentalAgreements: [
+        agreements: [
           {
             status: AgreementStatus.ACTIVE,
             startDate: new Date('2026-01-01'),
@@ -196,7 +196,7 @@ describe('UnitsService', () => {
 
   describe('status transitions', () => {
     it('refuses OCCUPIED when no agreement is active', async () => {
-      prisma.rentalAgreement.findMany.mockResolvedValue([]);
+      prisma.agreement.findMany.mockResolvedValue([]);
       await expect(
         service.setStatus('unit-1', UnitStatus.OCCUPIED, 'org-1'),
       ).rejects.toThrow(ConflictException);
@@ -204,7 +204,7 @@ describe('UnitsService', () => {
     });
 
     it('applies a legal transition', async () => {
-      prisma.rentalAgreement.findMany.mockResolvedValue([]);
+      prisma.agreement.findMany.mockResolvedValue([]);
       const updated = await service.setStatus(
         'unit-1',
         UnitStatus.MAINTENANCE,
@@ -218,7 +218,7 @@ describe('UnitsService', () => {
         id: 'unit-1',
         status: UnitStatus.OCCUPIED,
       });
-      prisma.rentalAgreement.findMany.mockResolvedValue([
+      prisma.agreement.findMany.mockResolvedValue([
         {
           status: AgreementStatus.ACTIVE,
           startDate: new Date('2026-01-01'),
@@ -235,7 +235,7 @@ describe('UnitsService', () => {
         id: 'unit-1',
         status: UnitStatus.VACANT,
       });
-      prisma.rentalAgreement.findMany.mockResolvedValue([
+      prisma.agreement.findMany.mockResolvedValue([
         {
           status: AgreementStatus.ACTIVE,
           startDate: new Date('2026-01-01'),
@@ -261,7 +261,7 @@ describe('UnitsService', () => {
         id: 'unit-1',
         status: UnitStatus.OCCUPIED,
       });
-      prisma.rentalAgreement.findMany.mockResolvedValue([
+      prisma.agreement.findMany.mockResolvedValue([
         {
           status: AgreementStatus.ACTIVE,
           startDate: new Date('2020-01-01'),
@@ -283,7 +283,7 @@ describe('UnitsService', () => {
         id: 'unit-1',
         status: UnitStatus.VACANT,
       });
-      prisma.rentalAgreement.findMany.mockResolvedValue([]);
+      prisma.agreement.findMany.mockResolvedValue([]);
 
       const result = await service.syncOccupancyStatus('unit-1', 'org-1');
 
@@ -307,7 +307,7 @@ describe('UnitsService', () => {
 
     it('reports a 409 instead of an FK error when a lease references the unit', async () => {
       prisma.unit.findFirst.mockResolvedValue({ id: 'unit-1' });
-      prisma.rentalAgreement.count.mockResolvedValue(2);
+      prisma.agreement.count.mockResolvedValue(2);
       await expect(service.remove('unit-1', 'org-1')).rejects.toThrow(
         ConflictException,
       );
@@ -344,7 +344,7 @@ describe('UnitsService', () => {
         {
           ...unit,
           property: { code: 'PR-001', name: 'Sunset' },
-          rentalAgreements: [activeAgreement],
+          agreements: [activeAgreement],
         },
       ]);
 

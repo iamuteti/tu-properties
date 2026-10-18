@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/entity-states";
-import { AgreementStatusBadge } from "@/components/leases/agreement-status-badge";
+import { AgreementStatusBadge } from "@/components/agreements/agreement-status-badge";
 import { tenantsApi } from "@/lib/api";
 import type { Tenant } from "@/types";
 
@@ -141,7 +141,7 @@ export default function TenantDetailPage() {
                                     label="Lease"
                                     value={
                                         <Link
-                                            href={`/rental-agreements/${lease.id}`}
+                                            href={`/agreements/${lease.id}`}
                                             className="hover:underline"
                                         >
                                             {lease.code ?? "Draft lease"}

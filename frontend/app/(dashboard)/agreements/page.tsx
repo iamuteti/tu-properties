@@ -5,22 +5,22 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle, Download, Eye, FileText, Pencil, Plus, Trash2 } from "lucide-react";
-import { useLeases, useExpiringLeases } from "@/hooks/use-leases";
+import { useAgreements, useExpiringAgreements } from "@/hooks/use-agreements";
 import { DataTable, type PaginationMeta } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { RowActionsMenu } from "@/components/ui/row-actions";
-import { AgreementStatusBadge } from "@/components/leases/agreement-status-badge";
-import { leasesApi } from "@/lib/api";
+import { AgreementStatusBadge } from "@/components/agreements/agreement-status-badge";
+import { agreementsApi } from "@/lib/api";
 import { AGREEMENT_STATUSES, AGREEMENT_TYPES } from "@/lib/constants";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Lease } from "@/types";
 
 /**
- * The single lease list. It replaces the orphan `/leases` page (a second list
- * for the same data with a dead row click) and the bare table that used to sit
- * here with a non-functional "…" button.
+ * The single agreements list. It replaces the orphan `/agreements` page (a
+ * second list for the same data with a dead row click) and the bare table that
+ * used to sit here with a non-functional "…" button.
  */
 export default function RentalAgreementsPage() {
     const router = useRouter();
@@ -34,7 +34,7 @@ export default function RentalAgreementsPage() {
     const [applied, setApplied] = useState({ status: "", type: "" });
     const [search, setSearch] = useState("");
 
-    const { leases, paginationMeta, isLoading, error, refetch } = useLeases({
+    const { agreements, paginationMeta, isLoading, error, refetch } = useAgreements({
         page,
         limit,
         search: search || undefined,
@@ -45,14 +45,14 @@ export default function RentalAgreementsPage() {
     });
 
     // Expiry reminder stub: the query that a Notifications job will consume.
-    const expiring = useExpiringLeases(60);
+    const expiring = useExpiringAgreements(60);
 
     const handleDelete = useCallback(
         async (lease: Lease) => {
             if (!confirm(`Delete lease ${lease.code ?? ''}? This cannot be undone.`)) return;
             try {
-                await leasesApi.removeLease(lease.id);
-                toast.success("Lease deleted");
+                await agreementsApi.removeLease(lease.id);
+                toast.success("Agreement deleted");
                 await refetch();
             } catch (err: any) {
                 toast.error(err.response?.data?.message || "Failed to delete the lease.");
@@ -65,11 +65,11 @@ export default function RentalAgreementsPage() {
         () => [
             {
                 accessorKey: "code",
-                header: "Lease",
+                header: "Agreement",
                 cell: ({ row }) => (
                     <div className="flex flex-col gap-0.5">
                         <Link
-                            href={`/rental-agreements/${row.original.id}`}
+                            href={`/agreements/${row.original.id}`}
                             className="font-medium hover:underline"
                         >
                             {row.original.code ?? "Draft lease"}
@@ -143,18 +143,18 @@ export default function RentalAgreementsPage() {
                     <div className="flex justify-end">
                         <RowActionsMenu<Lease>
                             row={row.original}
-                            label={`Actions for lease ${row.original.code ?? ""}`}
-                            actions={[
-                                {
-                                    label: "View lease",
-                                    icon: <Eye className="h-4 w-4" aria-hidden="true" />,
-                                    onSelect: (lease) => router.push(`/rental-agreements/${lease.id}`),
-                                },
-                                {
-                                    label: "Edit lease",
-                                    icon: <Pencil className="h-4 w-4" aria-hidden="true" />,
-                                    onSelect: (lease) => router.push(`/rental-agreements/${lease.id}/edit`),
-                                },
+                                label={`Actions for agreement ${row.original.code ?? ""}`}
+                                actions={[
+                                    {
+                                        label: "View agreement",
+                                        icon: <Eye className="h-4 w-4" aria-hidden="true" />,
+                                        onSelect: (lease) => router.push(`/agreements/${lease.id}`),
+                                    },
+                                    {
+                                        label: "Edit agreement",
+                                        icon: <Pencil className="h-4 w-4" aria-hidden="true" />,
+                                        onSelect: (lease) => router.push(`/agreements/${lease.id}/edit`),
+                                    },
                                 {
                                     label: "Raise a move-out",
                                     icon: <AlertTriangle className="h-4 w-4" aria-hidden="true" />,
@@ -164,16 +164,16 @@ export default function RentalAgreementsPage() {
                                             ? "Only an active lease can end with a move-out"
                                             : undefined,
                                     onSelect: (lease) =>
-                                        router.push(`/rental-agreements/${lease.id}`),
+                                        router.push(`/agreements/${lease.id}`),
                                 },
                                 {
-                                    label: "Delete lease",
+                                    label: "Delete agreement",
                                     icon: <Trash2 className="h-4 w-4" aria-hidden="true" />,
                                     variant: "danger",
                                     disabled: row.original.status === "ACTIVE",
                                     disabledReason:
                                         row.original.status === "ACTIVE"
-                                            ? "Terminate an active lease instead of deleting it"
+                                            ? "Terminate an active agreement instead of deleting it"
                                             : undefined,
                                     onSelect: handleDelete,
                                 },
@@ -195,7 +195,7 @@ export default function RentalAgreementsPage() {
           }
         : undefined;
 
-    const exportUrl = leasesApi.exportUrl({
+    const exportUrl = agreementsApi.exportUrl({
         search: search || undefined,
         status: applied.status || undefined,
         agreementType: applied.type || undefined,
@@ -205,7 +205,7 @@ export default function RentalAgreementsPage() {
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Leases</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Agreements</h1>
                     <p className="text-muted-foreground">
                         Tenancies from draft to renewal or move-out
                     </p>
@@ -215,23 +215,23 @@ export default function RentalAgreementsPage() {
                         <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                         Export CSV
                     </Button>
-                    <Link href="/rental-agreements/new">
+                    <Link href="/tenants/new">
                         <Button>
                             <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                            New Lease
+                            New Agreement
                         </Button>
                     </Link>
                 </div>
             </div>
 
-            {expiring.leases.length > 0 && (
+            {expiring.agreements.length > 0 && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
                                 <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                                {expiring.leases.length} lease
-                                {expiring.leases.length === 1 ? '' : 's'} ending within 60
+                                {expiring.agreements.length} agreement
+                                {expiring.agreements.length === 1 ? '' : 's'} ending within 60
                                 days
                             </h2>
                             <p className="mt-0.5 text-xs text-amber-800">
@@ -240,10 +240,10 @@ export default function RentalAgreementsPage() {
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {expiring.leases.slice(0, 4).map((lease) => (
+                            {expiring.agreements.slice(0, 4).map((lease) => (
                                 <Link
                                     key={lease.id}
-                                    href={`/rental-agreements/${lease.id}`}
+                                    href={`/agreements/${lease.id}`}
                                     className="rounded-md bg-card px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm hover:bg-amber-100"
                                 >
                                     {lease.tenant
@@ -311,8 +311,8 @@ export default function RentalAgreementsPage() {
                 </div>
             </div>
 
-            {isLoading && leases.length === 0 ? (
-                <div className="py-12 text-center text-sm text-muted-foreground">Loading leases…</div>
+            {isLoading && agreements.length === 0 ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">Loading agreements…</div>
             ) : error ? (
                 <div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive">
                     {error}
@@ -322,10 +322,10 @@ export default function RentalAgreementsPage() {
                 </div>
             ) : (
                 <DataTable
-                    data={leases}
+                    data={agreements}
                     columns={columns}
                     searchPlaceholder="Search by lease code, tenant or unit…"
-                    emptyMessage="No leases yet. Draft one against a vacant unit."
+                    emptyMessage="No agreements yet. Draft one against a vacant unit."
                     emptyIcon={<FileText className="h-12 w-12 text-slate-400" aria-hidden="true" />}
                     serverSidePagination
                     paginationMeta={meta}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { AxiosError } from "axios";
-import { tenantsApi, rentalAgreementsApi } from "@/lib/api";
+import { tenantsApi, agreementsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { Tenant, RentalAgreement, Unit, Property } from "@/types";
 import { TableData } from "@/components/ui/expandable-table";
@@ -21,11 +21,11 @@ export function useTableData() {
         try {
             const [tenantsResponse, agreementsResponse] = await Promise.all([
                 tenantsApi.findAll(),
-                rentalAgreementsApi.findAll()
+                agreementsApi.findLeases()
             ]);
 
             const tenants: Tenant[] = tenantsResponse.data.data;
-            const agreements: RentalAgreementWithRelations[] = agreementsResponse.data;
+            const agreements: RentalAgreementWithRelations[] = agreementsResponse.data.data as unknown as RentalAgreementWithRelations[];
 
             const agreementMap = new Map<string, RentalAgreementWithRelations>();
             agreements.forEach(agreement => {

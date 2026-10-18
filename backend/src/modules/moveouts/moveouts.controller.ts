@@ -21,7 +21,7 @@ import {
   CreateDeductionDto,
   CreateMoveOutRequestDto,
   RefundDepositDto,
-} from '@/modules/leases/dto/lease.dto';
+} from '@/modules/agreements/dto/agreement.dto';
 
 const MOVE_OUT_ROLES = [
   UserRole.SUPER_ADMIN,
@@ -43,7 +43,7 @@ export class MoveoutsController {
 
   @Post()
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   create(@Body() dto: CreateMoveOutRequestDto, @Request() req) {
     return this.moveoutsService.create(
       { ...dto, moveoutDate: new Date(dto.moveoutDate) },
@@ -81,7 +81,7 @@ export class MoveoutsController {
 
   @Patch(':id')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   update(
     @Param('id') id: string,
     @Body() dto: { moveoutDate?: string; notes?: string },
@@ -99,7 +99,7 @@ export class MoveoutsController {
 
   @Post(':id/approve')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   approve(
     @Param('id') id: string,
     @Body() dto: ApproveMoveOutDto,
@@ -120,7 +120,7 @@ export class MoveoutsController {
 
   @Post(':id/reject')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   reject(
     @Param('id') id: string,
     @Body() dto: { notes: string },
@@ -137,7 +137,7 @@ export class MoveoutsController {
 
   @Post(':id/deductions')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   addDeduction(
     @Param('id') id: string,
     @Body() dto: CreateDeductionDto,
@@ -153,7 +153,7 @@ export class MoveoutsController {
 
   @Delete(':id/deductions/:deductionId')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   removeDeduction(
     @Param('id') id: string,
     @Param('deductionId') deductionId: string,
@@ -168,7 +168,7 @@ export class MoveoutsController {
 
   @Post(':id/refund')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   refund(
     @Param('id') id: string,
     @Body() dto: RefundDepositDto,
@@ -184,7 +184,7 @@ export class MoveoutsController {
 
   @Delete(':id')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   remove(@Param('id') id: string, @Request() req) {
     return this.moveoutsService.remove(id, requireTenantId(req));
   }

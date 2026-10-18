@@ -49,7 +49,7 @@ export class CreateTenantRequestDto {
    */
   @IsOptional()
   @IsString()
-  rentalAgreementId?: string;
+  agreementId?: string;
 
   /** Requested date, e.g. when they want to move out. */
   @IsOptional()

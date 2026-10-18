@@ -7,7 +7,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { DeductionCategory, Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { UnitsService } from '@/modules/units/units.service';
-import { calculateDeposit, validateDeduction } from './lease-deposit';
+import { calculateDeposit, validateDeduction } from './agreement-deposit';
 
 export interface PaginationParams {
   page?: number;
@@ -31,7 +31,7 @@ export interface PaginatedResult<T> {
  *
  * The audit found the deposit refund was a number typed into the form, which is
  * not auditable. Now the itemised deductions are the record and the refund is
- * always derived from them (see `lease-deposit.ts`), and the lifecycle is
+ * always derived from them (see `agreement-deposit.ts`), and the lifecycle is
  * explicit: PENDING → APPROVED → COMPLETED, or REJECTED.
  */
 @Injectable()
@@ -49,13 +49,13 @@ export class MoveoutsService {
    * and it tenant-checks the agreement in the same step.
    */
   async create(
-    dto: { rentalAgreementId: string; moveoutDate: Date; notes?: string },
+    dto: { agreementId: string; moveoutDate: Date; notes?: string },
     tenantId: string,
   ) {
     const agreement = await requireRecord(
-      this.prisma.rentalAgreement.findFirst({
+      this.prisma.agreement.findFirst({
         where: {
-          id: dto.rentalAgreementId,
+          id: dto.agreementId,
           OR: [{ organizationId: tenantId }, { organizationId: null }],
         },
         select: { id: true, tenantId: true, status: true },
@@ -65,7 +65,7 @@ export class MoveoutsService {
 
     const open = await this.prisma.moveOutRequest.findFirst({
       where: {
-        rentalAgreementId: agreement.id,
+        agreementId: agreement.id,
         status: { in: ['PENDING', 'APPROVED'] },
       },
       select: { id: true },
@@ -78,7 +78,7 @@ export class MoveoutsService {
 
     return this.prisma.moveOutRequest.create({
       data: {
-        rentalAgreement: { connect: { id: agreement.id } },
+        agreement: { connect: { id: agreement.id } },
         tenant: { connect: { id: agreement.tenantId } },
         moveoutDate: dto.moveoutDate,
         notes: dto.notes ?? null,
@@ -222,8 +222,8 @@ export class MoveoutsService {
 
     // Terminate the lease through the leasing rules so the occupancy sync and
     // the termination reason behave exactly as they do from the lease screen.
-    await this.prisma.rentalAgreement.update({
-      where: { id: request.rentalAgreementId },
+    await this.prisma.agreement.update({
+      where: { id: request.agreementId },
       data: {
         status: 'TERMINATED',
         terminatedAt: new Date(request.moveoutDate),
@@ -231,17 +231,17 @@ export class MoveoutsService {
       },
     });
 
-    const successor = await this.prisma.rentalAgreement.findFirst({
+    const successor = await this.prisma.agreement.findFirst({
       where: {
-        unitId: request.rentalAgreement.unitId,
-        id: { not: request.rentalAgreementId },
+        unitId: request.agreement.unitId,
+        id: { not: request.agreementId },
         status: { in: ['DRAFT', 'ACTIVE'] },
       },
       select: { id: true },
     });
     if (!successor && tenantId) {
       await this.unitsService.syncOccupancyStatus(
-        request.rentalAgreement.unitId,
+        request.agreement.unitId,
         tenantId,
       );
     }
@@ -275,7 +275,7 @@ export class MoveoutsService {
   async depositCalculation(id: string, tenantId?: string) {
     const request = await this.loadOne(id, tenantId);
 
-    const deposit = Number(request.rentalAgreement.securityDeposit ?? 0);
+    const deposit = Number(request.agreement.securityDeposit ?? 0);
     const deductions = request.deductions.map((deduction) => ({
       category: deduction.category,
       description: deduction.description,
@@ -288,7 +288,7 @@ export class MoveoutsService {
     }));
 
     const invoices = await this.prisma.invoice.findMany({
-      where: { rentalAgreementId: request.rentalAgreementId },
+      where: { agreementId: request.agreementId },
       include: { payments: { select: { amount: true } } },
     });
 
@@ -319,7 +319,7 @@ export class MoveoutsService {
     return {
       moveOutRequestId: id,
       status: request.status,
-      currency: request.rentalAgreement.currency,
+      currency: request.agreement.currency,
       ...breakdown,
       refundPaid: request.depositRefunded,
       refundPaidAt: request.refundedAt,
@@ -401,7 +401,7 @@ export class MoveoutsService {
 
     const request = await this.prisma.moveOutRequest.findUniqueOrThrow({
       where: { id },
-      select: { rentalAgreementId: true },
+      select: { agreementId: true },
     });
 
     const updated = await this.prisma.moveOutRequest.update({
@@ -416,8 +416,8 @@ export class MoveoutsService {
       include: this.relationInclude(),
     });
 
-    await this.prisma.rentalAgreement.update({
-      where: { id: request.rentalAgreementId },
+    await this.prisma.agreement.update({
+      where: { id: request.agreementId },
       data: { depositRefunded: true },
     });
 
@@ -451,7 +451,7 @@ export class MoveoutsService {
           approvedBy: { select: { firstName: true, lastName: true } },
         },
       },
-      rentalAgreement: {
+      agreement: {
         include: { unit: { include: { property: true } } },
       },
     } as const;

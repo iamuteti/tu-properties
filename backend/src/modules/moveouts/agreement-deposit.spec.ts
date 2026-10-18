@@ -1,5 +1,5 @@
 import { DeductionCategory } from '@prisma/client';
-import { calculateDeposit, validateDeduction } from './lease-deposit';
+import { calculateDeposit, validateDeduction } from './agreement-deposit';
 
 /**
  * The deposit refund has to be auditable, which means derived — never typed in.

@@ -50,7 +50,7 @@ describe('RecurringBillingService', () => {
       findMany: jest.fn().mockResolvedValue([]),
     };
 
-    const rentalAgreement = {
+    const agreement = {
       findMany: jest.fn().mockResolvedValue([lease]),
     };
 
@@ -59,7 +59,7 @@ describe('RecurringBillingService', () => {
       delete: jest.fn().mockResolvedValue({}),
     };
 
-    const models = { recurringBillingRun, rentalAgreement, invoice };
+    const models = { recurringBillingRun, agreement, invoice };
     return { ...models, $transaction: jest.fn((fn: any) => fn(models)) };
   }
 
@@ -103,7 +103,7 @@ describe('RecurringBillingService', () => {
     // The tag is what makes the next run a no-op, so it has to be on the
     // insert — not patched on afterwards.
     expect(payload.billingPeriod).toBe('2026-10');
-    expect(payload.rentalAgreementId).toBe('lease-1');
+    expect(payload.agreementId).toBe('lease-1');
     expect(payload.invoiceItems[0].lineTotal).toBe(20_000);
     expect(run).toMatchObject({
       invoicesCreated: 1,
@@ -119,7 +119,7 @@ describe('RecurringBillingService', () => {
   });
 
   it('adds the unit service charges to the rent line', async () => {
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       {
         ...lease,
         unit: {
@@ -145,7 +145,7 @@ describe('RecurringBillingService', () => {
     // The database refusing the unique constraint is the idempotency guard.
     invoices.create.mockRejectedValueOnce(
       new Error(
-        'Unique constraint failed on the fields: (`rentalAgreementId`,`billingPeriod`)',
+        'Unique constraint failed on the fields: (`agreementId`,`billingPeriod`)',
       ),
     );
 
@@ -180,7 +180,7 @@ describe('RecurringBillingService', () => {
   });
 
   it('keeps going when one lease fails, and says so', async () => {
-    prisma.rentalAgreement.findMany.mockResolvedValue([lease]);
+    prisma.agreement.findMany.mockResolvedValue([lease]);
     invoices.create.mockRejectedValueOnce(new Error('rent is not a number'));
 
     const run = await service.runForOrganization(
@@ -196,7 +196,7 @@ describe('RecurringBillingService', () => {
   });
 
   it('skips a lease that has not started yet', async () => {
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       { ...lease, startDate: new Date('2026-11-01') },
     ]);
 
@@ -209,7 +209,7 @@ describe('RecurringBillingService', () => {
   });
 
   it('skips a lease that had already ended', async () => {
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       { ...lease, endDate: new Date('2026-06-30') },
     ]);
     const run = await service.runForOrganization(
@@ -221,7 +221,7 @@ describe('RecurringBillingService', () => {
 
   it('applies escalation only in its month, and only after a year', async () => {
     // Not yet a year in: no escalation.
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       {
         ...lease,
         startDate: new Date('2026-03-01'),
@@ -236,7 +236,7 @@ describe('RecurringBillingService', () => {
 
     // A year in: 10% on.
     invoices.create.mockClear();
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       { ...lease, escalationRate: 10, escalationMonth: 10 },
     ]);
     await service.runForOrganization('org-1', new Date('2026-10-01'));

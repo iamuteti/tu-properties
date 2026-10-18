@@ -119,7 +119,7 @@ model Organization {
   properties                 Property[]
   tenants                    Tenant[]
   landlords                  Landlord[]
-  leases                     RentalAgreement[]
+  leases                     Agreement[]
   moveOutRequests            MoveOutRequest[]
   invoices                   Invoice[]
   payments                   Payment[]
@@ -1073,7 +1073,7 @@ model Unit {
   status UnitStatus @default(VACANT)
 
   // Relationships
-  rentalAgreements RentalAgreement[]
+  agreements Agreement[]
 serviceCharges   UnitServiceCharge[]
   features         UnitFeature[]
   inspections      InspectionReport[]
@@ -1267,7 +1267,7 @@ model Tenant {
   requests TenantRequest[]
 
   // Relationships
-  rentalAgreements  RentalAgreement[]
+  agreements  Agreement[]
   emergencyContacts TenantEmergencyContact[]
   receipts          Receipt[]
   moveOutRequests   MoveOutRequest[]
@@ -1319,7 +1319,7 @@ model TenantEmergencyContact {
   @@map("tenant_emergency_contacts")
 }
 
-model RentalAgreement {
+model Agreement {
   id   String @id @default(cuid())
   code String @unique
 
@@ -1373,9 +1373,9 @@ utilityCharges  UtilityCharge[]
   // successor points back, so the full history of a unit's tenancies is one
   // query instead of a date-range reconstruction.
   renewedToId   String?          @unique
-  renewedTo     RentalAgreement? @relation("LeaseRenewals", fields: [renewedToId], references: [id], onDelete: SetNull)
+  renewedTo     Agreement? @relation("AgreementRenewals", fields: [renewedToId], references: [id], onDelete: SetNull)
   renewedFromId String?
-  renewedFrom   RentalAgreement? @relation("LeaseRenewals")
+  renewedFrom   Agreement? @relation("AgreementRenewals")
 
   // Inspections attached to this tenancy (move-in, periodic, move-out)
   inspections InspectionReport[]
@@ -1399,7 +1399,7 @@ utilityCharges  UtilityCharge[]
   @@index([startDate])
   @@index([endDate])
   @@index([organizationId])
-  @@map("rental_agreements")
+  @@map("agreements")
 }
 
 // Itemised deductions against a tenant's deposit. The refund is derived from
@@ -1463,8 +1463,8 @@ model InspectionReport {
   unitId String
   unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
 
   type   InspectionType
   status InspectionStatus @default(DRAFT)
@@ -1486,7 +1486,7 @@ model InspectionReport {
   updatedAt DateTime @updatedAt
 
   @@index([unitId])
-  @@index([rentalAgreementId])
+  @@index([agreementId])
   @@index([status])
   @@index([organizationId])
   @@map("inspection_reports")
@@ -1547,8 +1547,8 @@ model MoveOutRequest {
   id                  String          @id @default(cuid())
   tenantId            String
   tenant              Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  rentalAgreementId   String
-  rentalAgreement     RentalAgreement @relation(fields: [rentalAgreementId], references: [id], onDelete: Cascade)
+  agreementId   String
+  agreement     Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
   moveoutDate         DateTime
   approvalDate        DateTime?
   approvedBy          String? // User ID who approved
@@ -1572,7 +1572,7 @@ model MoveOutRequest {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
-  @@index([rentalAgreementId])
+  @@index([agreementId])
   @@index([status])
   @@index([organizationId])
   @@map("move_out_requests")
@@ -1807,8 +1807,8 @@ model TenantRequest {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
 
   type   TenantRequestType
   status TenantRequestStatus @default(PENDING)
@@ -1839,7 +1839,7 @@ model TenantRequest {
 
   @@index([organizationId, status])
   @@index([tenantId, status])
-  @@index([rentalAgreementId])
+  @@index([agreementId])
   @@map("tenant_requests")
 }
 
@@ -1985,8 +1985,8 @@ model Commission {
   saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: SetNull)
 
   // The leasing side of the same commission concept. Module 5 wires this up.
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
 
   agentUserId String
   agent       User   @relation("UserCommissions", fields: [agentUserId], references: [id], onDelete: Restrict)
@@ -2032,8 +2032,8 @@ model Invoice {
   landlord   Landlord? @relation(fields: [landlordId], references: [id], onDelete: SetNull)
 
   // Keep rental agreement reference for backward compatibility and property tracking
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
 
   // Sale instalment link (Module 4). Sale invoices are raised by the Sales
   // module through `InvoicesService` and classified with
@@ -2127,8 +2127,8 @@ saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], refere
   updatedAt       DateTime         @updatedAt
   saleInstallment SaleInstallment?
 
-  @@unique([rentalAgreementId, billingPeriod])
-  @@index([rentalAgreementId])
+  @@unique([agreementId, billingPeriod])
+  @@index([agreementId])
   @@index([saleTransactionId])
   @@index([status])
   @@index([dueDate])
@@ -2259,8 +2259,8 @@ model Payment {
   invoiceId String?
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
 
   receiptId String?
   receipt   Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
@@ -2321,7 +2321,7 @@ model Payment {
   updatedAt  DateTime @updatedAt
   recordedBy String?
 
-  @@index([rentalAgreementId])
+  @@index([agreementId])
   @@index([invoiceId])
   @@index([receiptId])
   @@index([paymentDate])
@@ -6304,8 +6304,8 @@ model UtilityCharge {
   unit   Unit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
   /// Rental agreement the invoice goes to. Null when the unit is vacant, which is
   /// a legitimate state for a bulk meter - nobody is there to pay for the water.
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: SetNull)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
 
   /// The two readings that bound the period. Consumption is the difference
   /// between them, derived - see `MeterReading`.
@@ -6338,7 +6338,7 @@ model UtilityCharge {
   /// "2026-10" - the period this charge bills. Same `YYYY-MM` form as
   /// `Invoice.billingPeriod` so the two are comparable, but it is *not* written
   /// to the invoice: `invoices` carries
-  /// `@@unique([rentalAgreementId, billingPeriod])` because a lease has one rent
+  /// `@@unique([agreementId, billingPeriod])` because a lease has one rent
   /// bill per month, and a utility invoice claiming that key would make the
   /// recurring rent run skip the month and the resident never get billed rent at
   /// all (recurring-billing.service.ts:45). So the utility bill is its own
@@ -6474,7 +6474,7 @@ enum VacancyPolicy {
 /// that requires a related entity cannot represent the most compliance-critical thing
 /// in the set.
 enum ContractType {
-  /// A residential or commercial lease. Points at a `RentalAgreement`.
+  /// A residential or commercial lease. Points at a `Agreement`.
   LEASE
   /// A sale agreement. Points at a `SaleTransaction`.
   SALE
@@ -6527,8 +6527,8 @@ model Contract {
   //
   // `COMPLIANCE` contracts set none of them, which is why the constraint below
   // permits zero *or* one rather than demanding exactly one.
-  rentalAgreementId String?
-  rentalAgreement   RentalAgreement? @relation(fields: [rentalAgreementId], references: [id], onDelete: Cascade)
+  agreementId String?
+  agreement   Agreement? @relation(fields: [agreementId], references: [id], onDelete: Cascade)
   saleTransactionId String?
   saleTransaction   SaleTransaction? @relation(fields: [saleTransactionId], references: [id], onDelete: Cascade)
   supplierId String?
@@ -6589,7 +6589,7 @@ model Contract {
   /// makes "what is expiring next" fast rather than a full scan of every contract the
   /// organization has ever signed.
   @@index([organizationId, type, expiresAt])
-  @@index([rentalAgreementId])
+  @@index([agreementId])
   @@index([saleTransactionId])
   @@index([supplierId])
   @@index([landlordId])

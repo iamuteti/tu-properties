@@ -52,7 +52,7 @@ describe('PortalService', () => {
         }),
         findFirst: jest.fn().mockResolvedValue({ id: 'tenant-1' }),
       },
-      rentalAgreement: {
+      agreement: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'lease-1',
           code: 'RA-000001',
@@ -128,7 +128,7 @@ describe('PortalService', () => {
 
       expect(prisma.invoice.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { rentalAgreement: { tenantId: 'tenant-1' } },
+          where: { agreement: { tenantId: 'tenant-1' } },
         }),
       );
     });
@@ -167,7 +167,7 @@ describe('PortalService', () => {
     });
 
     it('tells a resident with no active lease that they have none', async () => {
-      prisma.rentalAgreement.findFirst.mockResolvedValue(null);
+      prisma.agreement.findFirst.mockResolvedValue(null);
       await expect(service.currentLease(portalSession())).rejects.toThrow(
         /do not have an active lease/i,
       );
@@ -227,7 +227,7 @@ describe('PortalService', () => {
 
   describe('summary', () => {
     it('reports no lease rather than failing for a tenant without one', async () => {
-      prisma.rentalAgreement.findFirst.mockResolvedValue(null);
+      prisma.agreement.findFirst.mockResolvedValue(null);
       const result = await service.summary(portalSession());
 
       expect(result.hasLease).toBe(false);

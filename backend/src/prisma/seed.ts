@@ -31,7 +31,7 @@ async function main() {
   await prisma.saleInstallment.deleteMany();
   await prisma.saleTransaction.deleteMany();
   await prisma.invoice.deleteMany();
-  await prisma.rentalAgreement.deleteMany();
+  await prisma.agreement.deleteMany();
   await prisma.tenantEmergencyContact.deleteMany();
   // CRM first: `Lead`/`Contact` reference properties, branches, users and (optionally)
   // tenants, and `CommunicationLog` references both.

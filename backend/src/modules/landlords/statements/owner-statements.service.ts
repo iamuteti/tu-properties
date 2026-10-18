@@ -156,7 +156,7 @@ export class OwnerStatementsService {
             { landlordId },
             {
               landlordId: null,
-              rentalAgreement: { unit: { property: { landlordId } } },
+              agreement: { unit: { property: { landlordId } } },
             },
           ],
         },
@@ -167,7 +167,7 @@ export class OwnerStatementsService {
         invoice: {
           select: {
             invoiceNumber: true,
-            rentalAgreement: {
+            agreement: {
               select: {
                 unit: { select: { property: { select: { name: true } } } },
               },
@@ -187,8 +187,7 @@ export class OwnerStatementsService {
       const invoiceNumber = payment.invoice?.invoiceNumber;
       if (!invoiceNumber) continue;
 
-      const property =
-        payment.invoice?.rentalAgreement?.unit.property.name ?? null;
+      const property = payment.invoice?.agreement?.unit.property.name ?? null;
       const existing = byInvoice.get(invoiceNumber);
       const entry = existing ?? {
         amountCents: 0,

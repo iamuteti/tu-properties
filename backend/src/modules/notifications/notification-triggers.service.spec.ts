@@ -39,7 +39,7 @@ describe('NotificationTriggersService', () => {
       organization: {
         findMany: jest.fn().mockResolvedValue([{ id: 'org-1' }]),
       },
-      rentalAgreement: { findMany: jest.fn().mockResolvedValue(leases) },
+      agreement: { findMany: jest.fn().mockResolvedValue(leases) },
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
       user: {
         findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }),
@@ -81,7 +81,7 @@ describe('NotificationTriggersService', () => {
 
   it('reminds about a lease ending inside the window', async () => {
     const in20Days = new Date('2026-10-21');
-    prisma.rentalAgreement.findMany.mockResolvedValue([lease(in20Days)]);
+    prisma.agreement.findMany.mockResolvedValue([lease(in20Days)]);
 
     const summary = await service.runDailyReminders(new Date('2026-10-01'));
     expect(summary.leases).toBeGreaterThan(0);
@@ -94,7 +94,7 @@ describe('NotificationTriggersService', () => {
   });
 
   it('does not send the 60-day warning for a lease 20 days out', async () => {
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       lease(new Date('2026-10-21')),
     ]);
     await service.runDailyReminders(new Date('2026-10-01'));
@@ -108,7 +108,7 @@ describe('NotificationTriggersService', () => {
   });
 
   it('marks a lease within 14 days as critical', async () => {
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       lease(new Date('2026-10-05')),
     ]);
     await service.runDailyReminders(new Date('2026-10-01'));
@@ -126,7 +126,7 @@ describe('NotificationTriggersService', () => {
         invoiceNumber: 'INV-1',
         balanceAmount: 5_000,
         dueDate: new Date('2026-09-24'),
-        rentalAgreement: { tenantId: 'ten-1' },
+        agreement: { tenantId: 'ten-1' },
       },
     ]);
 
@@ -237,8 +237,8 @@ describe('NotificationTriggersService', () => {
         expiresAt: inDays(60),
         noticeDays: 30,
         autoRenew: false,
-        rentalAgreementId: null,
-        rentalAgreement: null,
+        agreementId: null,
+        agreement: null,
         ...over,
       };
     }
@@ -345,8 +345,8 @@ describe('NotificationTriggersService', () => {
           type: 'LEASE',
           expiresAt: null,
           noticeDays: null,
-          rentalAgreementId: 'lease-1',
-          rentalAgreement: { endDate: inDays(20), noticePeriodDays: null },
+          agreementId: 'lease-1',
+          agreement: { endDate: inDays(20), noticePeriodDays: null },
         }),
       ]);
       expect(summary.contracts).toBe(1);

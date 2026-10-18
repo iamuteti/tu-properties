@@ -97,7 +97,7 @@ function messageOf(err: unknown): string {
  * instalments use, so tax, numbering and the GL posting all happen the same way for
  * a utility bill as for a rent bill. What the utility module then does *not* do is
  * set `Invoice.billingPeriod`: `invoices` carries
- * `@@unique([rentalAgreementId, billingPeriod])` because a lease has one rent bill
+ * `@@unique([agreementId, billingPeriod])` because a lease has one rent bill
  * per month, and `recurring-billing.service.ts` relies on a duplicate being reported
  * as *skipped*. A utility invoice claiming that key would make the rent run skip the
  * month and the resident never be billed rent at all. The period lives on
@@ -803,7 +803,7 @@ export class UtilitiesService {
           organizationId: tenantId,
           meterId: meter.id,
           unitId: target.unitId,
-          rentalAgreementId: target.rentalAgreementId,
+          agreementId: target.agreementId,
           fromReadingId: bracket.opening.id,
           toReadingId: bracket.closing.id,
           rateId: rate.id ?? null,
@@ -942,9 +942,9 @@ export class UtilitiesService {
     }> = [];
 
     for (const charge of charges) {
-      const lease = charge.rentalAgreementId
-        ? await this.prisma.rentalAgreement.findUnique({
-            where: { id: charge.rentalAgreementId },
+      const lease = charge.agreementId
+        ? await this.prisma.agreement.findUnique({
+            where: { id: charge.agreementId },
             select: {
               id: true,
               tenant: { select: { surname: true, otherNames: true } },
@@ -1019,7 +1019,7 @@ export class UtilitiesService {
 
       const invoice = await this.invoicesService.create(
         {
-          rentalAgreementId: lease.id,
+          agreementId: lease.id,
           // The class the frontend's invoice filters can recognise. Deliberately NOT
           // `billingPeriod` - see the file header: setting it would make the
           // recurring rent run skip this month.
@@ -1430,7 +1430,7 @@ export class UtilitiesService {
       unitId: string | null;
       share: number;
       basis: string;
-      rentalAgreementId: string | null;
+      agreementId: string | null;
     }>
   > {
     if (meter.scope === MeterScope.SUBMETER) {
@@ -1447,7 +1447,7 @@ export class UtilitiesService {
           unitId: meter.unitId,
           share: 1,
           basis: 'Sub-meter',
-          rentalAgreementId: lease?.id ?? null,
+          agreementId: lease?.id ?? null,
         },
       ];
     }
@@ -1468,7 +1468,7 @@ export class UtilitiesService {
     // can be answered at all - every unit needs its occupancy before any share can be
     // computed, because shares are relative to each other.
     const window = periodFromPeriodKey(billingPeriod);
-    const tenancies = await this.prisma.rentalAgreement.findMany({
+    const tenancies = await this.prisma.agreement.findMany({
       where: {
         unit: { property: { organizationId: tenantId } },
         // Any tenancy overlapping the window at all, including an open-ended one.
@@ -1539,7 +1539,7 @@ export class UtilitiesService {
       unitId: string | null;
       share: number;
       basis: string;
-      rentalAgreementId: string | null;
+      agreementId: string | null;
     }> = [];
     for (const unitId of wanted) {
       const share = split.shares[unitId];
@@ -1556,7 +1556,7 @@ export class UtilitiesService {
         unitId,
         share,
         basis: split.basis,
-        rentalAgreementId: leaseIdAt(unitId),
+        agreementId: leaseIdAt(unitId),
       });
     }
 
@@ -1565,7 +1565,7 @@ export class UtilitiesService {
 
   private async activeLeaseFor(tenantId: string, unitId: string) {
     const now = new Date();
-    return this.prisma.rentalAgreement.findFirst({
+    return this.prisma.agreement.findFirst({
       where: {
         unitId,
         unit: { property: { organizationId: tenantId } },

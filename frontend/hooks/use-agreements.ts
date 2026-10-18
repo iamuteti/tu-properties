@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AxiosError } from "axios";
-import { inspectionsApi, leasesApi, leaseTemplatesApi, moveOutsApi } from "@/lib/api";
+import { inspectionsApi, agreementsApi, agreementTemplatesApi, moveOutsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import type { InspectionReport, Lease, LeaseTemplate, MoveOutRequest } from "@/types";
 
-export interface UseLeasesParams {
+export interface UseAgreementsParams {
     page?: number;
     limit?: number;
     search?: string;
@@ -17,9 +17,9 @@ export interface UseLeasesParams {
     propertyId?: string;
 }
 
-export function useLeases(params?: UseLeasesParams) {
+export function useAgreements(params?: UseAgreementsParams) {
     const { user } = useAuth();
-    const [leases, setLeases] = useState<Lease[]>([]);
+    const [agreements, setAgreements] = useState<Lease[]>([]);
     const [meta, setMeta] = useState<{
         total: number;
         page: number;
@@ -47,13 +47,13 @@ export function useLeases(params?: UseLeasesParams) {
         if (!user) return;
         setIsLoading(true);
         try {
-            const response = await leasesApi.findLeases(paramsRef.current);
-            setLeases(response.data.data);
+            const response = await agreementsApi.findLeases(paramsRef.current);
+            setAgreements(response.data.data);
             setMeta(response.data.meta);
             setError(null);
         } catch (err: unknown) {
             if (err instanceof AxiosError) {
-                setError(err.response?.data?.message || err.message || "Failed to fetch leases");
+                setError(err.response?.data?.message || err.message || "Failed to fetch agreements");
             } else {
                 setError(err instanceof Error ? err.message : "An unknown error occurred");
             }
@@ -67,16 +67,16 @@ export function useLeases(params?: UseLeasesParams) {
         refetch();
     }, [stableParams, refetch]);
 
-    return { leases, paginationMeta: meta, isLoading, error, refetch };
+    return { agreements, paginationMeta: meta, isLoading, error, refetch };
 }
 
 /**
- * Leases ending inside a window, with the contact details a reminder needs.
+ * Agreements ending inside a window, with the contact details a reminder needs.
  * The delivery side is Module 18; this is the query that will drive it.
  */
-export function useExpiringLeases(days = 60) {
+export function useExpiringAgreements(days = 60) {
     const { user } = useAuth();
-    const [leases, setLeases] = useState<Lease[]>([]);
+    const [agreements, setAgreements] = useState<Lease[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -84,11 +84,11 @@ export function useExpiringLeases(days = 60) {
         if (!user) return;
         setIsLoading(true);
         try {
-            const response = await leasesApi.expiring(days);
-            setLeases(response.data);
+            const response = await agreementsApi.expiring(days);
+            setAgreements(response.data);
             setError(null);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Failed to load expiring leases");
+            setError(err instanceof Error ? err.message : "Failed to load expiring agreements");
         } finally {
             setIsLoading(false);
         }
@@ -98,7 +98,7 @@ export function useExpiringLeases(days = 60) {
         refetch();
     }, [refetch]);
 
-    return { leases, isLoading, error, refetch };
+    return { agreements, isLoading, error, refetch };
 }
 
 export function useMoveOuts(params?: { page?: number; limit?: number; search?: string; status?: string }) {
@@ -173,7 +173,7 @@ export function useInspections(params?: { unitId?: string; type?: string }) {
     return { inspections, isLoading, error, refetch };
 }
 
-export function useLeaseTemplates() {
+export function useAgreementTemplates() {
     const { user } = useAuth();
     const [templates, setTemplates] = useState<LeaseTemplate[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -183,11 +183,11 @@ export function useLeaseTemplates() {
         if (!user) return;
         setIsLoading(true);
         try {
-            const response = await leaseTemplatesApi.list();
+            const response = await agreementTemplatesApi.list();
             setTemplates(response.data);
             setError(null);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Failed to load lease templates");
+            setError(err instanceof Error ? err.message : "Failed to load agreement templates");
         } finally {
             setIsLoading(false);
         }

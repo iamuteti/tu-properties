@@ -7,7 +7,7 @@ import { ReportsService } from './reports.service';
  *
  * **No imports at all, and that is the design.** Every number here is derived from rows
  * other modules own, so this module reads and never writes. It does not import Finance
- * and call `InvoicesService`, does not import Leases and call `RentalAgreementsService`,
+ * and call `InvoicesService`, does not import Agreements and call `AgreementsService`,
  * and does not import Maintenance for its work-order figures.
  *
  * The reason is that the alternative is a report whose numbers silently disagree with

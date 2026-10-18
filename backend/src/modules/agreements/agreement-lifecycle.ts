@@ -1,19 +1,19 @@
 import { AgreementStatus } from '@prisma/client';
 
 /**
- * Lease lifecycle rules (Module 5).
+ * Agreement lifecycle rules (Module 5).
  *
- * The module audit found leases were record-keeping: `status` could be set to
- * anything by a plain update, and there was no activate / renew / terminate
+ * The module audit found agreements were record-keeping: `status` could be set
+ * to anything by a plain update, and there was no activate / renew / terminate
  * flow with side-effects. These rules make the lifecycle explicit — they decide
  * which action is legal and what has to be true first, and they are pure so the
  * matrix can be unit-tested without a database.
  */
 
-export interface LeaseGateContext {
+export interface AgreementGateContext {
   startDate: Date;
   endDate: Date | null;
-  /** Rent still unpaid across the lease's invoices. */
+  /** Rent still unpaid across the agreement's invoices. */
   outstandingRent?: number;
   /** Rent arrears (overdue invoices only). */
   arrears?: number;
@@ -25,7 +25,7 @@ export interface LeaseGateContext {
   currency?: string;
 }
 
-export type LeaseAction =
+export type AgreementAction =
   | 'ACTIVATE'
   | 'RENEW'
   | 'EXTEND'
@@ -42,7 +42,7 @@ export interface ActionCheck {
  * Which actions a lease in `status` may be given. Pure data — the ordering is
  * the same one the UI renders as buttons.
  */
-export const ACTIONS_BY_STATUS: Record<AgreementStatus, LeaseAction[]> = {
+export const ACTIONS_BY_STATUS: Record<AgreementStatus, AgreementAction[]> = {
   [AgreementStatus.DRAFT]: ['ACTIVATE', 'TERMINATE'],
   [AgreementStatus.ACTIVE]: ['RENEW', 'EXTEND', 'TERMINATE', 'EXPIRE'],
   [AgreementStatus.RENEWED]: [],
@@ -51,25 +51,26 @@ export const ACTIONS_BY_STATUS: Record<AgreementStatus, LeaseAction[]> = {
 };
 
 /**
- * Default renewal window: a lease can be renewed once it is within this many
- * days of its end date (or has no end date at all — a rolling monthly rental).
+ * Default renewal window: an agreement can be renewed once it is within this
+ * many days of its end date (or has no end date at all — a rolling monthly
+ * rental).
  */
 export const RENEWAL_WINDOW_DAYS = 60;
 
-export function availableLeaseActions(
+export function availableAgreementActions(
   status: AgreementStatus,
-  context: LeaseGateContext,
+  context: AgreementGateContext,
   now: Date = new Date(),
-): LeaseAction[] {
+): AgreementAction[] {
   return ACTIONS_BY_STATUS[status].filter(
-    (action) => checkLeaseAction(status, action, context, now).allowed,
+    (action) => checkAgreementAction(status, action, context, now).allowed,
   );
 }
 
-export function checkLeaseAction(
+export function checkAgreementAction(
   status: AgreementStatus,
-  action: LeaseAction,
-  context: LeaseGateContext,
+  action: AgreementAction,
+  context: AgreementGateContext,
   now: Date = new Date(),
 ): ActionCheck {
   if (!ACTIONS_BY_STATUS[status].includes(action)) {
@@ -85,20 +86,20 @@ export function checkLeaseAction(
         return {
           allowed: false,
           reason:
-            'This tenancy has a move-out request against it. Resolve it before activating a new lease.',
+            'This tenancy has a move-out request against it. Resolve it before activating a new agreement.',
         };
       }
       if (context.hasOtherActiveAgreement) {
         return {
           allowed: false,
           reason:
-            'The unit already has an active lease. Terminate or expire it before activating another.',
+            'The unit already has an active agreement. Terminate or expire it before activating another.',
         };
       }
       if (context.startDate > now) {
         return {
           allowed: false,
-          reason: `This lease starts on ${formatDate(context.startDate)} — activate it on or after that date.`,
+          reason: `This agreement starts on ${formatDate(context.startDate)} — activate it on or after that date.`,
         };
       }
       return { allowed: true };
@@ -109,13 +110,13 @@ export function checkLeaseAction(
         return {
           allowed: false,
           reason:
-            'This lease has no end date (rolling monthly rental) — extend it instead of renewing.',
+            'This agreement has no end date (rolling monthly rental) — extend it instead of renewing.',
         };
       }
       if (context.endDate > addDays(now, RENEWAL_WINDOW_DAYS)) {
         return {
           allowed: false,
-          reason: `This lease runs until ${formatDate(context.endDate)}. Renewal opens ${RENEWAL_WINDOW_DAYS} days before it ends.`,
+          reason: `This agreement runs until ${formatDate(context.endDate)}. Renewal opens ${RENEWAL_WINDOW_DAYS} days before it ends.`,
         };
       }
       if (context.moveOutRequested) {
@@ -144,13 +145,13 @@ export function checkLeaseAction(
         return {
           allowed: false,
           reason:
-            'This lease has no end date, so it cannot expire — terminate it instead.',
+            'This agreement has no end date, so it cannot expire — terminate it instead.',
         };
       }
       if (context.endDate > now) {
         return {
           allowed: false,
-          reason: `This lease does not end until ${formatDate(context.endDate)}.`,
+          reason: `This agreement does not end until ${formatDate(context.endDate)}.`,
         };
       }
       return { allowed: true };
@@ -160,14 +161,17 @@ export function checkLeaseAction(
       if (context.hasOtherActiveAgreement) {
         return {
           allowed: false,
-          reason: 'The unit is already let under another lease.',
+          reason: 'The unit is already let under another agreement.',
         };
       }
       return { allowed: true };
     }
 
     default:
-      return { allowed: false, reason: `Unknown lease action "${action}".` };
+      return {
+        allowed: false,
+        reason: `Unknown agreement action "${action}".`,
+      };
   }
 }
 
@@ -175,7 +179,7 @@ export function agreementStatusLabel(status: AgreementStatus): string {
   return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
-/** Days until a lease ends; negative once it has, null when open-ended. */
+/** Days until an agreement ends; negative once it has, null when open-ended. */
 export function daysUntilEnd(
   endDate: Date | null,
   now: Date = new Date(),

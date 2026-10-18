@@ -185,7 +185,7 @@ export class ReportsService {
     });
 
     const agreements = units.length
-      ? await this.prisma.rentalAgreement.findMany({
+      ? await this.prisma.agreement.findMany({
           where: {
             ...(tenantId ? { organizationId: tenantId } : {}),
             unitId: { in: units.map((unit) => unit.id) },
@@ -300,7 +300,7 @@ export class ReportsService {
 
     if (units.length === 0 || dates.length === 0) return { points: [] };
 
-    const agreements = await this.prisma.rentalAgreement.findMany({
+    const agreements = await this.prisma.agreement.findMany({
       where: {
         ...(tenantId ? { organizationId: tenantId } : {}),
         unitId: { in: units.map((unit) => unit.id) },
@@ -884,7 +884,7 @@ export class ReportsService {
             FROM rental_agreements ra
             JOIN units u ON u.id = ra."unitId"
             JOIN properties p ON p.id = u."propertyId"
-            WHERE ra.id = i."rentalAgreementId" AND p."landlordId" = ${landlordId}
+            WHERE ra.id = i."agreementId" AND p."landlordId" = ${landlordId}
           )
         )
         ${tenantId ? Prisma.sql`AND i."organizationId" = ${tenantId}` : Prisma.sql``}
@@ -1082,7 +1082,7 @@ function money(value: number): number {
  * The fix is to attribute the way Module 6's owner statements already do, because those
  * demonstrably reconcile against the payments they were generated from:
  *
- *     invoice -> rentalAgreement -> unit -> property -> landlordId
+ *     invoice -> agreement -> unit -> property -> landlordId
  *
  * The stored column is kept as a second route via `OR`, so an invoice raised directly
  * against a landlord (no lease involved) is still counted. `OR` cannot double-count: it
@@ -1102,10 +1102,7 @@ function landlordAttribution(landlordId: string): {
   OR: Record<string, unknown>[];
 } {
   return {
-    OR: [
-      { landlordId },
-      { rentalAgreement: { unit: { property: { landlordId } } } },
-    ],
+    OR: [{ landlordId }, { agreement: { unit: { property: { landlordId } } } }],
   };
 }
 

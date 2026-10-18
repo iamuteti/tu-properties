@@ -219,7 +219,7 @@ export class PropertiesService {
           units: {
             orderBy: [{ status: 'asc' }, { name: 'asc' }],
             include: {
-              rentalAgreements: {
+              agreements: {
                 where: { status: 'ACTIVE' },
                 orderBy: { startDate: 'desc' },
                 take: 1,
@@ -408,7 +408,7 @@ export class PropertiesService {
       where: unitWhere,
       include: {
         property: { select: { id: true, name: true, code: true } },
-        rentalAgreements: {
+        agreements: {
           where: {
             status: 'ACTIVE',
             // Leases ending inside the window are the "coming available"

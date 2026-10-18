@@ -152,8 +152,8 @@ export class NotificationTriggersService {
         expiresAt: true,
         noticeDays: true,
         autoRenew: true,
-        rentalAgreementId: true,
-        rentalAgreement: {
+        agreementId: true,
+        agreement: {
           select: { endDate: true, noticePeriodDays: true },
         },
       },
@@ -167,11 +167,9 @@ export class NotificationTriggersService {
       // The same lease fallback the service applies: the register does not hold a
       // second copy of the lease's end date.
       const expiresAt =
-        contract.expiresAt ?? contract.rentalAgreement?.endDate ?? null;
+        contract.expiresAt ?? contract.agreement?.endDate ?? null;
       const noticeDays =
-        contract.noticeDays ??
-        contract.rentalAgreement?.noticePeriodDays ??
-        null;
+        contract.noticeDays ?? contract.agreement?.noticePeriodDays ?? null;
       if (!expiresAt) continue;
 
       const remainingDays = daysUntil(expiresAt, onDate);
@@ -261,7 +259,7 @@ export class NotificationTriggersService {
       // sweep, which is three messages saying the same thing.
       const lowerBound = LEASE_EXPIRY_WARNINGS[index + 1] ?? 0;
 
-      const leases = await this.prisma.rentalAgreement.findMany({
+      const leases = await this.prisma.agreement.findMany({
         where: {
           organizationId,
           status: 'ACTIVE',
@@ -303,7 +301,7 @@ export class NotificationTriggersService {
                 : NotificationPriority.NORMAL,
             title: `Lease ending in ${remainingDays} day${remainingDays === 1 ? '' : 's'}`,
             body: `Your tenancy at ${place} ends on ${lease.endDate.toDateString()}. Contact the management office to renew, or to discuss moving out.`,
-            entityType: 'RentalAgreement',
+            entityType: 'agreement',
             entityId: lease.id,
             actionUrl: '/portal',
             channels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
@@ -330,7 +328,7 @@ export class NotificationTriggersService {
         status: { in: ['PENDING', 'PARTIALLY_PAID'] },
         balanceAmount: { gt: 0 },
         dueDate: { gte: onDate, lte: horizon },
-        rentalAgreement: { isNot: null },
+        agreement: { isNot: null },
       },
       select: {
         id: true,
@@ -338,14 +336,14 @@ export class NotificationTriggersService {
         balanceAmount: true,
         currency: true,
         dueDate: true,
-        rentalAgreement: { select: { tenantId: true } },
+        agreement: { select: { tenantId: true } },
       },
       take: 1000,
     });
 
     let sent = 0;
     for (const invoice of invoices) {
-      const tenantId = invoice.rentalAgreement?.tenantId;
+      const tenantId = invoice.agreement?.tenantId;
       if (!tenantId) continue;
 
       const days = Math.ceil(
@@ -395,20 +393,20 @@ export class NotificationTriggersService {
           status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
           balanceAmount: { gt: 0 },
           dueDate: { lte: new Date(onDate.getTime() - days * 86400000) },
-          rentalAgreement: { isNot: null },
+          agreement: { isNot: null },
         },
         select: {
           id: true,
           invoiceNumber: true,
           balanceAmount: true,
           dueDate: true,
-          rentalAgreement: { select: { tenantId: true } },
+          agreement: { select: { tenantId: true } },
         },
         take: 1000,
       });
 
       for (const invoice of invoices) {
-        const tenantId = invoice.rentalAgreement?.tenantId;
+        const tenantId = invoice.agreement?.tenantId;
         if (!tenantId) continue;
 
         const overdueDays = Math.floor(

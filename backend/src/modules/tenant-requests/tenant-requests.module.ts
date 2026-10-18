@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '@/modules/audit/audit.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
-import { RentalAgreementsModule } from '@/modules/leases/rental-agreements.module';
+import { AgreementsModule } from '@/modules/agreements/agreements.module';
 import { MoveoutsModule } from '@/modules/moveouts/moveouts.module';
 import { MaintenanceModule } from '@/modules/maintenance/maintenance.module';
 import {
@@ -21,7 +21,7 @@ import { TenantRequestsService } from './tenant-requests.service';
  */
 @Module({
   imports: [
-    RentalAgreementsModule,
+    AgreementsModule,
     MoveoutsModule,
     MaintenanceModule,
     AuditModule,

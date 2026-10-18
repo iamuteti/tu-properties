@@ -8,7 +8,7 @@ import {
 import { TenantRequestsService } from './tenant-requests.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
-import { RentalAgreementsService } from '@/modules/leases/rental-agreements.service';
+import { AgreementsService } from '@/modules/agreements/agreements.service';
 import { MoveoutsService } from '@/modules/moveouts/moveouts.service';
 import { WorkOrdersService } from '@/modules/maintenance/work-orders.service';
 import { NotificationTriggersService } from '@/modules/notifications/notification-triggers.service';
@@ -41,7 +41,7 @@ describe('TenantRequestsService', () => {
     id: 'req-1',
     organizationId: 'org-1',
     tenantId: 'tenant-1',
-    rentalAgreementId: 'lease-1',
+    agreementId: 'lease-1',
     type: TenantRequestType.RENEWAL,
     status: TenantRequestStatus.PENDING,
     payload: { termMonths: 12 },
@@ -76,19 +76,19 @@ describe('TenantRequestsService', () => {
     };
     return {
       tenantRequest: requestModel,
-      rentalAgreement: {
+      agreement: {
         findFirst: jest.fn().mockResolvedValue(activeLease),
       },
     };
   }
 
   let prisma: ReturnType<typeof mockPrisma>;
-  let leases: { renew: jest.Mock };
+  let agreements: { renew: jest.Mock };
   let moveouts: { create: jest.Mock; approve: jest.Mock };
 
   beforeEach(async () => {
     prisma = mockPrisma();
-    leases = {
+    agreements = {
       renew: jest.fn().mockResolvedValue({
         previous: { id: 'lease-1', code: 'RA-1' },
         lease: { id: 'lease-2', code: 'RA-2' },
@@ -104,7 +104,7 @@ describe('TenantRequestsService', () => {
         TenantRequestsService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { logAction: jest.fn() } },
-        { provide: RentalAgreementsService, useValue: leases },
+        { provide: AgreementsService, useValue: agreements },
         { provide: MoveoutsService, useValue: moveouts },
         // Module 9: a MAINTENANT request delegates to the maintenance module, so
         // approving one files a real work order rather than a "to do" note.
@@ -134,7 +134,7 @@ describe('TenantRequestsService', () => {
         portalSession,
       );
 
-      expect(prisma.rentalAgreement.findFirst).toHaveBeenCalledWith(
+      expect(prisma.agreement.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             tenantId: 'tenant-1',
@@ -144,7 +144,7 @@ describe('TenantRequestsService', () => {
       );
       const args = prisma.tenantRequest.create.mock.calls[0][0];
       expect(args.data.tenantId).toBe('tenant-1');
-      expect(args.data.rentalAgreementId).toBe('lease-1');
+      expect(args.data.agreementId).toBe('lease-1');
       // The payload is snapshotted so a later lease change cannot rewrite it.
       expect(args.data.payload).toEqual({ termMonths: 12 });
     });
@@ -159,12 +159,12 @@ describe('TenantRequestsService', () => {
     });
 
     it('refuses a request against another household\u2019s lease', async () => {
-      prisma.rentalAgreement.findFirst.mockResolvedValue(null);
+      prisma.agreement.findFirst.mockResolvedValue(null);
       await expect(
         service.createFromPortal(
           {
             type: TenantRequestType.RENEWAL,
-            rentalAgreementId: 'someone-elses-lease',
+            agreementId: 'someone-elses-lease',
           },
           portalSession,
         ),
@@ -258,7 +258,7 @@ describe('TenantRequestsService', () => {
         staffSession,
       );
 
-      expect(leases.renew).toHaveBeenCalledWith(
+      expect(agreements.renew).toHaveBeenCalledWith(
         'lease-1',
         expect.objectContaining({ termMonths: 12 }),
         'org-1',
@@ -325,7 +325,7 @@ describe('TenantRequestsService', () => {
 
     it('propagates a refusal from the delegated service and leaves the request pending', async () => {
       prisma.tenantRequest.findFirst.mockResolvedValue(pendingRequest);
-      leases.renew.mockRejectedValue(
+      agreements.renew.mockRejectedValue(
         new ConflictException(
           'This lease runs until 2027-06-01. Renewal opens 60 days before it ends.',
         ),
@@ -375,7 +375,7 @@ describe('TenantRequestsService', () => {
       await expect(
         service.decide('req-1', { decision: 'APPROVE' }, 'org-1', 'admin-1'),
       ).rejects.toThrow(/already approved/i);
-      expect(leases.renew).not.toHaveBeenCalled();
+      expect(agreements.renew).not.toHaveBeenCalled();
     });
 
     it('refuses a request from another organization', async () => {

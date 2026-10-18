@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/simple-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ErrorState, LoadingState } from "@/components/ui/entity-states";
-import { leasesApi } from "@/lib/api";
+import { agreementsApi } from "@/lib/api";
 import { AGREEMENT_TYPES } from "@/lib/constants";
 import type { Lease } from "@/types";
 
@@ -47,7 +47,7 @@ export default function EditLeasePage() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await leasesApi.findLease(id);
+            const response = await agreementsApi.findLease(id);
             const lease = response.data;
             setLease(lease);
             setForm({
@@ -88,7 +88,7 @@ export default function EditLeasePage() {
         if (!id) return;
         setIsBusy(true);
         try {
-            await leasesApi.updateLease(id, {
+            await agreementsApi.updateLease(id, {
                 rentAmount: Number(form.rentAmount),
                 currency: form.currency,
                 agreementType: form.agreementType as Lease['agreementType'],
@@ -107,7 +107,7 @@ export default function EditLeasePage() {
                 paymentDay: form.paymentDay ? Number(form.paymentDay) : undefined,
             });
             toast.success("Lease updated");
-            router.push(`/rental-agreements/${id}`);
+            router.push(`/agreements/${id}`);
             router.refresh();
         } catch (err: any) {
             toast.error(err.response?.data?.message || "Failed to save the lease.");
@@ -126,7 +126,7 @@ export default function EditLeasePage() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => router.push(`/rental-agreements/${id}`)}
+                    onClick={() => router.push(`/agreements/${id}`)}
                     aria-label="Back to lease"
                 >
                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -251,7 +251,7 @@ export default function EditLeasePage() {
                             <Button
                                 type="button"
                                 variant="ghost"
-                                onClick={() => router.push(`/rental-agreements/${id}`)}
+                                onClick={() => router.push(`/agreements/${id}`)}
                             >
                                 Cancel
                             </Button>

@@ -22,7 +22,7 @@ import { InspectionsService } from './inspections.service';
 import {
   CreateInspectionDto,
   UpdateInspectionItemDto,
-} from '@/modules/leases/dto/lease.dto';
+} from '@/modules/agreements/dto/agreement.dto';
 
 const INSPECTION_ROLES = [
   UserRole.SUPER_ADMIN,
@@ -38,7 +38,7 @@ export class InspectionsController {
 
   @Post()
   @Roles(...INSPECTION_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   create(@Body() dto: CreateInspectionDto, @Request() req) {
     return this.inspections.create(dto, requireTenantId(req));
   }
@@ -59,7 +59,7 @@ export class InspectionsController {
 
   @Post(':id/items')
   @Roles(...INSPECTION_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   addItem(
     @Param('id') id: string,
     @Body()
@@ -77,7 +77,7 @@ export class InspectionsController {
 
   @Patch(':id/items/:itemId')
   @Roles(...INSPECTION_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   updateItem(
     @Param('id') id: string,
     @Param('itemId') itemId: string,
@@ -89,14 +89,14 @@ export class InspectionsController {
 
   @Post(':id/complete')
   @Roles(...INSPECTION_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   complete(@Param('id') id: string, @Request() req) {
     return this.inspections.complete(id, requireTenantId(req), getUserId(req));
   }
 
   @Delete(':id')
   @Roles(...INSPECTION_ROLES)
-  @Permissions('leases.update')
+  @Permissions('agreements.update')
   remove(@Param('id') id: string, @Request() req) {
     return this.inspections.remove(id, requireTenantId(req));
   }

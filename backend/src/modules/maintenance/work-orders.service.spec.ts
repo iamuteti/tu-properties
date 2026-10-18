@@ -153,7 +153,7 @@ describe('WorkOrdersService', () => {
         findFirst: jest.fn().mockResolvedValue(technician),
         findMany: jest.fn().mockResolvedValue([technician]),
       },
-      rentalAgreement: {
+      agreement: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'lease-1',
           organizationId: 'org-1',
@@ -266,7 +266,7 @@ describe('WorkOrdersService', () => {
       portalSession,
     );
 
-    expect(prisma.rentalAgreement.findFirst).toHaveBeenCalledWith(
+    expect(prisma.agreement.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ tenantId: 'tenant-1' }),
       }),
@@ -280,7 +280,7 @@ describe('WorkOrdersService', () => {
   });
 
   it('refuses a portal report with no active lease behind it', async () => {
-    prisma.rentalAgreement.findFirst.mockResolvedValue(null);
+    prisma.agreement.findFirst.mockResolvedValue(null);
 
     await expect(
       service.createFromPortal(

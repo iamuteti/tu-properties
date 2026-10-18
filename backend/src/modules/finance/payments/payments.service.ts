@@ -30,7 +30,7 @@ export class PaymentsService {
    * Record a payment.
    *
    * The controller receives the flat shape the UI sends (`invoiceId`,
-   * `rentalAgreementId`, `receiptId`) while Prisma needs either all scalar FKs
+   * `agreementId`, `receiptId`) while Prisma needs either all scalar FKs
    * *or* all nested relation writes — mixing them is rejected. Since we also
    * connect `organization` as a relation, the parent links are converted to
    * nested writes here; before this, paying an invoice by `invoiceId` always
@@ -45,21 +45,19 @@ export class PaymentsService {
     data: Prisma.PaymentCreateInput & {
       recordedBy?: string;
       invoiceId?: string | null;
-      rentalAgreementId?: string | null;
+      agreementId?: string | null;
       receiptId?: string | null;
     },
     tenantId?: string,
   ) {
-    const { invoiceId, rentalAgreementId, receiptId, ...rest } = data;
+    const { invoiceId, agreementId, receiptId, ...rest } = data;
     // `recordedBy` is the UI's display name, not a column.
     delete (rest as { recordedBy?: string }).recordedBy;
 
     const paymentData = {
       ...rest,
       ...(invoiceId ? { invoice: { connect: { id: invoiceId } } } : {}),
-      ...(rentalAgreementId
-        ? { rentalAgreement: { connect: { id: rentalAgreementId } } }
-        : {}),
+      ...(agreementId ? { agreement: { connect: { id: agreementId } } } : {}),
       ...(receiptId ? { receipt: { connect: { id: receiptId } } } : {}),
     } as Prisma.PaymentCreateInput;
 
@@ -106,7 +104,7 @@ export class PaymentsService {
           landlordId: true,
           taxWithheldAmount: true,
           taxSummary: true,
-          rentalAgreement: { select: { tenantId: true } },
+          agreement: { select: { tenantId: true } },
         },
       });
       if (!invoice) {
@@ -164,12 +162,12 @@ export class PaymentsService {
             reason: `Overpayment on invoice ${invoice.invoiceNumber}`,
             source: CustomerCreditSource.OVERPAYMENT,
             sourcePaymentId: payment.id,
-            tenantId: invoice.rentalAgreement?.tenantId ?? undefined,
+            tenantId: invoice.agreement?.tenantId ?? undefined,
             landlordId: invoice.landlordId ?? undefined,
             // Last resort for an invoice with neither a lease nor an owner: the
             // credit still has to belong to somebody.
             customerName:
-              invoice.rentalAgreement || invoice.landlordId
+              invoice.agreement || invoice.landlordId
                 ? undefined
                 : (payment.payee ?? undefined),
             currency: payment.currency,
@@ -270,7 +268,7 @@ export class PaymentsService {
           where: { id, organizationId: tenantId },
           include: {
             invoice: true,
-            rentalAgreement: { select: { tenantId: true } },
+            agreement: { select: { tenantId: true } },
           },
         }),
         'Payment',
@@ -291,8 +289,8 @@ export class PaymentsService {
       // Narrow the search to the customer this payment belongs to, when we can
       // tell who that is — allocating a landlord's transfer across a stranger's
       // arrears would be worse than leaving it unallocated.
-      const scope: Prisma.InvoiceWhereInput = payment.rentalAgreementId
-        ? { rentalAgreementId: payment.rentalAgreementId }
+      const scope: Prisma.InvoiceWhereInput = payment.agreementId
+        ? { agreementId: payment.agreementId }
         : payment.invoice?.landlordId
           ? { landlordId: payment.invoice.landlordId }
           : {};
@@ -368,13 +366,13 @@ export class PaymentsService {
               },
               select: {
                 landlordId: true,
-                rentalAgreement: { select: { tenantId: true } },
+                agreement: { select: { tenantId: true } },
               },
             })
           : null;
         tenantIdForCredit =
-          owner?.rentalAgreement?.tenantId ??
-          payment.rentalAgreement?.tenantId ??
+          owner?.agreement?.tenantId ??
+          payment.agreement?.tenantId ??
           undefined;
         landlordIdForCredit =
           owner?.landlordId ?? payment.invoice?.landlordId ?? undefined;
@@ -416,7 +414,7 @@ export class PaymentsService {
       where,
       include: {
         invoice: true,
-        rentalAgreement: true,
+        agreement: true,
         receipt: true,
       },
     });
@@ -429,7 +427,7 @@ export class PaymentsService {
         where,
         include: {
           invoice: true,
-          rentalAgreement: true,
+          agreement: true,
           receipt: true,
         },
       }),

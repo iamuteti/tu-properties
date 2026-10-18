@@ -42,7 +42,7 @@ describe('OwnerStatementsService', () => {
     paymentDate: new Date('2026-09-05T09:00:00.000Z'),
     invoice: {
       invoiceNumber: 'INV-2026-1001',
-      rentalAgreement: { unit: { property: { name: 'Tolo Towers' } } },
+      agreement: { unit: { property: { name: 'Tolo Towers' } } },
     },
   };
 
@@ -172,7 +172,7 @@ describe('OwnerStatementsService', () => {
       { landlordId: 'land-1' },
       {
         landlordId: null,
-        rentalAgreement: { unit: { property: { landlordId: 'land-1' } } },
+        agreement: { unit: { property: { landlordId: 'land-1' } } },
       },
     ]);
   });

@@ -64,7 +64,7 @@ export class InvoicesService {
     data: {
       invoiceNumber?: string;
       landlordId?: string;
-      rentalAgreementId?: string;
+      agreementId?: string;
       transactionClass: string;
       acReceivable?: string;
       billTo?: string;
@@ -86,7 +86,7 @@ export class InvoicesService {
       /**
        * Recurring billing tags its invoices with the period they bill for. It is
        * set on insert, not afterwards, so the unique constraint on
-       * (rentalAgreementId, billingPeriod) fires inside the insert — a duplicate
+       * (agreementId, billingPeriod) fires inside the insert — a duplicate
        * run is refused atomically instead of two invoices existing briefly.
        */
       billingPeriod?: string;
@@ -173,9 +173,9 @@ export class InvoicesService {
       }
 
       // Add rental agreement relation if provided (backward compatibility)
-      if (data.rentalAgreementId) {
-        invoiceData.rentalAgreement = {
-          connect: { id: data.rentalAgreementId },
+      if (data.agreementId) {
+        invoiceData.agreement = {
+          connect: { id: data.agreementId },
         };
       }
 
@@ -304,7 +304,7 @@ export class InvoicesService {
     id: string,
     data: {
       landlordId?: string;
-      rentalAgreementId?: string;
+      agreementId?: string;
       transactionClass?: string;
       acReceivable?: string;
       billTo?: string;
@@ -354,9 +354,9 @@ export class InvoicesService {
         ? { connect: { id: data.landlordId } }
         : { disconnect: true };
     }
-    if (data.rentalAgreementId !== undefined) {
-      updateData.rentalAgreement = data.rentalAgreementId
-        ? { connect: { id: data.rentalAgreementId } }
+    if (data.agreementId !== undefined) {
+      updateData.agreement = data.agreementId
+        ? { connect: { id: data.agreementId } }
         : { disconnect: true };
     }
     if (data.transactionClass !== undefined)
@@ -393,7 +393,7 @@ export class InvoicesService {
         invoiceItems: true,
         payments: true,
         landlord: true,
-        rentalAgreement: {
+        agreement: {
           include: {
             tenant: true,
             unit: true,
@@ -409,7 +409,7 @@ export class InvoicesService {
       where,
       include: {
         landlord: true,
-        rentalAgreement: {
+        agreement: {
           include: {
             tenant: true,
             unit: true,
@@ -441,7 +441,7 @@ export class InvoicesService {
         ...(tenantId && { organizationId: tenantId }),
         status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
         balanceAmount: { gt: 0 },
-        ...(propertyId ? { rentalAgreement: { unit: { propertyId } } } : {}),
+        ...(propertyId ? { agreement: { unit: { propertyId } } } : {}),
       },
       select: {
         id: true,
@@ -450,7 +450,7 @@ export class InvoicesService {
         issueDate: true,
         balanceAmount: true,
         currency: true,
-        rentalAgreement: {
+        agreement: {
           select: {
             id: true,
             tenantId: true,
@@ -517,7 +517,7 @@ export class InvoicesService {
       // An invoice with no lease (a sale invoice, say) has no tenant to owe it;
       // it is counted in the buckets and left out of the per-tenant list rather
       // than being lumped under a blank name.
-      const lease = invoice.rentalAgreement;
+      const lease = invoice.agreement;
       if (!lease) continue;
 
       const entry = byTenant.get(lease.tenantId) ?? {
@@ -564,7 +564,7 @@ export class InvoicesService {
           invoiceItems: true,
           payments: true,
           landlord: true,
-          rentalAgreement: {
+          agreement: {
             include: {
               tenant: true,
               unit: true,

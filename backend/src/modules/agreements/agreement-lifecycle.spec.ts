@@ -1,24 +1,24 @@
 import { AgreementStatus } from '@prisma/client';
 import {
   ACTIONS_BY_STATUS,
-  availableLeaseActions,
-  checkLeaseAction,
+  availableAgreementActions,
+  checkAgreementAction,
   daysUntilEnd,
   RENEWAL_WINDOW_DAYS,
-  type LeaseGateContext,
-} from './lease-lifecycle';
+  type AgreementGateContext,
+} from './agreement-lifecycle';
 
 /**
- * The lease lifecycle is the acceptance criterion for this module: a lease must
- * be creatable, renewable and terminable, with correct occupancy side-effects.
- * These tests pin which transitions are legal and why.
+ * The agreement lifecycle is the acceptance criterion for this module: an
+ * agreement must be creatable, renewable and terminable, with correct occupancy
+ * side-effects. These tests pin which transitions are legal and why.
  */
-describe('lease lifecycle', () => {
+describe('agreement lifecycle', () => {
   const now = new Date('2026-06-01T00:00:00.000Z');
   const days = (offset: number) =>
     new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
 
-  const base: LeaseGateContext = {
+  const base: AgreementGateContext = {
     startDate: days(-180),
     endDate: days(30),
   };
@@ -26,12 +26,13 @@ describe('lease lifecycle', () => {
   describe('checkLeaseAction', () => {
     it('activates a drafted lease that has started', () => {
       expect(
-        checkLeaseAction(AgreementStatus.DRAFT, 'ACTIVATE', base, now).allowed,
+        checkAgreementAction(AgreementStatus.DRAFT, 'ACTIVATE', base, now)
+          .allowed,
       ).toBe(true);
     });
 
-    it('refuses to activate a lease that has not started yet', () => {
-      const result = checkLeaseAction(
+    it('refuses to activate an agreement that has not started yet', () => {
+      const result = checkAgreementAction(
         AgreementStatus.DRAFT,
         'ACTIVATE',
         { ...base, startDate: days(30) },
@@ -42,18 +43,18 @@ describe('lease lifecycle', () => {
     });
 
     it('refuses to activate when the unit is already let', () => {
-      const result = checkLeaseAction(
+      const result = checkAgreementAction(
         AgreementStatus.DRAFT,
         'ACTIVATE',
         { ...base, hasOtherActiveAgreement: true },
         now,
       );
       expect(result.allowed).toBe(false);
-      expect(result.reason).toMatch(/already has an active lease/i);
+      expect(result.reason).toMatch(/already has an active agreement/i);
     });
 
     it('refuses to activate while a move-out request is open', () => {
-      const result = checkLeaseAction(
+      const result = checkAgreementAction(
         AgreementStatus.DRAFT,
         'ACTIVATE',
         { ...base, moveOutRequested: true },
@@ -65,12 +66,13 @@ describe('lease lifecycle', () => {
 
     it('renews inside the renewal window', () => {
       expect(
-        checkLeaseAction(AgreementStatus.ACTIVE, 'RENEW', base, now).allowed,
+        checkAgreementAction(AgreementStatus.ACTIVE, 'RENEW', base, now)
+          .allowed,
       ).toBe(true);
     });
 
     it('refuses to renew before the renewal window opens', () => {
-      const result = checkLeaseAction(
+      const result = checkAgreementAction(
         AgreementStatus.ACTIVE,
         'RENEW',
         { ...base, endDate: days(RENEWAL_WINDOW_DAYS + 30) },
@@ -80,8 +82,8 @@ describe('lease lifecycle', () => {
       expect(result.reason).toMatch(/renewal opens/i);
     });
 
-    it('refuses to renew an open-ended lease — extend it instead', () => {
-      const result = checkLeaseAction(
+    it('refuses to renew an open-ended agreement — extend it instead', () => {
+      const result = checkAgreementAction(
         AgreementStatus.ACTIVE,
         'RENEW',
         { ...base, endDate: null },
@@ -92,7 +94,7 @@ describe('lease lifecycle', () => {
     });
 
     it('refuses to renew a tenancy with a move-out request', () => {
-      const result = checkLeaseAction(
+      const result = checkAgreementAction(
         AgreementStatus.ACTIVE,
         'RENEW',
         { ...base, moveOutRequested: true },
@@ -101,9 +103,9 @@ describe('lease lifecycle', () => {
       expect(result.allowed).toBe(false);
     });
 
-    it('allows an extension of an open-ended lease', () => {
+    it('allows an extension of an open-ended agreement', () => {
       expect(
-        checkLeaseAction(
+        checkAgreementAction(
           AgreementStatus.ACTIVE,
           'EXTEND',
           { ...base, endDate: null },
@@ -113,7 +115,7 @@ describe('lease lifecycle', () => {
     });
 
     it('allows early termination even with rent outstanding', () => {
-      const result = checkLeaseAction(
+      const result = checkAgreementAction(
         AgreementStatus.ACTIVE,
         'TERMINATE',
         { ...base, arrears: 45000, outstandingRent: 90000 },
@@ -122,9 +124,9 @@ describe('lease lifecycle', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('expires a lease that has passed its end date', () => {
+    it('expires an agreement that has passed its end date', () => {
       expect(
-        checkLeaseAction(
+        checkAgreementAction(
           AgreementStatus.ACTIVE,
           'EXPIRE',
           { ...base, endDate: days(-1) },
@@ -133,8 +135,8 @@ describe('lease lifecycle', () => {
       ).toBe(true);
     });
 
-    it('refuses to expire a lease that has not ended', () => {
-      const result = checkLeaseAction(
+    it('refuses to expire an agreement that has not ended', () => {
+      const result = checkAgreementAction(
         AgreementStatus.ACTIVE,
         'EXPIRE',
         { ...base, endDate: days(30) },
@@ -144,8 +146,8 @@ describe('lease lifecycle', () => {
       expect(result.reason).toMatch(/does not end until/i);
     });
 
-    it('refuses to expire an open-ended lease', () => {
-      const result = checkLeaseAction(
+    it('refuses to expire an open-ended agreement', () => {
+      const result = checkAgreementAction(
         AgreementStatus.ACTIVE,
         'EXPIRE',
         { ...base, endDate: null },
@@ -155,16 +157,16 @@ describe('lease lifecycle', () => {
       expect(result.reason).toMatch(/terminate it instead/i);
     });
 
-    it('reactivates an expired lease when the unit is free', () => {
+    it('reactivates an expired agreement when the unit is free', () => {
       expect(
-        checkLeaseAction(AgreementStatus.EXPIRED, 'REACTIVATE', base, now)
+        checkAgreementAction(AgreementStatus.EXPIRED, 'REACTIVATE', base, now)
           .allowed,
       ).toBe(true);
     });
 
     it('refuses to reactivate when the unit is already let', () => {
       expect(
-        checkLeaseAction(
+        checkAgreementAction(
           AgreementStatus.EXPIRED,
           'REACTIVATE',
           { ...base, hasOtherActiveAgreement: true },
@@ -173,7 +175,7 @@ describe('lease lifecycle', () => {
       ).toBe(false);
     });
 
-    it('refuses everything on a closed lease', () => {
+    it('refuses everything on a closed agreement', () => {
       for (const action of [
         'RENEW',
         'EXTEND',
@@ -181,7 +183,7 @@ describe('lease lifecycle', () => {
         'EXPIRE',
         'ACTIVATE',
       ] as const) {
-        const result = checkLeaseAction(
+        const result = checkAgreementAction(
           AgreementStatus.RENEWED,
           action,
           base,
@@ -192,13 +194,13 @@ describe('lease lifecycle', () => {
       }
     });
 
-    it('refuses to terminate a renewed or terminated lease', () => {
+    it('refuses to terminate a renewed or terminated agreement', () => {
       expect(
-        checkLeaseAction(AgreementStatus.RENEWED, 'TERMINATE', base, now)
+        checkAgreementAction(AgreementStatus.RENEWED, 'TERMINATE', base, now)
           .allowed,
       ).toBe(false);
       expect(
-        checkLeaseAction(AgreementStatus.TERMINATED, 'TERMINATE', base, now)
+        checkAgreementAction(AgreementStatus.TERMINATED, 'TERMINATE', base, now)
           .allowed,
       ).toBe(false);
     });
@@ -206,20 +208,17 @@ describe('lease lifecycle', () => {
 
   describe('availableLeaseActions', () => {
     it('offers activate and terminate on a draft', () => {
-      expect(availableLeaseActions(AgreementStatus.DRAFT, base, now)).toEqual([
-        'ACTIVATE',
-        'TERMINATE',
-      ]);
+      expect(
+        availableAgreementActions(AgreementStatus.DRAFT, base, now),
+      ).toEqual(['ACTIVATE', 'TERMINATE']);
     });
 
     it('offers renewal only inside the window', () => {
-      expect(availableLeaseActions(AgreementStatus.ACTIVE, base, now)).toEqual([
-        'RENEW',
-        'EXTEND',
-        'TERMINATE',
-      ]);
       expect(
-        availableLeaseActions(
+        availableAgreementActions(AgreementStatus.ACTIVE, base, now),
+      ).toEqual(['RENEW', 'EXTEND', 'TERMINATE']);
+      expect(
+        availableAgreementActions(
           AgreementStatus.ACTIVE,
           { ...base, endDate: days(RENEWAL_WINDOW_DAYS + 30) },
           now,
@@ -229,11 +228,11 @@ describe('lease lifecycle', () => {
 
     it('offers nothing on a closed lease', () => {
       expect(
-        availableLeaseActions(AgreementStatus.TERMINATED, base, now),
+        availableAgreementActions(AgreementStatus.TERMINATED, base, now),
       ).toEqual([]);
-      expect(availableLeaseActions(AgreementStatus.RENEWED, base, now)).toEqual(
-        [],
-      );
+      expect(
+        availableAgreementActions(AgreementStatus.RENEWED, base, now),
+      ).toEqual([]);
     });
 
     it('agrees with checkLeaseAction for every status and action', () => {
@@ -251,10 +250,10 @@ describe('lease lifecycle', () => {
         AgreementStatus.RENEWED,
         AgreementStatus.TERMINATED,
       ]) {
-        const offered = availableLeaseActions(status, base, now);
+        const offered = availableAgreementActions(status, base, now);
         for (const action of actions) {
           expect(offered.includes(action)).toBe(
-            checkLeaseAction(status, action, base, now).allowed,
+            checkAgreementAction(status, action, base, now).allowed,
           );
         }
       }
@@ -266,11 +265,11 @@ describe('lease lifecycle', () => {
       expect(daysUntilEnd(days(10), now)).toBe(10);
     });
 
-    it('is negative once the lease has ended', () => {
+    it('is negative once the agreement has ended', () => {
       expect(daysUntilEnd(days(-3), now)).toBe(-3);
     });
 
-    it('is null for an open-ended lease', () => {
+    it('is null for an open-ended agreement', () => {
       expect(daysUntilEnd(null, now)).toBeNull();
     });
   });

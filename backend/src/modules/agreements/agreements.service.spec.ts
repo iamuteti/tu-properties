@@ -5,21 +5,21 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AgreementStatus } from '@prisma/client';
-import { RentalAgreementsService } from './rental-agreements.service';
+import { AgreementsService } from './agreements.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UnitsService } from '@/modules/units/units.service';
 
 /**
  * Lifecycle behaviour the service owns (the rules themselves are tested
- * separately in `lease-lifecycle.spec.ts`):
- *   1. one live lease per unit,
+ * separately in `agreement-lifecycle.spec.ts`):
+ *   1. one live agreement per unit,
  *   2. renewal creates a successor and links both sides of the chain,
  *   3. termination records the reason, vacates the unit and deactivates a
- *      tenant with no other active lease,
- *   4. nothing deletes a lease that has money or is in force.
+ *      tenant with no other active agreement,
+ *   4. nothing deletes an agreement that has money or is in force.
  */
-describe('RentalAgreementsService (lifecycle)', () => {
-  let service: RentalAgreementsService;
+describe('AgreementsService (lifecycle)', () => {
+  let service: AgreementsService;
 
   const activeLease: any = {
     id: 'lease-1',
@@ -77,7 +77,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
       delete: jest.fn().mockResolvedValue(activeLease),
     };
     return {
-      rentalAgreement: leaseModel,
+      agreement: leaseModel,
       state,
       unit: {
         findFirst: jest.fn().mockResolvedValue({ id: 'unit-1' }),
@@ -97,7 +97,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
-      $transaction: jest.fn((fn: any) => fn({ rentalAgreement: leaseModel })),
+      $transaction: jest.fn((fn: any) => fn({ agreement: leaseModel })),
     };
   }
 
@@ -112,12 +112,12 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
-        RentalAgreementsService,
+        AgreementsService,
         { provide: PrismaService, useValue: prisma },
         { provide: UnitsService, useValue: units },
       ],
     }).compile();
-    service = moduleRef.get(RentalAgreementsService);
+    service = moduleRef.get(AgreementsService);
   });
 
   describe('create', () => {
@@ -132,8 +132,8 @@ describe('RentalAgreementsService (lifecycle)', () => {
           { unitId: 'unit-1', tenantId: 'tenant-1', rentAmount: 45_000 },
           'org-1',
         ),
-      ).rejects.toThrow(/already has an open lease/i);
-      expect(prisma.rentalAgreement.create).not.toHaveBeenCalled();
+      ).rejects.toThrow(/already has an open agreement/i);
+      expect(prisma.agreement.create).not.toHaveBeenCalled();
     });
 
     it('rejects an end date before the start date', async () => {
@@ -157,7 +157,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
         'org-1',
       );
 
-      const args = prisma.rentalAgreement.create.mock.calls[0][0];
+      const args = prisma.agreement.create.mock.calls[0][0];
       expect(args.data.unit).toEqual({ connect: { id: 'unit-1' } });
       expect(args.data.tenant).toEqual({ connect: { id: 'tenant-1' } });
       expect(args.data.organization).toEqual({ connect: { id: 'org-1' } });
@@ -170,7 +170,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
       await service.activate('lease-1', 'org-1');
 
-      const args = prisma.rentalAgreement.update.mock.calls[0][0];
+      const args = prisma.agreement.update.mock.calls[0][0];
       expect(args.data).toMatchObject({
         status: AgreementStatus.ACTIVE,
         activatedAt: expect.any(Date),
@@ -207,15 +207,15 @@ describe('RentalAgreementsService (lifecycle)', () => {
         'org-1',
       );
 
-      expect(prisma.rentalAgreement.create).toHaveBeenCalled();
-      const created = prisma.rentalAgreement.create.mock.calls[0][0].data;
+      expect(prisma.agreement.create).toHaveBeenCalled();
+      const created = prisma.agreement.create.mock.calls[0][0].data;
       expect(created.renewedFrom).toEqual({ connect: { id: 'lease-1' } });
       expect(created.status).toBe(AgreementStatus.ACTIVE);
       expect(created.startDate).toEqual(new Date('2026-07-01'));
       expect(created.endDate).toEqual(new Date('2027-07-01'));
 
       // The old lease is closed and points at its successor.
-      const closeArgs = prisma.rentalAgreement.update.mock.calls[0][0];
+      const closeArgs = prisma.agreement.update.mock.calls[0][0];
       expect(closeArgs.data).toMatchObject({
         status: AgreementStatus.RENEWED,
         renewedToId: 'lease-2',
@@ -232,7 +232,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
       await expect(
         service.renew('lease-1', { termMonths: 12 }, 'org-1'),
       ).rejects.toThrow(/already been renewed/i);
-      expect(prisma.rentalAgreement.create).not.toHaveBeenCalled();
+      expect(prisma.agreement.create).not.toHaveBeenCalled();
     });
 
     it('needs an explicit start date for an open-ended lease', async () => {
@@ -261,7 +261,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
         { newEndDate: '2026-09-30' },
         'org-1',
       );
-      const args = prisma.rentalAgreement.update.mock.calls[0][0];
+      const args = prisma.agreement.update.mock.calls[0][0];
       expect(args.data.endDate).toEqual(new Date('2026-09-30'));
       expect(result.endDate).toEqual(new Date('2026-09-30'));
     });
@@ -275,7 +275,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
   describe('terminate', () => {
     it('records the reason, vacates the unit and deactivates the tenant', async () => {
-      prisma.rentalAgreement.count.mockResolvedValue(0);
+      prisma.agreement.count.mockResolvedValue(0);
 
       const result = await service.terminate(
         'lease-1',
@@ -283,7 +283,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
         'org-1',
       );
 
-      const args = prisma.rentalAgreement.update.mock.calls[0][0];
+      const args = prisma.agreement.update.mock.calls[0][0];
       expect(args.data).toMatchObject({
         status: AgreementStatus.TERMINATED,
         terminatedReason: 'Relocating abroad',
@@ -299,7 +299,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
     });
 
     it('leaves the tenant active when they still have another lease', async () => {
-      prisma.rentalAgreement.count.mockResolvedValue(1);
+      prisma.agreement.count.mockResolvedValue(1);
 
       await service.terminate('lease-1', { reason: 'Moving house' }, 'org-1');
 
@@ -308,7 +308,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
     it('does not vacate the unit when a renewal already took over', async () => {
       // The successor lookup filters on the unit, not on a lease id.
-      prisma.rentalAgreement.findFirst.mockImplementation(({ where }: any) =>
+      prisma.agreement.findFirst.mockImplementation(({ where }: any) =>
         Promise.resolve('unitId' in where ? { id: 'lease-2' } : activeLease),
       );
 
@@ -366,7 +366,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
 
       await service.expire('lease-1', 'org-1');
 
-      const args = prisma.rentalAgreement.update.mock.calls[0][0];
+      const args = prisma.agreement.update.mock.calls[0][0];
       expect(args.data).toMatchObject({
         status: AgreementStatus.EXPIRED,
         expiredAt: expect.any(Date),
@@ -383,7 +383,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
       await expect(service.remove('lease-1', 'org-1')).rejects.toThrow(
         /terminate it so the history/i,
       );
-      expect(prisma.rentalAgreement.delete).not.toHaveBeenCalled();
+      expect(prisma.agreement.delete).not.toHaveBeenCalled();
     });
 
     it('refuses to delete a lease that has invoices', async () => {
@@ -403,7 +403,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
       prisma.state.units = { status: AgreementStatus.DRAFT, invoices: [] };
 
       await service.remove('lease-1', 'org-1');
-      expect(prisma.rentalAgreement.delete).toHaveBeenCalledWith({
+      expect(prisma.agreement.delete).toHaveBeenCalledWith({
         where: { id: 'lease-1' },
       });
     });
@@ -414,7 +414,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
       const soon = new Date();
       soon.setDate(soon.getDate() + 10);
 
-      prisma.rentalAgreement.findMany.mockResolvedValue([
+      prisma.agreement.findMany.mockResolvedValue([
         {
           ...activeLease,
           endDate: soon,
@@ -445,7 +445,7 @@ describe('RentalAgreementsService (lifecycle)', () => {
         name: 'Flat 1',
         status: 'VACANT',
         property: { id: 'prop-1', name: 'Karen', code: 'PR-100' },
-        rentalAgreements: [
+        agreements: [
           {
             id: 'lease-1',
             code: 'RA-1',

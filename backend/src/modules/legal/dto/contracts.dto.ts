@@ -76,7 +76,7 @@ export class CreateContractDto {
   /** Required when `type` is `LEASE`, forbidden otherwise. */
   @IsOptional()
   @IsString()
-  rentalAgreementId?: string;
+  agreementId?: string;
 
   /** Required when `type` is `SALE`. */
   @IsOptional()

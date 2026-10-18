@@ -17,10 +17,10 @@ export interface DeductionLike {
 }
 
 export interface DepositInputs {
-  /** Deposit held on the lease, if any. */
+  /** Deposit held on the agreement, if any. */
   securityDeposit: number | null;
   deductions: DeductionLike[];
-  /** Rent still unpaid across the lease's invoices. */
+  /** Rent still unpaid across the agreement's invoices. */
   unpaidRent: number;
 }
 

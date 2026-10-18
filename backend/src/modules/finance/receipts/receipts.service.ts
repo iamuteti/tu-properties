@@ -81,7 +81,7 @@ export class ReceiptsService {
       }[];
       payments?: {
         invoiceId?: string;
-        rentalAgreementId?: string;
+        agreementId?: string;
         paymentDate: string | Date;
         amount: number;
         currency?: string;
@@ -215,8 +215,8 @@ export class ReceiptsService {
               invoice: { connect: { id: payment.invoiceId } },
             }),
             // Add rental agreement relation if provided
-            ...(payment.rentalAgreementId && {
-              rentalAgreement: { connect: { id: payment.rentalAgreementId } },
+            ...(payment.agreementId && {
+              agreement: { connect: { id: payment.agreementId } },
             }),
           }))
         : [];
@@ -278,7 +278,7 @@ export class ReceiptsService {
             paidAmount: true,
             taxWithheldAmount: true,
             taxSummary: true,
-            rentalAgreement: { select: { tenantId: true } },
+            agreement: { select: { tenantId: true } },
           },
         });
         if (!invoice) {
@@ -326,7 +326,7 @@ export class ReceiptsService {
               amount: allocation.surplus,
               reason: `Overpayment on invoice ${invoice.invoiceNumber}`,
               source: CustomerCreditSource.OVERPAYMENT,
-              tenantId: invoice.rentalAgreement?.tenantId ?? undefined,
+              tenantId: invoice.agreement?.tenantId ?? undefined,
               landlordId: data.landlordId,
               currency: receipt.currency,
               createdBy: data.recordedBy,
@@ -399,7 +399,7 @@ export class ReceiptsService {
         payments: {
           include: {
             invoice: true,
-            rentalAgreement: true,
+            agreement: true,
           },
         },
         receiptLines: true,
@@ -417,7 +417,7 @@ export class ReceiptsService {
           payments: {
             include: {
               invoice: true,
-              rentalAgreement: true,
+              agreement: true,
             },
           },
           receiptLines: true,

@@ -342,20 +342,20 @@ describe('buildRenewalChain', () => {
 describe('describeShapeViolation', () => {
   it('accepts a lease pointing at a rental agreement', () => {
     expect(
-      describeShapeViolation('LEASE', { rentalAgreementId: 'r1' }),
+      describeShapeViolation('LEASE', { agreementId: 'r1' }),
     ).toBeUndefined();
   });
 
   it('accepts a compliance certificate with no related entity', () => {
     expect(describeShapeViolation('COMPLIANCE', {})).toBeUndefined();
     expect(
-      describeShapeViolation('COMPLIANCE', { rentalAgreementId: null }),
+      describeShapeViolation('COMPLIANCE', { agreementId: null }),
     ).toBeUndefined();
   });
 
   it('refuses a contract linked to more than one record, and says how many', () => {
     const sentence = describeShapeViolation('LEASE', {
-      rentalAgreementId: 'r1',
+      agreementId: 'r1',
       supplierId: 's1',
     });
     expect(sentence).toContain('only be linked to one record');
@@ -376,14 +376,14 @@ describe('describeShapeViolation', () => {
   });
 
   it('refuses a sale contract pointing at a rental agreement', () => {
-    expect(
-      describeShapeViolation('SALE', { rentalAgreementId: 'r1' }),
-    ).toContain('own record type');
+    expect(describeShapeViolation('SALE', { agreementId: 'r1' })).toContain(
+      'own record type',
+    );
   });
 
   it('refuses a compliance certificate tied to a tenant, and explains the alternative', () => {
     const sentence = describeShapeViolation('COMPLIANCE', {
-      rentalAgreementId: 'r1',
+      agreementId: 'r1',
     });
     expect(sentence).toContain('not tied to a tenant');
     expect(sentence).toContain('change the type');

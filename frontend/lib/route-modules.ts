@@ -46,7 +46,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
 
     // Tenants & Leases
     "/tenants": "tenants",
-    "/rental-agreements": "leases",
+    "/agreements": "agreements",
     "/tenant-requests": "tenant-requests",
     "/moving-out": "moving-out",
 

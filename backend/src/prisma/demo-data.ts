@@ -13,7 +13,7 @@ import {
   Unit,
   Tenant,
   TenantStatus,
-  RentalAgreement,
+  Agreement,
   UnitStatus,
   AgreementStatus,
   AgreementType,
@@ -332,8 +332,7 @@ export async function generateDemoData(
 
   // ========== Rental Agreements (all occupied units get agreements) ==========
   console.log('Generating rental agreements...');
-  const rentalAgreements: (RentalAgreement & { tenant: Tenant; unit: Unit })[] =
-    [];
+  const agreements: (Agreement & { tenant: Tenant; unit: Unit })[] = [];
   let agreementIndex = 0;
 
   for (let i = 0; i < occupiedUnits.length; i++) {
@@ -381,7 +380,7 @@ export async function generateDemoData(
       }
     }
 
-    const rentalAgreement = await prisma.rentalAgreement.create({
+    const agreement = await prisma.agreement.create({
       data: {
         code: `${orgPrefix}-RA-${String(agreementIndex + 1).padStart(4, '0')}`,
         unitId: unit.id,
@@ -413,10 +412,10 @@ export async function generateDemoData(
       data: { status: unitStatus },
     });
 
-    rentalAgreements.push({ ...rentalAgreement, tenant, unit });
+    agreements.push({ ...agreement, tenant, unit });
     agreementIndex++;
   }
-  console.log(`Generated ${rentalAgreements.length} rental agreements`);
+  console.log(`Generated ${agreements.length} rental agreements`);
 
   // ========== Invoices, Payments, and Receipts (for all occupied units) ==========
   console.log('Generating invoices, payments, and receipts...');
@@ -435,10 +434,8 @@ export async function generateDemoData(
     const tenant = tenants[i]; // Each occupied unit has a corresponding tenant
 
     // Find the rental agreement for this unit
-    const rentalAgreement = rentalAgreements.find(
-      (ra) => ra.unit.id === unit.id,
-    );
-    const rentalAgreementId = rentalAgreement ? rentalAgreement.id : null;
+    const agreement = agreements.find((ra) => ra.unit.id === unit.id);
+    const agreementId = agreement ? agreement.id : null;
 
     for (let month = 0; month < months; month++) {
       const invoiceDate = new Date(startDate);
@@ -464,7 +461,7 @@ export async function generateDemoData(
       const invoice = await prisma.invoice.create({
         data: {
           invoiceNumber: `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, '0')}-${invoiceCount}${randomString(4)}`,
-          rentalAgreementId,
+          agreementId,
           issueDate: invoiceDate,
           dueDate,
           amount: Number(unit.baseRent),
@@ -495,7 +492,7 @@ export async function generateDemoData(
 
         const payment = await prisma.payment.create({
           data: {
-            rentalAgreementId,
+            agreementId,
             invoiceId: invoice.id,
             paymentDate,
             amount: paidAmount,
@@ -601,7 +598,7 @@ export async function generateDemoData(
     properties: properties.length,
     units: units.length,
     tenants: tenants.length,
-    rentalAgreements: rentalAgreements.length,
+    agreements: agreements.length,
     invoices: invoiceCount,
     payments: paymentCount,
     receipts: receiptCount,
@@ -809,7 +806,7 @@ async function generateOwnerData(
               { landlordId: landlord.id },
               {
                 landlordId: null,
-                rentalAgreement: {
+                agreement: {
                   unit: {
                     property: { landlordId: landlord.id },
                   },
@@ -824,7 +821,7 @@ async function generateOwnerData(
           invoice: {
             select: {
               invoiceNumber: true,
-              rentalAgreement: {
+              agreement: {
                 select: {
                   unit: { select: { property: { select: { name: true } } } },
                 },
@@ -845,8 +842,7 @@ async function generateOwnerData(
         const existing = byInvoice.get(invoiceNumber) ?? {
           amountCents: 0,
           paymentDate: payment.paymentDate.toISOString().slice(0, 10),
-          property:
-            payment.invoice?.rentalAgreement?.unit.property.name ?? null,
+          property: payment.invoice?.agreement?.unit.property.name ?? null,
         };
         existing.amountCents += Math.round(Number(payment.amount) * 100);
         existing.paymentDate = payment.paymentDate.toISOString().slice(0, 10);
@@ -1814,7 +1810,7 @@ async function generateMaintenanceData(
         select: {
           id: true,
           name: true,
-          rentalAgreements: {
+          agreements: {
             where: { status: AgreementStatus.ACTIVE },
             take: 1,
             select: { tenant: { select: { id: true, code: true } } },
@@ -2021,7 +2017,7 @@ async function generateMaintenanceData(
       propertyName: property.name,
       unitId: unit.id,
       unitName: unit.name,
-      tenantId: unit.rentalAgreements[0]?.tenant.id ?? null,
+      tenantId: unit.agreements[0]?.tenant.id ?? null,
     })),
   );
   const first = occupied[0];
@@ -3614,7 +3610,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     // them. There is no explicit `deleteMany` here on purpose - adding one would be a
     // second, redundant path to the same outcome, and the cascade is the guarantee that
     // a new entity type cannot be added to the contract without being cleaned up.
-    await prisma.rentalAgreement.deleteMany();
+    await prisma.agreement.deleteMany();
     await prisma.tenantEmergencyContact.deleteMany();
     // CRM first: `Lead`/`Contact` reference properties, branches, users and
     // (optionally) tenants, and `CommunicationLog` references both.
@@ -6148,7 +6144,7 @@ async function generateUtilitiesData(
  * Two details that are easy to get wrong and would make the demo lie:
  *
  * - **`LEASE` contracts leave `expiresAt` and `noticeDays` null on purpose.** The
- *   service falls back to `RentalAgreement.endDate` and `.noticePeriodDays`, so
+ *   service falls back to `agreement.endDate` and `.noticePeriodDays`, so
  *   filling them here would hide whether that wiring works. Two of them are filled
  *   anyway, with values that *disagree* with the lease, to show the register's own
  *   value winning - which is the documented behaviour and worth seeing.
@@ -6184,7 +6180,7 @@ async function generateContractsData(
   // ── leases ────────────────────────────────────────────────────────────────
   // Taken across the estate rather than the first few, so the ages are spread out
   // instead of every demo contract landing in the same year.
-  const leases = await prisma.rentalAgreement.findMany({
+  const leases = await prisma.agreement.findMany({
     where: { organizationId, endDate: { not: null } },
     orderBy: { endDate: 'asc' },
     select: { id: true, code: true, endDate: true, noticePeriodDays: true },
@@ -6254,7 +6250,7 @@ async function generateContractsData(
         reference: nextReference(),
         title: plan.title,
         type: ContractType.LEASE,
-        rentalAgreementId: plan.lease.id,
+        agreementId: plan.lease.id,
         // Deliberately null unless the plan overrides: the service reads the lease's
         // own `endDate` and `noticePeriodDays` when these are empty.
         expiresAt: plan.overrideExpiresAt ?? null,
@@ -6277,7 +6273,7 @@ async function generateContractsData(
   // still running is exactly the false alarm the status exists to avoid.
   if (leasePlans[0].lease && leasePlans[1].lease) {
     const original = await prisma.contract.findFirst({
-      where: { organizationId, rentalAgreementId: leasePlans[0].lease.id },
+      where: { organizationId, agreementId: leasePlans[0].lease.id },
       select: { id: true, reference: true, expiresAt: true },
     });
 
@@ -6295,7 +6291,7 @@ async function generateContractsData(
           reference: `${original.reference}-R2`,
           title: 'Renewed lease agreement',
           type: ContractType.LEASE,
-          rentalAgreementId: leasePlans[1].lease.id,
+          agreementId: leasePlans[1].lease.id,
           startDate: originalEnds,
           expiresAt: addDays(730),
           noticeDays: 90,
@@ -6622,7 +6618,7 @@ async function generateWesthillData(
   );
 
   // One active agreement on the occupied unit, one invoice paid, one pending.
-  const agreement = await prisma.rentalAgreement.create({
+  const agreement = await prisma.agreement.create({
     data: {
       organizationId,
       code: 'WESTHILL-RA-0001',
@@ -6645,7 +6641,7 @@ async function generateWesthillData(
   const paidInvoice = await prisma.invoice.create({
     data: {
       organizationId,
-      rentalAgreementId: agreement.id,
+      agreementId: agreement.id,
       invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0001`,
       issueDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
       dueDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 6)),
@@ -6660,7 +6656,7 @@ async function generateWesthillData(
   await prisma.payment.create({
     data: {
       organizationId,
-      rentalAgreementId: agreement.id,
+      agreementId: agreement.id,
       invoiceId: paidInvoice.id,
       paymentDate: new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 3),
@@ -6680,7 +6676,7 @@ async function generateWesthillData(
   await prisma.invoice.create({
     data: {
       organizationId,
-      rentalAgreementId: agreement.id,
+      agreementId: agreement.id,
       invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0002`,
       issueDate: new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
@@ -6711,7 +6707,7 @@ async function generateMoveOutData(
   prisma: PrismaClient,
   organizationId: string,
 ) {
-  const agreements = await prisma.rentalAgreement.findMany({
+  const agreements = await prisma.agreement.findMany({
     where: { organizationId, status: AgreementStatus.ACTIVE },
     include: { tenant: true, unit: true },
     take: 6,
@@ -6770,7 +6766,7 @@ async function generateMoveOutData(
       data: {
         organizationId,
         tenantId: plan.agreement.tenant.id,
-        rentalAgreementId: plan.agreement.id,
+        agreementId: plan.agreement.id,
         moveoutDate: plan.moveoutDate,
         status: plan.status,
         depositRefunded: plan.depositRefunded,

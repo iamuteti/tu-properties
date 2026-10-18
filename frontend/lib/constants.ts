@@ -1475,7 +1475,7 @@ export const CONTRACT_ENTITY_FOR_TYPE: Record<string, {
   label: string;
   picker: 'lease' | 'sale' | 'supplier' | 'landlord';
 } | null> = {
-  LEASE: { field: 'rentalAgreementId', label: 'Lease', picker: 'lease' },
+  LEASE: { field: 'rentalAgreementId', label: 'Agreement', picker: 'lease' },
   SALE: { field: 'saleTransactionId', label: 'Sale', picker: 'sale' },
   VENDOR: { field: 'supplierId', label: 'Supplier', picker: 'supplier' },
   MANAGEMENT: { field: 'landlordId', label: 'Landlord', picker: 'landlord' },

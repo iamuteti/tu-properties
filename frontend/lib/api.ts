@@ -729,24 +729,6 @@ export const tenantsApi = {
         api.delete(`/tenants/${id}`),
 };
 
-// Rental Agreements API
-export const rentalAgreementsApi = {
-    create: (data: { unitId: string; tenantId: string; agreementType?: string; startDate: string; endDate?: string; rentAmount: number; status: string }) =>
-        api.post<RentalAgreement>('/rental-agreements', data),
-
-    findAll: () =>
-        api.get<RentalAgreement[]>('/rental-agreements'),
-
-    findOne: (id: string) =>
-        api.get<RentalAgreement>(`/rental-agreements/${id}`),
-
-    update: (id: string, data: Partial<{ unitId: string; tenantId: string; agreementType: string; startDate: string; endDate: string; rentAmount: number; status: string }>) =>
-        api.patch<RentalAgreement>(`/rental-agreements/${id}`, data),
-
-    remove: (id: string) =>
-        api.delete(`/rental-agreements/${id}`),
-};
-
 // Finance API (new modular endpoints — the only billing API in use)
 export const financeApi = {
     // Invoices
@@ -1647,8 +1629,8 @@ export const salesApi = {
 // LEASES API (Module 5)
 // ============================================
 
-export const leasesApi = {
-    createLease: (data: CreateLeaseData) => api.post<Lease>('/leases', data),
+export const agreementsApi = {
+    createLease: (data: CreateLeaseData) => api.post<Lease>('/agreements', data),
 
     findLeases: (params?: {
         page?: number;
@@ -1668,16 +1650,16 @@ export const leasesApi = {
             query.append(key, String(value));
         });
         const qs = query.toString();
-        return api.get<PaginatedResponse<Lease>>(`/leases${qs ? `?${qs}` : ''}`);
+        return api.get<PaginatedResponse<Lease>>(`/agreements${qs ? `?${qs}` : ''}`);
     },
 
-    findLease: (id: string) => api.get<Lease>(`/leases/${id}`),
+    findLease: (id: string) => api.get<Lease>(`/agreements/${id}`),
 
     updateLease: (id: string, data: Partial<CreateLeaseData>) =>
-        api.patch<Lease>(`/leases/${id}`, data),
+        api.patch<Lease>(`/agreements/${id}`, data),
 
     // Lifecycle actions. `status` is only settable through these.
-    activate: (id: string) => api.post<Lease>(`/leases/${id}/activate`),
+    activate: (id: string) => api.post<Lease>(`/agreements/${id}/activate`),
 
     /** Creates the successor agreement and links the renewal chain. */
     renew: (
@@ -1690,32 +1672,32 @@ export const leasesApi = {
             termMonths?: number;
             currency?: string;
         },
-    ) => api.post<{ previous: { id: string; code: string }; lease: Lease }>(`/leases/${id}/renew`, data),
+    ) => api.post<{ previous: { id: string; code: string }; lease: Lease }>(`/agreements/${id}/renew`, data),
 
     extend: (id: string, newEndDate: string) =>
-        api.post<Lease>(`/leases/${id}/extend`, { newEndDate }),
+        api.post<Lease>(`/agreements/${id}/extend`, { newEndDate }),
 
     terminate: (id: string, reason: string) =>
         api.post<{ lease: Lease; outstanding: number; arrears: number; unitVacated: boolean }>(
-            `/leases/${id}/terminate`,
+            `/agreements/${id}/terminate`,
             { reason },
         ),
 
-    expire: (id: string) => api.post<Lease>(`/leases/${id}/expire`),
+    expire: (id: string) => api.post<Lease>(`/agreements/${id}/expire`),
 
-    reactivate: (id: string) => api.post<Lease>(`/leases/${id}/reactivate`),
+    reactivate: (id: string) => api.post<Lease>(`/agreements/${id}/reactivate`),
 
-    removeLease: (id: string) => api.delete(`/leases/${id}`),
+    removeLease: (id: string) => api.delete(`/agreements/${id}`),
 
-    /** Everything billed and collected against this lease. */
-    ledger: (id: string) => api.get<LeaseLedger>(`/leases/${id}/ledger`),
+    /** Everything billed and collected against this agreement. */
+    ledger: (id: string) => api.get<LeaseLedger>(`/agreements/${id}/ledger`),
 
     /** Expiry reminders (stub until Notifications exists). */
-    expiring: (days = 60) => api.get<Lease[]>('/leases/expiring', { params: { days } }),
+    expiring: (days = 60) => api.get<Lease[]>('/agreements/expiring', { params: { days } }),
 
     /** Occupancy history for a unit: tenancies plus the vacant gaps. */
     occupancyHistory: (unitId: string) =>
-        api.get<OccupancyHistory>(`/leases/units/${unitId}/occupancy-history`),
+        api.get<OccupancyHistory>(`/agreements/units/${unitId}/occupancy-history`),
 
     exportUrl: (params?: { search?: string; status?: string; agreementType?: string }) => {
         const query = new URLSearchParams();
@@ -1723,7 +1705,7 @@ export const leasesApi = {
             if (value) query.append(key, value);
         });
         const qs = query.toString();
-        return `${API_BASE_URL}/leases/export${qs ? `?${qs}` : ''}`;
+        return `${API_BASE_URL}/agreements/export${qs ? `?${qs}` : ''}`;
     },
 };
 
@@ -1792,13 +1774,13 @@ export const inspectionsApi = {
     remove: (id: string) => api.delete(`/inspections/${id}`),
 };
 
-export const leaseTemplatesApi = {
-    list: () => api.get<LeaseTemplate[]>('/lease-templates'),
-    create: (data: Partial<LeaseTemplate>) => api.post<LeaseTemplate>('/lease-templates', data),
+export const agreementTemplatesApi = {
+    list: () => api.get<LeaseTemplate[]>('/agreement-templates'),
+    create: (data: Partial<LeaseTemplate>) => api.post<LeaseTemplate>('/agreement-templates', data),
     update: (id: string, data: Partial<LeaseTemplate>) =>
-        api.patch<LeaseTemplate>(`/lease-templates/${id}`, data),
-    /** Deactivates rather than deleting — leases created from it are on file. */
-    remove: (id: string) => api.delete(`/lease-templates/${id}`),
+        api.patch<LeaseTemplate>(`/agreement-templates/${id}`, data),
+    /** Deactivates rather than deleting — agreements created from it are on file. */
+    remove: (id: string) => api.delete(`/agreement-templates/${id}`),
 };
 
 /**

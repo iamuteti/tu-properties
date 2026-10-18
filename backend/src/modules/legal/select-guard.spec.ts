@@ -96,14 +96,14 @@ describe('Module 15 selects match the schema', () => {
   it('names only fields that exist on the related models', () => {
     // Checked separately from the above so a failure says *which* model drifted.
     for (const model of [
-      'RentalAgreement',
+      'agreement',
       'SaleTransaction',
       'Supplier',
       'Landlord',
     ]) {
       const select = (RELATED_INCLUDE as Record<string, { select: unknown }>)[
         {
-          RentalAgreement: 'rentalAgreement',
+          agreement: 'agreement',
           SaleTransaction: 'saleTransaction',
           Supplier: 'supplier',
           Landlord: 'landlord',
@@ -147,11 +147,11 @@ describe('Module 15 selects match the schema', () => {
     // counterparty label would quietly fall through to the agreement code.
     const tenant = (
       LIST_SELECT as unknown as {
-        rentalAgreement: {
+        agreement: {
           select: { tenant: { select: Record<string, unknown> } };
         };
       }
-    ).rentalAgreement.select.tenant.select;
+    ).agreement.select.tenant.select;
 
     expect(Object.keys(tenant).sort()).toEqual([
       'email',

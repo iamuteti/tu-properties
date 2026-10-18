@@ -96,7 +96,7 @@ export class TenantsService {
 
     const agreementType = filters?.agreementType || 'RENTAL';
 
-    where.rentalAgreements = {
+    where.agreements = {
       some: {
         agreementType: agreementType,
       },
@@ -106,10 +106,10 @@ export class TenantsService {
       if (filters.status) where.status = filters.status;
       if (filters.gender) where.gender = filters.gender;
       if (filters.propertyId) {
-        where.rentalAgreements = {
-          ...where.rentalAgreements,
+        where.agreements = {
+          ...where.agreements,
           some: {
-            ...where.rentalAgreements.some,
+            ...where.agreements.some,
             unit: {
               propertyId: filters.propertyId,
             },
@@ -117,10 +117,10 @@ export class TenantsService {
         };
       }
       if (filters.withDeposit !== undefined) {
-        where.rentalAgreements = {
-          ...where.rentalAgreements,
+        where.agreements = {
+          ...where.agreements,
           some: {
-            ...where.rentalAgreements.some,
+            ...where.agreements.some,
             securityDeposit: filters.withDeposit
               ? { not: null }
               : { equals: null },
@@ -137,7 +137,7 @@ export class TenantsService {
           take: limit,
           orderBy: { [sortBy]: sortOrder },
           include: {
-            rentalAgreements: {
+            agreements: {
               include: {
                 unit: {
                   include: {
@@ -152,15 +152,15 @@ export class TenantsService {
         tx.tenant.count({ where }),
       ]);
 
-      // Format data to include rentalAgreement as single object instead of array
+      // Format data to include agreement as single object instead of array
       const formattedData = data.map((tenant) => {
-        const rentalAgreement =
-          tenant.rentalAgreements?.sort(
+        const agreement =
+          tenant.agreements?.sort(
             (a, b) =>
               new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
           )[0] || null;
         const lastPaidInvoice =
-          rentalAgreement?.invoices
+          agreement?.invoices
             ?.filter((inv) => inv.status === 'PAID')
             ?.sort(
               (a, b) =>
@@ -170,7 +170,7 @@ export class TenantsService {
 
         return {
           ...tenant,
-          rentalAgreement,
+          agreement,
           lastPaidInvoice,
         };
       });
@@ -193,7 +193,7 @@ export class TenantsService {
       this.prisma.tenant.findFirst({
         where,
         include: {
-          rentalAgreements: true,
+          agreements: true,
           emergencyContacts: true,
         },
       }),

@@ -353,7 +353,7 @@ export class WorkOrdersService {
   async createFromPortal(dto: ReportIssueDto, request: any) {
     const tenantId = getPortalTenantId(request);
 
-    const lease = await this.prisma.rentalAgreement.findFirst({
+    const lease = await this.prisma.agreement.findFirst({
       where: { tenantId, status: 'ACTIVE' },
       orderBy: { startDate: 'desc' },
       select: {
@@ -409,7 +409,7 @@ export class WorkOrdersService {
     payload?: { category?: string; priority?: string; title?: string } | null;
     userId?: string;
   }) {
-    const lease = await this.prisma.rentalAgreement.findFirst({
+    const lease = await this.prisma.agreement.findFirst({
       where: { tenantId: args.tenantId, status: 'ACTIVE' },
       orderBy: { startDate: 'desc' },
       select: {

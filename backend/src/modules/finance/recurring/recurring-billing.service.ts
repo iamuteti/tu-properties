@@ -44,7 +44,7 @@ interface LeaseToBill {
  * process mid-run — must not bill a tenant twice. So idempotency is enforced by
  * the database, not by the job being careful: every generated invoice carries a
  * `billingPeriod`, and there is a unique constraint on
- * `(rentalAgreementId, billingPeriod)`. A second attempt fails that constraint
+ * `(agreementId, billingPeriod)`. A second attempt fails that constraint
  * and is reported as *skipped*, which is the correct outcome rather than an
  * error to retry.
  *
@@ -196,7 +196,7 @@ export class RecurringBillingService {
   }
 
   private async leasesDueOn(organizationId: string, onDate: Date) {
-    return this.prisma.rentalAgreement.findMany({
+    return this.prisma.agreement.findMany({
       where: {
         organizationId,
         status: { in: [AgreementStatus.ACTIVE, AgreementStatus.DRAFT] },
@@ -281,7 +281,7 @@ export class RecurringBillingService {
     const invoice = await this.invoicesService.create(
       {
         transactionClass: 'RENT',
-        rentalAgreementId: lease.id,
+        agreementId: lease.id,
         issueDate: billingDate,
         // Rent falls due on the day it bills, which is the lease's payment day.
         dueDate: billingDate,

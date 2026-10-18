@@ -26,7 +26,7 @@ type MockDelegate = Record<string, jest.Mock>;
 interface MockPrisma {
   contract: MockDelegate;
   document: MockDelegate;
-  rentalAgreement: MockDelegate;
+  agreement: MockDelegate;
   saleTransaction: MockDelegate;
   supplier: MockDelegate;
   landlord: MockDelegate;
@@ -119,12 +119,12 @@ function row(overrides: Partial<ContractRow> = {}): ContractRow {
     documentId: null,
     createdAt: inDays(-200),
     updatedAt: inDays(-200),
-    rentalAgreementId: null,
+    agreementId: null,
     saleTransactionId: null,
     supplierId: SUPPLIER_A,
     landlordId: null,
     renewals: [],
-    rentalAgreement: null,
+    agreement: null,
     saleTransaction: null,
     supplier: { name: 'Nairobi Water Co', code: 'NWC-01' },
     landlord: null,
@@ -142,7 +142,7 @@ function row(overrides: Partial<ContractRow> = {}): ContractRow {
 function makePrisma(rows: ContractRow[] = [row()]) {
   const found: Record<string, any[]> = {
     supplier: [{ id: SUPPLIER_A }],
-    rentalAgreement: [{ id: LEASE_A }],
+    agreement: [{ id: LEASE_A }],
     saleTransaction: [{ id: 'sale-a' }],
     landlord: [{ id: 'landlord-a' }],
   };
@@ -187,12 +187,10 @@ function makePrisma(rows: ContractRow[] = [row()]) {
       delete: jest.fn().mockResolvedValue({}),
     },
     document: { findMany: jest.fn().mockResolvedValue([]) },
-    rentalAgreement: {
+    agreement: {
       findFirst: jest
         .fn()
-        .mockImplementation(() =>
-          Promise.resolve(found.rentalAgreement[0] ?? null),
-        ),
+        .mockImplementation(() => Promise.resolve(found.agreement[0] ?? null)),
     },
     saleTransaction: {
       findFirst: jest
@@ -282,16 +280,16 @@ describe('ContractsService', () => {
     });
 
     it('falls back to the lease dates rather than duplicating them', async () => {
-      // `RentalAgreement` already owns `startDate`, `endDate` and `noticePeriodDays`.
+      // `agreement` already owns `startDate`, `endDate` and `noticePeriodDays`.
       const { service } = makePrisma([
         row({
           type: 'LEASE',
           supplierId: null,
-          rentalAgreementId: LEASE_A,
+          agreementId: LEASE_A,
           startDate: null,
           expiresAt: null,
           noticeDays: null,
-          rentalAgreement: {
+          agreement: {
             code: 'RA-1',
             startDate: inDays(-300),
             endDate: inDays(60),
@@ -317,16 +315,16 @@ describe('ContractsService', () => {
         row({
           type: 'LEASE',
           supplierId: null,
-          rentalAgreementId: LEASE_A,
+          agreementId: LEASE_A,
           expiresAt: inDays(400),
           noticeDays: null,
-          rentalAgreement: {
+          agreement: {
             code: 'RA-1',
             startDate: inDays(-300),
             endDate: inDays(60),
             noticePeriodDays: 30,
             // Was `null` here, which the hand-written `ContractRow` allowed. It is
-            // not nullable in the schema - `RentalAgreement.tenantId` is required with
+            // not nullable in the schema - `agreement.tenantId` is required with
             // `onDelete: Restrict` - so the fixture was describing a lease with no
             // tenant, which is not a state any row can be in.
             tenant: { surname: 'Otieno', otherNames: 'Ama', email: null },
@@ -348,8 +346,8 @@ describe('ContractsService', () => {
           type: 'LEASE',
           supplierId: null,
           supplier: null,
-          rentalAgreementId: LEASE_A,
-          rentalAgreement: {
+          agreementId: LEASE_A,
+          agreement: {
             code: 'RA-1',
             startDate: inDays(-300),
             endDate: null,
@@ -454,7 +452,7 @@ describe('ContractsService', () => {
       const { prisma, service } = makePrisma();
       await service.findAll({ relatedId: 'x' }, requestFor(ORG_A));
       expect(argOf(prisma.contract.findMany.mock.calls[0]).where.OR).toEqual([
-        { rentalAgreementId: 'x' },
+        { agreementId: 'x' },
         { saleTransactionId: 'x' },
         { supplierId: 'x' },
         { landlordId: 'x' },
@@ -560,7 +558,7 @@ describe('ContractsService', () => {
       const { service } = makePrisma();
       await expect(
         service.create(
-          { ...base, rentalAgreementId: LEASE_A } as any,
+          { ...base, agreementId: LEASE_A } as any,
           requestFor(ORG_A),
         ),
       ).rejects.toThrow(/only be linked to one record/);

@@ -12,7 +12,7 @@ import {
 import { getPortalTenantId, requireRecord } from '@/common/utils';
 import { NotificationTriggersService } from '../notifications/notification-triggers.service';
 import { AuditService } from '@/modules/audit/audit.service';
-import { RentalAgreementsService } from '@/modules/leases/rental-agreements.service';
+import { AgreementsService } from '@/modules/agreements/agreements.service';
 import { MoveoutsService } from '@/modules/moveouts/moveouts.service';
 import { WorkOrdersService } from '@/modules/maintenance/work-orders.service';
 import type {
@@ -42,7 +42,7 @@ export class TenantRequestsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
-    private leases: RentalAgreementsService,
+    private agreements: AgreementsService,
     private moveouts: MoveoutsService,
     private workOrders: WorkOrdersService,
     private notificationTriggers: NotificationTriggersService,
@@ -54,11 +54,11 @@ export class TenantRequestsService {
   async createFromPortal(dto: CreateTenantRequestDto, request: any) {
     const tenantId = getPortalTenantId(request);
 
-    const lease = await this.activeLeaseFor(tenantId, dto.rentalAgreementId);
+    const lease = await this.activeLeaseFor(tenantId, dto.agreementId);
 
     const existing = await this.prisma.tenantRequest.findFirst({
       where: {
-        rentalAgreementId: lease.id,
+        agreementId: lease.id,
         type: dto.type,
         status: TenantRequestStatus.PENDING,
       },
@@ -86,7 +86,7 @@ export class TenantRequestsService {
       data: {
         organizationId: lease.organizationId ?? '',
         tenantId,
-        rentalAgreementId: lease.id,
+        agreementId: lease.id,
         type: dto.type,
         // Snapshot what was asked, so a later lease change cannot rewrite it.
         payload: (dto.payload ?? {}) as object,
@@ -292,7 +292,7 @@ export class TenantRequestsService {
     request: {
       id: string;
       type: TenantRequestType;
-      rentalAgreementId: string | null;
+      agreementId: string | null;
       tenantId: string;
       preferredDate: Date | null;
       payload: unknown;
@@ -300,7 +300,7 @@ export class TenantRequestsService {
     },
     userId?: string,
   ): Promise<Record<string, unknown> | null> {
-    if (!request.rentalAgreementId) {
+    if (!request.agreementId) {
       throw new BadRequestException(
         'This request is not attached to a lease, so there is nothing to apply it to.',
       );
@@ -314,8 +314,8 @@ export class TenantRequestsService {
     };
 
     if (request.type === TenantRequestType.RENEWAL) {
-      const renewed = await this.leases.renew(
-        request.rentalAgreementId,
+      const renewed = await this.agreements.renew(
+        request.agreementId,
         {
           ...(payload.termMonths ? { termMonths: payload.termMonths } : {}),
           ...(payload.rentAmount ? { rentAmount: payload.rentAmount } : {}),
@@ -335,7 +335,7 @@ export class TenantRequestsService {
     if (request.type === TenantRequestType.MOVE_OUT) {
       const moveOut = await this.moveouts.create(
         {
-          rentalAgreementId: request.rentalAgreementId,
+          agreementId: request.agreementId,
           moveoutDate: request.preferredDate ?? new Date(),
           notes:
             'Requested by the tenant through the portal. ' +
@@ -401,12 +401,12 @@ export class TenantRequestsService {
    * The tenant's active lease. A resident can only ever ask about their own
    * current tenancy — there is no path here to another household's lease.
    */
-  private async activeLeaseFor(tenantId: string, rentalAgreementId?: string) {
-    const lease = await this.prisma.rentalAgreement.findFirst({
+  private async activeLeaseFor(tenantId: string, agreementId?: string) {
+    const lease = await this.prisma.agreement.findFirst({
       where: {
         tenantId,
         status: AgreementStatus.ACTIVE,
-        ...(rentalAgreementId ? { id: rentalAgreementId } : {}),
+        ...(agreementId ? { id: agreementId } : {}),
       },
       orderBy: { startDate: 'desc' },
       select: {
@@ -444,7 +444,7 @@ export class TenantRequestsService {
           email: true,
         },
       },
-      rentalAgreement: {
+      agreement: {
         select: {
           id: true,
           code: true,

@@ -230,7 +230,7 @@ export class UnitsService {
           take: limit,
           include: {
             property: { select: { id: true, name: true, code: true } },
-            rentalAgreements: {
+            agreements: {
               where: { status: AgreementStatus.ACTIVE },
               orderBy: { startDate: 'desc' },
               take: 1,
@@ -272,7 +272,7 @@ export class UnitsService {
           // it into `utility_meters`, which is a proper register: type, scope and
           // the readings behind it.
           utilityMeters: true,
-          rentalAgreements: {
+          agreements: {
             orderBy: { startDate: 'desc' },
             include: {
               tenant: true,
@@ -293,7 +293,7 @@ export class UnitsService {
       'Unit',
     );
 
-    const agreements = unit.rentalAgreements.map((agreement) => ({
+    const agreements = unit.agreements.map((agreement) => ({
       status: agreement.status,
       startDate: agreement.startDate,
       endDate: agreement.endDate,
@@ -380,7 +380,7 @@ export class UnitsService {
 
     // Rental agreements reference units with `onDelete: Restrict`, so deleting
     // a tenanted unit would surface as a 500 FK violation.
-    const agreements = await this.prisma.rentalAgreement.count({
+    const agreements = await this.prisma.agreement.count({
       where: { unitId: id },
     });
     if (agreements > 0) {
@@ -411,7 +411,7 @@ export class UnitsService {
     });
     if (!unit) throw new BadRequestException('Unit not found.');
 
-    const agreements = await this.prisma.rentalAgreement.findMany({
+    const agreements = await this.prisma.agreement.findMany({
       where: { unitId: id },
       select: { status: true, startDate: true, endDate: true },
     });
@@ -449,7 +449,7 @@ export class UnitsService {
     });
     if (!unit) throw new BadRequestException('Unit not found.');
 
-    const agreements = await this.prisma.rentalAgreement.findMany({
+    const agreements = await this.prisma.agreement.findMany({
       where: { unitId: id },
       select: { status: true, startDate: true, endDate: true },
     });
@@ -480,7 +480,7 @@ export class UnitsService {
     );
 
     const rows = (data as unknown as UnitExportRow[]).map((unit) => {
-      const agreement = unit.rentalAgreements?.[0];
+      const agreement = unit.agreements?.[0];
       return {
         code: unit.code,
         name: unit.name,
@@ -683,7 +683,7 @@ interface UnitExportRow {
   baseRent?: number | string | null;
   currency?: string | null;
   furnished?: boolean | null;
-  rentalAgreements?: Array<{
+  agreements?: Array<{
     endDate?: Date | string | null;
     tenant?: { surname?: string | null; otherNames?: string | null } | null;
   }>;

@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/entity-states";
-import { AgreementStatusBadge } from "@/components/leases/agreement-status-badge";
-import { LeaseLifecycleActions, MoveOutPrompt } from "@/components/leases/lease-lifecycle-actions";
-import { leasesApi } from "@/lib/api";
+import { AgreementStatusBadge } from "@/components/agreements/agreement-status-badge";
+import { AgreementLifecycleActions, MoveOutPrompt } from "@/components/agreements/agreement-lifecycle-actions";
+import { agreementsApi } from "@/lib/api";
 import type { Lease } from "@/types";
 
 export default function LeaseDetailPage() {
@@ -29,7 +29,7 @@ export default function LeaseDetailPage() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await leasesApi.findLease(id);
+            const response = await agreementsApi.findLease(id);
             setLease(response.data);
         } catch (err: any) {
             setError(
@@ -51,9 +51,9 @@ export default function LeaseDetailPage() {
         if (!confirm(`Delete lease ${lease.code ?? ""}? This cannot be undone.`)) return;
         setIsBusy(true);
         try {
-            await leasesApi.removeLease(lease.id);
+            await agreementsApi.removeLease(lease.id);
             toast.success("Lease deleted");
-            router.push("/rental-agreements");
+            router.push("/agreements");
         } catch (err: any) {
             toast.error(err.response?.data?.message || "Failed to delete the lease.");
             setIsBusy(false);
@@ -67,7 +67,7 @@ export default function LeaseDetailPage() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => router.push("/rental-agreements")}
+                    onClick={() => router.push("/agreements")}
                     aria-label="Back to leases"
                 >
                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -90,7 +90,7 @@ export default function LeaseDetailPage() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => router.push("/rental-agreements")}
+                        onClick={() => router.push("/agreements")}
                         aria-label="Back to leases"
                     >
                         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -127,7 +127,7 @@ export default function LeaseDetailPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
-                        onClick={() => router.push(`/rental-agreements/${lease.id}/edit`)}
+                        onClick={() => router.push(`/agreements/${lease.id}/edit`)}
                         disabled={isBusy}
                     >
                         <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -216,7 +216,7 @@ export default function LeaseDetailPage() {
                         only be renewed inside its window, and terminating vacates the unit unless a
                         successor tenancy took over.
                     </p>
-                    <LeaseLifecycleActions lease={lease} onChanged={loadLease} />
+                    <AgreementLifecycleActions lease={lease} onChanged={loadLease} />
                     {moveOuts.length > 0 && (
                         <div className="space-y-2 border-t pt-4">
                             <h3 className="text-sm font-semibold">Move-out</h3>
@@ -300,7 +300,7 @@ export default function LeaseDetailPage() {
                             <p>
                                 Renewed from{' '}
                                 <Link
-                                    href={`/rental-agreements/${lease.renewedFrom.id}`}
+                                    href={`/agreements/${lease.renewedFrom.id}`}
                                     className="font-medium hover:underline"
                                 >
                                     {lease.renewedFrom.code}
@@ -315,7 +315,7 @@ export default function LeaseDetailPage() {
                             <p>
                                 Renewed into{' '}
                                 <Link
-                                    href={`/rental-agreements/${lease.renewedTo.id}`}
+                                    href={`/agreements/${lease.renewedTo.id}`}
                                     className="font-medium hover:underline"
                                 >
                                     {lease.renewedTo.code}

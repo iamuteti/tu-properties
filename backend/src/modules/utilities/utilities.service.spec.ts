@@ -38,7 +38,7 @@ interface MockPrisma {
   organization: MockDelegate;
   property: MockDelegate;
   unit: MockDelegate;
-  rentalAgreement: MockDelegate;
+  agreement: MockDelegate;
   $transaction: jest.Mock;
 }
 
@@ -189,7 +189,7 @@ function buildService() {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue({ id: UNIT_A }),
     },
-    rentalAgreement: {
+    agreement: {
       findFirst: jest.fn().mockResolvedValue({ id: LEASE_A }),
       // One query for every tenancy in the property, which is how OCCUPANCY gets
       // every unit's occupancy in one round trip instead of one query per unit.
@@ -682,7 +682,7 @@ describe('UtilitiesService — billing', () => {
 
     prisma.utilityMeter.findFirst.mockResolvedValue(meterRow());
     prisma.property.findFirst.mockResolvedValue({ id: PROPERTY_A });
-    prisma.rentalAgreement.findFirst.mockResolvedValue({ id: LEASE_A });
+    prisma.agreement.findFirst.mockResolvedValue({ id: LEASE_A });
 
     // `readingsBracketing` runs two `findFirst`s: the opening (at or before 1 Aug)
     // and the closing (at or before 1 Sep).
@@ -742,7 +742,7 @@ describe('UtilitiesService — billing', () => {
       .mockResolvedValueOnce(readingRow({ id: 'open', reading: dec(4000) }))
       .mockResolvedValueOnce(readingRow({ id: 'close', reading: dec(4150) }));
     prisma.utilityRate.findMany.mockResolvedValue([]);
-    prisma.rentalAgreement.findFirst.mockResolvedValue({ id: LEASE_A });
+    prisma.agreement.findFirst.mockResolvedValue({ id: LEASE_A });
 
     await expect(
       service.billPeriod(ORG_A, { meterId: METER_A, billingPeriod: '2026-08' }),
@@ -808,7 +808,7 @@ describe('UtilitiesService — billing', () => {
     prisma.utilityCharge.findMany.mockResolvedValue([
       {
         id: 'charge-a',
-        rentalAgreementId: LEASE_A,
+        agreementId: LEASE_A,
         currency: 'KES',
         ratePerUnit: dec('55.5'),
         vatRate: dec(16),
@@ -823,7 +823,7 @@ describe('UtilitiesService — billing', () => {
         unit: { id: UNIT_A, code: 'A-101', name: 'Flat 101' },
       },
     ]);
-    prisma.rentalAgreement.findUnique.mockResolvedValue({
+    prisma.agreement.findUnique.mockResolvedValue({
       id: LEASE_A,
       tenant: { surname: 'Otieno', otherNames: 'A' },
     });
@@ -842,7 +842,7 @@ describe('UtilitiesService — billing', () => {
     const arg = callArg<Record<string, unknown>>(invoicesService.create);
     expect(arg).toMatchObject({
       transactionClass: 'UTILITY',
-      rentalAgreementId: LEASE_A,
+      agreementId: LEASE_A,
     });
     expect(arg).not.toHaveProperty('billingPeriod');
     expect(result.invoices).toHaveLength(1);
@@ -857,7 +857,7 @@ describe('UtilitiesService — billing', () => {
     prisma.utilityCharge.findMany.mockResolvedValue([
       {
         id: 'charge-a',
-        rentalAgreementId: LEASE_A,
+        agreementId: LEASE_A,
         currency: 'KES',
         ratePerUnit: dec('55.5'),
         vatRate: dec(16),
@@ -872,7 +872,7 @@ describe('UtilitiesService — billing', () => {
         unit: { id: UNIT_A, code: 'A-101', name: 'Flat 101' },
       },
     ]);
-    prisma.rentalAgreement.findUnique.mockResolvedValue({
+    prisma.agreement.findUnique.mockResolvedValue({
       id: LEASE_A,
       tenant: null,
     });
@@ -902,7 +902,7 @@ describe('UtilitiesService — billing', () => {
     prisma.utilityCharge.findMany.mockResolvedValue([
       {
         id: 'charge-vacant',
-        rentalAgreementId: null,
+        agreementId: null,
         currency: 'KES',
         ratePerUnit: dec('55.5'),
         vatRate: dec(16),
@@ -940,7 +940,7 @@ describe('UtilitiesService — billing', () => {
     prisma.utilityCharge.findMany.mockResolvedValue([
       {
         id: 'charge-vacant',
-        rentalAgreementId: null,
+        agreementId: null,
         currency: 'KES',
         ratePerUnit: dec('55.5'),
         vatRate: dec(16),
@@ -955,7 +955,7 @@ describe('UtilitiesService — billing', () => {
         unit: { id: UNIT_A, code: 'A-101', name: 'Flat 101' },
       },
     ]);
-    prisma.rentalAgreement.findUnique.mockResolvedValue(null);
+    prisma.agreement.findUnique.mockResolvedValue(null);
     prisma.meterReading.findFirst
       .mockResolvedValueOnce(readingRow({ id: 'open', reading: dec(4000) }))
       .mockResolvedValueOnce(readingRow({ id: 'close', reading: dec(4150) }));
@@ -1049,7 +1049,7 @@ describe('UtilitiesService — billing', () => {
         vatRate: null,
       }),
     );
-    prisma.rentalAgreement.findFirst.mockResolvedValue({ id: LEASE_A });
+    prisma.agreement.findFirst.mockResolvedValue({ id: LEASE_A });
     prisma.utilityCharge.findFirst.mockResolvedValue(null);
 
     const result = await service.billPeriod(ORG_A, {
@@ -1130,7 +1130,7 @@ describe('UtilitiesService — billing', () => {
       { id: 'unit-b', areaSqFt: dec(1000) },
     ]);
     // August 2026: unit A occupied all 31 days, unit B only from the 20th (12 days).
-    prisma.rentalAgreement.findMany.mockResolvedValue([
+    prisma.agreement.findMany.mockResolvedValue([
       {
         id: 'lease-a',
         unitId: UNIT_A,
@@ -1181,7 +1181,7 @@ describe('UtilitiesService — billing', () => {
         areaSqFt: dec(1000 + i),
       })),
     );
-    prisma.rentalAgreement.findMany.mockResolvedValue([]);
+    prisma.agreement.findMany.mockResolvedValue([]);
     prisma.utilityRate.findMany.mockResolvedValue([rateRow()]);
     prisma.utilityRate.findUnique.mockResolvedValue(rateRow());
     prisma.utilityCharge.findFirst.mockResolvedValue(null);
@@ -1191,8 +1191,8 @@ describe('UtilitiesService — billing', () => {
       billingPeriod: '2026-08',
     });
 
-    expect(prisma.rentalAgreement.findMany).toHaveBeenCalledTimes(1);
-    expect(prisma.rentalAgreement.findFirst).not.toHaveBeenCalled();
+    expect(prisma.agreement.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.agreement.findFirst).not.toHaveBeenCalled();
   });
 });
 

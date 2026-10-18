@@ -43,7 +43,7 @@ export class PortalService {
   async currentLease(request: any) {
     const tenantId = getPortalTenantId(request);
 
-    const lease = await this.prisma.rentalAgreement.findFirst({
+    const lease = await this.prisma.agreement.findFirst({
       where: { tenantId, status: AgreementStatus.ACTIVE },
       orderBy: { startDate: 'desc' },
       include: {
@@ -73,7 +73,7 @@ export class PortalService {
     }
 
     const invoices = await this.prisma.invoice.findMany({
-      where: { rentalAgreementId: lease.id },
+      where: { agreementId: lease.id },
       include: { payments: { select: { amount: true } } },
     });
     const money = this.summarise(invoices);
@@ -120,7 +120,7 @@ export class PortalService {
     const tenantId = getPortalTenantId(request);
 
     return this.prisma.invoice.findMany({
-      where: { rentalAgreement: { tenantId } },
+      where: { agreement: { tenantId } },
       orderBy: { dueDate: 'desc' },
       take: 100,
       select: {
@@ -179,7 +179,7 @@ export class PortalService {
    */
   async summary(request: any) {
     const tenantId = getPortalTenantId(request);
-    const lease = await this.prisma.rentalAgreement.findFirst({
+    const lease = await this.prisma.agreement.findFirst({
       where: { tenantId, status: AgreementStatus.ACTIVE },
       orderBy: { startDate: 'desc' },
       select: {
@@ -212,7 +212,7 @@ export class PortalService {
     }
 
     const invoices = await this.prisma.invoice.findMany({
-      where: { rentalAgreementId: lease.id },
+      where: { agreementId: lease.id },
       include: { payments: { select: { amount: true } } },
     });
     const money = this.summarise(invoices);

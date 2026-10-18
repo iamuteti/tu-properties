@@ -32,7 +32,7 @@ describe('RefundsService', () => {
       totalAmount: 10_000,
       status: InvoiceStatus.PAID,
       landlordId: null,
-      rentalAgreement: { tenantId: 'ten-1' },
+      agreement: { tenantId: 'ten-1' },
     },
   };
 

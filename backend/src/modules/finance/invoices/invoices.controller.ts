@@ -31,7 +31,7 @@ export class InvoicesController {
     createInvoiceDto: {
       invoiceNumber?: string;
       landlordId?: string;
-      rentalAgreementId?: string;
+      agreementId?: string;
       transactionClass: string;
       acReceivable?: string;
       billTo?: string;
@@ -106,7 +106,7 @@ export class InvoicesController {
     @Body()
     updateInvoiceDto: {
       landlordId?: string;
-      rentalAgreementId?: string;
+      agreementId?: string;
       transactionClass?: string;
       acReceivable?: string;
       billTo?: string;

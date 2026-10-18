@@ -172,7 +172,7 @@ export default function TenantRequestsPage() {
                                                     <>
                                                         {" · "}
                                                         <Link
-                                                            href={`/rental-agreements/${request.rentalAgreement.id}`}
+                                                            href={`/agreements/${request.rentalAgreement.id}`}
                                                             className="hover:underline"
                                                         >
                                                             {request.rentalAgreement.code}

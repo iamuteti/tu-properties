@@ -187,13 +187,13 @@ const navItems: NavItem[] = [
         ]
     },
     {
-        label: "Tenants & Leases",
+        label: "Tenants & Agreements",
         icon: Users,
         roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
         module: 'tenants',
         children: [
             { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
-            { href: "/rental-agreements", label: "Leases", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'leases' },
+            { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'leases' },
             { href: "/tenant-requests", label: "Tenant requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'tenant-requests' },
             { href: "/moving-out", label: "Moving Out", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
         ]

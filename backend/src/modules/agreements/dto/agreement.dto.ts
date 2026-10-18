@@ -21,13 +21,13 @@ import {
 import { CleanOptional, ToBoolean, ToNumber } from '@/common/dto/transforms';
 
 /**
- * Lease payloads (Module 5).
+ * Agreement payloads (Module 5).
  *
- * These replace the raw `Prisma.RentalAgreementCreateInput` bodies the leases
- * endpoints used to accept, which let any column be set from the browser and
- * validated nothing.
+ * These replace the raw `Prisma.agreementCreateInput` bodies the
+ * agreements endpoints used to accept, which let any column be set from the
+ * browser and validated nothing.
  */
-export class RentalAgreementFieldsDto {
+export class AgreementFieldsDto {
   @IsOptional()
   @IsEnum(AgreementType)
   agreementType?: AgreementType;
@@ -96,11 +96,11 @@ export class RentalAgreementFieldsDto {
   notes?: string;
 
   // `status` is deliberately absent: the lifecycle moves through
-  // /leases/:id/{activate,renew,extend,terminate,expire}, which applies the
-  // rules in lease-lifecycle.ts and the occupancy side-effects.
+  // /agreements/:id/{activate,renew,extend,terminate,expire}, which applies the
+  // rules in agreement-lifecycle.ts and the occupancy side-effects.
 }
 
-export class CreateRentalAgreementDto extends RentalAgreementFieldsDto {
+export class CreateAgreementDto extends AgreementFieldsDto {
   @IsString()
   unitId!: string;
 
@@ -113,7 +113,7 @@ export class CreateRentalAgreementDto extends RentalAgreementFieldsDto {
   rentAmount!: number;
 }
 
-export class UpdateRentalAgreementDto extends RentalAgreementFieldsDto {
+export class UpdateAgreementDto extends AgreementFieldsDto {
   @IsOptional()
   @IsNumber()
   @ToNumber()
@@ -121,14 +121,14 @@ export class UpdateRentalAgreementDto extends RentalAgreementFieldsDto {
   rentAmount?: number;
 }
 
-/** Extend an existing lease in place (no new agreement row). */
-export class ExtendLeaseDto {
+/** Extend an existing agreement in place (no new agreement row). */
+export class ExtendAgreementDto {
   @IsDateString()
   newEndDate!: string;
 }
 
-/** Terminate a lease early. */
-export class TerminateLeaseDto {
+/** Terminate an agreement early. */
+export class TerminateAgreementDto {
   @IsString()
   @MaxLength(500)
   reason!: string;
@@ -140,7 +140,7 @@ export class TerminateLeaseDto {
 }
 
 /** Create the successor agreement of a renewal. */
-export class RenewLeaseDto {
+export class RenewAgreementDto {
   @IsOptional()
   @IsDateString()
   @CleanOptional()
@@ -169,7 +169,7 @@ export class RenewLeaseDto {
   @CleanOptional()
   currency?: string;
 
-  /** Carry the previous lease's unscheduled end date when no new one is given. */
+  /** Carry the previous agreement's unscheduled end date when no new one is given. */
   @IsOptional()
   @IsInt()
   @ToNumber()
@@ -203,7 +203,7 @@ export class CreateDeductionDto {
 
 export class CreateMoveOutRequestDto {
   @IsString()
-  rentalAgreementId!: string;
+  agreementId!: string;
 
   @IsDateString()
   moveoutDate!: string;
@@ -281,7 +281,7 @@ export class CreateInspectionDto {
 
   @IsOptional()
   @IsString()
-  rentalAgreementId?: string;
+  agreementId?: string;
 
   @IsEnum(['MOVE_IN', 'PERIODIC', 'MOVE_OUT', 'ANNUAL'])
   type!: 'MOVE_IN' | 'PERIODIC' | 'MOVE_OUT' | 'ANNUAL';
@@ -324,7 +324,7 @@ export class UpdateInspectionItemDto {
   requiresAction?: boolean;
 }
 
-export class CreateLeaseTemplateDto {
+export class CreateAgreementTemplateDto {
   @IsString()
   @MaxLength(120)
   @CleanOptional()
@@ -385,15 +385,15 @@ export class CreateLeaseTemplateDto {
   isActive?: boolean;
 }
 
-export type UpdateLeaseTemplateDto = CreateLeaseTemplateDto;
+export type UpdateAgreementTemplateDto = CreateAgreementTemplateDto;
 
-export interface LeaseFilters {
+export interface AgreementFilters {
   status?: string;
   agreementType?: string;
   unitId?: string;
   propertyId?: string;
   tenantId?: string;
-  /** Only leases ending within N days (the expiry-reminder stub). */
+  /** Only agreements ending within N days (the expiry-reminder stub). */
   expiringInDays?: number;
 }
 

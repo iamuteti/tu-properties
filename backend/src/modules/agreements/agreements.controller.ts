@@ -18,24 +18,21 @@ import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { requireTenantId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { Permissions } from '@/common/decorators/permissions.decorator';
+import { AgreementsService, type PaginationParams } from './agreements.service';
+import type { AgreementFilters } from './dto/agreement.dto';
 import {
-  RentalAgreementsService,
-  type PaginationParams,
-} from './rental-agreements.service';
-import type { LeaseFilters } from './dto/lease.dto';
-import {
-  CreateLeaseTemplateDto,
-  CreateRentalAgreementDto,
-  ExtendLeaseDto,
-  RenewLeaseDto,
-  TerminateLeaseDto,
-  UpdateLeaseTemplateDto,
-  UpdateRentalAgreementDto,
-} from './dto/lease.dto';
-import { LeaseTemplatesService } from './lease-templates.service';
-import { RENEWAL_WINDOW_DAYS } from './lease-lifecycle';
+  CreateAgreementTemplateDto,
+  CreateAgreementDto,
+  ExtendAgreementDto,
+  RenewAgreementDto,
+  TerminateAgreementDto,
+  UpdateAgreementTemplateDto,
+  UpdateAgreementDto,
+} from './dto/agreement.dto';
+import { AgreementTemplatesService } from './agreement-templates.service';
+import { RENEWAL_WINDOW_DAYS } from './agreement-lifecycle';
 
-const LEASE_WRITE_ROLES = [
+const AGREEMENT_WRITE_ROLES = [
   UserRole.SUPER_ADMIN,
   UserRole.ADMIN,
   UserRole.PROPERTY_MANAGER,
@@ -43,22 +40,22 @@ const LEASE_WRITE_ROLES = [
 ];
 
 /**
- * Leases (Module 5).
+ * Agreements (Module 5).
  *
- * The lifecycle is explicit: `status` cannot be set through `PATCH /leases/:id`
+ * The lifecycle is explicit: `status` cannot be set through `PATCH /agreements/:id`
  * (the DTO does not include it), only through the action endpoints, which apply
- * the rules in `lease-lifecycle.ts` and the unit occupancy side-effects.
+ * the rules in `agreement-lifecycle.ts` and the unit occupancy side-effects.
  */
 @UseGuards(JwtAuthGuard)
-@Controller('leases')
-export class RentalAgreementsController {
-  constructor(private readonly leasesService: RentalAgreementsService) {}
+@Controller('agreements')
+export class AgreementsController {
+  constructor(private readonly agreementsService: AgreementsService) {}
 
   @Post()
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.create')
-  create(@Body() dto: CreateRentalAgreementDto, @Request() req) {
-    return this.leasesService.create(dto, requireTenantId(req));
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.create')
+  create(@Body() dto: CreateAgreementDto, @Request() req) {
+    return this.agreementsService.create(dto, requireTenantId(req));
   }
 
   @Get()
@@ -82,14 +79,18 @@ export class RentalAgreementsController {
       sortBy,
       sortOrder,
     };
-    const filters: LeaseFilters = {
+    const filters: AgreementFilters = {
       status,
       agreementType,
       unitId,
       tenantId,
       propertyId,
     };
-    return this.leasesService.findAll(requireTenantId(req), params, filters);
+    return this.agreementsService.findAll(
+      requireTenantId(req),
+      params,
+      filters,
+    );
   }
 
   /**
@@ -98,7 +99,7 @@ export class RentalAgreementsController {
    */
   @Get('expiring')
   expiring(@Request() req, @Query('days') days?: string) {
-    return this.leasesService.expiring(
+    return this.agreementsService.expiring(
       requireTenantId(req),
       days ? parseInt(days, 10) : RENEWAL_WINDOW_DAYS,
     );
@@ -106,7 +107,7 @@ export class RentalAgreementsController {
 
   @Get('export')
   @Header('Content-Type', 'text/csv; charset=utf-8')
-  @Header('Content-Disposition', 'attachment; filename="leases.csv"')
+  @Header('Content-Disposition', 'attachment; filename="agreements.csv"')
   async export(
     @Request() req,
     @Res() res: Response,
@@ -114,7 +115,7 @@ export class RentalAgreementsController {
     @Query('status') status?: string,
     @Query('agreementType') agreementType?: string,
   ) {
-    const csv = await this.leasesService.exportCsv(
+    const csv = await this.agreementsService.exportCsv(
       requireTenantId(req),
       { status, agreementType },
       search,
@@ -125,95 +126,106 @@ export class RentalAgreementsController {
   /** Occupancy history for a unit: tenancies plus the vacant gaps between them. */
   @Get('units/:unitId/occupancy-history')
   occupancyHistory(@Param('unitId') unitId: string, @Request() req) {
-    return this.leasesService.occupancyHistory(unitId, requireTenantId(req));
+    return this.agreementsService.occupancyHistory(
+      unitId,
+      requireTenantId(req),
+    );
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
-    return this.leasesService.findOne(id, requireTenantId(req));
+    return this.agreementsService.findOne(id, requireTenantId(req));
   }
 
-  /** Everything billed and collected against this lease. */
+  /** Everything billed and collected against this agreement. */
   @Get(':id/ledger')
   ledger(@Param('id') id: string, @Request() req) {
-    return this.leasesService.ledger(id, requireTenantId(req));
+    return this.agreementsService.ledger(id, requireTenantId(req));
   }
 
   @Patch(':id')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   update(
     @Param('id') id: string,
-    @Body() dto: UpdateRentalAgreementDto,
+    @Body() dto: UpdateAgreementDto,
     @Request() req,
   ) {
-    return this.leasesService.update(id, dto, requireTenantId(req));
+    return this.agreementsService.update(id, dto, requireTenantId(req));
   }
 
   // ------------------------------------------------------------- lifecycle
 
   @Post(':id/activate')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   activate(@Param('id') id: string, @Request() req) {
-    return this.leasesService.activate(id, requireTenantId(req));
+    return this.agreementsService.activate(id, requireTenantId(req));
   }
 
   /** Renew: creates the successor agreement and links the renewal chain. */
   @Post(':id/renew')
-  @Roles(...LEASE_WRITE_ROLES)
+  @Roles(...AGREEMENT_WRITE_ROLES)
   // The permission vocabulary is module + {view,create,update,delete}; a renewal is an
   // update to the tenancy (and it creates the successor).
-  @Permissions('leases.update')
-  renew(@Param('id') id: string, @Body() dto: RenewLeaseDto, @Request() req) {
-    return this.leasesService.renew(id, dto, requireTenantId(req));
+  @Permissions('agreements.update')
+  renew(
+    @Param('id') id: string,
+    @Body() dto: RenewAgreementDto,
+    @Request() req,
+  ) {
+    return this.agreementsService.renew(id, dto, requireTenantId(req));
   }
 
   @Post(':id/extend')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
-  extend(@Param('id') id: string, @Body() dto: ExtendLeaseDto, @Request() req) {
-    return this.leasesService.extend(id, dto, requireTenantId(req));
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
+  extend(
+    @Param('id') id: string,
+    @Body() dto: ExtendAgreementDto,
+    @Request() req,
+  ) {
+    return this.agreementsService.extend(id, dto, requireTenantId(req));
   }
 
   @Post(':id/terminate')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   terminate(
     @Param('id') id: string,
-    @Body() dto: TerminateLeaseDto,
+    @Body() dto: TerminateAgreementDto,
     @Request() req,
   ) {
-    return this.leasesService.terminate(id, dto, requireTenantId(req));
+    return this.agreementsService.terminate(id, dto, requireTenantId(req));
   }
 
   @Post(':id/expire')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   expire(@Param('id') id: string, @Request() req) {
-    return this.leasesService.expire(id, requireTenantId(req));
+    return this.agreementsService.expire(id, requireTenantId(req));
   }
 
   @Post(':id/reactivate')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   reactivate(@Param('id') id: string, @Request() req) {
-    return this.leasesService.reactivate(id, requireTenantId(req));
+    return this.agreementsService.reactivate(id, requireTenantId(req));
   }
 
   @Delete(':id')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.delete')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.delete')
   remove(@Param('id') id: string, @Request() req) {
-    return this.leasesService.remove(id, requireTenantId(req));
+    return this.agreementsService.remove(id, requireTenantId(req));
   }
 }
 
-/** Lease templates (Module 5): reusable default terms for the create form. */
+/** Agreement templates (Module 5): reusable default terms for the create form. */
 @UseGuards(JwtAuthGuard)
-@Controller('lease-templates')
-export class LeaseTemplatesController {
-  constructor(private readonly templates: LeaseTemplatesService) {}
+@Controller('agreement-templates')
+export class AgreementTemplatesController {
+  constructor(private readonly templates: AgreementTemplatesService) {}
 
   @Get()
   list(@Request() req) {
@@ -221,26 +233,26 @@ export class LeaseTemplatesController {
   }
 
   @Post()
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
-  create(@Body() dto: CreateLeaseTemplateDto, @Request() req) {
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
+  create(@Body() dto: CreateAgreementTemplateDto, @Request() req) {
     return this.templates.create(dto, requireTenantId(req));
   }
 
   @Patch(':id')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   update(
     @Param('id') id: string,
-    @Body() dto: UpdateLeaseTemplateDto,
+    @Body() dto: UpdateAgreementTemplateDto,
     @Request() req,
   ) {
     return this.templates.update(id, dto, requireTenantId(req));
   }
 
   @Delete(':id')
-  @Roles(...LEASE_WRITE_ROLES)
-  @Permissions('leases.update')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('agreements.update')
   remove(@Param('id') id: string, @Request() req) {
     return this.templates.remove(id, requireTenantId(req));
   }

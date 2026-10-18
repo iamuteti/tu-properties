@@ -77,7 +77,7 @@ export class RefundsService {
       const payment = await requireRecord(
         client.payment.findFirst({
           where: { id: data.paymentId, organizationId: tenantId },
-          include: { invoice: { include: { rentalAgreement: true } } },
+          include: { invoice: { include: { agreement: true } } },
         }),
         'Payment',
       );
@@ -111,7 +111,7 @@ export class RefundsService {
           amount,
           reason: data.reason,
           invoiceId: data.toCredit ? null : (payment.invoiceId ?? null),
-          tenantId: payment.invoice?.rentalAgreement?.tenantId,
+          tenantId: payment.invoice?.agreement?.tenantId,
           landlordId: payment.invoice?.landlordId ?? null,
           processedBy: data.processedBy,
         },
@@ -141,7 +141,7 @@ export class RefundsService {
             reason: `Refund of payment: ${data.reason}`,
             source: CustomerCreditSource.REFUND_UNSPENT,
             sourcePaymentId: payment.id,
-            tenantId: payment.invoice?.rentalAgreement?.tenantId,
+            tenantId: payment.invoice?.agreement?.tenantId,
             landlordId: payment.invoice?.landlordId ?? undefined,
             currency: payment.currency,
             createdBy: data.processedBy,
@@ -294,7 +294,7 @@ export class RefundsService {
       where,
       include: {
         creditNote: true,
-        payment: { include: { invoice: true, rentalAgreement: true } },
+        payment: { include: { invoice: true, agreement: true } },
       },
       orderBy: { processedAt: 'desc' },
     });
@@ -307,7 +307,7 @@ export class RefundsService {
         where,
         include: {
           creditNote: { include: { lines: true } },
-          payment: { include: { invoice: true, rentalAgreement: true } },
+          payment: { include: { invoice: true, agreement: true } },
         },
       }),
       'Refund',

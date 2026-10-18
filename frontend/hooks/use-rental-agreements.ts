@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { AxiosError } from "axios";
-import { rentalAgreementsApi } from "@/lib/api";
+import { agreementsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { RentalAgreement } from "@/types";
 
@@ -14,8 +14,8 @@ export function useRentalAgreements() {
         if (!user) return;
         setIsLoading(true);
         try {
-            const response = await rentalAgreementsApi.findAll();
-            setRentalAgreements(response.data);
+            const response = await agreementsApi.findLeases({ limit: 1000 });
+            setRentalAgreements(response.data.data as unknown as RentalAgreement[]);
             setError(null);
         } catch (err: unknown) {
             if (err instanceof AxiosError) {

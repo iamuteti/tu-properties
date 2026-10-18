@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/ui/entity-states";
 import { UnitStatusActions } from "@/components/units/unit-status-actions";
-import { leasesApi, unitsApi } from "@/lib/api";
+import { agreementsApi, unitsApi } from "@/lib/api";
 import type { OccupancyHistory, Unit } from "@/types";
 
 export default function UnitDetailPage() {
@@ -35,7 +35,7 @@ export default function UnitDetailPage() {
 
             // Occupancy history (Module 5) — every tenancy plus the vacant gaps.
             try {
-                const occupancy = await leasesApi.occupancyHistory(id);
+                const occupancy = await agreementsApi.occupancyHistory(id);
                 setHistory(occupancy.data);
                 setHistoryError(null);
             } catch (historyErr: any) {
@@ -271,7 +271,7 @@ export default function UnitDetailPage() {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Link
-                                                        href={`/rental-agreements/${period.agreementId}`}
+                                                        href={`/agreements/${period.agreementId}`}
                                                         className="hover:underline"
                                                     >
                                                         {`${period.tenant.surname} ${period.tenant.otherNames ?? ""}`.trim()}
@@ -318,7 +318,7 @@ export default function UnitDetailPage() {
                             description="Once a lease exists for this unit its occupancy follows the lease automatically."
                             icon={<FileText className="h-10 w-10" aria-hidden="true" />}
                             action={
-                                <Button onClick={() => router.push("/rental-agreements/new")}>
+                                <Button onClick={() => router.push("/agreements/new")}>
                                     Create lease
                                 </Button>
                             }

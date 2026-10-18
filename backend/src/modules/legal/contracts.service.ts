@@ -74,7 +74,7 @@ export interface ContractView {
 
 /** The four related-entity columns, so the relation include below cannot drift from the schema. */
 const RELATED_COLUMNS = [
-  'rentalAgreementId',
+  'agreementId',
   'saleTransactionId',
   'supplierId',
   'landlordId',
@@ -84,16 +84,16 @@ const RELATED_COLUMNS = [
  * Which relation name backs each column, for `include` and for label resolution.
  *
  * Selects match the real schemas rather than a wish: `Tenant` has `surname`/`otherNames`
- * and not `firstName`/`lastName`, `Landlord` has `name`/`code`, `RentalAgreement` is
+ * and not `firstName`/`lastName`, `Landlord` has `name`/`code`, `agreement` is
  * identified by `code`, and `Unit` by `name`/`code`. Getting these wrong is exactly
  * what a hand-written test mock cannot catch - a mock that invents plausible field
  * names keeps every unit test green and then 500s on first contact with the database.
  *
- * `RentalAgreement` also brings `startDate`, `endDate` and `noticePeriodDays` - see
+ * `agreement` also brings `startDate`, `endDate` and `noticePeriodDays` - see
  * `effectiveTerm` for why they are selected.
  */
 export const RELATED_INCLUDE = {
-  rentalAgreement: {
+  agreement: {
     select: {
       code: true,
       startDate: true,
@@ -131,12 +131,12 @@ export const LIST_SELECT = {
   documentId: true,
   createdAt: true,
   updatedAt: true,
-  rentalAgreementId: true,
+  agreementId: true,
   saleTransactionId: true,
   supplierId: true,
   landlordId: true,
   renewals: { select: { id: true } },
-  rentalAgreement: {
+  agreement: {
     select: {
       code: true,
       startDate: true,
@@ -408,7 +408,7 @@ export class ContractsService {
       ?.role;
 
     const related = {
-      rentalAgreementId: dto.rentalAgreementId ?? null,
+      agreementId: dto.agreementId ?? null,
       saleTransactionId: dto.saleTransactionId ?? null,
       supplierId: dto.supplierId ?? null,
       landlordId: dto.landlordId ?? null,
@@ -561,7 +561,7 @@ export class ContractsService {
         reference,
         title: predecessor.title,
         type: predecessor.type,
-        rentalAgreementId: predecessor.rentalAgreementId,
+        agreementId: predecessor.agreementId,
         saleTransactionId: predecessor.saleTransactionId,
         supplierId: predecessor.supplierId,
         landlordId: predecessor.landlordId,
@@ -640,7 +640,7 @@ export class ContractsService {
     );
 
     const relatedId =
-      row.rentalAgreementId ??
+      row.agreementId ??
       row.saleTransactionId ??
       row.supplierId ??
       row.landlordId ??
@@ -767,19 +767,15 @@ export class ContractsService {
     // is being checked for *tenancy* - the only thing the CHECK constraints cannot see.
     const scoped = { id: true } as const;
     const checks: {
-      column:
-        | 'rentalAgreementId'
-        | 'saleTransactionId'
-        | 'supplierId'
-        | 'landlordId';
+      column: 'agreementId' | 'saleTransactionId' | 'supplierId' | 'landlordId';
       label: string;
       exists: (id: string) => Promise<unknown>;
     }[] = [
       {
-        column: 'rentalAgreementId',
+        column: 'agreementId',
         label: 'lease',
         exists: (id) =>
-          this.prisma.rentalAgreement.findFirst({
+          this.prisma.agreement.findFirst({
             where: { id, organizationId: tenantId },
             select: scoped,
           }),
@@ -933,7 +929,7 @@ type ContractRowFromSelect = Prisma.ContractGetPayload<{
 
 /** The four related entities, non-nullable where the schema says they are. */
 interface RelatedShape {
-  rentalAgreementId: string | null;
+  agreementId: string | null;
   saleTransactionId: string | null;
   supplierId: string | null;
   landlordId: string | null;
@@ -991,7 +987,7 @@ export type ContractRow = ContractRowFromSelect &
 /**
  * The dates and notice period a contract is actually read against.
  *
- * `RentalAgreement` already carries `startDate`, `endDate` and `noticePeriodDays`, and
+ * `agreement` already carries `startDate`, `endDate` and `noticePeriodDays`, and
  * this module does **not** add a second copy of them for lease contracts. A `LEASE`
  * contract therefore falls back to the lease's own dates when its own columns are
  * empty, which is what stops the register disagreeing with the lease module about when
@@ -1013,7 +1009,7 @@ function effectiveTerm(row: ContractRow): {
   expiresAt: Date | null;
   noticeDays: number | null;
 } {
-  const lease = row.type === 'LEASE' ? row.rentalAgreement : null;
+  const lease = row.type === 'LEASE' ? row.agreement : null;
   return {
     startDate: row.startDate ?? lease?.startDate ?? null,
     expiresAt: row.expiresAt ?? lease?.endDate ?? null,
@@ -1032,8 +1028,8 @@ function labelFor(row: ContractRow): string | null {
   if (row.supplier) return row.supplier.name;
   if (row.saleTransaction) return row.saleTransaction.code;
   if (row.landlord) return row.landlord.name || row.landlord.email || null;
-  if (row.rentalAgreement) {
-    const tenant = row.rentalAgreement.tenant;
+  if (row.agreement) {
+    const tenant = row.agreement.tenant;
     // `surname` is the required column and `otherNames` the optional one, so the
     // surname alone is a complete label - and joining the wrong way round would put
     // "Otieno Ama" in the register.
@@ -1041,10 +1037,8 @@ function labelFor(row: ContractRow): string | null {
       ? [tenant.surname, tenant.otherNames].filter(Boolean).join(' ')
       : '';
     if (name) return name;
-    if (row.rentalAgreement.code) return row.rentalAgreement.code;
-    return (
-      row.rentalAgreement.unit?.name ?? row.rentalAgreement.unit?.code ?? null
-    );
+    if (row.agreement.code) return row.agreement.code;
+    return row.agreement.unit?.name ?? row.agreement.unit?.code ?? null;
   }
   return null;
 }
