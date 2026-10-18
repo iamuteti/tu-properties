@@ -7,8 +7,9 @@ import { useAuth } from "@/context/auth-context";
 import { platformApi } from "@/lib/api";
 import { PlatformOrganization } from "@/types";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SimpleTable, SimpleTableColumn } from "@/components/ui/simple-table";
 
 export default function PlatformOrganizationsPage() {
     const { user, isLoading } = useAuth();
@@ -86,6 +87,93 @@ export default function PlatformOrganizationsPage() {
         );
     }
 
+    const columns: SimpleTableColumn<PlatformOrganization>[] = [
+        {
+            key: 'tenant',
+            header: 'Tenant',
+            className: 'whitespace-nowrap',
+            cell: (org) => (
+                <div>
+                    <Link href={`/platform/organizations/${org.id}`} className="text-blue-600 hover:underline font-medium">
+                        {org.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">{org.slug} · {org.plan}</div>
+                </div>
+            ),
+        },
+        {
+            key: 'subscription',
+            header: 'Subscription',
+            cell: (org) => (
+                <span className="text-sm">{org.subscription ? org.subscription.status : "—"}</span>
+            ),
+        },
+        {
+            key: 'users',
+            header: 'Users',
+            cell: (org) => <span className="text-sm">{org._count?.users ?? "—"}</span>,
+        },
+        {
+            key: 'properties',
+            header: 'Properties',
+            cell: (org) => <span className="text-sm">{org._count?.properties ?? "—"}</span>,
+        },
+        {
+            key: 'status',
+            header: 'Status',
+            className: 'whitespace-nowrap',
+            cell: (org) => (
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${org.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                    {org.isActive ? "Active" : "Suspended"}
+                </span>
+            ),
+        },
+        {
+            key: 'actions',
+            header: 'Actions',
+            className: 'whitespace-nowrap',
+            cell: (org) => (
+                <div>
+                    {deletingOrgId === org.id ? (
+                        <span className="flex items-center gap-1">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Deleting...
+                        </span>
+                    ) : (
+                        <Button
+                            onClick={() => setConfirmDeleteOrgId(org.id)}
+                            disabled={deletingOrgId === org.id}
+                            variant="destructive"
+                            size="sm"
+                            className="flex items-center gap-1"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                        </Button>
+                    )}
+                    {confirmDeleteOrgId === org.id && (
+                        <div className="mt-2 flex items-center gap-2">
+                            <Button
+                                onClick={() => handleDelete(org.id)}
+                                variant="destructive"
+                                size="sm"
+                            >
+                                Confirm delete
+                            </Button>
+                            <Button
+                                onClick={() => setConfirmDeleteOrgId(null)}
+                                variant="outline"
+                                size="sm"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -154,87 +242,12 @@ export default function PlatformOrganizationsPage() {
             )}
 
             <div className="bg-card rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-muted">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Tenant</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Subscription</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Users</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Properties</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-card divide-y divide-gray-200">
-                        {orgs.map((org) => (
-                            <tr key={org.id} className="hover:bg-muted">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <Link href={`/platform/organizations/${org.id}`} className="text-blue-600 hover:underline font-medium">
-                                        {org.name}
-                                    </Link>
-                                    <div className="text-xs text-muted-foreground">{org.slug} · {org.plan}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    {org.subscription ? org.subscription.status : "—"}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">{org._count?.users ?? "—"}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">{org._count?.properties ?? "—"}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${org.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                                        {org.isActive ? "Active" : "Suspended"}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <Button
-                                        onClick={() => setConfirmDeleteOrgId(org.id)}
-                                        disabled={deletingOrgId === org.id}
-                                        variant="destructive"
-                                        size="sm"
-                                        className="flex items-center gap-1"
-                                    >
-                                        {deletingOrgId === org.id ? (
-                                            <span className="flex items-center gap-1">
-                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                Deleting...
-                                            </span>
-                                        ) : (
-                                            <>
-                                                <Trash2 className="h-4 w-4" />
-                                                Delete
-                                            </>
-                                        )}
-                                    </Button>
-                                    {confirmDeleteOrgId === org.id && (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <Button
-                                                onClick={() => handleDelete(org.id)}
-                                                variant="destructive"
-                                                size="sm"
-                                            >
-                                                Confirm delete
-                                            </Button>
-                                            <Button
-                                                onClick={() => setConfirmDeleteOrgId(null)}
-                                                variant="outline"
-                                                size="sm"
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </div>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {orgs.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No tenants yet.</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                <SimpleTable
+                    data={orgs}
+                    rowKey={(org) => org.id}
+                    columns={columns}
+                    emptyMessage="No tenants yet."
+                />
             </div>
         </div>
     );

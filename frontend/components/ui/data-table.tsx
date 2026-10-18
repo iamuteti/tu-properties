@@ -15,6 +15,7 @@ import {
   type Table as TableType,
   type PaginationState,
 } from '@tanstack/react-table';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
 import { Select } from './select';
@@ -270,6 +271,23 @@ export function DataTable<T extends Record<string, any>>({
     },
   });
 
+  const pageCount = table.getPageCount();
+  const currentPage = table.getState().pagination.pageIndex + 1;
+
+  // Visible page numbers: current page ±2, bounded to [1, pageCount], with ellipsis
+  const visiblePages = React.useMemo(() => {
+    const pages: (number | '...')[] = [];
+    if (!pageCount || pageCount <= 1) return pages;
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(pageCount, currentPage + 2);
+    if (start > 1) pages.push(1);
+    if (start > 2) pages.push('...');
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < pageCount - 1) pages.push('...');
+    if (end < pageCount) pages.push(pageCount);
+    return pages;
+  }, [currentPage, pageCount]);
+
   // Callback for row selection changes (moved after table declaration)
   React.useEffect(() => {
     if (onRowSelectionChange && table) {
@@ -425,68 +443,61 @@ export function DataTable<T extends Record<string, any>>({
 
       {/* Pagination */}
       {(table.getPageCount() >= 1 || (serverSidePagination && paginationMeta && paginationMeta.totalPages > 0)) && (
-        <div className="flex items-center justify-between px-2">
-          <div className="flex-1 flex justify-between sm:hidden">
+        <div className="flex items-center justify-between px-2 sm:px-4">
+          {/* Left: page size selector */}
+          <div className="flex items-center space-x-2">
+            <p className="text-sm text-foreground whitespace-nowrap">Show</p>
+            <Select
+              options={pageSizeOptions.map((size) => ({ value: size.toString(), label: size.toString() }))}
+              value={table.getState().pagination.pageSize.toString()}
+              onChange={(e) => table.setPageSize(Number(e.target.value))}
+              className="w-20"
+            />
+            <p className="text-sm text-foreground whitespace-nowrap">per page</p>
+          </div>
+
+          {/* Center: page numbers */}
+          <div className="hidden sm:flex items-center space-x-1">
+            {visiblePages.map((page, idx) => {
+              const isEllipsis = typeof page === 'string';
+              const isCurrent = !isEllipsis && page === currentPage;
+              return (
+                <button
+                  key={idx}
+                  onClick={isEllipsis ? undefined : () => table.setPageIndex(page - 1)}
+                  disabled={isEllipsis}
+                  className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition-colors ${
+                    isCurrent
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {isEllipsis ? '···' : page}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right: prev / next icon buttons */}
+          <div className="flex items-center space-x-1">
             <Button
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              variant="secondary"
+              variant="outline"
+              size="icon"
+              aria-label="Previous page"
             >
-              Previous
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              variant="secondary"
+              variant="outline"
+              size="icon"
+              aria-label="Next page"
             >
-              Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <p className="text-sm text-foreground whitespace-nowrap">Show</p>
-                <Select
-                  options={pageSizeOptions.map(size => ({ value: size.toString(), label: size.toString() }))}
-                  value={table.getState().pagination.pageSize.toString()}
-                  onChange={(e) => table.setPageSize(Number(e.target.value))}
-                  className="w-20"
-                />
-                <p className="text-sm text-foreground whitespace-nowrap">per page</p>
-              </div>
-              <div className="h-5 w-px bg-border"></div>
-              <p className="text-sm text-foreground">
-                Page{' '}
-                <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>
-                {' '}of{' '}
-                <span className="font-medium">{table.getPageCount()}</span>
-                {' '}({' '}
-                <span className="font-medium">
-                  {serverSidePagination 
-                    ? (paginationMeta?.total ?? table.getFilteredRowModel().rows.length)
-                    : table.getFilteredRowModel().rows.length}
-                </span>
-                {' '}total items)
-              </p>
-            </div>
-            <div>
-              <nav className="relative z-0 inline-flex rounded-xl -space-x-px gap-2" aria-label="Pagination">
-                <Button
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                  variant="secondary"
-                >
-                  Previous
-                </Button>
-                <Button
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                  variant="secondary"
-                >
-                  Next
-                </Button>
-              </nav>
-            </div>
           </div>
         </div>
       )}
