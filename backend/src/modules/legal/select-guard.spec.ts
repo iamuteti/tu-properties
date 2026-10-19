@@ -95,19 +95,22 @@ describe('Module 15 selects match the schema', () => {
 
   it('names only fields that exist on the related models', () => {
     // Checked separately from the above so a failure says *which* model drifted.
-    for (const model of [
-      'agreement',
-      'SaleTransaction',
-      'Supplier',
-      'Landlord',
-    ]) {
+    //
+    // Two names per entry, because they are not the same name: the **relation**
+    // is the field on `Contract` (`agreement`, `saleTransaction`, ...) and the
+    // **model** is the table it points at (`Agreement`, `SaleTransaction`, ...).
+    // They used to coincide for the lease, back when the model was
+    // `RentalAgreement`; after the rename they do not, and this file was left
+    // asking the schema for a model called `agreement` - which does not exist,
+    // so the guard threw before it could guard anything.
+    for (const [model, relation] of [
+      ['Agreement', 'agreement'],
+      ['SaleTransaction', 'saleTransaction'],
+      ['Supplier', 'supplier'],
+      ['Landlord', 'landlord'],
+    ] as const) {
       const select = (RELATED_INCLUDE as Record<string, { select: unknown }>)[
-        {
-          agreement: 'agreement',
-          SaleTransaction: 'saleTransaction',
-          Supplier: 'supplier',
-          Landlord: 'landlord',
-        }[model]!
+        relation
       ]?.select;
       if (!select) continue;
 

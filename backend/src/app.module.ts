@@ -90,8 +90,9 @@ import { SecurityModule } from './security/security.module';
     HrModule,
     // Module 13 — Facilities. Imports Notifications only; exports nothing.
     FacilitiesModule,
-    // Module 14 — Utilities. Imports Finance because it *writes into* Finance:
-    // consumption invoices go through `InvoicesService`, never a direct insert.
+    // Module 14 — Utilities. Imports `InvoicesModule` because it *writes into*
+    // Finance: consumption invoices go through `InvoicesService`, never a direct
+    // insert.
     UtilitiesModule,
     LegalModule,
     ReportsModule,

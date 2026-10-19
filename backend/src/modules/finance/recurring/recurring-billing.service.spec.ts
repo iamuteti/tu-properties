@@ -7,6 +7,7 @@ import {
 } from './recurring-billing.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { UtilityPricingService } from '@/modules/utilities/utility-pricing.service';
 
 /**
  * The rule that matters most here: **a lease is billed once per period, ever.**
@@ -76,6 +77,13 @@ describe('RecurringBillingService', () => {
         RecurringBillingService,
         { provide: PrismaService, useValue: prisma },
         { provide: InvoicesService, useValue: invoices },
+        {
+          // The real pricer over the same mock: a lease whose property does not
+          // bundle utilities never reaches it, and one that does must price the
+          // charge the way the utilities module would.
+          provide: UtilityPricingService,
+          useValue: new UtilityPricingService(prisma as never),
+        },
       ],
     }).compile();
     service = module.get(RecurringBillingService);

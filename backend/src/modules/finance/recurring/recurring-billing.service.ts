@@ -8,7 +8,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { InvoicesService } from '../invoices/invoices.service';
-import { UtilitiesService } from '@/modules/utilities/utilities.service';
+import { UtilityPricingService } from '@/modules/utilities/utility-pricing.service';
 import { round2 } from '../invoice-allocation';
 
 /** "2026-10" for a date — the unit a billing period is identified by. */
@@ -67,7 +67,7 @@ export class RecurringBillingService {
   constructor(
     private prisma: PrismaService,
     private invoicesService: InvoicesService,
-    private utilitiesService: UtilitiesService,
+    private pricing: UtilityPricingService,
   ) {}
 
   /**
@@ -318,7 +318,7 @@ export class RecurringBillingService {
       });
 
       for (const charge of charges) {
-        const priced = await this.utilitiesService.priceStoredCharge(
+        const priced = await this.pricing.priceStoredCharge(
           lease.organizationId!,
           {
             fromReadingId: charge.fromReadingId,

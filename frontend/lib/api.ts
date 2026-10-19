@@ -725,6 +725,17 @@ export const tenantsApi = {
     findOne: (id: string) =>
         api.get<Tenant>(`/tenants/${id}`),
 
+    /**
+     * The printable receipt. Served as HTML with print CSS, so the browser's own
+     * print dialog produces the PDF; `download=true` serves it as a file instead.
+     *
+     * The URL is absolute and points at the backend rather than at an axios route
+     * because it is opened in a new tab, not fetched - the session cookie travels
+     * with it, so no token is needed in the query string.
+     */
+    receiptDocumentUrl: (tenantId: string, receiptId: string, download = false) =>
+        `${API_BASE_URL}/tenants/${tenantId}/receipts/${receiptId}/document${download ? '?download=true' : ''}`,
+
     update: (id: string, data: Partial<Tenant>) =>
         api.patch<Tenant>(`/tenants/${id}`, data),
 

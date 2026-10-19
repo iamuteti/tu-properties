@@ -18,6 +18,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import { InvoicesService } from '@/modules/finance/invoices/invoices.service';
+import { UtilityPricingService } from './utility-pricing.service';
 import {
   apportion,
   calculateCharge,
@@ -115,6 +116,7 @@ export class UtilitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly invoicesService: InvoicesService,
+    private readonly pricing: UtilityPricingService,
   ) {}
 
   // ---------------------------------------------------------------- meters
@@ -899,7 +901,10 @@ export class UtilitiesService {
       }> = [];
 
       for (const charge of charges) {
-        const calculation = await this.priceStoredCharge(tenantId, charge);
+        const calculation = await this.pricing.priceStoredCharge(
+          tenantId,
+          charge,
+        );
         await this.prisma.utilityCharge.update({
           where: { id: charge.id },
           data: { status: UtilityChargeStatus.RECONCILED },
@@ -1003,7 +1008,10 @@ export class UtilitiesService {
         continue;
       }
 
-      const calculation = await this.priceStoredCharge(tenantId, charge);
+      const calculation = await this.pricing.priceStoredCharge(
+        tenantId,
+        charge,
+      );
 
       const issueDate = new Date();
       const dueDate = new Date(
@@ -1112,7 +1120,7 @@ export class UtilitiesService {
     // its own copy of the arithmetic.
     const shaped: Array<Record<string, unknown>> = [];
     for (const charge of charges) {
-      const priced = await this.priceStoredCharge(tenantId, charge);
+      const priced = await this.pricing.priceStoredCharge(tenantId, charge);
       shaped.push({ ...this.shapeCharge(charge), ...priced });
     }
 
@@ -1623,87 +1631,6 @@ export class UtilitiesService {
           spotRate: full.spotRate === null ? undefined : Number(full.spotRate),
         }
       : null;
-  }
-
-  /**
-   * Recompute a stored charge's money from the rows it names.
-   *
-   * Consumption and amount are derived rather than stored, so this is where a saved
-   * charge's figures come from every time they are read. The charge holds the
-   * *inputs* - which two readings, which share, which rate - precisely so this can be
-   * reconstructed; a charge that also held its own copy of the answer would be a second
-   * thing to keep in step with the readings.
-   *
-   * Typed as a structural minimum rather than a full Prisma payload so both call sites
-   * (the charge ledger and the billing run) can pass what they happen to have loaded.
-   */
-  /**
-   * Price a stored charge from its two readings and snapshotted rate.
-   * Public so the recurring-billing runner can append utility lines to a rent
-   * invoice when a property bundles metered utilities with rent.
-   */
-  async priceStoredCharge(
-    tenantId: string,
-    charge: {
-      fromReadingId: string;
-      toReadingId: string;
-      meterId: string;
-      ratePerUnit: Prisma.Decimal;
-      currency: string;
-      vatRate: Prisma.Decimal | null;
-      allocationShare: Prisma.Decimal;
-      incomeAccount?: string | null;
-      revenueExpenseItem?: string | null;
-    },
-  ) {
-    // Recomputed from the two readings rather than carried on the charge: the
-    // consumption is a derivation of those rows, and storing a copy would be a
-    // second thing to keep in step with them. The charge stores the *inputs* (which
-    // readings, which share, which rate) precisely so this can be reconstructed.
-    const [from, to, meter] = await Promise.all([
-      this.prisma.meterReading.findFirst({
-        where: { id: charge.fromReadingId, organizationId: tenantId },
-      }),
-      this.prisma.meterReading.findFirst({
-        where: { id: charge.toReadingId, organizationId: tenantId },
-      }),
-      this.prisma.utilityMeter.findFirst({
-        where: { id: charge.meterId, organizationId: tenantId },
-      }),
-    ]);
-
-    if (!from || !to || !meter) {
-      throw new ConflictException(
-        'The readings this charge was priced from are no longer both present, so the consumption cannot be recomputed. Void the charge and price the period again.',
-      );
-    }
-
-    const consumption = consumptionBetween(
-      Number(from.reading),
-      Number(to.reading),
-      { digits: meter.digits, digitWrapAt: meter.digitWrapAt },
-    );
-    if (!consumption.ok) {
-      throw new ConflictException(consumption.message);
-    }
-
-    const calculated = calculateCharge({
-      meterConsumption: consumption.consumption,
-      allocationShare: Number(charge.allocationShare),
-      rate: {
-        currency: charge.currency,
-        ratePerUnit: Number(charge.ratePerUnit),
-        vatRate: charge.vatRate === null ? null : Number(charge.vatRate),
-        incomeAccount: charge.incomeAccount,
-        revenueExpenseItem: charge.revenueExpenseItem,
-      },
-    });
-
-    if (!calculated.ok) {
-      throw new ConflictException(calculated.message);
-    }
-
-    return calculated.value;
   }
 
   /**

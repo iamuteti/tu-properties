@@ -148,12 +148,66 @@ const KE_LAST_NAMES = [
 ];
 
 const KENYAN_PHONE_PREFIXES = [
-  '700', '701', '702', '703', '704', '705', '706', '707', '708', '709',
-  '710', '711', '712', '713', '714', '715', '716', '717', '718', '719',
-  '720', '721', '722', '723', '724', '725', '726', '727', '728', '729',
-  '740', '741', '742', '743', '744', '745', '746', '747', '748', '749',
-  '750', '751', '752', '753', '754', '755', '756', '757', '758', '759',
-  '790', '791', '792', '793', '794', '795', '796', '797', '798', '799',
+  '700',
+  '701',
+  '702',
+  '703',
+  '704',
+  '705',
+  '706',
+  '707',
+  '708',
+  '709',
+  '710',
+  '711',
+  '712',
+  '713',
+  '714',
+  '715',
+  '716',
+  '717',
+  '718',
+  '719',
+  '720',
+  '721',
+  '722',
+  '723',
+  '724',
+  '725',
+  '726',
+  '727',
+  '728',
+  '729',
+  '740',
+  '741',
+  '742',
+  '743',
+  '744',
+  '745',
+  '746',
+  '747',
+  '748',
+  '749',
+  '750',
+  '751',
+  '752',
+  '753',
+  '754',
+  '755',
+  '756',
+  '757',
+  '758',
+  '759',
+  '790',
+  '791',
+  '792',
+  '793',
+  '794',
+  '795',
+  '796',
+  '797',
+  '798',
+  '799',
 ];
 
 const r = (n: number) => Math.floor(Math.random() * n);
@@ -573,7 +627,8 @@ async function main() {
   });
 
   // Electricity sub-meter per floor (one meter per floor, serves units on that floor).
-  const electricityMeters: Record<string, { id: string; meterNumber: string }> = {};
+  const electricityMeters: Record<string, { id: string; meterNumber: string }> =
+    {};
   for (const floor of FLOORS) {
     const meter = await prisma.utilityMeter.create({
       data: {
@@ -592,7 +647,10 @@ async function main() {
         readingSetup: `Floor ${floor.label} sub-meter, split equally across 11 units`,
       },
     });
-    electricityMeters[floor.label] = { id: meter.id, meterNumber: meter.meterNumber };
+    electricityMeters[floor.label] = {
+      id: meter.id,
+      meterNumber: meter.meterNumber,
+    };
   }
 
   // Tariffs effective for the whole window.

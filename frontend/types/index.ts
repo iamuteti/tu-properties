@@ -206,6 +206,13 @@ export interface Organization {
     currency?: string;
     timezone?: string;
     /**
+     * BCP-47 tag (`en-KE`, `de-DE`, `fr-FR`) used to format money, dates and
+     * numbers for this organization. Null means "let the runtime decide".
+     */
+    defaultLocale?: string | null;
+    /** ISO-3166-1 alpha-2 of the organization's tax jurisdiction. */
+    taxCountryCode?: string | null;
+    /**
      * Module 14 — Utilities. Both are organization settings rather than utilities-screen
      * fields because they are commercial choices the landlord makes, and neither is the
      * same in every market. Null means "nobody has decided", which is deliberately
@@ -599,6 +606,7 @@ export interface Tenant {
     agreements?: Agreement[];
     lastPaidInvoice?: Invoice;
     emergencyContacts?: TenantEmergencyContact[];
+    /** Receipts, each loaded with its `receiptLines` and the `payments` it applied. */
     receipts?: Receipt[];
     moveOutRequests?: MoveOutRequest[];
     credits?: CustomerCredit[];
@@ -607,12 +615,48 @@ export interface Tenant {
     facilityBookings?: FacilityBookingRow[];
     accessCards?: AccessCardRow[];
     visitorVisits?: VisitorVisitRow[];
+    /** Resident requests raised against a tenancy. */
     tenantRequests?: TenantRequest[];
+    /** Every request this resident has raised (portal and staff alike). */
+    requests?: TenantRequest[];
+    /** Messages addressed to this resident (Module 17). */
+    notifications?: TenantNotification[];
     contact?: Contact;
+    /**
+     * The organization this tenant belongs to, with the settings that decide
+     * how money and dates are written. Every record carries its own currency;
+     * this is the default for the ones that do not, and the locale for
+     * formatting them.
+     */
+    organization?: {
+        id: string;
+        name: string;
+        currency: string;
+        timezone: string;
+        defaultLocale: string | null;
+        taxCountryCode: string | null;
+    } | null;
     status: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
+}
+
+/** A message addressed to a resident (Module 17). */
+export interface TenantNotification {
+    id: string;
+    type: string;
+    channel: string;
+    priority: string;
+    title: string;
+    body: string;
+    status: string;
+    actionUrl?: string | null;
+    entityType?: string | null;
+    entityId?: string | null;
+    sentAt?: string | null;
+    readAt?: string | null;
+    createdAt: string;
 }
 
 /** Customer credit balance owed back to a tenant (Module 8: Payments). */
@@ -667,10 +711,83 @@ export interface Agreement {
     unit?: Unit;
     tenant?: Tenant;
     property?: Property;
-    invoices?: any[];
+    invoices?: Invoice[];
+    payments?: Payment[];
+    /** Metered charges raised against this tenancy (Module 14). */
+    utilityCharges?: UtilityChargeDetail[];
+    /** Condition reports attached to this tenancy. */
+    inspections?: InspectionReport[];
+    /** Resident requests raised against this tenancy. */
+    tenantRequests?: TenantRequest[];
+    /** Contracts filed against this tenancy (Module 15). */
+    contracts?: ContractRow[];
     moveOutRequests?: MoveOutRequest[];
     createdAt: string;
     updatedAt: string;
+}
+
+/**
+ * A metered charge on a tenancy, with its money recomputed.
+ *
+ * The charge stores the *inputs* to its price - which two readings, which share,
+ * which rate - and the server recomputes the answer from those rows on every
+ * read, so `pricing` here is the current truth rather than a snapshot.
+ */
+export interface UtilityChargeDetail {
+    id: string;
+    billingPeriod: string;
+    status: string;
+    ratePerUnit: number;
+    currency: string;
+    vatRate?: number | null;
+    allocationShare: number;
+    allocationBasis?: string | null;
+    invoiceId?: string | null;
+    voidReason?: string | null;
+    voidedAt?: string | null;
+    createdAt: string;
+    meter?: {
+        id: string;
+        meterNumber: string;
+        type: string;
+        scope: string;
+    } | null;
+    unit?: { id: string; code: string; name: string } | null;
+    invoice?: {
+        id: string;
+        invoiceNumber: string;
+        status: string;
+        totalAmount: number;
+        dueDate: string;
+    } | null;
+    /** The recomputed money, or null when the period cannot be priced. */
+    pricing?: {
+        meterConsumption: number;
+        billableConsumption: number;
+        consumptionAmount: number;
+        standingChargeAmount: number;
+        subtotal: number;
+        vatAmount: number;
+        total: number;
+        currency: string;
+        vatRate: number | null;
+        allocationShare: number;
+    } | null;
+    /** Why the period could not be priced, when it could not be. */
+    pricingError?: string | null;
+}
+
+/** A line on an invoice. */
+export interface InvoiceItem {
+    id: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    vatRate?: number | null;
+    vatAmount?: number | null;
+    revenueExpenseItem?: string | null;
+    className?: string | null;
 }
 
 export interface Invoice {
@@ -701,7 +818,7 @@ export interface Invoice {
     updatedAt: string;
     landlord?: Landlord;
     Agreement?: Agreement;
-    invoiceItems?: any[];
+    invoiceItems?: InvoiceItem[];
     payments?: Payment[];
 }
 
@@ -777,9 +894,23 @@ export interface Payment {
     createdAt: string;
     updatedAt: string;
     recordedBy?: string;
+    /** How much of this payment settled an invoice (Module 8). */
+    appliedAmount?: number;
+    isReversed?: boolean;
+    /** The split of this payment across invoices. */
+    allocations?: PaymentAllocation[];
     invoice?: Invoice;
     Agreement?: Agreement;
     receipt?: Receipt;
+}
+
+/** How much of a payment settled which invoice. */
+export interface PaymentAllocation {
+    id: string;
+    paymentId: string;
+    invoiceId: string;
+    amount: number;
+    createdAt: string;
 }
 
 export interface ReceiptLine {
@@ -1666,6 +1797,8 @@ export interface TenantRequest {
     result?: Record<string, unknown> | null;
     createdAt: string;
     AgreementId?: string | null;
+    /** The tenancy the request is about, when it was raised against one. */
+    agreementId?: string | null;
     Agreement?: {
         id: string;
         code: string;

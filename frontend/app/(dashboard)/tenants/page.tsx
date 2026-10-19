@@ -12,6 +12,8 @@ import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { ColumnDef } from "@tanstack/react-table";
 import { TenantFilters, TenantFiltersState } from "@/components/filters/tenants-filter";
+import { computeRentStatus, RentStatus, RentTone } from "@/lib/rent-status";
+import { useOrgFormat } from "@/hooks/use-org-format";
 
 interface TenantTableData extends TableData {
     tenantId: string;
@@ -35,7 +37,7 @@ interface TenantTableData extends TableData {
     photoUrl?: string;
     emergencyContact?: string;
     rentAmount: number;
-    rentBalance: number;
+    rentStatus: RentStatus;
     status: 'active' | 'inactive' | 'archived';
 }
 
@@ -45,8 +47,19 @@ const statusOptions = [
     { value: "ARCHIVED", label: "Archived" }
 ];
 
+// Bar track is the unpaid part of the period, tinted by how bad it is.
+// The fill is always the settled part.
+const rentStatusTones: Record<RentTone, { track: string; fill: string; label: string; text: string }> = {
+    paid: { track: 'bg-gray-200', fill: 'bg-green-500', label: '', text: '' },
+    overdue: { track: 'bg-red-200', fill: 'bg-green-500', label: 'text-red-600', text: 'Overdue' },
+    partial: { track: 'bg-amber-200', fill: 'bg-green-500', label: 'text-amber-700', text: 'Part paid' },
+    due: { track: 'bg-blue-200', fill: 'bg-green-500', label: 'text-blue-700', text: 'Payment due' },
+    none: { track: 'bg-gray-200', fill: 'bg-gray-300', label: 'text-muted-foreground', text: '' },
+};
+
 export default function TenantsPage() {
     const router = useRouter();
+    const fmt = useOrgFormat();
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [sortBy, setSortBy] = useState<string>("createdAt");
@@ -229,42 +242,52 @@ export default function TenantsPage() {
             header: 'Monthly Rent',
             cell: ({ row }) => {
                 const rentAmount = row.original.rentAmount;
-                const rentBalance = row.original.rentBalance;
-                const paidPct = rentAmount > 0 ? Math.max(0, Math.min(((rentAmount - rentBalance) / rentAmount) * 100, 100)) : 0;
-                let barColor = 'bg-green-500';
-                let label = 'Paid';
-                let barWidth = 100;
-                if (rentBalance === 0) {
-                    barColor = 'bg-green-500';
-                    label = 'Paid';
-                    barWidth = 100;
-                } else if (paidPct >= 33) {
-                    barColor = 'bg-yellow-500';
-                    label = 'Partial';
-                    barWidth = paidPct;
-                } else {
-                    barColor = 'bg-red-500';
-                    label = 'Overdue';
-                    barWidth = 100;
-                }
+                const status = row.original.rentStatus;
+                const tone = rentStatusTones[status.tone];
+                // The tenancy's own currency — a lease denominated in USD is
+                // in USD whatever the organization's default happens to be.
+                const currency = row.original.currency;
+
                 return (
                     <div className="flex flex-col gap-1">
                         <span className="font-medium text-foreground">
-                            {rentAmount ? `KES ${rentAmount.toLocaleString()}` : '-'}
+                            {rentAmount ? fmt.money(rentAmount, currency) : '-'}
                         </span>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                            className={`w-full rounded-full h-1.5 overflow-hidden ${tone.track}`}
+                            title={
+                                status.tone === 'none'
+                                    ? undefined
+                                    : `${status.scopeLabel}: ${fmt.money(status.billed, currency)} billed, ${fmt.money(status.paid, currency)} paid`
+                            }
+                        >
                             <div
-                                className={`h-1.5 rounded-full transition-all duration-300 ${barColor}`}
-                                style={{ width: `${barWidth}%` }}
+                                className={`h-1.5 rounded-full transition-all duration-300 ${tone.fill}`}
+                                style={{ width: `${status.paidPct}%` }}
                             />
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                            {label} - KES {rentBalance.toLocaleString()}
-                        </span>
+                        {status.tone === 'none' ? (
+                            <span className="text-xs text-muted-foreground">No invoice raised</span>
+                        ) : status.tone === 'paid' ? null : (
+                            <span
+                                className="text-xs"
+                                title={
+                                    status.arrears > 0 && status.arrears < status.outstanding
+                                        ? `${fmt.money(status.arrears, currency)} of it is past due`
+                                        : undefined
+                                }
+                            >
+                                <span className={`font-medium ${tone.label}`}>{tone.text}</span>
+                                <span className="text-muted-foreground">
+                                    {' '}
+                                    - {fmt.money(status.outstanding, currency)} owing
+                                </span>
+                            </span>
+                        )}
                     </div>
                 );
             },
-            size: 140,
+            size: 160,
         },
         {
             accessorKey: 'agreementStartDate',
@@ -413,7 +436,7 @@ export default function TenantsPage() {
                     photoUrl: tenant.photoUrl,
                     emergencyContact: tenant.emergencyContacts?.[0]?.contactName || tenant.emergencyContacts?.[0]?.phone || '',
                     rentAmount: tenant.agreement?.rentAmount ? Number(tenant.agreement.rentAmount) : 0,
-                    rentBalance: tenant.agreement?.invoices?.reduce((sum, inv) => sum + Number(inv.balanceAmount || 0), 0) ?? 0,
+                    rentStatus: computeRentStatus(tenant.agreement?.invoices),
                     status: tenant?.status === 'ACTIVE' ? 'active' : tenant.status === 'INACTIVE' ? 'inactive' : 'archived' as 'active' | 'inactive' | 'archived'
                 }))}
                 columns={tenantColumns}

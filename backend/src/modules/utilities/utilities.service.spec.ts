@@ -12,6 +12,7 @@ import {
   VacancyPolicy,
 } from '@prisma/client';
 import { UtilitiesService } from './utilities.service';
+import { UtilityPricingService } from './utility-pricing.service';
 
 /**
  * Module 14 — the utilities service, against a hand-written Prisma mock.
@@ -212,6 +213,9 @@ function buildService() {
   const service = new UtilitiesService(
     prisma as never,
     invoicesService as never,
+    // The real pricer, over the same mock: the charge's money is recomputed from
+    // the readings it names, and a stubbed pricer would test nothing.
+    new UtilityPricingService(prisma as never),
   );
   return { service, prisma, invoicesService };
 }

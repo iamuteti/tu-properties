@@ -11,7 +11,18 @@ export interface JurisdictionProfile {
   name: string;
   currency: string; // ISO-4217
   locale: string; // BCP-47
-  timezone: string;
+  timezone: string; // IANA
+  /**
+   * The consumption tax rate, as a percentage: VAT in most of the world, GST in
+   * some, sales tax in the United States — where there is no national rate at
+   * all, which is why this is 0 there and not 5.
+   *
+   * It belongs to the country because it is the country's. A tariff priced in
+   * pounds and taxed at the Kenyan rate of 16% is a number nobody can reconcile,
+   * and a seeded utility bill that is wrong in a way only the tax authority
+   * would notice is worse than one that is obviously a demo.
+   */
+  vatRate: number;
   phoneCountryCode: string; // E.164 country code, e.g. +254
   phonePrefixes: string[]; // carrier prefixes (subscriber portion)
   phoneSubscriberLength: number;
@@ -40,6 +51,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'KE',
     name: 'Kenya',
     currency: 'KES',
+    vatRate: 16,
     locale: 'en-KE',
     timezone: 'Africa/Nairobi',
     phoneCountryCode: '+254',
@@ -338,6 +350,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'US',
     name: 'United States',
     currency: 'USD',
+    vatRate: 0,
     locale: 'en-US',
     timezone: 'America/New_York',
     phoneCountryCode: '+1',
@@ -980,6 +993,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'GB',
     name: 'United Kingdom',
     currency: 'GBP',
+    vatRate: 20,
     locale: 'en-GB',
     timezone: 'Europe/London',
     phoneCountryCode: '+44',
@@ -1235,6 +1249,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'ZA',
     name: 'South Africa',
     currency: 'ZAR',
+    vatRate: 15,
     locale: 'en-ZA',
     timezone: 'Africa/Johannesburg',
     phoneCountryCode: '+27',
@@ -1415,6 +1430,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'NG',
     name: 'Nigeria',
     currency: 'NGN',
+    vatRate: 7.5,
     locale: 'en-NG',
     timezone: 'Africa/Lagos',
     phoneCountryCode: '+234',
@@ -1603,6 +1619,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'AE',
     name: 'United Arab Emirates',
     currency: 'AED',
+    vatRate: 5,
     locale: 'en-AE',
     timezone: 'Asia/Dubai',
     phoneCountryCode: '+971',
@@ -1743,6 +1760,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'CA',
     name: 'Canada',
     currency: 'CAD',
+    vatRate: 5,
     locale: 'en-CA',
     timezone: 'America/Toronto',
     phoneCountryCode: '+1',
@@ -1984,6 +2002,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'AU',
     name: 'Australia',
     currency: 'AUD',
+    vatRate: 10,
     locale: 'en-AU',
     timezone: 'Australia/Sydney',
     phoneCountryCode: '+61',
@@ -2258,6 +2277,7 @@ const profiles: JurisdictionProfile[] = [
     code: 'DE',
     name: 'Germany',
     currency: 'EUR',
+    vatRate: 19,
     locale: 'de-DE',
     timezone: 'Europe/Berlin',
     phoneCountryCode: '+49',
@@ -2512,6 +2532,29 @@ export function getProfile(code: string): JurisdictionProfile {
   const p = PROFILES[code.toUpperCase()];
   if (!p) throw new Error(`Unknown jurisdiction profile: ${code}`);
   return p;
+}
+
+/**
+ * The tariff for a utility in this jurisdiction, with a little jitter.
+ *
+ * A tariff is not a number in the abstract — it is a number in a currency, per
+ * a unit, in a country whose units are not the same as anybody else's. Kenya
+ * charges per cubic metre of water, the United States per gallon, so the rate
+ * has to come from the profile rather than from a constant in the seeder.
+ *
+ * The jitter keeps a hundred tariffs from looking like a spreadsheet: two
+ * properties on the same street do not get billed the identical rate to the
+ * cent.
+ */
+export function utilityRate(
+  profile: JurisdictionProfile,
+  type: 'WATER' | 'ELECTRICITY' | 'GAS',
+): number {
+  const tariff = profile.utilityTariffs.find((t) => t.type === type);
+  if (!tariff) return 0;
+  // ±10%, and at least a hundredth of a unit so the rate is never zero.
+  const jitter = 0.9 + Math.random() * 0.2;
+  return Math.round(tariff.rate * jitter * 100) / 100;
 }
 
 export function randomFrom<T>(arr: T[]): T {

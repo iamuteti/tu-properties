@@ -76,6 +76,10 @@ export function useTableData() {
                     agreementEndDate: agreement?.endDate || '',
                     rentAmount: agreement?.rentAmount || 0,
                     rentBalance: rentBalance,
+                    // The tenancy's own currency. The list adds up money, and an
+                    // amount without the currency it is in is an amount nobody can
+                    // reconcile against the invoice it came from.
+                    currency: agreement?.currency || undefined,
                     daysToExpire: daysToExpire,
                     status: status,
                     agreementType: agreement?.agreementType || 'RENTAL',

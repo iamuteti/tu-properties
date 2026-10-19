@@ -55,6 +55,9 @@ import {
   NotificationStatus,
   // Module 5 — Move-outs.
   MoveOutStatus,
+  // Module 5 — Resident requests.
+  TenantRequestStatus,
+  TenantRequestType,
   // Module 13 — Facilities
   AccessCardHolder,
   AccessCardStatus,
@@ -66,6 +69,7 @@ import {
   MeterReadingSource,
   MeterScope,
   MeterStatus,
+  UtilityChargeStatus,
   UtilityType,
   UtilityBillingMode,
   VacancyPolicy,
@@ -93,6 +97,11 @@ import {
 } from '../modules/hr/payroll-calc';
 import { DEFAULT_CHART_OF_ACCOUNTS } from '../modules/finance/accounting/chart-of-accounts';
 import {
+  calculateCharge,
+  consumptionBetween,
+  type ChargeCalculation,
+} from '../modules/utilities/meter-rates';
+import {
   setActiveProfile,
   getActiveProfile,
   randomPhone as profileRandomPhone,
@@ -101,6 +110,7 @@ import {
   randomEmail as profileRandomEmail,
   randomTaxId as profileRandomTaxId,
   randomPropertyName as profileRandomPropertyName,
+  utilityRate,
 } from './jurisdictions';
 
 dotenv.config();
@@ -253,13 +263,21 @@ export async function generateDemoData(
         organizationId: organizationId,
         meterId: waterMeter.id,
         type: UtilityType.WATER,
-        currency: 'KES',
-        ratePerUnit: 45 + Math.random() * 30, // KES per 1000 litres
-        standingCharge: 80 + Math.random() * 40,
+        // The tariff belongs to the jurisdiction: its currency, its rate and
+        // its consumption tax. A pound tariff taxed at the Kenyan rate of 16%
+        // is a number nobody can reconcile.
+        currency: activeProfile.currency,
+        ratePerUnit: utilityRate(activeProfile, 'WATER'),
+        standingCharge:
+          Math.round(
+            utilityRate(activeProfile, 'WATER') *
+              (1.4 + Math.random() * 0.7) *
+              100,
+          ) / 100,
         prorateStandingCharge: false,
-        purchaseCurrency: 'KES',
+        purchaseCurrency: activeProfile.currency,
         spotRate: null,
-        vatRate: 16,
+        vatRate: activeProfile.vatRate,
         incomeAccount: '6100',
         revenueExpenseItem: 'WATER',
         validFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -292,16 +310,25 @@ export async function generateDemoData(
           organizationId: organizationId,
           meterId: elecMeter.id,
           type: UtilityType.ELECTRICITY,
-          currency: 'KES',
-          ratePerUnit: 20 + Math.random() * 15, // KES per kWh
-          standingCharge: 40 + Math.random() * 20,
+          currency: activeProfile.currency,
+          ratePerUnit: utilityRate(activeProfile, 'ELECTRICITY'),
+          standingCharge:
+            Math.round(
+              utilityRate(activeProfile, 'ELECTRICITY') *
+                (1.2 + Math.random() * 0.6) *
+                100,
+            ) / 100,
           prorateStandingCharge: false,
-          purchaseCurrency: 'KES',
+          purchaseCurrency: activeProfile.currency,
           spotRate: null,
-          vatRate: 16,
+          vatRate: activeProfile.vatRate,
           incomeAccount: '6200',
           revenueExpenseItem: 'ELECTRICITY',
-          validFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          validFrom: new Date(
+            new Date().getFullYear(),
+            new Date().getMonth(),
+            1,
+          ),
           validTo: null,
         },
       });
@@ -402,7 +429,10 @@ export async function generateDemoData(
     // Each unit gets 1–2 service charges.
     const count = 1 + Math.floor(Math.random() * 2);
     for (let s = 0; s < count; s += 1) {
-      const type = serviceChargeTypes[Math.floor(Math.random() * serviceChargeTypes.length)];
+      const type =
+        serviceChargeTypes[
+          Math.floor(Math.random() * serviceChargeTypes.length)
+        ];
       await prisma.unitServiceCharge.create({
         data: {
           unitId: unit.id,
@@ -563,21 +593,34 @@ export async function generateDemoData(
       const isPaid = Math.random() > 0.15; // 85% paid
       const isPartial = !isPaid && Math.random() > 0.5; // 50% of unpaid are partially paid
 
+      // The rent is quoted the way leases are quoted nearly everywhere: a base
+      // rent and a service charge. The two invoice lines foot to the total, so the
+      // breakdown and the headline figure agree - which is the whole point of
+      // having lines.
+      const invoiceTotal = Number(unit.baseRent);
+      const baseRent = Math.round(invoiceTotal * 0.85);
+      const serviceCharge = Number((invoiceTotal - baseRent).toFixed(2));
+
       const paidAmount = isPaid
-        ? Number(unit.baseRent)
+        ? invoiceTotal
         : isPartial
-          ? Math.floor(Number(unit.baseRent) * Math.random() * 0.8)
+          ? Math.floor(invoiceTotal * Math.random() * 0.8)
           : 0;
-      const balanceAmount = Number(unit.baseRent) - paidAmount;
+      const balanceAmount = invoiceTotal - paidAmount;
 
       const invoice = await prisma.invoice.create({
         data: {
           invoiceNumber: `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, '0')}-${invoiceCount}${randomString(4)}`,
           agreementId,
+          // The invoice is denominated in the organization's currency. Left
+          // unset it takes the database default, which is a currency and not a
+          // blank - and a demo estate that bills in dollars while the schema
+          // says otherwise is a bug report nobody can reproduce.
+          currency: activeProfile.currency,
           issueDate: invoiceDate,
           dueDate,
-          amount: Number(unit.baseRent),
-          totalAmount: Number(unit.baseRent),
+          amount: invoiceTotal,
+          totalAmount: invoiceTotal,
           balanceAmount,
           paidAmount,
           status: isPaid
@@ -585,6 +628,30 @@ export async function generateDemoData(
             : isPartial
               ? InvoiceStatus.PARTIALLY_PAID
               : InvoiceStatus.PENDING,
+          // The line items. A rent invoice that is a single number cannot be
+          // questioned, and "what am I paying for?" is answered by the breakdown -
+          // so the rent is split the way a lease quotes it: a base rent and a
+          // service charge. The two lines foot to the invoice total, so the
+          // breakdown and the total agree.
+          invoiceItems: {
+            create: [
+              {
+                description: `Base rent — ${unit.name} (${invoiceDate.toLocaleString('en-GB', { month: 'long', year: 'numeric' })})`,
+                revenueExpenseItem: 'Rent',
+                quantity: 1,
+                unitPrice: Number(baseRent),
+                amount: Number(baseRent),
+              },
+              {
+                description:
+                  'Service charge — common area upkeep and building services',
+                revenueExpenseItem: 'Service charge',
+                quantity: 1,
+                unitPrice: Number(serviceCharge),
+                amount: Number(serviceCharge),
+              },
+            ],
+          },
           organizationId,
         },
       });
@@ -654,6 +721,26 @@ export async function generateDemoData(
               'Admin User',
             ][Math.floor(Math.random() * 4)],
             payments: { connect: { id: payment.id } },
+            // The particulars. A receipt is a document, and the document is the
+            // line: which invoice was settled, what was owed before, what it
+            // became afterwards. Without this the receipt is an amount with no
+            // explanation - and the tenant's file cannot answer "what did this
+            // payment settle?".
+            receiptLines: {
+              create: [
+                {
+                  date: paymentDate,
+                  invNo: invoice.invoiceNumber,
+                  particular: `Rent and service charge — ${unit.name} for ${invoiceDate.toLocaleString('en-GB', { month: 'long', year: 'numeric' })}`,
+                  invoiceTotal,
+                  prevReceipts: 0,
+                  amtDue: invoiceTotal,
+                  payment: paidAmount,
+                  newBalance: invoiceTotal - paidAmount,
+                  whtTax: 0,
+                },
+              ],
+            },
             organizationId,
           },
         });
@@ -997,6 +1084,7 @@ async function generateOwnerData(
           statementNumber,
           organizationId,
           landlordId: landlord.id,
+          currency: activeProfile.currency,
           periodStart,
           periodEnd,
           grossIncome: grossIncomeCents / 100,
@@ -1242,6 +1330,7 @@ async function generateSalesData(
           data: {
             invoiceNumber: `INV-SALE-${String(sequence).padStart(4, '0')}-${row.sequence}`,
             transactionClass: 'SALE',
+            currency: activeProfile.currency,
             billTo: 'Seeded buyer',
             issueDate: daysFromNow(-12),
             dueDate: row.dueDate,
@@ -1280,6 +1369,7 @@ async function generateSalesData(
             data: {
               invoiceId: invoice.id,
               amount: row.amount,
+              currency: activeProfile.currency,
               paymentMethod: 'MPESA',
               paymentReference: `SALE-PAY-${row.sequence}`,
               organizationId,
@@ -1699,7 +1789,7 @@ async function generateWorkflowData(
       });
 
   const label = (amount: number) =>
-    `Refund of ${payment.currency || 'KES'} ${amount.toLocaleString()} on payment ${payment.paymentReference ?? payment.id}`;
+    `Refund of ${payment.currency || activeProfile.currency} ${amount.toLocaleString()} on payment ${payment.paymentReference ?? payment.id}`;
 
   // ── 1. waiting on Finance ──────────────────────────────────────────────
   await prisma.workflowInstance.create({
@@ -4201,6 +4291,10 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     // after generateDemoData.
     await generateMoveOutData(prisma, rohiOrg.id);
 
+    // Resident requests (Module 5). Needs tenants and their tenancies, so it
+    // runs after the demo data and before the notifications, which quote them.
+    await generateTenantRequestsData(prisma, rohiOrg.id);
+
     // Item 1 — Notifications (Module 17). Needs invoices, tenants, landlords and
     // staff users, all of which exist by now.
     await generateNotificationsData(prisma, rohiOrg.id);
@@ -4535,7 +4629,7 @@ async function generateHrData(prisma: PrismaClient, organizationId: string) {
         employmentType: plan.employmentType ?? EmploymentType.FULL_TIME,
         hireDate: new Date(plan.hireDate),
         basicSalary: new Prisma.Decimal(plan.basicSalary),
-        salaryCurrency: plan.salaryCurrency ?? 'KES',
+        salaryCurrency: plan.salaryCurrency ?? activeProfile.currency,
         payFrequency: plan.payFrequency ?? PayFrequency.MONTHLY,
         periodsPerYear: 12,
         ...(plan.component ? { leavePolicyId: policy?.id } : {}),
@@ -4573,7 +4667,7 @@ async function generateHrData(prisma: PrismaClient, organizationId: string) {
           employeeId: employee.id,
           payComponentId: payComponent.id,
           percentage: new Prisma.Decimal(plan.component.percentage),
-          currency: plan.salaryCurrency ?? 'KES',
+          currency: plan.salaryCurrency ?? activeProfile.currency,
         },
       });
     }
@@ -5124,7 +5218,9 @@ async function generateFacilitiesData(
         bookingFee:
           spec.bookingFee != null ? new Prisma.Decimal(spec.bookingFee) : null,
         bookingFeeCurrency:
-          spec.bookingFee != null ? (spec.currency ?? 'KES') : null,
+          spec.bookingFee != null
+            ? (spec.currency ?? activeProfile.currency)
+            : null,
       },
       select: {
         id: true,
@@ -6077,16 +6173,44 @@ async function generateUtilitiesData(
 
   // An organization default per utility, then a superseded window for water so the
   // rate list shows a tariff history rather than one mutable row.
+  //
+  // The rates and the consumption tax come from the jurisdiction profile, not
+  // from constants here: a tariff is a number in a currency, per a unit, in a
+  // country whose units are not anybody else's. Kenya's water tariff is per
+  // cubic metre and the United States' is per gallon, and a seeded bill in
+  // pounds charging 55.5 a cubic metre is a number from nowhere.
   const defaults: Array<{
     type: UtilityType;
     rate: number;
     standing: number;
     vat: number | null;
   }> = [
-    { type: UtilityType.WATER, rate: 55.5, standing: 250, vat: null },
-    { type: UtilityType.ELECTRICITY, rate: 32.75, standing: 150, vat: null },
-    { type: UtilityType.GAS, rate: 145.0, standing: 0, vat: 16 },
-    { type: UtilityType.SEWAGE, rate: 180.0, standing: 0, vat: null },
+    {
+      type: UtilityType.WATER,
+      rate: utilityRate(activeProfile, 'WATER'),
+      standing:
+        Math.round(utilityRate(activeProfile, 'WATER') * 4.5 * 100) / 100,
+      vat: null,
+    },
+    {
+      type: UtilityType.ELECTRICITY,
+      rate: utilityRate(activeProfile, 'ELECTRICITY'),
+      standing:
+        Math.round(utilityRate(activeProfile, 'ELECTRICITY') * 4.5 * 100) / 100,
+      vat: null,
+    },
+    {
+      type: UtilityType.GAS,
+      rate: utilityRate(activeProfile, 'GAS'),
+      standing: 0,
+      vat: activeProfile.vatRate,
+    },
+    {
+      type: UtilityType.SEWAGE,
+      rate: Math.round(utilityRate(activeProfile, 'WATER') * 1.5 * 100) / 100,
+      standing: 0,
+      vat: null,
+    },
   ];
 
   for (const d of defaults) {
@@ -6129,8 +6253,12 @@ async function generateUtilitiesData(
         organizationId,
         type: UtilityType.WATER,
         currency: activeProfile.currency,
-        ratePerUnit: 62.4,
-        standingCharge: 250,
+        // The new window is the same tariff a little dearer, which is what a
+        // mid-year tariff review actually looks like.
+        ratePerUnit:
+          Math.round(utilityRate(activeProfile, 'WATER') * 1.12 * 100) / 100,
+        standingCharge:
+          Math.round(utilityRate(activeProfile, 'WATER') * 4.5 * 100) / 100,
         vatRate: null,
         incomeAccount: '4000',
         revenueExpenseItem: '3',
@@ -6238,8 +6366,286 @@ async function generateUtilitiesData(
     });
   }
 
+  // ---------------------------------------------------------------- charges
+  //
+  // A meter with readings and a tariff but no charge is a register, not a bill.
+  // The charges are what make a resident's water and electricity visible on their
+  // own file, so the demo prices a couple of periods for the sub-metered units and
+  // raises the utility invoice for them.
+  //
+  // The money is computed with the module's own rules rather than a second copy of
+  // them: `consumptionBetween` and `calculateCharge` are the same functions the
+  // billing run uses, so a seeded charge and a billed one cannot disagree.
+
+  const subMeters = await prisma.utilityMeter.findMany({
+    where: {
+      organizationId,
+      scope: MeterScope.SUBMETER,
+      unitId: { not: null },
+      meterNumber: { not: { startsWith: 'ROLL-PWR-' } },
+    },
+    orderBy: { meterNumber: 'asc' },
+  });
+
+  let chargeCount = 0;
+  let utilityInvoiceCount = 0;
+
+  // The charges are collected per billing period first and billed afterwards,
+  // because the product's shape is **one bill per tenancy per period** carrying
+  // every charge of that period - the water and the electricity on the same
+  // statement, not two statements. The schema says as much: one invoice collects
+  // several charges, which is why the foreign key lives on the charge and not on
+  // the invoice.
+  type PricedLine = {
+    meter: (typeof subMeters)[number];
+    rate: NonNullable<Awaited<ReturnType<typeof resolveDemoRate>>>;
+    pricing: ChargeCalculation;
+    fromId: string;
+    toId: string;
+    fromDate: Date;
+    toDate: Date;
+    periodEnd: Date;
+    billingPeriod: string;
+  };
+
+  const periodGroups = new Map<
+    string,
+    {
+      agreementId: string | null;
+      billingPeriod: string;
+      periodEnd: Date;
+      lines: PricedLine[];
+    }
+  >();
+
+  for (const meter of subMeters) {
+    const readings = await prisma.meterReading.findMany({
+      where: { meterId: meter.id },
+      orderBy: { readingDate: 'asc' },
+    });
+    if (readings.length < 2 || !meter.unitId) {
+      continue;
+    }
+
+    // The tenancy the consumption is billed to. A vacant unit is a legitimate
+    // state for a meter, and the module prices the charge and leaves it unbilled
+    // rather than inventing a payer.
+    const agreement = await prisma.agreement.findFirst({
+      where: { unitId: meter.unitId, status: AgreementStatus.ACTIVE },
+      orderBy: { startDate: 'desc' },
+    });
+
+    for (let i = 1; i < readings.length; i += 1) {
+      const from = readings[i - 1];
+      const to = readings[i];
+
+      const rate = await resolveDemoRate(
+        prisma,
+        organizationId,
+        meter.id,
+        meter.type,
+        to.readingDate,
+      );
+      if (!rate) {
+        continue;
+      }
+
+      const consumption = consumptionBetween(
+        Number(from.reading),
+        Number(to.reading),
+        { digits: meter.digits, digitWrapAt: meter.digitWrapAt },
+      );
+      if (!consumption.ok) {
+        continue;
+      }
+
+      const calculated = calculateCharge({
+        meterConsumption: consumption.consumption,
+        allocationShare: 1,
+        rate: {
+          currency: rate.currency,
+          ratePerUnit: Number(rate.ratePerUnit),
+          // The standing charge is deliberately not passed. The module's own
+          // invoice path prices a charge with `priceStoredCharge`, which does not
+          // include it either, so a demo invoice that added it would disagree
+          // with the module's own ledger by the standing charge on every row.
+          vatRate: rate.vatRate === null ? null : Number(rate.vatRate),
+          incomeAccount: rate.incomeAccount,
+          revenueExpenseItem: rate.revenueExpenseItem,
+        },
+      });
+      if (!calculated.ok) {
+        continue;
+      }
+
+      const pricing = calculated.value;
+      const billingPeriod = `${to.readingDate.getUTCFullYear()}-${String(
+        to.readingDate.getUTCMonth() + 1,
+      ).padStart(2, '0')}`;
+
+      const groupKey = `${agreement?.id ?? 'vacant'}:${billingPeriod}`;
+      const group = periodGroups.get(groupKey) ?? {
+        agreementId: agreement?.id ?? null,
+        billingPeriod,
+        periodEnd: to.readingDate,
+        lines: [] as PricedLine[],
+      };
+      group.lines.push({
+        meter,
+        rate,
+        pricing,
+        fromId: from.id,
+        toId: to.id,
+        fromDate: from.readingDate,
+        toDate: to.readingDate,
+        periodEnd: to.readingDate,
+        billingPeriod,
+      });
+      periodGroups.set(groupKey, group);
+    }
+  }
+
+  for (const group of periodGroups.values()) {
+    const subtotal = group.lines.reduce((s, l) => s + l.pricing.subtotal, 0);
+    const vatTotal = group.lines.reduce((s, l) => s + l.pricing.vatAmount, 0);
+    const grandTotal = group.lines.reduce((s, l) => s + l.pricing.total, 0);
+    const currency = group.lines[0]?.pricing.currency ?? activeProfile.currency;
+
+    // The bill for the period. It is looked up rather than blindly created,
+    // because a tenancy's period is already billed by the recurring-billing
+    // module in some estates, and two bills for one period is exactly the
+    // double-billing the unique constraint on (agreement, period) exists to
+    // prevent.
+    const agreement = group.agreementId
+      ? await prisma.agreement.findUnique({ where: { id: group.agreementId } })
+      : null;
+    const invoiceNumber = `INV-UTL-${group.billingPeriod}-${agreement?.code ?? group.agreementId}`;
+    let invoice = group.agreementId
+      ? await prisma.invoice.findFirst({
+          where: {
+            agreementId: group.agreementId,
+            billingPeriod: group.billingPeriod,
+          },
+        })
+      : null;
+
+    if (!invoice && group.agreementId) {
+      invoice = await prisma.invoice.create({
+        data: {
+          invoiceNumber,
+          agreementId: group.agreementId,
+          billingPeriod: group.billingPeriod,
+          transactionClass: 'UTILITY',
+          issueDate: group.periodEnd,
+          dueDate: new Date(group.periodEnd.getTime() + 14 * 86_400_000),
+          amount: subtotal,
+          vatAmount: vatTotal || null,
+          totalAmount: grandTotal,
+          currency,
+          balanceAmount: grandTotal,
+          status: InvoiceStatus.PENDING,
+          memo: `Metered utilities for ${group.billingPeriod}`,
+          organizationId,
+        },
+      });
+      utilityInvoiceCount += 1;
+    }
+
+    for (const line of group.lines) {
+      if (invoice) {
+        // The invoice is a document, so it carries the line that explains it.
+        const existingItem = await prisma.invoiceItem.findFirst({
+          where: {
+            invoiceId: invoice.id,
+            description: { contains: line.meter.meterNumber },
+          },
+        });
+        if (!existingItem) {
+          await prisma.invoiceItem.create({
+            data: {
+              invoiceId: invoice.id,
+              description: `${line.meter.type} consumption — ${line.pricing.billableConsumption} units at ${Number(
+                line.rate.ratePerUnit,
+              )} ${line.pricing.currency} (meter ${line.meter.meterNumber})`,
+              revenueExpenseItem: line.rate.revenueExpenseItem,
+              incomeAccount: line.rate.incomeAccount,
+              quantity: line.pricing.billableConsumption,
+              unitPrice: Number(line.rate.ratePerUnit),
+              amount: line.pricing.consumptionAmount,
+              vatRate: line.pricing.vatRate,
+              vatAmount: line.pricing.vatAmount || null,
+            },
+          });
+        }
+      }
+
+      await prisma.utilityCharge.create({
+        data: {
+          organizationId,
+          meterId: line.meter.id,
+          unitId: line.meter.unitId,
+          agreementId: group.agreementId,
+          fromReadingId: line.fromId,
+          toReadingId: line.toId,
+          rateId: line.rate.id,
+          ratePerUnit: line.rate.ratePerUnit,
+          currency: line.rate.currency,
+          vatRate: line.rate.vatRate,
+          incomeAccount: line.rate.incomeAccount,
+          revenueExpenseItem: line.rate.revenueExpenseItem,
+          allocationShare: 1,
+          allocationBasis: null,
+          billingPeriod: group.billingPeriod,
+          invoiceId: invoice?.id ?? null,
+          status: invoice
+            ? UtilityChargeStatus.INVOICED
+            : UtilityChargeStatus.PENDING,
+        },
+      });
+      chargeCount += 1;
+    }
+  }
+
   console.log(
-    `  Utilities: ${metersCreated.length} meters (${bulkMeters.length} bulk), ${totalReadings} readings, ${rateRows.length} tariffs`,
+    `  Utilities: ${metersCreated.length} meters (${bulkMeters.length} bulk), ${totalReadings} readings, ${rateRows.length} tariffs, ${chargeCount} charges on ${utilityInvoiceCount} utility invoice(s)`,
+  );
+}
+
+/**
+ * The tariff in force for a meter on a date.
+ *
+ * Most-specific-wins, the same rule the module applies: a rate attached to this
+ * meter beats one attached to its property, which beats the organization default.
+ * The rate is snapshotted onto the charge, so repricing a tariff later cannot
+ * rewrite what a resident was already billed.
+ */
+async function resolveDemoRate(
+  prisma: PrismaClient,
+  organizationId: string,
+  meterId: string,
+  type: UtilityType,
+  at: Date,
+) {
+  const candidates = await prisma.utilityRate.findMany({
+    where: {
+      organizationId,
+      type,
+      validFrom: { lte: at },
+      OR: [{ validTo: null }, { validTo: { gt: at } }],
+    },
+  });
+
+  const specificity = (rate: {
+    meterId: string | null;
+    propertyId: string | null;
+  }) => (rate.meterId === meterId ? 2 : rate.propertyId ? 1 : 0);
+
+  return (
+    candidates.slice().sort((a, b) => {
+      const bySpecificity = specificity(b) - specificity(a);
+      if (bySpecificity !== 0) return bySpecificity;
+      return b.validFrom.getTime() - a.validFrom.getTime();
+    })[0] ?? null
   );
 }
 
@@ -6754,6 +7160,7 @@ async function generateWesthillData(
     data: {
       organizationId,
       agreementId: agreement.id,
+      currency: activeProfile.currency,
       invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0001`,
       issueDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
       dueDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 6)),
@@ -6789,6 +7196,7 @@ async function generateWesthillData(
     data: {
       organizationId,
       agreementId: agreement.id,
+      currency: activeProfile.currency,
       invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0002`,
       issueDate: new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
@@ -6899,6 +7307,134 @@ async function generateMoveOutData(
   }
 
   console.log(`  Move-outs: ${count} requests across statuses`);
+}
+
+/**
+ * Item 5 — Resident requests (Module 5).
+ *
+ * A request is something a resident *asks* for — a renewal, a move-out date, a
+ * payment plan, a repair, a lease amendment — and it is decided by staff, so the
+ * queue is a staff screen. The demo estate needs a few of each type across the
+ * four statuses, because a queue where every row is PENDING teaches nobody how
+ * to read a queue: the interesting cases are the ones with a decision on them,
+ * and the one where the resident is told no.
+ *
+ * The `payload` is a JSON snapshot of what the resident asked for, so a request
+ * still says what it was about after the thing it was about has moved on.
+ */
+async function generateTenantRequestsData(
+  prisma: PrismaClient,
+  organizationId: string,
+) {
+  const agreements = await prisma.agreement.findMany({
+    where: { organizationId, status: AgreementStatus.ACTIVE },
+    include: { tenant: true, unit: true },
+    take: 5,
+  });
+  if (agreements.length === 0) return;
+
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: { id: true, role: true },
+  });
+  const admin = users.find((u) => u.role === UserRole.ADMIN);
+  const now = new Date();
+
+  /** One request per kind, so the queue shows the range rather than one type. */
+  const plans: {
+    agreement: (typeof agreements)[number];
+    type: TenantRequestType;
+    status: TenantRequestStatus;
+    note: string;
+    decisionNote?: string;
+    daysAgo: number;
+    preferredInDays?: number;
+    earlyNotice?: boolean;
+  }[] = [
+    {
+      agreement: agreements[0],
+      type: 'MAINTENANT',
+      status: 'PENDING',
+      note: 'The bedroom window will not lock and the latch is sticking.',
+      daysAgo: 2,
+    },
+    {
+      agreement: agreements[1] ?? agreements[0],
+      type: 'RENEWAL',
+      status: 'PENDING',
+      note: 'Would like to renew for another year at the same rent.',
+      daysAgo: 5,
+    },
+    {
+      agreement: agreements[2] ?? agreements[0],
+      type: 'PAYMENT_PLAN',
+      status: 'APPROVED',
+      note: 'Asked to spread the arrears over three monthly instalments.',
+      decisionNote:
+        'Approved: three instalments, first one taken with this month’s rent.',
+      daysAgo: 18,
+    },
+    {
+      agreement: agreements[3] ?? agreements[0],
+      type: 'LEASE_AMENDMENT',
+      status: 'REJECTED',
+      note: 'Asked to add a second occupant to the lease.',
+      decisionNote:
+        'Rejected — every occupant has to be on the lease, so the new occupant needs to be added formally.',
+      daysAgo: 40,
+    },
+    {
+      agreement: agreements[4] ?? agreements[0],
+      type: 'MOVE_OUT',
+      status: 'WITHDRAWN',
+      note: 'Asked to hand the unit back at the end of the month.',
+      decisionNote: 'Withdrawn — the resident decided to stay after all.',
+      daysAgo: 55,
+      preferredInDays: 20,
+      earlyNotice: true,
+    },
+  ];
+
+  let count = 0;
+  for (const plan of plans) {
+    if (!plan.agreement) continue;
+    const createdAt = new Date(now.getTime() - plan.daysAgo * 86_400_000);
+    const decided =
+      plan.status === 'PENDING'
+        ? null
+        : new Date(createdAt.getTime() + 2 * 86_400_000);
+
+    await prisma.tenantRequest.create({
+      data: {
+        organizationId,
+        tenantId: plan.agreement.tenant.id,
+        agreementId: plan.agreement.id,
+        type: plan.type,
+        status: plan.status,
+        payload: {
+          unit: plan.agreement.unit?.name ?? null,
+          requestedAt: createdAt.toISOString(),
+        },
+        note: plan.note,
+        earlyNotice: plan.earlyNotice ?? false,
+        ...(plan.preferredInDays !== undefined
+          ? {
+              preferredDate: new Date(
+                now.getTime() + plan.preferredInDays * 86_400_000,
+              ),
+            }
+          : {}),
+        ...(decided
+          ? { decidedAt: decided, decidedById: admin?.id ?? null }
+          : {}),
+        ...(plan.decisionNote ? { decisionNote: plan.decisionNote } : {}),
+        createdAt,
+      },
+    });
+    count += 1;
+  }
+
+  console.log(`  Tenant requests: ${count} requests across statuses`);
 }
 
 /**
@@ -7095,7 +7631,7 @@ async function generateNotificationsData(
       type: NotificationType.PAYOUT_PAID,
       channel: NotificationChannel.IN_APP,
       status: NotificationStatus.SENT,
-      title: 'Payout of KES 142,500 sent',
+      title: `Payout of ${activeProfile.currency} 142,500 sent`,
       body: 'Your October payout has been transferred to your bank account.',
       dedupeKey: `PAYOUT_PAID:${landlords[1].id}:2026-10`,
       sentAt: new Date(now.getTime() - 4 * 86_400_000),
