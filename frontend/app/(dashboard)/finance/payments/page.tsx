@@ -74,8 +74,8 @@ const columns: ColumnDef<Payment>[] = [
             {payment.invoice.invoiceNumber}
           </Link>
         );
-      } else if (payment.rentalAgreement?.tenant) {
-        return `${payment.rentalAgreement.tenant.surname}, ${payment.rentalAgreement.tenant.otherNames}`;
+      } else if (payment.Agreement?.tenant) {
+        return `${payment.Agreement.tenant.surname}, ${payment.Agreement.tenant.otherNames}`;
       } else if (payment.payee) {
         return payment.payee;
       }
@@ -212,7 +212,7 @@ export default function PaymentsPage() {
         const payeeLower = filters.payee.toLowerCase();
         const matchesPayee =
           payment.payee?.toLowerCase().includes(payeeLower) ||
-          payment.rentalAgreement?.tenant?.surname?.toLowerCase().includes(payeeLower);
+          payment.Agreement?.tenant?.surname?.toLowerCase().includes(payeeLower);
         if (!matchesPayee) return false;
       }
 
@@ -363,3 +363,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
+

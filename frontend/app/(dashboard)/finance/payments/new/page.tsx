@@ -126,8 +126,8 @@ export default function NewPaymentPage() {
         // Auto-fill amount with balance due
         setValue("amount", Number(invoice.balanceAmount));
         // Auto-fill payee from lease tenant
-        if (invoice.rentalAgreement?.tenant) {
-          const tenant = invoice.rentalAgreement.tenant;
+        if (invoice.Agreement?.tenant) {
+          const tenant = invoice.Agreement.tenant;
           setValue("payee", `${tenant.surname} ${tenant.otherNames || ''}`.trim());
         }
       }
@@ -442,3 +442,4 @@ export default function NewPaymentPage() {
     </div>
   );
 }
+

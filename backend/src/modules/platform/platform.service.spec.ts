@@ -131,10 +131,10 @@ describe('PlatformService', () => {
       providers: [
         PlatformService,
         { provide: PrismaService, useValue: prisma },
-      { provide: AuditService, useValue: audit },
-      { provide: JwtService, useValue: jwt },
-      { provide: FILE_STORAGE, useValue: storage },
-    ],
+        { provide: AuditService, useValue: audit },
+        { provide: JwtService, useValue: jwt },
+        { provide: FILE_STORAGE, useValue: storage },
+      ],
     }).compile();
 
     service = module.get(PlatformService);

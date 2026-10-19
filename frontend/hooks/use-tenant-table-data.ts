@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { AxiosError } from "axios";
 import { tenantsApi, agreementsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
-import { Tenant, RentalAgreement, Unit, Property } from "@/types";
+import { Tenant, Agreement, Unit, Property } from "@/types";
 import { TableData } from "@/components/ui/expandable-table";
 
-interface RentalAgreementWithRelations extends RentalAgreement {
+interface AgreementWithRelations extends Agreement {
     unit?: Unit & { property?: Property };
 }
 
@@ -25,9 +25,9 @@ export function useTableData() {
             ]);
 
             const tenants: Tenant[] = tenantsResponse.data.data;
-            const agreements: RentalAgreementWithRelations[] = agreementsResponse.data.data as unknown as RentalAgreementWithRelations[];
+            const agreements: AgreementWithRelations[] = agreementsResponse.data.data as unknown as AgreementWithRelations[];
 
-            const agreementMap = new Map<string, RentalAgreementWithRelations>();
+            const agreementMap = new Map<string, AgreementWithRelations>();
             agreements.forEach(agreement => {
                 if (!agreementMap.has(agreement.tenantId)) {
                     agreementMap.set(agreement.tenantId, agreement);
@@ -104,3 +104,4 @@ export function useTableData() {
 
     return { data, isLoading, error, refetch: fetchData };
 }
+

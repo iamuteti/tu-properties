@@ -543,7 +543,7 @@ export interface Unit {
     status: string;
 
     // Relationships
-    rentalAgreements?: RentalAgreement[];
+    Agreements?: Agreement[];
     serviceCharges?: any[];
     meterNumbers?: any[];
     features?: UnitFeature[];
@@ -593,17 +593,63 @@ export interface Tenant {
     country?: string;
     photoUrl?: string;
     organizationId?: string;
-    rentalAgreement?: RentalAgreement;
+    /** The tenant's most recent agreement (kept for list-page compatibility). */
+    agreement?: Agreement;
+    /** Every agreement (current and historical) for this tenant. */
+    agreements?: Agreement[];
     lastPaidInvoice?: Invoice;
     emergencyContacts?: TenantEmergencyContact[];
+    receipts?: Receipt[];
+    moveOutRequests?: MoveOutRequest[];
+    credits?: CustomerCredit[];
+    creditNotes?: CreditNote[];
+    workOrders?: WorkOrder[];
+    facilityBookings?: FacilityBookingRow[];
+    accessCards?: AccessCardRow[];
+    visitorVisits?: VisitorVisitRow[];
+    tenantRequests?: TenantRequest[];
+    contact?: Contact;
     status: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
 }
 
-export interface RentalAgreement {
+/** Customer credit balance owed back to a tenant (Module 8: Payments). */
+export interface CustomerCredit {
     id: string;
+    amount: number;
+    appliedAmount: number;
+    currency: string;
+    reason?: string | null;
+    source: 'OVERPAYMENT' | 'UNALLOCATED_RECEIPT' | 'GOODWILL' | 'REFUND_UNSPENT' | 'MANUAL';
+    status: 'OPEN' | 'PARTIALLY_APPLIED' | 'APPLIED' | 'VOID';
+    tenantId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** A credit note reducing what a tenant owes (Module 8: Payments). */
+export interface CreditNote {
+    id: string;
+    creditNoteNumber: string;
+    invoiceId?: string | null;
+    tenantId?: string | null;
+    issueDate: string;
+    reason: string;
+    notes?: string | null;
+    subtotal: number;
+    vatAmount: number;
+    totalAmount: number;
+    currency: string;
+    status: 'DRAFT' | 'ISSUED' | 'VOID';
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Agreement {
+    id: string;
+    code?: string;
     unitId: string;
     tenantId: string;
     agreementType?: 'LEASE' | 'RENTAL';
@@ -622,6 +668,7 @@ export interface RentalAgreement {
     tenant?: Tenant;
     property?: Property;
     invoices?: any[];
+    moveOutRequests?: MoveOutRequest[];
     createdAt: string;
     updatedAt: string;
 }
@@ -630,7 +677,7 @@ export interface Invoice {
     id: string;
     invoiceNumber: string;
     landlordId?: string;
-    rentalAgreementId?: string;
+    AgreementId?: string;
     issueDate: string;
     dueDate: string;
     amount: number;
@@ -653,7 +700,7 @@ export interface Invoice {
     createdAt: string;
     updatedAt: string;
     landlord?: Landlord;
-    rentalAgreement?: RentalAgreement;
+    Agreement?: Agreement;
     invoiceItems?: any[];
     payments?: Payment[];
 }
@@ -708,7 +755,7 @@ export interface Receipt {
 export interface Payment {
     id: string;
     invoiceId?: string;
-    rentalAgreementId?: string;
+    AgreementId?: string;
     receiptId?: string;
     paymentDate: string;
     amount: number;
@@ -731,7 +778,7 @@ export interface Payment {
     updatedAt: string;
     recordedBy?: string;
     invoice?: Invoice;
-    rentalAgreement?: RentalAgreement;
+    Agreement?: Agreement;
     receipt?: Receipt;
 }
 
@@ -791,7 +838,7 @@ export interface CreateReceiptData {
     receiptLines?: Omit<ReceiptLine, 'id'>[];
     payments?: {
         invoiceId?: string;
-        rentalAgreementId?: string;
+        AgreementId?: string;
         paymentDate: string;
         amount: number;
         currency?: string;
@@ -860,7 +907,7 @@ export interface CreateInvoiceData {
     // Invoice header
     invoiceNumber?: string;
     landlordId?: string;
-    rentalAgreementId?: string;
+    AgreementId?: string;
     transactionClass: string;
     acReceivable: string;
     billTo?: string;
@@ -888,7 +935,7 @@ export interface CreateInvoiceData {
 
 export interface CreatePaymentData {
     invoiceId?: string;
-    rentalAgreementId?: string;
+    AgreementId?: string;
     receiptId?: string;
     paymentDate: string;
     amount: number;
@@ -911,7 +958,7 @@ export interface MoveOutRequest {
     id: string;
     organizationId: string;
     tenantId: string;
-    rentalAgreementId: string;
+    AgreementId: string;
     moveoutDate: string;
     approvalDate?: string;
     approvedBy?: string;
@@ -922,7 +969,7 @@ export interface MoveOutRequest {
     createdAt: string;
     updatedAt: string;
     tenant?: Tenant;
-    rentalAgreement?: RentalAgreement;
+    Agreement?: Agreement;
     /** Itemised deductions behind the refund (Module 5). */
     deductions?: MoveOutDeduction[];
     /** Detail endpoint only: the derived deposit position. */
@@ -1135,7 +1182,7 @@ export interface Commission {
     id: string;
     organizationId?: string;
     saleTransactionId?: string | null;
-    rentalAgreementId?: string | null;
+    AgreementId?: string | null;
     agentUserId: string;
     amount: number | string;
     splitPercentage?: number | string | null;
@@ -1387,7 +1434,7 @@ export interface InspectionItem {
 export interface InspectionReport {
     id: string;
     unitId: string;
-    rentalAgreementId?: string | null;
+    AgreementId?: string | null;
     type: InspectionType;
     status: InspectionStatus;
     scheduledDate: string;
@@ -1396,7 +1443,7 @@ export interface InspectionReport {
     notes?: string | null;
     items?: InspectionItem[];
     unit?: { id: string; name: string; property?: { id: string; name: string } } | null;
-    rentalAgreement?: {
+    Agreement?: {
         id: string;
         code: string;
         status: AgreementStatus;
@@ -1618,8 +1665,8 @@ export interface TenantRequest {
     /** What the approval actually did (e.g. created the successor lease). */
     result?: Record<string, unknown> | null;
     createdAt: string;
-    rentalAgreementId?: string | null;
-    rentalAgreement?: {
+    AgreementId?: string | null;
+    Agreement?: {
         id: string;
         code: string;
         status: string;
@@ -4004,7 +4051,7 @@ export interface ContractPayload {
     reference: string;
     title: string;
     type: ContractType;
-    rentalAgreementId?: string;
+    AgreementId?: string;
     saleTransactionId?: string;
     supplierId?: string;
     landlordId?: string;
@@ -4271,3 +4318,4 @@ export interface SupportTicket {
     createdAt: string;
     updatedAt: string;
 }
+

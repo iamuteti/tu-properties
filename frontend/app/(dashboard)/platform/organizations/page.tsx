@@ -24,6 +24,7 @@ export default function PlatformOrganizationsPage() {
         name: "",
         slug: "",
         plan: "STARTER",
+        organizationType: "AGENCY",
         adminEmail: "",
         adminFirstName: "",
         adminLastName: "",
@@ -45,7 +46,7 @@ export default function PlatformOrganizationsPage() {
             const response = await platformApi.list();
             setOrgs(response.data);
         } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Failed to load tenants");
+            setError(err.response?.data?.message || err.message || "Failed to load organizations");
         } finally {
             setLoading(false);
         }
@@ -57,23 +58,23 @@ export default function PlatformOrganizationsPage() {
         try {
             await platformApi.onboard(formData);
             setShowForm(false);
-            setFormData({ name: "", slug: "", plan: "STARTER", adminEmail: "", adminFirstName: "", adminLastName: "", adminPassword: "" });
+            setFormData({ name: "", slug: "", plan: "STARTER", organizationType: "AGENCY", adminEmail: "", adminFirstName: "", adminLastName: "", adminPassword: "" });
             load();
         } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Failed to onboard tenant");
+            setError(err.response?.data?.message || err.message || "Failed to onboard organization");
         }
     };
 
     const handleDelete = async (orgId: string) => {
-        if (!window.confirm("Delete this tenant? This cannot be undone.")) return;
+        if (!window.confirm("Delete this organization? This cannot be undone.")) return;
         setDeletingOrgId(orgId);
         try {
             await platformApi.remove(orgId);
-            toast.success("Tenant deleted");
+            toast.success("Organization deleted");
             setConfirmDeleteOrgId(null);
             load();
         } catch (err: any) {
-            toast.error(err.message || "Failed to delete tenant");
+            toast.error(err.message || "Failed to delete organization");
         } finally {
             setDeletingOrgId(null);
         }
@@ -89,8 +90,8 @@ export default function PlatformOrganizationsPage() {
 
     const columns: SimpleTableColumn<PlatformOrganization>[] = [
         {
-            key: 'tenant',
-            header: 'Tenant',
+            key: 'organization',
+            header: 'Organization',
             className: 'whitespace-nowrap',
             cell: (org) => (
                 <div>
@@ -178,14 +179,14 @@ export default function PlatformOrganizationsPage() {
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold">Tenants</h1>
+                    <h1 className="text-2xl font-bold">Organizations</h1>
                     <p className="text-sm text-muted-foreground">Every organization on the platform, with its subscription state.</p>
                 </div>
                 <button
                     onClick={() => setShowForm(!showForm)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                    {showForm ? "Cancel" : "Onboard tenant"}
+                    {showForm ? "Cancel" : "Onboard organization"}
                 </button>
             </div>
 
@@ -195,7 +196,7 @@ export default function PlatformOrganizationsPage() {
 
             {showForm && (
                 <div className="mb-6 p-6 bg-card rounded-lg shadow">
-                    <h2 className="text-lg font-semibold mb-4">Onboard a new tenant</h2>
+                    <h2 className="text-lg font-semibold mb-4">Onboard a new organization</h2>
                     <p className="text-sm text-muted-foreground mb-4">
                         Creates the organization, its first administrator and a 14-day trial subscription in one transaction.
                     </p>
@@ -217,6 +218,13 @@ export default function PlatformOrganizationsPage() {
                             </select>
                         </div>
                         <div>
+                            <label className="block text-sm font-medium mb-1">Organization type</label>
+                            <select value={formData.organizationType} onChange={(e) => setFormData({ ...formData, organizationType: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
+                                <option value="AGENCY">Agency</option>
+                                <option value="OWNER">Owner</option>
+                            </select>
+                        </div>
+                        <div>
                             <label className="block text-sm font-medium mb-1">Admin email (login)</label>
                             <input type="email" value={formData.adminEmail} onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required />
                         </div>
@@ -233,9 +241,9 @@ export default function PlatformOrganizationsPage() {
                             <input type="password" value={formData.adminPassword} onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required minLength={10} />
                         </div>
                         <div className="md:col-span-2">
-                            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                Onboard tenant
-                            </button>
+                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                    Onboard organization
+                                </button>
                         </div>
                     </form>
                 </div>
@@ -246,7 +254,7 @@ export default function PlatformOrganizationsPage() {
                     data={orgs}
                     rowKey={(org) => org.id}
                     columns={columns}
-                    emptyMessage="No tenants yet."
+                    emptyMessage="No organizations yet."
                 />
             </div>
         </div>

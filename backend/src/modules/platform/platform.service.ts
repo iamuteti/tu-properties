@@ -131,6 +131,7 @@ export class PlatformService {
             slug: dto.slug,
             subdomain: dto.subdomain,
             plan: dto.plan ?? 'STARTER',
+            organizationType: dto.organizationType ?? 'AGENCY',
             contactEmail: dto.contactEmail,
             isActive: true,
             subscription: {

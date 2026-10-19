@@ -216,6 +216,23 @@ const randomName = (): { firstName: string; lastName: string } => ({
   lastName: KE_LAST_NAMES[r(KE_LAST_NAMES.length)],
 });
 
+// User's own details for B06 (John Muteti Kyalo)
+const USER_TENANT: { firstName: string; lastName: string } = {
+  firstName: 'John Muteti',
+  lastName: 'Kyalo',
+};
+
+const USER_TENANT_DETAILS = {
+  email: 'iamuteti@gmail.com',
+  phone: '+254700001600',
+  town: 'Machakos',
+  idNoRegNo: '29652542',
+  taxPin: null as string | null,
+  postalAddress: '8, 90100, Machakos',
+  postalCode: '90100',
+  country: 'Kenya',
+};
+
 const daysInMonth = (year: number, month: number): number =>
   new Date(year, month + 1, 0).getDate();
 
@@ -238,6 +255,16 @@ type Tenancy = {
   moveIn: Date;
   moveOut: Date | null;
   tenant: { firstName: string; lastName: string };
+  tenantDetails?: {
+    email: string;
+    phone: string;
+    town: string;
+    idNoRegNo: string;
+    taxPin: string | null;
+    postalAddress: string;
+    postalCode: string | null;
+    country: string;
+  };
 };
 
 const generateUnitTenancies = (unitCode: string): Tenancy[] => {
@@ -253,7 +280,8 @@ const generateUnitTenancies = (unitCode: string): Tenancy[] => {
       {
         moveIn: new Date(2026, 6, 19),
         moveOut: null,
-        tenant: randomName(),
+        tenant: USER_TENANT,
+        tenantDetails: USER_TENANT_DETAILS,
       },
     ];
   }
@@ -572,6 +600,7 @@ async function main() {
       // Skip if entirely outside window
       if (moveOut && moveOut < WINDOW_START) continue;
 
+      const td = tenancy.tenantDetails;
       const tenant = await prisma.tenant.create({
         data: {
           accountNumber: `JEDAN-TEN-${String(r(999999) + 1).padStart(6, '0')}`,
@@ -579,15 +608,19 @@ async function main() {
           tenantType: 'Individual',
           surname: tenancy.tenant.lastName,
           otherNames: tenancy.tenant.firstName,
-          email: `${tenancy.tenant.firstName.toLowerCase()}.${tenancy.tenant.lastName.toLowerCase()}@gmail.com`,
-          phone: kenyanPhone(),
-          town: 'Machakos',
+          email: td
+            ? td.email
+            : `${tenancy.tenant.firstName.toLowerCase()}.${tenancy.tenant.lastName.toLowerCase()}@gmail.com`,
+          phone: td ? td.phone : kenyanPhone(),
+          town: td ? td.town : 'Machakos',
           status: moveOut ? TenantStatus.INACTIVE : TenantStatus.ACTIVE,
-          idNoRegNo: kraPin(),
-          taxPin: kraPin(),
-          postalAddress: `PO Box ${r(99999) + 1}, Machakos`,
-          postalCode: null,
-          country: 'Kenya',
+          idNoRegNo: td ? td.idNoRegNo : kraPin(),
+          taxPin: td ? td.taxPin : kraPin(),
+          postalAddress: td
+            ? td.postalAddress
+            : `PO Box ${r(99999) + 1}, Machakos`,
+          postalCode: td ? td.postalCode : null,
+          country: td ? td.country : 'Kenya',
           organizationId: organization.id,
         },
       });

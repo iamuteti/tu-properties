@@ -165,7 +165,7 @@ export function MoveOutPrompt({ lease, onCreated }: { lease: Lease; onCreated: (
         setBusy(true);
         try {
             const { moveOutsApi } = await import('@/lib/api');
-            await moveOutsApi.create({ rentalAgreementId: lease.id, moveoutDate: date, notes });
+            await moveOutsApi.create({ AgreementId: lease.id, moveoutDate: date, notes });
             toast.success('Move-out requested');
             setIsOpen(false);
             onCreated();

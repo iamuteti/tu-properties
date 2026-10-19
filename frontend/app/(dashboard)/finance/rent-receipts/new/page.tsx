@@ -7,7 +7,7 @@ import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenants } from "@/hooks/use-tenants";
-import { useRentalAgreements } from "@/hooks/use-rental-agreements";
+import { useAgreements } from "@/hooks/use-agreements";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +21,7 @@ import { financeApi } from "@/lib/api";
 const rentReceiptSchema = z.object({
   receiptNumber: z.string().min(1, "Receipt number is required"),
   tenantId: z.string().min(1, "Tenant is required"),
-  rentalAgreementId: z.string().min(1, "Rental Agreement is required"),
+  AgreementId: z.string().min(1, "Rental Agreement is required"),
   paymentDate: z.string().min(1, "Payment date is required"),
   paymentMethod: z.string().min(1, "Payment method is required"),
   paymentReference: z.string().optional(),
@@ -36,7 +36,7 @@ type RentReceiptFormValues = z.infer<typeof rentReceiptSchema>;
 export default function NewRentReceiptPage() {
   const { user } = useAuth();
   const { tenants } = useTenants({ limit: 1000 });
-  const { rentalAgreements } = useRentalAgreements();
+  const { agreements } = useAgreements();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [appliedInvoices, setAppliedInvoices] = useState<string[]>([]);
@@ -46,7 +46,7 @@ export default function NewRentReceiptPage() {
     defaultValues: {
       receiptNumber: `RR-${Date.now()}`,
       tenantId: "",
-      rentalAgreementId: "",
+      AgreementId: "",
       paymentDate: new Date().toISOString().split("T")[0],
       paymentMethod: "CASH",
       paymentReference: "",
@@ -66,17 +66,17 @@ export default function NewRentReceiptPage() {
   } = form;
 
   // Get invoices associated with the selected rental agreement
-  const selectedRentalAgreement = rentalAgreements.find((agreement) => agreement.id === watch("rentalAgreementId"));
-  const associatedInvoices: any[] = selectedRentalAgreement?.invoices || [];
+  const selectedAgreement = agreements.find((agreement) => agreement.id === watch("AgreementId"));
+  const associatedInvoices: any[] = selectedAgreement?.invoices || [];
 
   const invoiceBalance = (invoice: any) => Number(invoice?.balanceAmount ?? 0);
 
-  const handleRentalAgreementChange = (e: { target: { value: string } }) => {
-    const rentalAgreementId = e.target.value;
-    setValue("rentalAgreementId", rentalAgreementId);
-    const selectedRentalAgreement = rentalAgreements.find((agreement) => agreement.id === rentalAgreementId);
-    if (selectedRentalAgreement && selectedRentalAgreement.tenant) {
-      setValue("tenantId", selectedRentalAgreement.tenantId);
+  const handleAgreementChange = (e: { target: { value: string } }) => {
+    const AgreementId = e.target.value;
+    setValue("AgreementId", AgreementId);
+    const selectedAgreement = agreements.find((agreement) => agreement.id === AgreementId);
+    if (selectedAgreement && selectedAgreement.tenant) {
+      setValue("tenantId", selectedAgreement.tenantId);
     }
     // Switching lease invalidates previously applied invoices
     setAppliedInvoices([]);
@@ -87,11 +87,11 @@ export default function NewRentReceiptPage() {
     const tenantId = e.target.value;
     setValue("tenantId", tenantId);
     // Filter rental agreements to only those belonging to the selected tenant
-    const tenantRentalAgreements = rentalAgreements.filter((agreement) => agreement.tenantId === tenantId);
-    if (tenantRentalAgreements.length > 0) {
-      setValue("rentalAgreementId", tenantRentalAgreements[0].id);
+    const tenantagreements = agreements.filter((agreement) => agreement.tenantId === tenantId);
+    if (tenantagreements.length > 0) {
+      setValue("AgreementId", tenantagreements[0].id);
     } else {
-      setValue("rentalAgreementId", "");
+      setValue("AgreementId", "");
     }
     // Switching tenant invalidates previously applied invoices
     setAppliedInvoices([]);
@@ -152,7 +152,7 @@ export default function NewRentReceiptPage() {
         receiptLines,
         payments: appliedInvoices.map((id) => ({
           invoiceId: id,
-          rentalAgreementId: data.rentalAgreementId,
+          AgreementId: data.AgreementId,
           paymentDate: data.paymentDate,
           amount: invoiceBalance(associatedInvoices.find((i) => i.id === id)),
           currency: data.currency,
@@ -172,9 +172,9 @@ export default function NewRentReceiptPage() {
   };
 
   // Filter rental agreements to match selected tenant
-  const filteredRentalAgreements = watch("tenantId") 
-    ? rentalAgreements.filter((agreement) => agreement.tenantId === watch("tenantId"))
-    : rentalAgreements;
+  const filteredagreements = watch("tenantId") 
+    ? agreements.filter((agreement) => agreement.tenantId === watch("tenantId"))
+    : agreements;
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -245,21 +245,21 @@ export default function NewRentReceiptPage() {
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor="rentalAgreementId" className="text-sm font-medium leading-none">
+              <label htmlFor="AgreementId" className="text-sm font-medium leading-none">
                 Rental Agreement <span className="text-red-500">*</span>
               </label>
               <Select
-                id="rentalAgreementId"
-                options={filteredRentalAgreements.map((agreement) => ({
+                id="AgreementId"
+                options={filteredagreements.map((agreement) => ({
                   value: agreement.id,
                   label: `${agreement.agreementType || 'RENTAL'} #${agreement.id.slice(0, 8)}`,
                 }))}
-                value={watch("rentalAgreementId")}
-                onChange={handleRentalAgreementChange}
-                disabled={isSubmitting || filteredRentalAgreements.length === 0}
+                value={watch("AgreementId")}
+                onChange={handleAgreementChange}
+                disabled={isSubmitting || filteredagreements.length === 0}
               />
-              {errors.rentalAgreementId && (
-                <p className="text-xs text-destructive">{errors.rentalAgreementId.message}</p>
+              {errors.AgreementId && (
+                <p className="text-xs text-destructive">{errors.AgreementId.message}</p>
               )}
             </div>
           </div>
@@ -415,3 +415,4 @@ export default function NewRentReceiptPage() {
     </div>
   );
 }
+

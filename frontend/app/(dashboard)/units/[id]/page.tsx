@@ -85,7 +85,7 @@ export default function UnitDetailPage() {
         );
     }
 
-    const agreements = unit.rentalAgreements ?? [];
+    const agreements = unit.Agreements ?? [];
     const invoices = (agreements.flatMap((agreement: any) => agreement.invoices ?? []) ?? []) as Array<{
         id: string;
         invoiceNumber: string;

@@ -358,7 +358,7 @@ const navItems: NavItem[] = [
         icon: Shield,
         roles: ['SUPER_ADMIN'],
         children: [
-            { href: '/platform/organizations', label: 'Tenants', icon: Building, roles: ['SUPER_ADMIN'] },
+            { href: '/platform/organizations', label: 'Organizations', icon: Building, roles: ['SUPER_ADMIN'] },
             { href: '/platform/support-tickets', label: 'Support tickets', icon: MessageSquare, roles: ['SUPER_ADMIN'] },
         ],
     },

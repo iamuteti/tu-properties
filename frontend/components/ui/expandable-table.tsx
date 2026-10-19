@@ -22,7 +22,8 @@ import { Select } from './select';
 import { Checkbox } from './checkbox';
 import { 
   ChevronDown, 
-  ChevronRight, 
+  ChevronRight,
+  ChevronLeft,
   AlertCircle, 
   AlertTriangle, 
   CheckCircle2,
@@ -202,6 +203,23 @@ export function ExpandableTable<TData extends TableData>({
     },
   });
 
+  const pageCount = table.getPageCount();
+  const currentPage = table.getState().pagination.pageIndex + 1;
+
+  // Visible page numbers: current page ±2, bounded to [1, pageCount], with ellipsis
+  const visiblePages = React.useMemo(() => {
+    const pages: (number | '...')[] = [];
+    if (!pageCount || pageCount <= 1) return pages;
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(pageCount, currentPage + 2);
+    if (start > 1) pages.push(1);
+    if (start > 2) pages.push('...');
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < pageCount - 1) pages.push('...');
+    if (end < pageCount) pages.push(pageCount);
+    return pages;
+  }, [currentPage, pageCount]);
+
   return (
     <div className="space-y-4">
       {/* Search */}
@@ -314,52 +332,61 @@ export function ExpandableTable<TData extends TableData>({
 
       {/* Pagination */}
       {table.getPageCount() >= 1 && (
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <p className="text-sm text-foreground whitespace-nowrap">Show</p>
-              <Select
-                options={[10, 20, 30, 50].map(size => ({ value: size.toString(), label: size.toString() }))}
-                value={table.getState().pagination.pageSize.toString()}
-                onChange={(e) => table.setPageSize(Number(e.target.value))}
-                className="w-20"
-              />
-              <p className="text-sm text-foreground whitespace-nowrap">per page</p>
-            </div>
-            <div className="h-5 w-px bg-slate-300" />
-              <p className="text-sm text-foreground">
-                Page{' '}
-                <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span>
-                {' '}of{' '}
-                <span className="font-medium">{table.getPageCount()}</span>
-                {' '}({' '}
-                <span className="font-medium">
-                  {serverSidePagination
-                    ? (paginationMeta?.total ?? table.getFilteredRowModel().rows.length)
-                    : table.getFilteredRowModel().rows.length}
-                </span>
-                {' '}total records)
-              </p>
+        <div className="flex items-center justify-between px-2 sm:px-4">
+          {/* Left: page size selector */}
+          <div className="flex items-center space-x-2">
+            <p className="text-sm text-foreground whitespace-nowrap">Show</p>
+            <Select
+              options={[10, 20, 30, 50].map(size => ({ value: size.toString(), label: size.toString() }))}
+              value={table.getState().pagination.pageSize.toString()}
+              onChange={(e) => table.setPageSize(Number(e.target.value))}
+              className="w-20"
+            />
+            <p className="text-sm text-foreground whitespace-nowrap">per page</p>
           </div>
-          <div>
-            <nav className="relative z-0 inline-flex rounded-xl -space-x-px gap-2" aria-label="Pagination">
-              <Button
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                variant="secondary"
-                size="sm"
-              >
-                Previous
-              </Button>
-              <Button
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                variant="secondary"
-                size="sm"
-              >
-                Next
-              </Button>
-            </nav>
+
+          {/* Center: page numbers */}
+          <div className="hidden sm:flex items-center space-x-1">
+            {visiblePages.map((page, idx) => {
+              const isEllipsis = typeof page === 'string';
+              const isCurrent = !isEllipsis && page === currentPage;
+              return (
+                <button
+                  key={idx}
+                  onClick={isEllipsis ? undefined : () => table.setPageIndex(page - 1)}
+                  disabled={isEllipsis}
+                  className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition-colors ${
+                    isCurrent
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {isEllipsis ? '···' : page}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right: prev / next icon buttons */}
+          <div className="flex items-center space-x-1">
+            <Button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              variant="outline"
+              size="icon"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              variant="outline"
+              size="icon"
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}

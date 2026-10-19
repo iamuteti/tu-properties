@@ -62,7 +62,7 @@ export default function NewReceiptPage() {
       const q = invoiceSearch.toLowerCase();
       return (
         invoice.invoiceNumber.toLowerCase().includes(q) ||
-        (invoice.rentalAgreement?.tenant?.surname || "").toLowerCase().includes(q)
+        (invoice.Agreement?.tenant?.surname || "").toLowerCase().includes(q)
       );
     });
 
@@ -404,7 +404,7 @@ export default function NewReceiptPage() {
                   >
                     <span className="font-medium">{invoice.invoiceNumber}</span>
                     <span className="text-muted-foreground">
-                      {invoice.rentalAgreement?.tenant?.surname || "—"}
+                      {invoice.Agreement?.tenant?.surname || "—"}
                     </span>
                     <span className="text-right">
                       {invoice.currency} {Number(invoice.balanceAmount).toFixed(2)} due
@@ -492,3 +492,4 @@ export default function NewReceiptPage() {
     </div>
   );
 }
+

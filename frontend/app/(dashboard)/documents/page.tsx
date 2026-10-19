@@ -23,7 +23,7 @@ const ENTITY_TYPES = [
     "Unit",
     "Tenant",
     "Landlord",
-    "RentalAgreement",
+    "Agreement",
     "Invoice",
     "Payment",
     "Receipt",
@@ -315,3 +315,4 @@ export default function DocumentsPage() {
         </div>
     );
 }
+

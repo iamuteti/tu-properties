@@ -193,8 +193,58 @@ export class TenantsService {
       this.prisma.tenant.findFirst({
         where,
         include: {
-          agreements: true,
-          emergencyContacts: true,
+          agreements: {
+            include: {
+              unit: {
+                include: {
+                  property: true,
+                },
+              },
+              invoices: true,
+              payments: true,
+              inspections: true,
+              tenantRequests: true,
+              contracts: true,
+              moveOutRequests: {
+                orderBy: { moveoutDate: 'desc' },
+              },
+            },
+            orderBy: { startDate: 'desc' },
+          },
+          emergencyContacts: {
+            orderBy: { priority: 'asc' },
+          },
+          receipts: {
+            orderBy: { recordingDate: 'desc' },
+          },
+          moveOutRequests: {
+            include: {
+              deductions: true,
+            },
+            orderBy: { moveoutDate: 'desc' },
+          },
+          credits: {
+            orderBy: { createdAt: 'desc' },
+          },
+          creditNotes: {
+            orderBy: { issueDate: 'desc' },
+          },
+          workOrders: {
+            orderBy: { reportedAt: 'desc' },
+          },
+          facilityBookings: {
+            orderBy: { startsAt: 'desc' },
+          },
+          accessCards: {
+            orderBy: { issuedAt: 'desc' },
+          },
+          visitorVisits: {
+            orderBy: { createdAt: 'desc' },
+          },
+          requests: {
+            orderBy: { createdAt: 'desc' },
+          },
+          contact: true,
         },
       }),
       'Tenant',

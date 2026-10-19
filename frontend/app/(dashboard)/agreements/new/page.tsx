@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/simple-select";
 import { ChevronLeft } from "lucide-react";
 import { agreementsApi } from "@/lib/api";
 
-const rentalAgreementSchema = z.object({
+const AgreementSchema = z.object({
     unitId: z.string().min(1, "Unit is required"),
     tenantId: z.string().min(1, "Tenant is required"),
     agreementType: z.enum(["LEASE", "RENTAL"]).default("RENTAL"),
@@ -27,17 +27,17 @@ const rentalAgreementSchema = z.object({
     noticePeriodDays: z.coerce.number().optional(),
 });
 
-type RentalAgreementFormValues = z.infer<typeof rentalAgreementSchema>;
+type AgreementFormValues = z.infer<typeof AgreementSchema>;
 
-export default function NewRentalAgreementPage() {
+export default function NewAgreementPage() {
     const { user } = useAuth();
     const { units } = useUnits();
     const { tenants } = useTenants();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
 
-    const form = useForm<RentalAgreementFormValues>({
-        resolver: zodResolver(rentalAgreementSchema) as Resolver<RentalAgreementFormValues>,
+    const form = useForm<AgreementFormValues>({
+        resolver: zodResolver(AgreementSchema) as Resolver<AgreementFormValues>,
         defaultValues: {
             rentAmount: 0,
             unitId: "",
@@ -70,7 +70,7 @@ export default function NewRentalAgreementPage() {
         }
     };
 
-    const onSubmit: SubmitHandler<RentalAgreementFormValues> = async (data) => {
+    const onSubmit: SubmitHandler<AgreementFormValues> = async (data) => {
         setError(null);
         try {
             const payload = {
@@ -337,3 +337,4 @@ export default function NewRentalAgreementPage() {
         </div>
     );
 }
+

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, RentalAgreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow,
+import { AuthResponse, User, Property, Unit, Tenant, Agreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow,
     UtilityMeterRow,
     UtilityMeterDetail,
     MeterReadingRow,
@@ -746,7 +746,7 @@ export const financeApi = {
 
     updateInvoice: (id: string, data: {
         landlordId?: string;
-        rentalAgreementId?: string;
+        AgreementId?: string;
         issueDate?: string;
         dueDate?: string;
         currency?: string;
@@ -1713,7 +1713,7 @@ export const agreementsApi = {
 };
 
 export const moveOutsApi = {
-    create: (data: { rentalAgreementId: string; moveoutDate: string; notes?: string }) =>
+    create: (data: { AgreementId: string; moveoutDate: string; notes?: string }) =>
         api.post<MoveOutRequest>('/move-outs', data),
 
     findAll: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
@@ -1749,7 +1749,7 @@ export const moveOutsApi = {
 export const inspectionsApi = {
     create: (data: {
         unitId: string;
-        rentalAgreementId?: string;
+        AgreementId?: string;
         type: InspectionType;
         scheduledDate: string;
         notes?: string;
@@ -1821,7 +1821,7 @@ export const tenantRequestsApi = {
     myRequests: () => api.get<TenantRequest[]>('/portal/requests'),
     createRequest: (data: {
         type: TenantRequestType;
-        rentalAgreementId?: string;
+        AgreementId?: string;
         preferredDate?: string;
         note?: string;
         payload?: Record<string, unknown>;
@@ -3731,3 +3731,4 @@ export const reportsApi = {
         params?: { from?: string; to?: string },
     ) => buildUrl(`/reports/landlords/${id}/roi/export`, params),
 };
+

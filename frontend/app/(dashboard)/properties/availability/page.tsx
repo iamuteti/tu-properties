@@ -60,7 +60,7 @@ export default function PropertyAvailabilityPage() {
     }, [units]);
 
     const endingSoon = units.filter((unit) =>
-        (unit.rentalAgreements ?? []).some((agreement) => agreement.endDate),
+        (unit.Agreements ?? []).some((agreement) => agreement.endDate),
     ).length;
 
     return (
@@ -155,7 +155,7 @@ export default function PropertyAvailabilityPage() {
                             <CardContent>
                                 <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     {group.units.map((unit) => {
-                                        const ending = (unit.rentalAgreements ?? [])[0];
+                                        const ending = (unit.Agreements ?? [])[0];
                                         return (
                                             <li key={unit.id} className="rounded-lg border p-3 text-sm">
                                                 <div className="flex items-start justify-between gap-2">

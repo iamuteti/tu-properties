@@ -301,7 +301,7 @@ export default function PropertyDetailPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {units.map((unit) => {
-                                        const activeAgreement = unit.rentalAgreements?.[0];
+                                        const activeAgreement = unit.Agreements?.[0];
                                         return (
                                             <TableRow key={unit.id}>
                                                 <TableCell>

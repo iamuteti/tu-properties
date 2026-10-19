@@ -114,6 +114,10 @@ model Organization {
   currency String @default("KES")
   timezone String @default("Africa/Nairobi")
 
+  // The business shape of this organization — an agency managing property on
+  // behalf of landlords, or a single entity that directly owns its property.
+  organizationType OrganizationType @default(AGENCY)
+
   // Relationships
   users                      User[]
   properties                 Property[]
@@ -227,6 +231,13 @@ enum SubscriptionStatus {
   SUSPENDED
   /** The relationship has ended. Kept for history rather than deleted. */
   CANCELLED
+}
+
+enum OrganizationType {
+  /** Manages property on behalf of landlords / owners. */
+  AGENCY
+  /** Directly owns its property. */
+  OWNER
 }
 
 model Subscription {

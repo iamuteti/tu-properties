@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
-import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, User } from "lucide-react";
 import { useTenants } from "@/hooks/use-tenants";
 import { ExpandableTable, TableData } from "@/components/ui/expandable-table";
 import { Button } from "@/components/ui/button";
@@ -29,9 +30,12 @@ interface TenantTableData extends TableData {
     leaseId: string;
     agreementStartDate: string;
     agreementEndDate?: string;
+    postalAddress?: string;
+    country?: string;
+    photoUrl?: string;
+    emergencyContact?: string;
     rentAmount: number;
     rentBalance: number;
-    rentStatus: string;
     status: 'active' | 'inactive' | 'archived';
 }
 
@@ -42,6 +46,7 @@ const statusOptions = [
 ];
 
 export default function TenantsPage() {
+    const router = useRouter();
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [sortBy, setSortBy] = useState<string>("createdAt");
@@ -78,7 +83,7 @@ export default function TenantsPage() {
         sortBy,
         sortOrder,
         status: appliedFilters.status || undefined,
-        withDeposit: appliedFilters.withDeposit,
+        withDeposit: appliedFilters.withDeposit ? true : undefined,
     });
 
     const handlePaginationChange = useCallback((newPagination: { page: number; limit: number }) => {
@@ -120,11 +125,6 @@ export default function TenantsPage() {
         return <div className="text-destructive">Error: {error}</div>;
     }
 
-    const handleRowClick = (tenant: any) => {
-        console.log("Tenant clicked:", tenant);
-        // Could navigate to detail page or open a modal
-    };
-
     const handleRowSelect = (selectedRows: any[]) => {
         console.log("Selected rows:", selectedRows);
         // Handle bulk actions on selected rows
@@ -135,19 +135,23 @@ export default function TenantsPage() {
         {
             id: 'expander',
             header: () => null,
-            cell: ({ row }) => (
-                <button
-                    className="p-1 hover:bg-muted rounded transition-colors"
-                    onClick={() => row.toggleExpanded()}
-                    aria-label={row.getIsExpanded() ? 'Collapse row' : 'Expand row'}
-                >
-                    {row.getIsExpanded() ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                </button>
-            ),
+            cell: ({ row }) => {
+                const isExpanded = row.getIsExpanded();
+                return (
+                    <button
+                        title={isExpanded ? 'Collapse row' : 'Expand row'}
+                        onClick={() => row.toggleExpanded()}
+                        className="p-1 hover:bg-muted rounded transition-colors"
+                        aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
+                    >
+                        {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 rotate-180" />
+                        ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                        )}
+                    </button>
+                );
+            },
             enableSorting: false,
             enableHiding: false,
             size: 40,
@@ -183,14 +187,24 @@ export default function TenantsPage() {
         {
             accessorKey: 'tenantName',
             header: 'Name',
-            cell: ({ row }) => (
-                <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-foreground">{row.original.tenantName}</span>
-                    {row.original.phone && (
-                        <span className="text-xs text-muted-foreground">{row.original.phone}</span>
-                    )}
-                </div>
-            ),
+            cell: ({ row }) => {
+                const tenant = row.original;
+                return (
+                    <span
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/tenants/${tenant.id}`);
+                        }}
+                        title={`View ${tenant.tenantName}`}
+                        className="flex flex-col gap-0.5 w-full items-start cursor-pointer text-cyan-600 hover:bg-cyan-50 hover:underline hover:text-cyan-700 transition-all duration-200"
+                    >
+                        <span className="font-medium">{tenant.tenantName}</span>
+                        {tenant.phone && (
+                            <span className="text-xs text-muted-foreground">{tenant.phone}</span>
+                        )}
+                    </span>
+                );
+            },
             size: 180,
         },
         {
@@ -205,63 +219,149 @@ export default function TenantsPage() {
             size: 150,
         },
         {
-            accessorKey: 'agreementStartDate',
-            header: 'Start Date',
-            cell: ({ row }) => row.original.agreementStartDate ? new Date(row.original.agreementStartDate).toLocaleDateString('en-GB') : '-',
-            size: 120,
+            accessorKey: 'email',
+            header: 'Email',
+            cell: ({ row }) => row.original.email || '-',
+            size: 150,
         },
         {
             accessorKey: 'rentAmount',
             header: 'Monthly Rent',
-            cell: ({ row }) => row.original.rentAmount ? `KES ${row.original.rentAmount.toLocaleString()}` : '-',
-            size: 120,
-        },
-        {
-            accessorKey: 'rentBalance',
-            header: 'Balance',
             cell: ({ row }) => {
-                const balance = row.original.rentBalance;
                 const rentAmount = row.original.rentAmount;
-                let bgColor = 'bg-green-100 text-green-800';
-                let status = 'Paid';
-                if (balance === 0) {
-                    bgColor = 'bg-green-100 text-green-800';
-                    status = 'Paid';
-                } else if (balance < rentAmount / 3) {
-                    bgColor = 'bg-yellow-100 text-yellow-800';
-                    status = 'Partial';
+                const rentBalance = row.original.rentBalance;
+                const paidPct = rentAmount > 0 ? Math.max(0, Math.min(((rentAmount - rentBalance) / rentAmount) * 100, 100)) : 0;
+                let barColor = 'bg-green-500';
+                let label = 'Paid';
+                let barWidth = 100;
+                if (rentBalance === 0) {
+                    barColor = 'bg-green-500';
+                    label = 'Paid';
+                    barWidth = 100;
+                } else if (paidPct >= 33) {
+                    barColor = 'bg-yellow-500';
+                    label = 'Partial';
+                    barWidth = paidPct;
                 } else {
-                    bgColor = 'bg-red-100 text-red-800';
-                    status = 'Overdue';
+                    barColor = 'bg-red-500';
+                    label = 'Overdue';
+                    barWidth = 100;
                 }
                 return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${bgColor}`}>
-                        {status} - KES {balance.toLocaleString()}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                        <span className="font-medium text-foreground">
+                            {rentAmount ? `KES ${rentAmount.toLocaleString()}` : '-'}
+                        </span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                                className={`h-1.5 rounded-full transition-all duration-300 ${barColor}`}
+                                style={{ width: `${barWidth}%` }}
+                            />
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            {label} - KES {rentBalance.toLocaleString()}
+                        </span>
+                    </div>
                 );
             },
+            size: 140,
+        },
+        {
+            accessorKey: 'agreementStartDate',
+            header: 'Start Date',
+            cell: ({ row }) => row.original.agreementStartDate ? new Date(row.original.agreementStartDate).toLocaleDateString('en-GB') : '-',
             size: 120,
         },
     ];
 
     // Custom expanded row component for tenants
     const TenantExpandedDetails = ({ row }: { row: TenantTableData }) => {
+        const daysToExpire = row.agreementEndDate
+            ? Math.ceil((new Date(row.agreementEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+            : 0;
+        const leasePeriod = row.agreementEndDate && row.agreementStartDate
+            ? Math.max(1, Math.round((new Date(row.agreementEndDate).getTime() - new Date(row.agreementStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)))
+            : 0;
+
         return (
-            <div className="bg-muted p-4 border-l-4 border-cyan-500 ml-4">
-                <div className="grid grid-cols-3 gap-4">
-                    <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Tax PIN</p>
-                        <p className="text-sm font-medium text-foreground">{row.taxPin || 'N/A'}</p>
+            <div className="bg-muted p-4 border-l-4 border-cyan-500 ml-4 rounded-lg">
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                    {/* Photo */}
+                    <div className="flex flex-col items-center shrink-0">
+                        {row.photoUrl ? (
+                            <img
+                                src={row.photoUrl}
+                                alt="Tenant"
+                                className="w-28 h-28 rounded-full object-cover border-2 border-cyan-500 shadow-md"
+                            />
+                        ) : (
+                            <div className="w-28 h-28 rounded-full bg-gray-300 flex items-center justify-center shadow-md">
+                                <User className="h-14 w-14 text-gray-500" />
+                            </div>
+                        )}
                     </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Tenant Type</p>
-                        <p className="text-sm font-medium text-foreground">{row.agreementType || 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Town</p>
-                        <p className="text-sm font-medium text-foreground">{row.tenancyType || 'N/A'}</p>
+
+                    {/* Details */}
+                    <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-3">
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">ID/REG Number</p>
+                            <p className="text-sm text-foreground">{row.idNoRegNo || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Tax PIN Number</p>
+                            <p className="text-sm text-foreground">{row.taxPin || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Agreement Type</p>
+                            <p className="text-sm text-foreground">{row.agreementType || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Tenancy Type</p>
+                            <p className="text-sm text-foreground">{row.tenancyType || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Postal Address</p>
+                            <p className="text-sm text-foreground">{row.postalAddress || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Country/Town</p>
+                            <p className="text-sm text-foreground">{row.country || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Email Address</p>
+                            <p className="text-sm text-foreground">{row.email || 'N/A'}</p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Emergency Contact</p>
+                            <p className="text-sm text-foreground">{row.emergencyContact || 'N/A'}</p>
+                        </div>
                     </div>
                 </div>
+
+                {row.agreementType === 'LEASE' && (
+                    <div className="mt-5 bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs font-semibold text-cyan-700 bg-cyan-100 px-2 py-1 rounded">Lease Dates & Term</span>
+                            <span className="text-sm text-foreground">
+                                {row.agreementStartDate ? new Date(row.agreementStartDate).toLocaleDateString('en-GB') : '-'} - {row.agreementEndDate ? new Date(row.agreementEndDate).toLocaleDateString('en-GB') : '-'}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Lease Period</p>
+                                <p className="text-sm text-foreground">{leasePeriod}Yr(s)</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Days To Expire</p>
+                                <p className="text-sm text-foreground">{daysToExpire}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Lease Variation Type</p>
+                                <p className="text-sm text-foreground">Revision</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -295,27 +395,29 @@ export default function TenantsPage() {
                     tenantId: tenant.id,
                     tenantName: `${tenant.surname} ${tenant.otherNames || ''}`.trim(),
                     tenantCode: tenant.code,
-                    unitName: tenant.rentalAgreement?.unit?.name || '',
-                    unitId: tenant.rentalAgreement?.unitId || '',
-                    propertyName: tenant.rentalAgreement?.unit?.property?.name || '',
-                    propertyId: tenant.rentalAgreement?.unit?.propertyId || '',
+                    unitName: tenant.agreement?.unit?.name || '',
+                    unitId: tenant.agreement?.unitId || '',
+                    propertyName: tenant.agreement?.unit?.property?.name || '',
+                    propertyId: tenant.agreement?.unit?.propertyId || '',
                     idNoRegNo: tenant.idNoRegNo,
                     taxPin: tenant.taxPin,
-                    agreementType: tenant.rentalAgreement?.agreementType,
-                    tenancyType: tenant.town,
+                    agreementType: tenant.agreement?.agreementType,
+                    tenancyType: tenant.tenantType,
                     phone: tenant.phone,
                     email: tenant.email,
-                    leaseId: tenant.rentalAgreement?.id || '',
-                    agreementStartDate: tenant.rentalAgreement?.startDate || '',
-                    agreementEndDate: tenant.rentalAgreement?.endDate || '',
-                    rentAmount: tenant.rentalAgreement?.rentAmount ? Number(tenant.rentalAgreement.rentAmount) : 0,
-                    rentBalance: tenant.lastPaidInvoice ? Number(tenant.lastPaidInvoice.balanceAmount) : (tenant.rentalAgreement?.rentAmount ? Number(tenant.rentalAgreement.rentAmount) : 0),
-                    rentStatus: '',
+                    leaseId: tenant.agreement?.id || '',
+                    agreementStartDate: tenant.agreement?.startDate || '',
+                    agreementEndDate: tenant.agreement?.endDate || '',
+                    postalAddress: tenant.postalAddress,
+                    country: tenant.country,
+                    photoUrl: tenant.photoUrl,
+                    emergencyContact: tenant.emergencyContacts?.[0]?.contactName || tenant.emergencyContacts?.[0]?.phone || '',
+                    rentAmount: tenant.agreement?.rentAmount ? Number(tenant.agreement.rentAmount) : 0,
+                    rentBalance: tenant.agreement?.invoices?.reduce((sum, inv) => sum + Number(inv.balanceAmount || 0), 0) ?? 0,
                     status: tenant?.status === 'ACTIVE' ? 'active' : tenant.status === 'INACTIVE' ? 'inactive' : 'archived' as 'active' | 'inactive' | 'archived'
                 }))}
                 columns={tenantColumns}
                 expandedRowComponent={TenantExpandedDetails}
-                onRowClick={handleRowClick}
                 onRowSelect={handleRowSelect}
                 pagination={{ pageIndex: page - 1, pageSize: limit }}
                 serverSidePagination={true}

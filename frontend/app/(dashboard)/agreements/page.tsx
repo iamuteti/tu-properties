@@ -22,7 +22,7 @@ import type { Lease } from "@/types";
  * second list for the same data with a dead row click) and the bare table that
  * used to sit here with a non-functional "…" button.
  */
-export default function RentalAgreementsPage() {
+export default function AgreementsPage() {
     const router = useRouter();
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);

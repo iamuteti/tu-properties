@@ -1471,11 +1471,11 @@ export const CONTRACT_TYPES = [
  * `null` means none is required, which is `COMPLIANCE`'s whole peculiarity.
  */
 export const CONTRACT_ENTITY_FOR_TYPE: Record<string, {
-  field: 'rentalAgreementId' | 'saleTransactionId' | 'supplierId' | 'landlordId';
+  field: 'AgreementId' | 'saleTransactionId' | 'supplierId' | 'landlordId';
   label: string;
   picker: 'lease' | 'sale' | 'supplier' | 'landlord';
 } | null> = {
-  LEASE: { field: 'rentalAgreementId', label: 'Agreement', picker: 'lease' },
+  LEASE: { field: 'AgreementId', label: 'Agreement', picker: 'lease' },
   SALE: { field: 'saleTransactionId', label: 'Sale', picker: 'sale' },
   VENDOR: { field: 'supplierId', label: 'Supplier', picker: 'supplier' },
   MANAGEMENT: { field: 'landlordId', label: 'Landlord', picker: 'landlord' },

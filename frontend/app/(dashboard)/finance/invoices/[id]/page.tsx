@@ -135,8 +135,8 @@ export default function InvoiceDetailPage() {
 
     const currency = invoice.currency || "KES";
     const fmt = (n: number | string | undefined) => Number(n ?? 0).toFixed(2);
-    const tenant = invoice.rentalAgreement?.tenant;
-    const unit = invoice.rentalAgreement?.unit;
+    const tenant = invoice.Agreement?.tenant;
+    const unit = invoice.Agreement?.unit;
     const payments = invoice.payments || [];
 
     return (
@@ -322,3 +322,4 @@ export default function InvoiceDetailPage() {
         </div>
     );
 }
+

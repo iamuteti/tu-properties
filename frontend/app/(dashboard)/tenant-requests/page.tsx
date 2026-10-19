@@ -168,17 +168,17 @@ export default function TenantRequestsPage() {
                                                     : "Unknown tenant"}{" "}
                                                 ·{" "}
                                                 {request.tenant?.accountNumber}
-                                                {request.rentalAgreement && (
+                                                {request.Agreement && (
                                                     <>
                                                         {" · "}
                                                         <Link
-                                                            href={`/agreements/${request.rentalAgreement.id}`}
+                                                            href={`/agreements/${request.Agreement.id}`}
                                                             className="hover:underline"
                                                         >
-                                                            {request.rentalAgreement.code}
+                                                            {request.Agreement.code}
                                                         </Link>
-                                                        {request.rentalAgreement.unit && (
-                                                            <> ({request.rentalAgreement.unit.name})</>
+                                                        {request.Agreement.unit && (
+                                                            <> ({request.Agreement.unit.name})</>
                                                         )}
                                                     </>
                                                 )}

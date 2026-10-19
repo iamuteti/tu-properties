@@ -36,7 +36,7 @@ const columns: ColumnDef<Invoice>[] = [
   {
     accessorKey: "customer",
     header: "Customer",
-      cell: ({ row }) => row.original.rentalAgreement?.tenant?.surname || "Unknown",
+      cell: ({ row }) => row.original.Agreement?.tenant?.surname || "Unknown",
   },
   {
     accessorKey: "memo",
@@ -156,7 +156,7 @@ export default function InvoicesPage() {
 
       // Customer filter
       if (filters.customer) {
-        const customerName = (invoice.rentalAgreement?.tenant?.surname || '') + ' ' + (invoice.rentalAgreement?.tenant?.otherNames || '');
+        const customerName = (invoice.Agreement?.tenant?.surname || '') + ' ' + (invoice.Agreement?.tenant?.otherNames || '');
         if (!customerName.toLowerCase().includes(filters.customer.toLowerCase())) return false;
       }
 
@@ -172,9 +172,9 @@ export default function InvoicesPage() {
   // Get unique customers and transaction classes for filters
   const uniqueCustomers = Array.from(new Set(
     allInvoices
-      .map(inv => inv.rentalAgreement?.tenant?.surname && inv.rentalAgreement?.tenant?.otherNames 
-        ? `${inv.rentalAgreement.tenant.surname} ${inv.rentalAgreement.tenant.otherNames}` 
-        : inv.rentalAgreement?.tenant?.surname || '')
+      .map(inv => inv.Agreement?.tenant?.surname && inv.Agreement?.tenant?.otherNames 
+        ? `${inv.Agreement.tenant.surname} ${inv.Agreement.tenant.otherNames}` 
+        : inv.Agreement?.tenant?.surname || '')
       .filter(Boolean)
   )).sort()
 
@@ -267,7 +267,7 @@ export default function InvoicesPage() {
         searchPlaceholder="Search invoices..."
         searchColumns={[
           { id: "invoiceNumber", label: "Invoice Number" },
-          { id: "customer", label: "Customer", accessor: (row: Invoice) => row.rentalAgreement?.tenant?.surname || "" },
+          { id: "customer", label: "Customer", accessor: (row: Invoice) => row.Agreement?.tenant?.surname || "" },
           { id: "status", label: "Status" },
         ]}
         emptyMessage="No invoices found. Create your first invoice to get started."
@@ -281,3 +281,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+

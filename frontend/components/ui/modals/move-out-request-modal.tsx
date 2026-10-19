@@ -18,7 +18,7 @@ import { toast } from "sonner";
 const moveOutRequestSchema = z.object({
   propertyId: z.string().min(1, "Please select a property"),
   tenantId: z.string().min(1, "Please select a tenant"),
-  rentalAgreementId: z.string().min(1, "Please select a rental agreement"),
+  AgreementId: z.string().min(1, "Please select a rental agreement"),
   moveoutDate: z.string().min(1, "Please select a move-out date"),
   notes: z.string().optional(),
 });
@@ -57,7 +57,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
     defaultValues: {
       propertyId: "",
       tenantId: "",
-      rentalAgreementId: "",
+      AgreementId: "",
       moveoutDate: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
       notes: "",
     },
@@ -71,7 +71,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
   const [allTenants, setAllTenants] = useState<any[]>([]);
   const [tenantsLoading, setTenantsLoading] = useState(false);
   const [filteredTenants, setFilteredTenants] = useState<any[]>([]);
-  const [rentalAgreements, setRentalAgreements] = useState<any[]>([]);
+  const [Agreements, setAgreements] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Handle tenant data changes from the fetcher component
@@ -84,23 +84,23 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
   useEffect(() => {
     setFilteredTenants(allTenants);
     setValue("tenantId", "");
-    setRentalAgreements([]);
+    setAgreements([]);
   }, [allTenants, setValue]);
 
   // Update rental agreements when tenant changes
   useEffect(() => {
     if (watchedTenantId) {
       const tenant = filteredTenants.find(t => t.id === watchedTenantId);
-      if (tenant?.rentalAgreement) {
-        setRentalAgreements([tenant.rentalAgreement]);
-        setValue("rentalAgreementId", tenant.rentalAgreement.id);
+      if (tenant?.Agreement) {
+        setAgreements([tenant.Agreement]);
+        setValue("AgreementId", tenant.Agreement.id);
       } else {
-        setRentalAgreements([]);
-        setValue("rentalAgreementId", "");
+        setAgreements([]);
+        setValue("AgreementId", "");
       }
     } else {
-      setRentalAgreements([]);
-      setValue("rentalAgreementId", "");
+      setAgreements([]);
+      setValue("AgreementId", "");
     }
   }, [watchedTenantId, filteredTenants, setValue]);
 
@@ -110,12 +110,12 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
       reset({
         propertyId: "",
         tenantId: "",
-        rentalAgreementId: "",
+        AgreementId: "",
         moveoutDate: new Date().toISOString().split('T')[0],
         notes: "",
       });
       setFilteredTenants([]);
-      setRentalAgreements([]);
+      setAgreements([]);
     }
   }, [isOpen, reset]);
 
@@ -146,7 +146,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
     label: `${tenant.surname} ${tenant.otherNames || ''} (${tenant.code})`.trim(),
   }));
 
-  const rentalAgreementOptions = rentalAgreements.map(agreement => ({
+  const AgreementOptions = Agreements.map(agreement => ({
     value: agreement.id,
     label: `${agreement.unit?.name || 'Unknown Unit'} - ${agreement.agreementType} (${new Date(agreement.startDate).toLocaleDateString()})`,
   }));
@@ -201,15 +201,15 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
             Rental Agreement *
           </label>
           <Select
-            {...register("rentalAgreementId")}
-            value={watch("rentalAgreementId")}
-            options={rentalAgreementOptions}
+            {...register("AgreementId")}
+            value={watch("AgreementId")}
+            options={AgreementOptions}
             placeholder="Select a rental agreement"
             disabled={!watchedTenantId}
-            onChange={(e) => setValue("rentalAgreementId", e.target.value)}
+            onChange={(e) => setValue("AgreementId", e.target.value)}
           />
-          {errors.rentalAgreementId && (
-            <p className="mt-1 text-sm text-red-600">{errors.rentalAgreementId.message}</p>
+          {errors.AgreementId && (
+            <p className="mt-1 text-sm text-red-600">{errors.AgreementId.message}</p>
           )}
         </div>
 

@@ -46,6 +46,12 @@ export class OnboardOrganizationDto {
 
   /** The plan this org *starts* on. Only the handful of real tiers, not free text. */
   @IsOptional()
+  @IsString()
+  @IsIn(['AGENCY', 'OWNER'])
+  organizationType?: 'AGENCY' | 'OWNER';
+
+  /** The plan this org *starts* on. Only the handful of real tiers, not free text. */
+  @IsOptional()
   @IsIn(['STARTER', 'PROFESSIONAL', 'ENTERPRISE'])
   plan?: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 

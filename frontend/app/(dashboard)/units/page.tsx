@@ -157,7 +157,7 @@ export default function UnitsPage() {
                                     label: "Delete unit",
                                     icon: <Trash2 className="h-4 w-4" aria-hidden="true" />,
                                     variant: "danger",
-                                    disabled: (row.original.rentalAgreements?.length ?? 0) > 0,
+                                    disabled: (row.original.Agreements?.length ?? 0) > 0,
                                     disabledReason: "This unit has rental agreements — terminate them first.",
                                     onSelect: handleDelete,
                                 },

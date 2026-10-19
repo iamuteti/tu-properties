@@ -179,7 +179,7 @@ export default function PaymentDetailPage() {
                 </Card>
             </div>
 
-            {payment.rentalAgreement && (
+            {payment.Agreement && (
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Lease</CardTitle>
@@ -196,13 +196,13 @@ export default function PaymentDetailPage() {
                             <TableBody>
                                 <TableRow>
                                     <TableCell className="font-mono">
-                                        {payment.rentalAgreement.id.slice(-8)}
+                                        {payment.Agreement.id.slice(-8)}
                                     </TableCell>
                                     <TableCell>
-                                        {payment.rentalAgreement.unit?.name ?? "—"}
+                                        {payment.Agreement.unit?.name ?? "—"}
                                     </TableCell>
                                     <TableCell>
-                                        {money(payment.rentalAgreement.rentAmount)}
+                                        {money(payment.Agreement.rentAmount)}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
@@ -213,3 +213,4 @@ export default function PaymentDetailPage() {
         </div>
     );
 }
+
