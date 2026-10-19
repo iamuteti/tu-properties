@@ -1637,7 +1637,12 @@ export class UtilitiesService {
    * Typed as a structural minimum rather than a full Prisma payload so both call sites
    * (the charge ledger and the billing run) can pass what they happen to have loaded.
    */
-  private async priceStoredCharge(
+  /**
+   * Price a stored charge from its two readings and snapshotted rate.
+   * Public so the recurring-billing runner can append utility lines to a rent
+   * invoice when a property bundles metered utilities with rent.
+   */
+  async priceStoredCharge(
     tenantId: string,
     charge: {
       fromReadingId: string;

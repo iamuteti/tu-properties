@@ -25,6 +25,7 @@
     "db:seed": "prisma db seed",
     "db:seed:demo": "ts-node -r tsconfig-paths/register src/prisma/demo-data.ts",
     "db:seed:jedan": "ts-node -r tsconfig-paths/register src/prisma/jedan-apartments-seed.ts",
+    "db:reset:demo": "npm run db:drop && npm run db:create && npm run db:migrate && npm run db:seed && npm run db:seed:demo",
     "smtp:sink": "ts-node -r tsconfig-paths/register scripts/smtp-sink.ts"
   },
   "dependencies": {

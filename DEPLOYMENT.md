@@ -2,7 +2,9 @@
 
 > **AGENT RESUME CHECKPOINT** — If you're resuming a session (context maxed, session expired, etc.), read this file top to bottom. It contains everything needed to continue without rediscovery.
 >
-> **Current Status**: tu-properties is a NestJS 11 + Prisma 7 + PostgreSQL backend (port 3003) and Next.js 16 frontend (port 3002). Real Estate Property Management SaaS. Prisma schema at `backend/src/prisma/schema.prisma`. Deployments are manual via PM2 + nginx; CI runs typecheck, tests, and builds on push to `main`.
+> **Current Status** (2026-10-19): tu-properties is a NestJS 11 + Prisma 7 + PostgreSQL backend (port 3003) and Next.js 16 frontend (port 3002). Real Estate Property Management SaaS. Prisma schema at `backend/src/prisma/schema.prisma`. Deployments are manual via PM2 + nginx; CI runs typecheck, tests, and builds on push to `main`.
+>
+> **Key Files to Re-read**: `AGENTS.md` (project commands & layout), `docs/00-MASTER-ARCHITECTURE.md` (architecture & design decisions), `backend/.env.example`, `frontend/.env.example`.
 
 ---
 
@@ -34,7 +36,7 @@ npm run dev                   # http://localhost:3002
 
 ## Running the Project
 
-### Backend Scripts (run from `backend/`)
+### Backend Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -50,8 +52,10 @@ npm run dev                   # http://localhost:3002
 | `npm run db:migrate:undo:all` | `prisma migrate reset --force` |
 | `npm run db:seed` | `prisma db seed` (`src/prisma/seed.ts`) |
 | `npm run db:seed:demo` | Demo data (`src/prisma/demo-data.ts`) |
+| `npm run db:seed:jedan` | Jedan Apartments immersive seed (`src/prisma/jedan-apartments-seed.ts`) |
+| `npm run db:reset:demo` | Drop → create → migrate → seed → demo data (full reset) |
 
-### Frontend Scripts (run from `frontend/`)
+### Frontend Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -60,7 +64,7 @@ npm run dev                   # http://localhost:3002
 | `npm run start` | `next start` (serve production build) |
 | `npm run lint` | eslint |
 
-### Database Scripts (Backend)
+### Database Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -69,6 +73,8 @@ npm run dev                   # http://localhost:3002
 | `npm run db:migrate:undo:all` | Revert all migrations |
 | `npm run db:seed` | Run `prisma db seed` |
 | `npm run db:seed:demo` | Demo dataset only |
+| `npm run db:seed:jedan` | Jedan Apartments immersive dataset only |
+| `npm run db:reset:demo` | Full reset: drop → create → migrate → seed → demo |
 | `npx prisma generate` | Regenerate Prisma client |
 
 ---
@@ -150,6 +156,14 @@ npm test
    - Token expiry: check auth cookie / localStorage handling in `frontend/lib/api.ts`.
    - Frontend env vars are baked in at build time — change them, then rebuild.
 
+### E2E Debugging
+
+```bash
+cd backend
+# Run single e2e spec
+npx jest --config ./test/jest-e2e.json test/<module>.e2e-spec.ts
+```
+
 ---
 
 ## Key Conventions (Must Follow)
@@ -229,8 +243,11 @@ npm test -- --run
 ### Database Operations
 
 ```bash
-# Fresh DB with seed data
+# Full reset: drop DB, create it fresh, run migrations, then seed + demo data
 cd backend
+npm run db:reset:demo
+
+# Or step by step
 npm run db:migrate:undo:all && npm run db:migrate && npm run db:seed
 
 # Demo data only
@@ -250,8 +267,8 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 
 ### Backend (`backend/.env`)
 
-| Variable | Example / Default | Required | Notes |
-|----------|-------------------|----------|-------|
+| Variable | Default | Required | Notes |
+|----------|---------|----------|-------|
 | `PORT` | `3003` | No | Single source of truth; nginx proxies to this |
 | `NODE_ENV` | `development` | No | `production` disables dev-only behaviour |
 | `FRONTEND_URL` | `https://app.tu-properties.co.ke` | Yes | Exact production origin; used by the frontend / nginx proxying |
@@ -277,7 +294,7 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 
 ### Frontend (`frontend/.env` / `.env.local`)
 
-| Variable | Example | Notes |
+| Variable | Default | Notes |
 |----------|---------|-------|
 | `PORT` | `3002` | Read for `dev`/`build`/`start` |
 | `NEXT_PUBLIC_BACKEND_URL` | `https://api.tu-properties.co.ke` | Backend base URL; baked at build time |
@@ -316,12 +333,11 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Project commands, layout, typecheck/lint/test commands |
-| `ARCHITECTURE.md` (docs/00-MASTER-ARCHITECTURE.md) | Architecture & design decisions |
-| `DEVELOPMENT.md` | Development guide (if present) |
+| `docs/00-MASTER-ARCHITECTURE.md` | Architecture & design decisions |
 | `DEPLOYMENT.md` | **You are here** — deployment guide |
 | `docs/01-...` through `docs/20-...` | Module specs and database schema (20 module docs) |
-| `TESTING.md` | Testing approach |
-| `DEMO_DATA.md` | Demo data |
+| `TESTING.md` | Testing approach (if present) |
+| `DEMO_DATA.md` | Demo data (if present) |
 
 ---
 
@@ -396,32 +412,35 @@ Write `backend/.env` and `frontend/.env` with production values (see Environment
 
 ### 4. Create `ecosystem.config.js` (does not exist yet)
 
-`nano backend/ecosystem.config.js`:
+`nano ecosystem.config.js` (repo root):
 
 ```js
 module.exports = {
   apps: [
     {
-      name: 'tu-properties-api-prod',
-      cwd: '/var/www/tu-properties/backend',
+      name: 'properties-api-prod',
+      cwd: './backend',
       script: 'dist/main.js',
       instances: 1,
       autorestart: true,
       exec_mode: 'fork',
       max_memory_restart: '1G',
-      env: { NODE_ENV: 'production', PORT: 3003 },
+      env: {
+        NODE_ENV: 'production',
+      },
     },
     {
-      name: 'tu-properties-front-prod',
-      cwd: '/var/www/tu-properties/frontend',
-      script: 'node_modules/.bin/next',
-      args: 'start -p 3002',
-      interpreter: 'node',
+      name: 'properties-front-prod',
+      cwd: './frontend',
+      script: 'npm',
+      args: 'run start',
       instances: 1,
       autorestart: true,
       exec_mode: 'fork',
       max_memory_restart: '1G',
-      env: { NODE_ENV: 'production', PORT: 3002 },
+      env: {
+        NODE_ENV: 'production',
+      },
     },
   ],
 }
@@ -447,13 +466,13 @@ pm2 save
 Bootstrap (HTTP, before certs):
 
 ```bash
-sudo nano /etc/nginx/sites-available/tu-properties
+sudo nano /etc/nginx/sites-available/properties.tuhame.co.ke.conf
 ```
 
 ```nginx
 server {
     listen 80;
-    server_name app.tu-properties.co.ke www.app.tu-properties.co.ke;
+    server_name properties.tuhame.co.ke www.properties.tuhame.co.ke;
     location / {
         proxy_pass http://127.0.0.1:3002;
         proxy_http_version 1.1;
@@ -469,7 +488,7 @@ server {
 
 server {
     listen 80;
-    server_name api.tu-properties.co.ke;
+    server_name api-properties.tuhame.co.ke;
     client_max_body_size 25M;
     location / {
         proxy_pass http://127.0.0.1:3003;
@@ -487,9 +506,9 @@ server {
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/tu-properties /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/properties.tuhame.co.ke.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d app.tu-properties.co.ke -d www.app.tu-properties.co.ke -d api.tu-properties.co.ke
+sudo certbot --nginx -d properties.tuhame.co.ke -d www.properties.tuhame.co.ke -d api-properties.tuhame.co.ke
 ```
 
 Then replace with full HTTPS config (redirect 80→443, ssl_certificate paths from certbot, gzip, `/_next/static/` caching, 25M body limit). Enforce HTTPS — `CORS_ORIGINS` must list exact `https://` origins and CORS compares exact origins.
@@ -523,8 +542,8 @@ PostgreSQL (5432) stays on localhost — never expose publicly.
 
 ### 9. Post-Deploy Verification Checklist
 
-- [ ] `https://api.tu-properties.co.ke/` responds through nginx
-- [ ] `https://app.tu-properties.co.ke` loads and API calls succeed (no CORS errors)
+- [ ] `https://api-properties.tuhame.co.ke/` responds through nginx
+- [ ] `https://properties.tuhame.co.ke` loads and API calls succeed (no CORS errors)
 - [ ] Login / signup works; email arrives if SMTP configured
 - [ ] Create a property/unit/lease through the app
 - [ ] Upload a document — confirms storage driver (`uploads/` or S3/MinIO)

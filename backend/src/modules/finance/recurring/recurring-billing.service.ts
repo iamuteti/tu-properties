@@ -1,8 +1,14 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { AgreementStatus, Prisma, RecurringRunStatus } from '@prisma/client';
+import {
+  AgreementStatus,
+  Prisma,
+  RecurringRunStatus,
+  UtilityChargeStatus,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { InvoicesService } from '../invoices/invoices.service';
+import { UtilitiesService } from '@/modules/utilities/utilities.service';
 import { round2 } from '../invoice-allocation';
 
 /** "2026-10" for a date — the unit a billing period is identified by. */
@@ -27,8 +33,10 @@ interface LeaseToBill {
     otherNames: string | null;
   } | null;
   unit?: {
+    id: string;
+    code: string | null;
     name: string | null;
-    property?: { name: string } | null;
+    property?: { name: string; bundleUtilitiesWithRent: boolean } | null;
     serviceCharges?: {
       serviceUtilityAmenity: string;
       totalCost: Prisma.Decimal;
@@ -59,6 +67,7 @@ export class RecurringBillingService {
   constructor(
     private prisma: PrismaService,
     private invoicesService: InvoicesService,
+    private utilitiesService: UtilitiesService,
   ) {}
 
   /**
@@ -136,7 +145,11 @@ export class RecurringBillingService {
       }
 
       try {
-        const outcome = await this.billLease(lease, billingDate, billingPeriod);
+        const outcome = await this.billAgreement(
+          lease,
+          billingDate,
+          billingPeriod,
+        );
         details[lease.id] = outcome.created
           ? `invoiced ${outcome.invoiceNumber}`
           : 'skipped: already billed for this period';
@@ -206,8 +219,10 @@ export class RecurringBillingService {
         tenant: { select: { surname: true, otherNames: true } },
         unit: {
           select: {
+            id: true,
+            code: true,
             name: true,
-            property: { select: { name: true } },
+            property: { select: { name: true, bundleUtilitiesWithRent: true } },
             serviceCharges: {
               select: { serviceUtilityAmenity: true, totalCost: true },
             },
@@ -245,15 +260,21 @@ export class RecurringBillingService {
     return null;
   }
 
-  /** Build and post one lease's invoice for the period. */
-  private async billLease(
+  /** Build and post one agreement's invoice for the period. */
+  private async billAgreement(
     lease: LeaseToBill,
     billingDate: Date,
     billingPeriod: string,
   ): Promise<{ created: boolean; invoiceNumber: string }> {
     const rent = round2(this.rentFor(lease, billingDate));
 
-    const invoiceItems = [
+    const invoiceItems: Array<{
+      particular: string;
+      revenueExpenseItem: string;
+      qty: number;
+      unitCost: number;
+      lineTotal: number;
+    }> = [
       {
         particular: `Rent — ${billingPeriod}`,
         revenueExpenseItem: 'residential_rent',
@@ -271,6 +292,59 @@ export class RecurringBillingService {
           lineTotal: round2(Number(charge.totalCost)),
         })),
     ];
+
+    const utilityChargeIds: string[] = [];
+
+    // When the property bundles metered utilities onto the rent invoice, price
+    // each pending utility charge for this agreement's unit and period and append
+    // it as a line on this same document. A single combined invoice is created, so
+    // the `(agreementId, billingPeriod)` uniqueness guard is never violated: there
+    // is one rent invoice per period, utility lines ride on it, and the charges are
+    // marked INVOICED against it rather than raised as separate UTILITY invoices.
+    if (lease.unit?.property?.bundleUtilitiesWithRent && lease.unit?.id) {
+      const charges = await this.prisma.utilityCharge.findMany({
+        where: {
+          organizationId: lease.organizationId ?? undefined,
+          agreementId: lease.id,
+          unitId: lease.unit.id,
+          billingPeriod,
+          status: UtilityChargeStatus.PENDING,
+        },
+        include: {
+          meter: { select: { type: true, meterNumber: true } },
+          unit: { select: { code: true, name: true } },
+        },
+        orderBy: [{ meter: { type: 'asc' } }],
+      });
+
+      for (const charge of charges) {
+        const priced = await this.utilitiesService.priceStoredCharge(
+          lease.organizationId!,
+          {
+            fromReadingId: charge.fromReadingId,
+            toReadingId: charge.toReadingId,
+            meterId: charge.meterId,
+            ratePerUnit: charge.ratePerUnit,
+            currency: charge.currency,
+            vatRate: charge.vatRate,
+            allocationShare: charge.allocationShare,
+            incomeAccount: charge.incomeAccount ?? undefined,
+            revenueExpenseItem: charge.revenueExpenseItem ?? undefined,
+          },
+        );
+
+        const unitLabel = charge.unit ? `${charge.unit.code} units` : 'units';
+        invoiceItems.push({
+          particular: `${charge.meter.type} consumption - ${priced.billableConsumption ?? priced.meterConsumption} ${unitLabel} at ${Number(charge.ratePerUnit)} ${charge.currency}`,
+          revenueExpenseItem: charge.revenueExpenseItem ?? 'utility',
+          qty: priced.billableConsumption ?? priced.meterConsumption ?? 0,
+          unitCost: round2(Number(charge.ratePerUnit)),
+          lineTotal: round2(priced.consumptionAmount ?? priced.subtotal ?? 0),
+        });
+
+        utilityChargeIds.push(charge.id);
+      }
+    }
 
     const subtotal = round2(
       invoiceItems.reduce((sum, item) => sum + item.lineTotal, 0),
@@ -298,6 +372,18 @@ export class RecurringBillingService {
       },
       lease.organizationId ?? undefined,
     );
+
+    // Mark the bundled utility charges INVOICED against this combined document so
+    // they are not re-priced or re-billed by the standalone utility billing run.
+    if (utilityChargeIds.length > 0) {
+      await this.prisma.utilityCharge.updateMany({
+        where: { id: { in: utilityChargeIds } },
+        data: {
+          status: UtilityChargeStatus.INVOICED,
+          invoiceId: invoice.id,
+        },
+      });
+    }
 
     return { created: true, invoiceNumber: invoice.invoiceNumber };
   }

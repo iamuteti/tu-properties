@@ -12,6 +12,13 @@ import {
   UnitStatus,
   AgreementStatus,
   AgreementType,
+  UtilityType,
+  MeterScope,
+  MeterStatus,
+  MeterReadingSource,
+  UtilityChargeStatus,
+  UtilityBillingMode,
+  VacancyPolicy,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -141,66 +148,12 @@ const KE_LAST_NAMES = [
 ];
 
 const KENYAN_PHONE_PREFIXES = [
-  '700',
-  '701',
-  '702',
-  '703',
-  '704',
-  '705',
-  '706',
-  '707',
-  '708',
-  '709',
-  '710',
-  '711',
-  '712',
-  '713',
-  '714',
-  '715',
-  '716',
-  '717',
-  '718',
-  '719',
-  '720',
-  '721',
-  '722',
-  '723',
-  '724',
-  '725',
-  '726',
-  '727',
-  '728',
-  '729',
-  '740',
-  '741',
-  '742',
-  '743',
-  '744',
-  '745',
-  '746',
-  '747',
-  '748',
-  '749',
-  '750',
-  '751',
-  '752',
-  '753',
-  '754',
-  '755',
-  '756',
-  '757',
-  '758',
-  '759',
-  '790',
-  '791',
-  '792',
-  '793',
-  '794',
-  '795',
-  '796',
-  '797',
-  '798',
-  '799',
+  '700', '701', '702', '703', '704', '705', '706', '707', '708', '709',
+  '710', '711', '712', '713', '714', '715', '716', '717', '718', '719',
+  '720', '721', '722', '723', '724', '725', '726', '727', '728', '729',
+  '740', '741', '742', '743', '744', '745', '746', '747', '748', '749',
+  '750', '751', '752', '753', '754', '755', '756', '757', '758', '759',
+  '790', '791', '792', '793', '794', '795', '796', '797', '798', '799',
 ];
 
 const r = (n: number) => Math.floor(Math.random() * n);
@@ -397,6 +350,18 @@ async function main() {
       where: { organizationId: orgId },
     });
     await prisma.tenant.deleteMany({ where: { organizationId: orgId } });
+    await prisma.utilityCharge.deleteMany({
+      where: { organizationId: orgId },
+    });
+    await prisma.meterReading.deleteMany({
+      where: { organizationId: orgId },
+    });
+    await prisma.utilityMeter.deleteMany({
+      where: { organizationId: orgId },
+    });
+    await prisma.utilityRate.deleteMany({
+      where: { organizationId: orgId },
+    });
     await prisma.unitServiceCharge.deleteMany({
       where: { unit: { property: { organizationId: orgId } } },
     });
@@ -431,6 +396,10 @@ async function main() {
       taxRegionCode: null,
       defaultLocale: 'en-KE',
       weekendDays: [6, 7],
+      // Garbage rides the rent invoice via UnitServiceCharge; metered water &
+      // electricity are billed as separate statements, never bundled into rent.
+      utilityBillingMode: UtilityBillingMode.SEPARATE_STATEMENT,
+      vacancyPolicy: VacancyPolicy.RECORD_ONLY,
     },
   });
 
@@ -447,6 +416,7 @@ async function main() {
         'payments',
         'receipts',
         'arrears',
+        'utilities',
       ],
     },
   });
@@ -494,9 +464,13 @@ async function main() {
         '44 units across 4 floors (A–D), 11 units per floor: ' +
         '3×2-bedroom (KES 14,500) + 8×1-bedroom (KES 11,500) per floor. ' +
         'Garbage collection KES 200/unit/month included in rent invoice. ' +
-        'Rent due by the 5th of each month.',
+        'Rent due by the 5th of each month. ' +
+        'Metered water (bulk) and electricity (sub-meters) billed separately.',
       landlordId: landlord.id,
       organizationId: organization.id,
+      // Garbage is bundled into the rent invoice via UnitServiceCharge; metered
+      // utilities are separate statements. Jedan does not bundle metered utilities.
+      bundleUtilitiesWithRent: false,
     },
   });
 
@@ -552,6 +526,17 @@ async function main() {
           apartmentNotes: `${bedrooms}-BR unit on ${floor.label} floor, unit #${unitNum}`,
         },
       });
+
+      // ── Garbage as a UnitServiceCharge that rides the rent invoice ──
+      await prisma.unitServiceCharge.create({
+        data: {
+          unitId: unit.id,
+          serviceUtilityAmenity: 'Garbage Collection',
+          costPerArea: null,
+          totalCost: GARBAGE,
+        },
+      });
+
       units.push({
         id: unit.id,
         code,
@@ -565,7 +550,93 @@ async function main() {
   }
   console.log(`Created ${units.length} units`);
 
-  // ── 7. Tenancies, tenants, deposits, agreements ────────────────────────
+  // ── 7. Utility meters & rates ──────────────────────────────────────────
+  console.log('Creating utility meters and rates...');
+
+  // Bulk water meter serves the whole estate (consumption split across units).
+  const waterMeter = await prisma.utilityMeter.create({
+    data: {
+      organizationId: organization.id,
+      propertyId: property.id,
+      type: UtilityType.WATER,
+      meterNumber: 'KW-0012345',
+      serialNumber: 'KWM-998877',
+      source: MeterReadingSource.MANUAL,
+      scope: MeterScope.BULK,
+      apportionmentMethod: 'AREA',
+      digits: 6,
+      digitWrapAt: 1000000,
+      lastBilledThrough: null,
+      status: MeterStatus.ACTIVE,
+      readingSetup: 'Bulk-and-divided by floor area',
+    },
+  });
+
+  // Electricity sub-meter per floor (one meter per floor, serves units on that floor).
+  const electricityMeters: Record<string, { id: string; meterNumber: string }> = {};
+  for (const floor of FLOORS) {
+    const meter = await prisma.utilityMeter.create({
+      data: {
+        organizationId: organization.id,
+        propertyId: property.id,
+        type: UtilityType.ELECTRICITY,
+        meterNumber: `KE-${floor.label}-00${floor.floor + 1}`,
+        serialNumber: `KEM-${floor.label}-${floor.floor + 1}`,
+        source: MeterReadingSource.MANUAL,
+        scope: MeterScope.BULK,
+        apportionmentMethod: 'EQUAL',
+        digits: 5,
+        digitWrapAt: 100000,
+        lastBilledThrough: null,
+        status: MeterStatus.ACTIVE,
+        readingSetup: `Floor ${floor.label} sub-meter, split equally across 11 units`,
+      },
+    });
+    electricityMeters[floor.label] = { id: meter.id, meterNumber: meter.meterNumber };
+  }
+
+  // Tariffs effective for the whole window.
+  await prisma.utilityRate.create({
+    data: {
+      organizationId: organization.id,
+      meterId: waterMeter.id,
+      type: UtilityType.WATER,
+      currency: 'KES',
+      ratePerUnit: 50, // KES per 1000 litres
+      standingCharge: 100,
+      prorateStandingCharge: false,
+      purchaseCurrency: 'KES',
+      spotRate: null,
+      vatRate: 16,
+      incomeAccount: '6100',
+      revenueExpenseItem: 'WATER',
+      validFrom: WINDOW_START,
+      validTo: null,
+    },
+  });
+
+  for (const floor of FLOORS) {
+    await prisma.utilityRate.create({
+      data: {
+        organizationId: organization.id,
+        meterId: electricityMeters[floor.label].id,
+        type: UtilityType.ELECTRICITY,
+        currency: 'KES',
+        ratePerUnit: 25, // KES per kWh
+        standingCharge: 50,
+        prorateStandingCharge: false,
+        purchaseCurrency: 'KES',
+        spotRate: null,
+        vatRate: 16,
+        incomeAccount: '6200',
+        revenueExpenseItem: 'ELECTRICITY',
+        validFrom: WINDOW_START,
+        validTo: null,
+      },
+    });
+  }
+
+  // ── 8. Tenancies, tenants, deposits, agreements ────────────────────────
   console.log('Creating tenancies, tenants, deposits and leases...');
 
   type LeaseCtx = {
@@ -678,7 +749,7 @@ async function main() {
   }
   console.log(`Created ${leases.length} leases across ${units.length} units`);
 
-  // ── 8. Invoices, payments, receipts (18 months) ────────────────────────
+  // ── 9. Invoices, payments, receipts (18 months) ────────────────────────
   console.log('Generating 18 months of invoices, payments and receipts...');
 
   let invoiceCount = 0;
@@ -709,6 +780,7 @@ async function main() {
           ? proratedRent(lease.baseRent, leaseStart, monthStart)
           : lease.baseRent;
 
+      // Garbage rides the rent invoice via UnitServiceCharge (totalCost = GARBAGE).
       const totalAmount = rentAmount + GARBAGE;
 
       // Due date: 5th of the month
@@ -736,14 +808,12 @@ async function main() {
         daysLate: number;
       };
       if (isFuture) {
-        // Future month: invoice issued but not due yet
         paymentResult = {
           status: InvoiceStatus.PENDING,
           paidFraction: 0,
           daysLate: 0,
         };
       } else if (isCurrent && now.getDate() < PAYMENT_DAY) {
-        // Current month, before due date: pending
         paymentResult = {
           status: InvoiceStatus.PENDING,
           paidFraction: 0,
@@ -875,7 +945,8 @@ async function main() {
   console.log(
     `Jedan Apartments seeded: ${units.length} units (12×2BR @ KES ${RENT_2B}, 32×1BR @ KES ${RENT_1B}), ` +
       `${leases.length} leases, ${billingMonths.length} billing months (Mar 2025–${monthLabel(WINDOW_END)}), ` +
-      `${invoiceCount} invoices. Rent due by the ${PAYMENT_DAY}th. Garbage: KES ${GARBAGE}/unit/month.`,
+      `${invoiceCount} invoices. Rent due by the ${PAYMENT_DAY}th. Garbage: KES ${GARBAGE}/unit/month. ` +
+      'Metered water (bulk) + electricity (per-floor sub-meters) ready for separate billing.',
   );
 }
 

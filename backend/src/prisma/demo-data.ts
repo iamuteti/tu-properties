@@ -67,6 +67,8 @@ import {
   MeterScope,
   MeterStatus,
   UtilityType,
+  UtilityBillingMode,
+  VacancyPolicy,
   // Module 15 - Documents & Legal
   ContractType,
 } from '@prisma/client';
@@ -217,11 +219,95 @@ export async function generateDemoData(
         type: propertyType.value,
         mpesaPropertyPayNumber: String(Math.floor(Math.random() * 1000000)),
         organizationId,
+        // Whether metered utilities ride the rent invoice on this property.
+        bundleUtilitiesWithRent: Math.random() < 0.3,
       },
     });
     properties.push(property);
   }
   console.log(`Generated ${properties.length} properties`);
+
+  // ========== Utility meters & rates (Module 14) ==========
+  console.log('Generating utility meters and rates...');
+  for (const property of properties) {
+    // Bulk water meter per property.
+    const waterMeter = await prisma.utilityMeter.create({
+      data: {
+        organizationId: organizationId,
+        propertyId: property.id,
+        type: UtilityType.WATER,
+        meterNumber: `KW-${property.code.slice(-3)}`,
+        serialNumber: `KWM-${Math.floor(Math.random() * 900000) + 100000}`,
+        source: MeterReadingSource.MANUAL,
+        scope: MeterScope.BULK,
+        apportionmentMethod: Math.random() < 0.5 ? 'AREA' : 'EQUAL',
+        digits: 6,
+        digitWrapAt: 1000000,
+        lastBilledThrough: null,
+        status: MeterStatus.ACTIVE,
+      },
+    });
+
+    await prisma.utilityRate.create({
+      data: {
+        organizationId: organizationId,
+        meterId: waterMeter.id,
+        type: UtilityType.WATER,
+        currency: 'KES',
+        ratePerUnit: 45 + Math.random() * 30, // KES per 1000 litres
+        standingCharge: 80 + Math.random() * 40,
+        prorateStandingCharge: false,
+        purchaseCurrency: 'KES',
+        spotRate: null,
+        vatRate: 16,
+        incomeAccount: '6100',
+        revenueExpenseItem: 'WATER',
+        validFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        validTo: null,
+      },
+    });
+
+    // 1–3 electricity sub-meters per property.
+    const meterCount = 1 + Math.floor(Math.random() * 3);
+    for (let m = 0; m < meterCount; m += 1) {
+      const elecMeter = await prisma.utilityMeter.create({
+        data: {
+          organizationId: organizationId,
+          propertyId: property.id,
+          type: UtilityType.ELECTRICITY,
+          meterNumber: `KE-${property.code.slice(-3)}-${m + 1}`,
+          serialNumber: `KEM-${Math.floor(Math.random() * 900000) + 100000}`,
+          source: MeterReadingSource.MANUAL,
+          scope: MeterScope.BULK,
+          apportionmentMethod: 'EQUAL',
+          digits: 5,
+          digitWrapAt: 100000,
+          lastBilledThrough: null,
+          status: MeterStatus.ACTIVE,
+        },
+      });
+
+      await prisma.utilityRate.create({
+        data: {
+          organizationId: organizationId,
+          meterId: elecMeter.id,
+          type: UtilityType.ELECTRICITY,
+          currency: 'KES',
+          ratePerUnit: 20 + Math.random() * 15, // KES per kWh
+          standingCharge: 40 + Math.random() * 20,
+          prorateStandingCharge: false,
+          purchaseCurrency: 'KES',
+          spotRate: null,
+          vatRate: 16,
+          incomeAccount: '6200',
+          revenueExpenseItem: 'ELECTRICITY',
+          validFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          validTo: null,
+        },
+      });
+    }
+  }
+  console.log('Utility meters and rates generated.');
 
   // ========== Units (1500+ units) ==========
   console.log('Generating units...');
@@ -303,6 +389,32 @@ export async function generateDemoData(
     }
   }
   console.log(`Generated ${units.length} units`);
+
+  // ========== Unit service charges (garbage, cleaning, security, etc.) ==========
+  console.log('Generating unit service charges...');
+  const serviceChargeTypes = [
+    { name: 'Garbage Collection', cost: 200 },
+    { name: 'Security Service', cost: 300 },
+    { name: 'Cleaning (Common Areas)', cost: 150 },
+  ];
+  let serviceChargeCount = 0;
+  for (const unit of units) {
+    // Each unit gets 1–2 service charges.
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let s = 0; s < count; s += 1) {
+      const type = serviceChargeTypes[Math.floor(Math.random() * serviceChargeTypes.length)];
+      await prisma.unitServiceCharge.create({
+        data: {
+          unitId: unit.id,
+          serviceUtilityAmenity: type.name,
+          costPerArea: null,
+          totalCost: type.cost + Math.floor(Math.random() * 100),
+        },
+      });
+      serviceChargeCount += 1;
+    }
+  }
+  console.log(`Generated ${serviceChargeCount} unit service charges.`);
 
   // ========== Mark some units as occupied for demo ==========
   // We DON'T set them to OCCUPIED here - we set status AFTER creating rental agreements

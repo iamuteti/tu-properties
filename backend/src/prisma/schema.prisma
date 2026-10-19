@@ -964,6 +964,11 @@ model Property {
   penaltyChargeMode String? // Penalty Charge Mode
   penaltyDay        Int? // Penalty Day
 
+  // Whether metered utility charges for this property are bundled onto the
+  // rent invoice (single combined document) rather than billed as separate
+  // UTILITY statements. False keeps metered utilities on their own invoice.
+  bundleUtilitiesWithRent Boolean @default(false)
+
   // Landlord Banking Details
   landlordDrawerBank    String?
   landlordBankBranch    String?
