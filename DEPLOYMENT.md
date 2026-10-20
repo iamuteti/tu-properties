@@ -68,13 +68,13 @@ npm run dev                   # http://localhost:3002
 
 | Command | Description |
 |---------|-------------|
-| `npm run db:create` / `db:drop` | Create / drop database |
+| `npm run db:create` / `db:drop` | Create / drop database — `scripts/db-admin.ts`, cross-platform (no `bash`, no `psql` on the PATH) |
 | `npm run db:migrate` | Run pending migrations |
 | `npm run db:migrate:undo:all` | Revert all migrations |
 | `npm run db:seed` | Run `prisma db seed` |
-| `npm run db:seed:demo` | Demo dataset only |
+| `npm run db:seed:demo` | Demo dataset only — `DEMO_COUNTRIES=KE,ZA,IN` seeds a subset, `DEMO_COUNTRY=IN` makes India the primary market |
 | `npm run db:seed:jedan` | Jedan Apartments immersive dataset only |
-| `npm run db:reset:demo` | Full reset: drop → create → migrate → seed → demo |
+| `npm run db:reset:demo` | Full reset: drop → create → migrate → seed → demo. It wipes the database, so anything seeded separately (`npm run db:seed:jedan`) has to be re-seeded afterwards |
 | `npx prisma generate` | Regenerate Prisma client |
 
 ---
@@ -253,9 +253,19 @@ npm run db:migrate:undo:all && npm run db:migrate && npm run db:seed
 # Demo data only
 npm run db:seed:demo
 
+# Demo data for specific markets (ISO-3166-1 alpha-2 codes)
+DEMO_COUNTRIES=KE,ZA,IN,BR npm run db:seed:demo   # a subset
+DEMO_COUNTRY=IN npm run db:seed:demo                # India as the primary market
+DEMO_MODE=multi npm run db:seed:demo                # + Global Properties International
+
+# The demo seed DELETES every organization and re-seeds from scratch — run
+# `npm run db:seed:jedan` afterwards to bring the Jedan Apartments dataset back.
+
 # Validate schema before deploy
 npx prisma validate
 ```
+
+> The `DEMO_*` variables are shell syntax above. On PowerShell use `$env:DEMO_COUNTRIES="KE,ZA,IN,BR"; npm run db:seed:demo` instead.
 
 ### Generate API Types
 
@@ -289,6 +299,9 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | `STORAGE_DIR` | `./uploads` | No | Local storage directory |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | — | No | Email; blank = no mail |
 | `MPESA_CONSUMER_KEY` / `MPESA_CONSUMER_SECRET` / `MPESA_SHORT_CODE` / `MPESA_PASSKEY` / `MPESA_ENV` | — | No | M-Pesa live credentials (per property) |
+| `DEMO_COUNTRY` | `KE` | No | Demo seed only. The *primary* market (ISO-3166-1 alpha-2) — the one that gets Rohi + Westhill |
+| `DEMO_COUNTRIES` | all 15 markets | No | Demo seed only. Comma-separated ISO-3166-1 alpha-2 codes to seed (`KE ZA US GB CA AU DE FR IN CN JP KR BR MX AE`) |
+| `DEMO_MODE` | — | No | Demo seed only. `multi` adds the Global Properties International org with its branches |
 
 > Also read by code (absent from `.env.example`): `LOGIN_MAX_ATTEMPTS`, `LOGIN_LOCKOUT_DURATION_MINUTES`, `PASSWORD_RESET_URL_BASE`, `PASSWORD_RESET_TTL_SECONDS`.
 
@@ -325,6 +338,8 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | CORS rejects HTTP origin | `CORS_ORIGINS` must list exact `https://` production origins |
 | `NEXT_PUBLIC_*` changes need rebuild | Frontend env vars are baked in at build time |
 | Silent storage fallback | Wrong S3/MinIO credentials fall back to local `uploads/`; verify first real upload |
+| Demo seed wipes all organizations | `db:seed:demo` deletes every org, invoice and user before re-seeding; re-run `db:seed:jedan` afterwards |
+| Unknown market code in `DEMO_COUNTRIES` | The seed fails loudly by design — a skipped market is worse than a stopped seed |
 
 ---
 
@@ -336,8 +351,7 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | `docs/00-MASTER-ARCHITECTURE.md` | Architecture & design decisions |
 | `DEPLOYMENT.md` | **You are here** — deployment guide |
 | `docs/01-...` through `docs/20-...` | Module specs and database schema (20 module docs) |
-| `TESTING.md` | Testing approach (if present) |
-| `DEMO_DATA.md` | Demo data (if present) |
+| `Testing.md` | Testing guide — demo logins, data isolation scenarios, `DEMO_COUNTRIES` / `DEMO_COUNTRY` |
 
 ---
 

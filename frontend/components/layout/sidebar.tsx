@@ -200,7 +200,13 @@ const navItems: NavItem[] = [
             { href: "/moving-out", label: "Move Out Processings", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
         ]
     },
-    { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'leases' },
+    // Module 5. A leasing officer is in this list because the role matrix says
+    // they may write leases: `agreements` is `viewWrite()` for them (view,
+    // create, update — not delete), and `AGREEMENT_WRITE_ROLES` on the
+    // controller names them too. The nav list and the API are the same list,
+    // because a role shown a nav item it cannot use — or given an API it is
+    // not shown — is the inconsistency this file's role lists exist to avoid.
+    { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'leases' },
     {
         label: "Billing & Finance",
         icon: CreditCard,

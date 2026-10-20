@@ -49,6 +49,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
     "/agreements": "agreements",
     "/tenant-requests": "tenant-requests",
     "/moving-out": "moving-out",
+    "/security-deposits": "security-deposits",
 
     // Billing & Finance
     "/finance/invoices": "invoices",

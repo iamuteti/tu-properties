@@ -18,10 +18,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/ui/entity-states";
 import { PropertyDocuments } from "@/components/properties/property-documents";
+import { PropertyUnitTypes } from "@/components/properties/property-unit-types";
 import { propertiesApi } from "@/lib/api";
 import type { Property, Unit } from "@/types";
 
-type Tab = "overview" | "units" | "files";
+type Tab = "overview" | "units" | "deposits" | "files";
 
 export default function PropertyDetailPage() {
     const params = useParams<{ id: string }>();
@@ -168,6 +169,7 @@ export default function PropertyDetailPage() {
                     [
                         { id: "overview", label: "Overview" },
                         { id: "units", label: `Units (${units.length})` },
+                        { id: "deposits", label: "Unit types & deposits" },
                         { id: "files", label: "Photos & documents" },
                     ] as Array<{ id: Tab; label: string }>
                 ).map((item) => (
@@ -315,7 +317,7 @@ export default function PropertyDetailPage() {
                                                         {unit.code}
                                                     </span>
                                                 </TableCell>
-                                                <TableCell>{unit.type ?? "—"}</TableCell>
+                                                <TableCell>{unit.unitType?.code ?? "—"}</TableCell>
                                                 <TableCell>
                                                     <StatusBadge status={unit.status} />
                                                 </TableCell>
@@ -344,6 +346,10 @@ export default function PropertyDetailPage() {
                         )}
                     </CardContent>
                 </Card>
+            )}
+
+            {tab === "deposits" && (
+                <PropertyUnitTypes propertyId={property.id} />
             )}
 
             {tab === "files" && (

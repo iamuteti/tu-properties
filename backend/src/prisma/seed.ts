@@ -83,7 +83,8 @@ async function main() {
   await prisma.utilityMeter.deleteMany();
   await prisma.unitServiceCharge.deleteMany();
   await prisma.unit.deleteMany();
-  await prisma.propertySecurityDeposit.deleteMany();
+  await prisma.propertyDepositRule.deleteMany();
+  await prisma.propertyUnitType.deleteMany();
   await prisma.propertyStandingCharge.deleteMany();
   await prisma.property.deleteMany();
   await prisma.landlord.deleteMany();

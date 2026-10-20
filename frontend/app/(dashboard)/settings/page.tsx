@@ -20,16 +20,41 @@ type ActiveSession = {
     isCurrent: boolean;
 };
 
-const CURRENCIES = ["KES", "USD", "GBP", "EUR", "NGN", "ZAR", "INR", "AED"];
+const CURRENCIES = [
+    "KES",
+    "ZAR",
+    "USD",
+    "GBP",
+    "EUR",
+    "CAD",
+    "AUD",
+    "INR",
+    "CNY",
+    "JPY",
+    "KRW",
+    "BRL",
+    "MXN",
+    "AED",
+    "NGN",
+];
 const TIMEZONES = [
     "Africa/Nairobi",
-    "Africa/Lagos",
     "Africa/Johannesburg",
+    "Africa/Lagos",
     "UTC",
     "Europe/London",
+    "Europe/Berlin",
+    "Europe/Paris",
+    "America/New_York",
+    "America/Toronto",
+    "America/Sao_Paulo",
+    "America/Mexico_City",
     "Asia/Dubai",
     "Asia/Karachi",
     "Asia/Kolkata",
+    "Asia/Shanghai",
+    "Asia/Tokyo",
+    "Asia/Seoul",
     "Asia/Singapore",
     "Australia/Sydney",
 ];

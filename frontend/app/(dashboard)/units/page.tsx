@@ -117,9 +117,9 @@ export default function UnitsPage() {
                 cell: ({ row }) => <StatusBadge status={row.original.status} />,
             },
             {
-                accessorKey: "type",
+                id: "unitType",
                 header: "Type",
-                cell: ({ row }) => row.original.type || "—",
+                cell: ({ row }) => row.original.unitType?.code || "—",
             },
             {
                 accessorKey: "bedrooms",

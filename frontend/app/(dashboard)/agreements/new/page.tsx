@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm, SubmitHandler, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/simple-select";
 import { ChevronLeft } from "lucide-react";
-import { agreementsApi } from "@/lib/api";
+import { agreementsApi, securityDepositsApi } from "@/lib/api";
+import type { UnitDepositRule } from "@/types";
 
 const AgreementSchema = z.object({
     unitId: z.string().min(1, "Unit is required"),
@@ -61,6 +62,52 @@ export default function NewAgreementPage() {
     } = form;
 
     const agreementType = watch("agreementType");
+    const unitId = watch("unitId");
+    const rentAmount = watch("rentAmount");
+
+    /**
+     * The deposit rule for the chosen unit.
+     *
+     * The property's rule says what a deposit is for this kind of unit, and
+     * the number is worked out from the rule and the rent rather than typed
+     * in. It is pre-filled, not locked: the property manager may agree
+     * something else, and the agreement keeps both numbers so the register
+     * can show that they differed.
+     */
+    const [depositRule, setDepositRule] = useState<UnitDepositRule | null>(null);
+
+    useEffect(() => {
+        if (!unitId) {
+            setDepositRule(null);
+            return;
+        }
+        let active = true;
+        securityDepositsApi
+            .ruleForUnit(unitId)
+            .then((response) => {
+                if (active) setDepositRule(response.data);
+            })
+            .catch(() => {
+                if (active) setDepositRule(null);
+            });
+        return () => {
+            active = false;
+        };
+    }, [unitId]);
+
+    /** What the rule works out to for the rent being typed. */
+    const ruleAmount = useMemo(() => {
+        if (!depositRule?.rule) return null;
+        if (depositRule.rule.basis === "RENT_MONTHS") {
+            return Number(depositRule.rule.months ?? 0) * Number(rentAmount || 0);
+        }
+        return Number(depositRule.rule.amount ?? 0);
+    }, [depositRule, rentAmount]);
+
+    useEffect(() => {
+        if (ruleAmount === null) return;
+        setValue("securityDeposit", Math.round(ruleAmount * 100) / 100);
+    }, [ruleAmount, setValue]);
 
     const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const unitId = e.target.value;
@@ -128,7 +175,7 @@ export default function NewAgreementPage() {
                                     .filter((u) => u.status === "VACANT")
                                     .map((unit) => (
                                         <option key={unit.id} value={unit.id}>
-                                            {unit.name} ({unit.type}) - {unit.currency || 'KES'} {unit.baseRent?.toFixed(2) || '0.00'}
+                                            {unit.name} ({unit.unitType?.code ?? 'no type'}) - {unit.currency || 'KES'} {unit.baseRent?.toFixed(2) || '0.00'}
                                         </option>
                                     ))}
                             </Select>
@@ -240,7 +287,7 @@ export default function NewAgreementPage() {
                                     htmlFor="securityDeposit"
                                     className="text-sm font-medium leading-none"
                                 >
-                                    Security Deposit
+                                    Deposit
                                 </label>
                                 <Input
                                     id="securityDeposit"
@@ -249,6 +296,21 @@ export default function NewAgreementPage() {
                                     {...register("securityDeposit")}
                                     disabled={isSubmitting}
                                 />
+                                {depositRule?.decided ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        The property&rsquo;s rule says{" "}
+                                        {depositRule.rule?.basis === "RENT_MONTHS"
+                                            ? `${depositRule.rule?.months} month(s) of rent`
+                                            : "a fixed amount"}
+                                        . Change it if you have agreed something
+                                        else — the agreement keeps both numbers.
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-amber-700">
+                                        This kind of unit has no deposit rule yet, so
+                                        say what the deposit is.
+                                    </p>
+                                )}
                             </div>
                         </div>
                     )}

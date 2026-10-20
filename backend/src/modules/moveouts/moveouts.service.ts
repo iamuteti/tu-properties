@@ -7,6 +7,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { DeductionCategory, Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { UnitsService } from '@/modules/units/units.service';
+import { AccountingService } from '@/modules/finance/accounting/accounting.service';
 import { calculateDeposit, validateDeduction } from './agreement-deposit';
 
 export interface PaginationParams {
@@ -39,6 +40,7 @@ export class MoveoutsService {
   constructor(
     private prisma: PrismaService,
     private unitsService: UnitsService,
+    private accountingService: AccountingService,
   ) {}
 
   /**
@@ -404,6 +406,28 @@ export class MoveoutsService {
       select: { agreementId: true },
     });
 
+    // The money actually moves here, and the ledger says where it went. The
+    // claims are applied in the deposit's own order — deductions first, rent
+    // second — so the part of the deposit that reached the rent is known, and
+    // the part of the claims it did not reach is still owed by the resident.
+    const held = Number(
+      (
+        await this.prisma.agreement.findUnique({
+          where: { id: request.agreementId },
+          select: { securityDeposit: true, code: true },
+        })
+      )?.securityDeposit ?? 0,
+    );
+    const applied = Math.min(
+      held,
+      calculation.deductionsTotal + calculation.unpaidRent,
+    );
+    const deductionsCovered = Math.min(calculation.deductionsTotal, applied);
+    const rentCovered = Math.min(
+      calculation.unpaidRent,
+      Math.max(applied - deductionsCovered, 0),
+    );
+
     const updated = await this.prisma.moveOutRequest.update({
       where: { id },
       data: {
@@ -421,11 +445,35 @@ export class MoveoutsService {
       data: { depositRefunded: true },
     });
 
+    if (tenantId) {
+      await this.accountingService.postDepositSettled(
+        {
+          amount: held,
+          refundAmount: calculation.refund,
+          deductionsAmount: calculation.deductionsTotal,
+          rentCoveredAmount: rentCovered,
+          unpaidDeductionsAmount:
+            calculation.deductionsTotal - deductionsCovered,
+          agreementCode:
+            (
+              await this.prisma.agreement.findUnique({
+                where: { id: request.agreementId },
+                select: { code: true },
+              })
+            )?.code ?? request.agreementId,
+          settledOn: new Date(),
+        },
+        tenantId,
+      );
+    }
+
     return {
       ...updated,
       refund: calculation.refund,
       currency: calculation.currency,
       reference: dto.paidRef,
+      /** What the deposit did not reach is still owed by the resident. */
+      carriedForward: calculation.carriedForward,
     };
   }
 

@@ -1,5 +1,11 @@
 import axios from 'axios';
-import { AuthResponse, User, Property, Unit, Tenant, Agreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant, TenantRequest, TenantRequestType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow,
+import { AuthResponse, User, Property, Unit, Tenant, Agreement, Invoice, Payment, Organization, OrganizationProfileInput, Role, RoleAssignment, Branch, Document, LoginEvent, Landlord, LandlordDetail, LandlordCharge, LandlordPayout, OwnerStatement, StatementPreview, CreateInvoiceData, CreatePaymentData, CreateReceiptData, DashboardStats, Receipt, PaginatedResponse, MoveOutRequest, PropertyAmenity, ImportReport, UnitStatus, Lead, Contact, Communication, CreateLeadData, ConvertLeadData, LogCommunicationData, LeadStage, Sale, SaleStage, CreateSaleData, Commission, CommissionStatus, CommissionReport, SaleInstallment, Lease, LeaseAction, LeaseLedger, CreateLeaseData, MoveOutDeduction, DepositBreakdown, DeductionCategory, InspectionReport, InspectionItem, InspectionType, ConditionRating, LeaseTemplate, OccupancyHistory, PortalSummary, PortalLease, PortalInvoice, PortalReceipt, PortalDocument, PortalTenant,     TenantRequest,
+    TenantRequestType,
+    SecurityDepositRegister,
+    PropertyDepositPolicy,
+    PropertyDepositRule,
+    UnitDepositRule,
+    PropertyUnitType, ApprovalInbox, WorkflowDefinition, WorkflowDelegation, WorkflowInstance, WorkflowStepTemplate, WorkOrder, WorkOrderStats, WorkOrderTask, MaintenanceTechnician, Asset, AssetDetail, AssetStats, PmSchedule, PmRun, PortalWorkOrder, PurchaseRequest, PurchaseRequestStats, PurchaseRequestLine, Rfq, RfqStats, RfqInvitation, RfqQuote, QuoteComparison, PurchaseOrder, PurchaseOrderStats, PurchaseOrderLine, ProcurementSupplier, SupplierSpendRow, StockInStatus, InventoryItemRow, InventoryItemDetail, InventoryStats, WarehouseRow, WarehouseDetail, StockMovementRow, StockMovementStats, WorkOrderMaterials, EmployeeRow, EmployeeDetail, EmployeeSelf, EmployeeStats, LeaveRequestRow, LeaveBalanceRow, LeaveCalendar, LeavePolicyRow, HolidayRow, LeaveBalance, PayrollRuleRow, PayrollRuleCoverage, PayrollRulePreview, PayrollJurisdiction, PayrollTotals, PayrollRunRow, PayrollRunDetail, PayslipRow, PayslipDetail, PayslipLineRow, PayrollRunSummary, FacilityRow, FacilityDetail, FacilityAvailability, FacilityBookingRow, FacilityBookingPreview, FacilityBlackoutRow, AccessCardRow, VisitorRow, VisitorDetail, VisitorVisitRow,
     UtilityMeterRow,
     UtilityMeterDetail,
     MeterReadingRow,
@@ -427,6 +433,30 @@ export const propertiesApi = {
 
     removeAmenity: (id: string, amenityId: string) =>
         api.delete(`/properties/${id}/amenities/${amenityId}`),
+
+    // Unit types (Module 5, deposit side)
+    //
+    // The kinds of unit a property has — "1B", "2B", "3B" — declared per
+    // property, because two estates call the same kind of unit different
+    // things and the deposit for a "2B" in one is not the deposit for a "2B"
+    // in another. The deposit rule hangs off these.
+    listUnitTypes: (id: string) =>
+        api.get<PropertyUnitType[]>(`/properties/${id}/unit-types`),
+
+    createUnitType: (
+        id: string,
+        data: { code: string; name: string; bedrooms?: number; bathrooms?: number },
+    ) =>
+        api.post<PropertyUnitType>(`/properties/${id}/unit-types`, data),
+
+    updateUnitType: (
+        unitTypeId: string,
+        data: { code?: string; name?: string; bedrooms?: number; bathrooms?: number },
+    ) =>
+        api.patch<PropertyUnitType>(`/properties/unit-types/${unitTypeId}`, data),
+
+    removeUnitType: (unitTypeId: string) =>
+        api.delete(`/properties/unit-types/${unitTypeId}`),
 
     // Bulk import / export
     /** Browser-navigable CSV download (the httpOnly cookie is sent automatically). */
@@ -1420,6 +1450,72 @@ export const moveoutsApi = {
 
     remove: (id: string) =>
         api.delete(`/moveouts/${id}`),
+};
+
+// ============================================
+// SECURITY DEPOSITS API (Module 5, read side)
+// ============================================
+
+export const securityDepositsApi = {
+    /**
+     * The deposit register: one row per tenancy that carries a deposit, with
+     * the totals for the whole register alongside the page.
+     */
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        /** Disposition filter — HELD, PART_DEDUCTED, DEDUCTED, REFUNDED, WAIVED. */
+        status?: string;
+        propertyId?: string;
+    }) => {
+        const query = new URLSearchParams();
+        Object.entries(params ?? {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            query.append(key, String(value));
+        });
+        const qs = query.toString();
+        return api.get<SecurityDepositRegister>(
+            `/security-deposits${qs ? `?${qs}` : ''}`,
+        );
+    },
+
+    /** The per-property deposit rules, per kind of unit. */
+    policies: () => api.get<PropertyDepositPolicy[]>('/security-deposits/policies'),
+
+    /**
+     * The rule that applies to a unit, and what it works out to.
+     *
+     * What the agreement screen asks before anybody types a deposit: it either
+     * has an answer, or it says that nobody has decided.
+     */
+    ruleForUnit: (unitId: string, rentAmount?: number) => {
+        const query = new URLSearchParams();
+        query.append('unitId', unitId);
+        if (rentAmount !== undefined && rentAmount !== null) {
+            query.append('rentAmount', String(rentAmount));
+        }
+        return api.get<UnitDepositRule>(`/security-deposits/rule?${query.toString()}`);
+    },
+
+    /**
+     * Set the deposit rule for a kind of unit.
+     *
+     * A rule of zero is a decision — "this kind of unit takes no deposit" —
+     * and it is stored as a rule of zero rather than as the absence of one.
+     */
+    setRule: (
+        unitTypeId: string,
+        body: { amount?: number; basis?: string; months?: number },
+    ) =>
+        api.put<PropertyDepositRule>(
+            `/security-deposits/unit-types/${unitTypeId}/rule`,
+            body,
+        ),
+
+    /** Take the rule away, which is "nobody has decided" rather than "no deposit". */
+    clearRule: (unitTypeId: string) =>
+        api.delete(`/security-deposits/unit-types/${unitTypeId}/rule`),
 };
 // ============================================
 // CRM API (Module 3)

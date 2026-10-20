@@ -166,7 +166,7 @@ export default function PropertyAvailabilityPage() {
                                                 </div>
                                                 <p className="mt-1 text-xs text-muted-foreground font-mono">
                                                     {unit.code}
-                                                    {unit.type ? ` · ${unit.type}` : ""}
+                                                    {unit.unitType ? ` · ${unit.unitType.code}` : ""}
                                                     {unit.baseRent != null
                                                         ? ` · ${unit.currency ?? "KES"} ${Number(unit.baseRent).toLocaleString()}`
                                                         : ""}

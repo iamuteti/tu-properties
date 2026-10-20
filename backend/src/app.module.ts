@@ -33,6 +33,7 @@ import { SalesModule } from './modules/sales/sales.module';
 import { InspectionsModule } from './modules/inspections/inspections.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { TenantRequestsModule } from './modules/tenant-requests/tenant-requests.module';
+import { SecurityDepositsModule } from './modules/security-deposits/security-deposits.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
@@ -80,6 +81,9 @@ import { SecurityModule } from './security/security.module';
     InspectionsModule,
     PortalModule,
     TenantRequestsModule,
+    // Module 5, read side — the security-deposit register. It is derived from
+    // agreements and move-outs, so it imports neither: it reads both.
+    SecurityDepositsModule,
     WorkflowModule,
     MaintenanceModule,
     ProcurementModule,

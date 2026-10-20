@@ -15,7 +15,7 @@ import {
 import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
-import { requireTenantId } from '@/common/utils';
+import { requireTenantId, getUserId } from '@/common/utils';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { AgreementsService, type PaginationParams } from './agreements.service';
@@ -28,6 +28,7 @@ import {
   TerminateAgreementDto,
   UpdateAgreementTemplateDto,
   UpdateAgreementDto,
+  WaiveDepositDto,
 } from './dto/agreement.dto';
 import { AgreementTemplatesService } from './agreement-templates.service';
 import { RENEWAL_WINDOW_DAYS } from './agreement-lifecycle';
@@ -161,6 +162,42 @@ export class AgreementsController {
   @Permissions('agreements.update')
   activate(@Param('id') id: string, @Request() req) {
     return this.agreementsService.activate(id, requireTenantId(req));
+  }
+
+  // --------------------------------------------------------------- deposit
+
+  /**
+   * Record that this resident is not paying a deposit.
+   *
+   * The only way past the activation gate without paying, so it carries a
+   * reason and the person who gave it. The register shows a waived deposit as
+   * a waiver rather than as a resident with no deposit.
+   */
+  @Post(':id/deposit/waive')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('deposits.update')
+  waiveDeposit(
+    @Param('id') id: string,
+    @Body() dto: WaiveDepositDto,
+    @Request() req,
+  ) {
+    return this.agreementsService.waiveDeposit(
+      id,
+      dto,
+      requireTenantId(req),
+      getUserId(req),
+    );
+  }
+
+  /**
+   * Bill the deposit, for the rare case where raising it with the agreement
+   * failed, or where a deposit was agreed after the agreement was created.
+   */
+  @Post(':id/deposit/invoice')
+  @Roles(...AGREEMENT_WRITE_ROLES)
+  @Permissions('deposits.create')
+  billDeposit(@Param('id') id: string, @Request() req) {
+    return this.agreementsService.billDeposit(id, requireTenantId(req));
   }
 
   /** Renew: creates the successor agreement and links the renewal chain. */

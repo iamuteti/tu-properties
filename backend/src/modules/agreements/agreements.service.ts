@@ -2,12 +2,23 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AgreementStatus, AgreementType, Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
 import { toCsv } from '@/common/csv';
 import { UnitsService } from '@/modules/units/units.service';
+import { InvoicesService } from '@/modules/finance/invoices/invoices.service';
+import { TRANSACTION_CLASS } from '@/modules/finance/transaction-class';
+import {
+  DEPOSIT_BASIS,
+  computeDepositAmount,
+} from '@/modules/security-deposits/deposit-rule';
+import {
+  DEPOSIT_TRANSACTION_CLASS,
+  depositInvoiceFor,
+} from '@/modules/security-deposits/deposit-state';
 import type {
   CreateAgreementDto,
   ExtendAgreementDto,
@@ -95,6 +106,7 @@ export class AgreementsService {
   constructor(
     private prisma: PrismaService,
     private unitsService: UnitsService,
+    private invoicesService: InvoicesService,
   ) {}
 
   // ------------------------------------------------------------------- CRUD
@@ -140,9 +152,21 @@ export class AgreementsService {
       );
     }
 
-    return this.prisma.agreement.create({
+    // The deposit: what the property's rule says for this kind of unit, and
+    // what this resident actually agreed to. Two numbers, kept apart, because
+    // they answer two different questions and the register shows both.
+    const deposit = await this.resolveDeposit({
+      unitId,
+      rentAmount: scalars.rentAmount,
+      agreedAmount: scalars.securityDeposit,
+      tenantId,
+    });
+
+    const agreement = await this.prisma.agreement.create({
       data: {
         ...scalars,
+        securityDeposit: deposit.agreedAmount,
+        depositRuleAmount: deposit.ruleAmount,
         code: await this.nextCode(tenantId),
         startDate,
         endDate,
@@ -152,6 +176,140 @@ export class AgreementsService {
       } as Prisma.AgreementCreateInput,
       include: this.listInclude(),
     });
+
+    // The deposit is billed on its own invoice, due at move-in. It is not rent
+    // and it is not part of the monthly cycle, so it carries its own class and
+    // the arrears sweep leaves it alone.
+    if (deposit.agreedAmount > 0) {
+      await this.raiseDepositInvoice(agreement.id, tenantId);
+    }
+
+    return agreement;
+  }
+
+  /**
+   * What the deposit should be, and what has been agreed.
+   *
+   * The rule is the owner's policy: what this kind of unit costs as a deposit
+   * in this property. The agreed amount is this resident's fact, and it may
+   * differ — a property manager may agree something else, and then the
+   * register shows the rule and the agreement side by side rather than one
+   * quietly overwriting the other.
+   *
+   * A unit whose kind has **no rule** is the awkward case: nobody has decided
+   * what a deposit is here. That is not the same as "no deposit", so the
+   * agreement cannot be created without somebody saying which it is.
+   */
+  private async resolveDeposit(input: {
+    unitId: string;
+    rentAmount?: number | null;
+    agreedAmount?: number | null;
+    tenantId: string;
+  }): Promise<{ ruleAmount: number | null; agreedAmount: number }> {
+    const unit = await this.prisma.unit.findFirst({
+      where: {
+        id: input.unitId,
+        property: { organizationId: input.tenantId },
+      },
+      select: {
+        unitType: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            depositRule: {
+              select: { amount: true, basis: true, months: true },
+            },
+          },
+        },
+      },
+    });
+
+    const rule = unit?.unitType?.depositRule ?? null;
+    const rent = Number(input.rentAmount ?? 0);
+
+    if (!rule) {
+      if (input.agreedAmount === undefined || input.agreedAmount === null) {
+        throw new BadRequestException(
+          unit?.unitType
+            ? `No deposit has been set for ${unit.unitType.name} units, and this agreement does not say what the deposit is. Set the rule for that kind of unit, or state the deposit on the agreement.`
+            : 'This unit has no kind, so no deposit rule applies to it. Set the deposit on the agreement, or give the unit a kind first.',
+        );
+      }
+      return { ruleAmount: null, agreedAmount: Number(input.agreedAmount) };
+    }
+
+    const ruleAmount = computeDepositAmount(
+      {
+        amount: Number(rule.amount),
+        basis: rule.basis,
+        months: rule.months === null ? null : Number(rule.months),
+      },
+      rent,
+    );
+
+    return {
+      ruleAmount,
+      agreedAmount:
+        input.agreedAmount === undefined || input.agreedAmount === null
+          ? ruleAmount
+          : Number(input.agreedAmount),
+    };
+  }
+
+  /**
+   * Bill the deposit.
+   *
+   * Its own invoice, its own class, due now: a deposit is paid before the
+   * resident moves in, and it is not part of the monthly cycle — so it carries
+   * no billing period, and the recurring run and the arrears sweep never see
+   * it.
+   */
+  private async raiseDepositInvoice(agreementId: string, tenantId: string) {
+    const agreement = await this.prisma.agreement.findFirst({
+      where: { id: agreementId, organizationId: tenantId },
+      select: {
+        id: true,
+        code: true,
+        currency: true,
+        securityDeposit: true,
+        tenant: { select: { surname: true, otherNames: true } },
+      },
+    });
+    if (!agreement) {
+      throw new NotFoundException('Agreement not found.');
+    }
+
+    const amount = Number(agreement.securityDeposit ?? 0);
+    if (amount <= 0) return null;
+
+    const existing = await this.prisma.invoice.findFirst({
+      where: {
+        agreementId: agreement.id,
+        transactionClass: DEPOSIT_TRANSACTION_CLASS,
+      },
+      select: { id: true },
+    });
+    if (existing) return existing;
+
+    const now = new Date();
+    return this.invoicesService.create(
+      {
+        transactionClass: TRANSACTION_CLASS.DEPOSIT,
+        agreementId: agreement.id,
+        issueDate: now,
+        dueDate: now,
+        currency: agreement.currency,
+        billTo:
+          `${agreement.tenant.surname} ${agreement.tenant.otherNames ?? ''}`.trim(),
+        amount,
+        totalAmount: amount,
+        balanceAmount: amount,
+        status: 'PENDING',
+        memo: `Security deposit for agreement ${agreement.code}`,
+      },
+      tenantId,
+    );
   }
 
   findAll(
@@ -388,6 +546,11 @@ export class AgreementsService {
       await this.gateContext(lease, tenantId),
     );
 
+    // The deposit is paid before the resident moves in, so the agreement does
+    // not go live until it has been settled — or until somebody has recorded,
+    // with a reason, that this resident is not paying one.
+    await this.assertDepositSettled(lease);
+
     const updated = await this.prisma.agreement.update({
       where: { id },
       data: { status: AgreementStatus.ACTIVE, activatedAt: new Date() },
@@ -396,6 +559,91 @@ export class AgreementsService {
 
     await this.unitsService.syncOccupancyStatus(lease.unitId, tenantId);
     return updated;
+  }
+
+  /**
+   * The deposit has to be in hand before the resident gets the keys.
+   *
+   * Three ways to be here: the deposit is paid, the deposit is zero (the
+   * property takes none for this kind of unit, or the owner waived it), or the
+   * owner waived it — which is recorded with a reason rather than left as a
+   * missing invoice, so the register can show it.
+   */
+  private async assertDepositSettled(agreement: {
+    id: string;
+    code: string;
+    currency: string;
+    securityDeposit: Prisma.Decimal | null;
+    depositWaived: boolean;
+  }) {
+    if (agreement.depositWaived) return { waived: true, settled: true };
+
+    const agreed = Number(agreement.securityDeposit ?? 0);
+    if (agreed <= 0) return { waived: false, settled: true };
+
+    const state = await depositInvoiceFor(this.prisma, agreement.id);
+    if (state.settled) return { waived: false, settled: true };
+
+    const outstanding = state.balance > 0 ? state.balance : agreed;
+    throw new BadRequestException(
+      `The deposit for ${agreement.code} has not been paid: ${outstanding.toFixed(2)} ${agreement.currency} is still outstanding. Record the payment, or record that this resident is not paying a deposit.`,
+    );
+  }
+
+  /**
+   * Record that this resident is not paying a deposit.
+   *
+   * The only way past the gate without paying, so it is stored with who did it
+   * and why. The register shows it as a waiver, and the agreement keeps the
+   * rule's amount next to the agreed one, so a waived deposit is visible
+   * rather than looking like a resident with no deposit.
+   */
+  async waiveDeposit(
+    id: string,
+    dto: { reason: string },
+    tenantId: string,
+    userId?: string,
+  ) {
+    const agreement = await this.loadForAction(id, tenantId);
+
+    if (agreement.status !== AgreementStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only a draft agreement can have its deposit waived.',
+      );
+    }
+
+    if (Number(agreement.securityDeposit ?? 0) <= 0) {
+      throw new BadRequestException('This agreement has no deposit to waive.');
+    }
+
+    return this.prisma.agreement.update({
+      where: { id },
+      data: {
+        depositWaived: true,
+        depositWaiverReason: dto.reason,
+        depositWaivedById: userId ?? null,
+        depositWaivedAt: new Date(),
+      },
+      include: this.listInclude(),
+    });
+  }
+
+  /**
+   * (Re)bill the deposit.
+   *
+   * The invoice is raised with the agreement, so this is the recovery path for
+   * the rare case where raising it failed — and the way to bill a deposit that
+   * was agreed after the agreement was created.
+   */
+  async billDeposit(id: string, tenantId: string) {
+    const agreement = await this.loadForAction(id, tenantId);
+
+    if (Number(agreement.securityDeposit ?? 0) <= 0) {
+      throw new BadRequestException('This agreement has no deposit to bill.');
+    }
+
+    const invoice = await this.raiseDepositInvoice(agreement.id, tenantId);
+    return { agreementId: agreement.id, invoice };
   }
 
   /**
@@ -441,6 +689,19 @@ export class AgreementsService {
       );
     }
 
+    // The deposit is inherited, not re-charged: the resident is not moving in
+    // and keeps the money they paid. It is also **re-priced** when the rule is
+    // a multiple of the rent and the rent has moved, because a deposit that
+    // quietly drifts out of step with the rent it secures is the problem the
+    // rule exists to prevent. The difference is recorded on the successor as
+    // an adjustment: what the resident owes, or what the estate owes back.
+    const newRent = dto.rentAmount ?? Number(lease.rentAmount);
+    const inherited = await this.inheritedDeposit({
+      agreement: lease,
+      newRent,
+      tenantId,
+    });
+
     const successor = await this.prisma.agreement.create({
       data: {
         code: await this.nextCode(tenantId),
@@ -450,9 +711,15 @@ export class AgreementsService {
           ? { connect: { id: lease.organizationId } }
           : { connect: { id: tenantId } },
         agreementType: lease.agreementType,
-        rentAmount: dto.rentAmount ?? lease.rentAmount,
+        rentAmount: newRent,
         currency: dto.currency ?? lease.currency,
-        securityDeposit: dto.securityDeposit ?? lease.securityDeposit,
+        securityDeposit: inherited.amount,
+        depositRuleAmount: inherited.ruleAmount,
+        depositAdjustment: inherited.adjustment,
+        depositWaived: lease.depositWaived,
+        depositWaiverReason: lease.depositWaiverReason,
+        depositWaivedById: lease.depositWaivedById,
+        depositWaivedAt: lease.depositWaivedAt,
         noticePeriodDays: lease.noticePeriodDays,
         escalationRate: lease.escalationRate,
         escalationMonth: lease.escalationMonth,
@@ -476,6 +743,82 @@ export class AgreementsService {
     await this.unitsService.syncOccupancyStatus(lease.unitId, tenantId);
 
     return { previous: { id: lease.id, code: lease.code }, lease: successor };
+  }
+
+  /**
+   * The deposit a renewal carries forward.
+   *
+   * The resident is not moving in, so nothing is re-charged: the successor
+   * inherits the deposit the predecessor took, and the money stays where it
+   * is.
+   *
+   * The one thing that can change is the **rule**. "One month's rent" is not a
+   * number, so when the renewal moves the rent, the deposit moves with it —
+   * and the difference is recorded, because a resident whose rent went up
+   * should be told what the deposit now is, and a resident whose deposit is
+   * larger than the new rule should be told what is owed back.
+   */
+  private async inheritedDeposit(input: {
+    agreement: {
+      id: string;
+      securityDeposit: Prisma.Decimal | null;
+      depositRuleAmount: Prisma.Decimal | null;
+      unitId: string;
+    };
+    newRent: number;
+    tenantId: string;
+  }): Promise<{
+    amount: number;
+    ruleAmount: number | null;
+    adjustment: number | null;
+  }> {
+    const current = Number(input.agreement.securityDeposit ?? 0);
+    if (current <= 0) {
+      return { amount: 0, ruleAmount: null, adjustment: null };
+    }
+
+    const unit = await this.prisma.unit.findFirst({
+      where: { id: input.agreement.unitId },
+      select: {
+        unitType: {
+          select: {
+            depositRule: {
+              select: { amount: true, basis: true, months: true },
+            },
+          },
+        },
+      },
+    });
+
+    const rule = unit?.unitType?.depositRule ?? null;
+    if (!rule || rule.basis !== DEPOSIT_BASIS.RENT_MONTHS) {
+      // A fixed deposit, or no rule at all: the amount simply carries over.
+      return {
+        amount: current,
+        ruleAmount:
+          input.agreement.depositRuleAmount === null
+            ? null
+            : Number(input.agreement.depositRuleAmount),
+        adjustment: null,
+      };
+    }
+
+    const ruleAmount = computeDepositAmount(
+      {
+        amount: Number(rule.amount),
+        basis: rule.basis,
+        months: rule.months === null ? null : Number(rule.months),
+      },
+      input.newRent,
+    );
+
+    const adjustment = Math.round((ruleAmount - current) * 100) / 100;
+
+    return {
+      amount: current,
+      ruleAmount,
+      adjustment: adjustment === 0 ? null : adjustment,
+    };
   }
 
   /** Extend in place — used for rolling monthlies with no fixed end date. */

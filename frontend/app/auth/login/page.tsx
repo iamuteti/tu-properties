@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, KeyRound, Sparkles } from "lucide-react";
+import { Building2, Eye, EyeOff, KeyRound, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -158,6 +158,21 @@ export default function LoginPage() {
 
     return (
         <div className="space-y-6">
+            <div className="flex justify-center">
+                <Link
+                    href="/"
+                    aria-label="TU Properties - back to home"
+                    className="group flex items-center gap-2.5 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/25 transition-transform duration-200 group-hover:scale-105">
+                        <Building2 className="h-5 w-5 stroke-[2.3]" />
+                    </span>
+                    <span className="text-lg font-extrabold tracking-tight text-foreground">
+                        TU Properties
+                    </span>
+                </Link>
+            </div>
+
             <div className="space-y-2 text-center">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
                     Welcome back
@@ -228,7 +243,7 @@ export default function LoginPage() {
             </form>
 
             {/* Quick Demo Fill Buttons */}
-            <div className="pt-4 border-t border-border space-y-2">
+            {/* <div className="pt-4 border-t border-border space-y-2">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                     <KeyRound className="w-3.5 h-3.5 text-amber-500" />
                     <span>Quick Fill Demo Personas (Password123!):</span>
@@ -264,7 +279,7 @@ export default function LoginPage() {
                 >
                     Sign up
                 </Link>
-            </div>
+            </div> */}
         </div>
     );
 }

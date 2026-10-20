@@ -21,8 +21,13 @@ export const COUNTRIES = [
   { value: "FR", label: "France" },
   { value: "IT", label: "Italy" },
   { value: "ES", label: "Spain" },
-  { value: "JP", label: "Japan" },
+  { value: "IN", label: "India" },
   { value: "CN", label: "China" },
+  { value: "JP", label: "Japan" },
+  { value: "KR", label: "South Korea" },
+  { value: "BR", label: "Brazil" },
+  { value: "MX", label: "Mexico" },
+  { value: "AE", label: "United Arab Emirates" },
 ];
 
 export const MULTI_STORY_TYPES = [
@@ -525,6 +530,34 @@ export const REQUEST_STATUS_STYLES: Record<string, string> = {
     APPROVED: 'bg-green-100 text-green-800',
     REJECTED: 'bg-red-100 text-red-800',
     WITHDRAWN: 'bg-slate-100 text-slate-700',
+};
+
+// ---------------------------------------------------------------------------
+// Module 5, read side: the security-deposit register
+// ---------------------------------------------------------------------------
+
+export const DEPOSIT_DISPOSITION_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'HELD', label: 'Held' },
+    { value: 'PART_DEDUCTED', label: 'Part deducted' },
+    { value: 'DEDUCTED', label: 'Deducted in full' },
+    { value: 'REFUNDED', label: 'Refunded' },
+    { value: 'WAIVED', label: 'Waived' },
+];
+
+export const DEPOSIT_DISPOSITION_STYLES: Record<string, string> = {
+    HELD: 'bg-blue-100 text-blue-800',
+    PART_DEDUCTED: 'bg-amber-100 text-amber-800',
+    DEDUCTED: 'bg-red-100 text-red-800',
+    REFUNDED: 'bg-green-100 text-green-800',
+    WAIVED: 'bg-slate-100 text-slate-700',
+};
+
+export const DEPOSIT_DISPOSITION_LABELS: Record<string, string> = {
+    HELD: 'Held',
+    PART_DEDUCTED: 'Part deducted',
+    DEDUCTED: 'Deducted in full',
+    REFUNDED: 'Refunded',
+    WAIVED: 'Waived',
 };
 
 // ---------------------------------------------------------------------------
@@ -1117,15 +1150,20 @@ export const PAY_FREQUENCIES: Array<{ value: string; label: string; hint: string
 export const PAYSLIP_LOCALES: Array<{ value: string; label: string }> = [
     { value: '', label: "The organization's default" },
     { value: 'en-KE', label: 'English (Kenya)' },
+    { value: 'en-ZA', label: 'English (South Africa)' },
     { value: 'en-GB', label: 'English (UK)' },
     { value: 'en-US', label: 'English (US)' },
     { value: 'sw-KE', label: 'Kiswahili (Kenya)' },
     { value: 'fr-FR', label: 'Français (France)' },
     { value: 'de-DE', label: 'Deutsch (Deutschland)' },
     { value: 'es-ES', label: 'Español (España)' },
+    { value: 'es-MX', label: 'Español (México)' },
     { value: 'pt-BR', label: 'Português (Brasil)' },
     { value: 'ar-EG', label: 'العربية (مصر)' },
     { value: 'hi-IN', label: 'हिन्दी (भारत)' },
+    { value: 'ja-JP', label: '日本語 (日本)' },
+    { value: 'ko-KR', label: '한국어 (대한민국)' },
+    { value: 'zh-CN', label: '中文 (中国)' },
 ];
 
 export const LEAVE_TYPES: Array<{ value: string; label: string; hint: string }> = [

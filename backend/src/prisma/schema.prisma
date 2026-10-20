@@ -994,7 +994,7 @@ model Property {
   // Related entities
   units            Unit[]
   standingCharges  PropertyStandingCharge[]
-  securityDeposits PropertySecurityDeposit[]
+  unitTypes        PropertyUnitType[]
   amenities        PropertyAmenity[]
   landlordCharges  LandlordCharge[]
   // Module 9: the equipment this building actually owns, and the faults found
@@ -1042,10 +1042,16 @@ model Unit {
   code     String  @unique // Unit/Space No.
   name     String // Unit Name/Number
   sequence Int? // Unit Sequence
-  type     String?
 
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  // Which kind of unit this is — "1B", "2B", "3B" — as the property's own
+  // type rather than a free-text string. It is what the deposit rule hangs
+  // off, so it has to be a controlled value: a string let "1B" and "1b" and
+  // "1 Bedroom" become three rules for one kind of unit.
+  unitTypeId String?
+  unitType   PropertyUnitType? @relation(fields: [unitTypeId], references: [id], onDelete: SetNull)
 
   // Pricing
   quotedPrice     Decimal? @db.Decimal(10, 2)
@@ -1209,24 +1215,71 @@ model PropertyStandingCharge {
   @@map("property_standing_charges")
 }
 
-model PropertySecurityDeposit {
-  id String @id @default(cuid())
-
+/// A kind of unit a property has — "1B", "2B", "3B" — and the deposit the
+/// owner requires for it.
+///
+/// This replaces the free-text `Unit.type` string and the old
+/// `PropertySecurityDeposit` table. The old table had one value and four
+/// booleans per row and no per-unit-type key, so it could not say "this kind
+/// of unit takes no deposit" and nothing ever populated it; the type was a
+/// string on the unit, which could disagree with the unit's own bedroom
+/// count. A property now declares its own types, and the deposit rule hangs
+/// off the type.
+model PropertyUnitType {
+  id         String @id @default(cuid())
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  month               String // Month identifier
-  value               Decimal @db.Decimal(10, 2)
-  ofRentBillingAmount Boolean @default(false)
-  ofInitialRent       Boolean @default(false)
-  ofLastEscalation    Boolean @default(false)
-  excludesWithRent    Boolean @default(false)
+  /// What the estate calls it: "1B".
+  code String
+  /// What people read: "One Bedroom".
+  name String
+
+  /// The type's specification. A unit keeps its own `bedrooms` / `bathrooms`,
+  /// because a two-bedroom may be one bathroom or two — the type is the
+  /// default a unit is created with, not a second copy of the same fact.
+  bedrooms  Int?
+  bathrooms Int?
+
+  units        Unit[]
+  depositRule PropertyDepositRule?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([propertyId, code])
   @@index([propertyId])
-  @@map("property_security_deposits")
+  @@map("property_unit_types")
+}
+
+/// What the owner requires as a deposit for one kind of unit.
+///
+/// One number, because a deposit is one number. The `basis` is the only
+/// complication and it is there for a reason: "one month's rent" has to keep
+/// itself true when the rent is escalated, and a fixed amount quietly goes
+/// stale. Both forms end up as a plain number on the agreement.
+///
+/// A row with `amount = 0` means "this kind of unit takes no deposit",
+/// deliberately and on the record. **No row at all** means "nobody has decided
+/// yet", which is a different thing, and the agreement screen says so rather
+/// than charging nothing silently.
+model PropertyDepositRule {
+  id         String @id @default(cuid())
+  unitTypeId String @unique
+  unitType   PropertyUnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+
+  /// The deposit for a unit of this type.
+  amount Decimal @db.Decimal(10, 2)
+
+  /// FIXED — `amount` is the deposit. RENT_MONTHS — the deposit is
+  /// `months` of the agreement's rent, recomputed for every new agreement.
+  basis  String   @default("FIXED")
+  months Decimal? @db.Decimal(4, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("property_deposit_rules")
 }
 
 // ============================================
@@ -1359,7 +1412,22 @@ model Agreement {
   termMonths Int? // Lease term in months (null for rental)
 
   // Security Deposit
-  securityDeposit Decimal? @db.Decimal(10, 2)
+  //
+  // The amount **agreed** on this tenancy, and a copy of what the property's
+  // rule said, so the two can be compared rather than one overwriting the
+  // other. The rule is a policy; this is a fact about one resident.
+  securityDeposit    Decimal? @db.Decimal(10, 2)
+  depositRuleAmount  Decimal? @db.Decimal(10, 2)
+  // A waiver is the only way past the activation gate without paying, so it
+  // is stored with who did it and why rather than left as a missing invoice.
+  depositWaived      Boolean  @default(false)
+  depositWaiverReason String? @db.Text
+  depositWaivedById  String?
+  depositWaivedAt    DateTime?
+  // Set when a renewal re-prices an inherited deposit because the rent moved
+  // ("one month's rent" is a rule, not a number). Positive: the resident owes
+  // the difference. Negative: the estate owes it back at move-out.
+  depositAdjustment  Decimal? @db.Decimal(10, 2)
 
   // Lease-specific fields (commercial)
   escalationRate   Decimal? @db.Decimal(5, 2) // % increase per year
@@ -1449,6 +1517,11 @@ enum DeductionCategory {
   LATE_FEE
   UTILITY
   REPAIRS
+  // Module 5 — a claim for work the estate had to do to put the unit back, as
+  // distinct from damage to the resident's things. It was hiding in `OTHER`,
+  // which is how a maintenance bill and a broken door end up indistinguishable
+  // in a dispute.
+  MAINTENANCE
   OTHER
 }
 

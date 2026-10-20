@@ -166,7 +166,14 @@ export default function UnitDetailPage() {
                         <CardTitle>Specifications</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 text-sm">
-                        <Detail label="Type" value={unit.type} />
+                        <Detail
+                            label="Kind of unit"
+                            value={
+                                unit.unitType
+                                    ? `${unit.unitType.code} — ${unit.unitType.name}`
+                                    : undefined
+                            }
+                        />
                         <Detail label="Floor" value={unit.floor?.toString()} />
                         <Detail label="Bedrooms" value={unit.bedrooms?.toString()} />
                         <Detail label="Bathrooms" value={unit.bathrooms?.toString()} />

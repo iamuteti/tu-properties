@@ -35,6 +35,13 @@ const MOVE_OUT_ROLES = [
  *
  * The deposit refund is derived from itemised deductions, so the endpoints are
  * split: `deductions` records *why*, `refund` pays the derived amount out.
+ *
+ * The permission module is `moveouts`, the one named for this subject, and not
+ * `agreements` — a move-out is a decision about a tenancy, but it is its own
+ * record with its own lifecycle, and the matrix grants it to the same roles
+ * today (`full()` to an administrator and a property manager, `viewWrite()` to a
+ * leasing officer) for the sake of the grants being able to diverge later
+ * without anybody having to notice.
  */
 @UseGuards(JwtAuthGuard)
 @Controller('move-outs')
@@ -43,7 +50,7 @@ export class MoveoutsController {
 
   @Post()
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.create')
   create(@Body() dto: CreateMoveOutRequestDto, @Request() req) {
     return this.moveoutsService.create(
       { ...dto, moveoutDate: new Date(dto.moveoutDate) },
@@ -81,7 +88,7 @@ export class MoveoutsController {
 
   @Patch(':id')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   update(
     @Param('id') id: string,
     @Body() dto: { moveoutDate?: string; notes?: string },
@@ -99,7 +106,7 @@ export class MoveoutsController {
 
   @Post(':id/approve')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   approve(
     @Param('id') id: string,
     @Body() dto: ApproveMoveOutDto,
@@ -120,7 +127,7 @@ export class MoveoutsController {
 
   @Post(':id/reject')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   reject(
     @Param('id') id: string,
     @Body() dto: { notes: string },
@@ -137,7 +144,7 @@ export class MoveoutsController {
 
   @Post(':id/deductions')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   addDeduction(
     @Param('id') id: string,
     @Body() dto: CreateDeductionDto,
@@ -153,7 +160,7 @@ export class MoveoutsController {
 
   @Delete(':id/deductions/:deductionId')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   removeDeduction(
     @Param('id') id: string,
     @Param('deductionId') deductionId: string,
@@ -168,7 +175,7 @@ export class MoveoutsController {
 
   @Post(':id/refund')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   refund(
     @Param('id') id: string,
     @Body() dto: RefundDepositDto,
@@ -184,7 +191,7 @@ export class MoveoutsController {
 
   @Delete(':id')
   @Roles(...MOVE_OUT_ROLES)
-  @Permissions('agreements.update')
+  @Permissions('moveouts.update')
   remove(@Param('id') id: string, @Request() req) {
     return this.moveoutsService.remove(id, requireTenantId(req));
   }

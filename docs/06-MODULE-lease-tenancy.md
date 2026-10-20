@@ -102,8 +102,14 @@ See `01-DATABASE-SCHEMA.md`, domains: Leasing + Move-Outs — now `rental_agreem
   so editing one cannot rewrite a signed agreement. Deleting deactivates it.
 - **DTOs everywhere** with `class-validator`; the leases endpoints previously took raw `Prisma` input like the
   sales one did.
-- **RBAC** — a new `leases` permission module; Leasing Officer and Property Manager get full lease/move-out
-  rights, Sales Agents nothing here.
+- **RBAC** — an `agreements` permission module and a `moveouts` one; Leasing Officer and Property Manager get full
+  lease/move-out rights, Sales Agents nothing here. The keys are the models' names, like every other module in the
+  matrix — and they used to be `leases`, while every controller asked for `agreements.create` / `.update` / `.delete`,
+  so `hasPermission` read `modules.agreements`, which no role's JSON contained, and refused every agreement write to
+  every customer. `SUPER_ADMIN` was the only way in, because `all: true` bypasses the check. The matrix key is now
+  `agreements`, the move-out endpoints are guarded by the module named for their own subject, and
+  `backend/src/security/permission-keys.spec.ts` fails the build if a controller ever names a key the matrix does not
+  contain.
 - **Incidental bug fixed**: `POST /inspections` silently dropped the whole body because the controller
   type-imported its DTO, which erases the class from `design:paramtypes` and makes Nest skip validation. The
   same trap will bite any future `import type` on a `@Body()` parameter.
@@ -158,6 +164,72 @@ one does.
 - **Frontend** - `/portal/requests` (request desk + history with the decision note shown verbatim) and
   `/tenant-requests` (staff queue with notice badges, approve/reject, and a deep link into the lease), wired
   into the sidebar under Tenants & Leases.
+
+### Security deposits (the whole side, not just the register)
+
+A deposit is money a resident pays **before they move in**: not rent, not a fee, a one-off payment the
+**property owner** decides. Some properties take none, some take one month's rent, some take two months or a
+month's rent plus a water and an electricity deposit. At the end of the tenancy it comes back in full, less any
+damage or maintenance claimed against it.
+
+**The unit's kind.** The deposit rule hangs off a *kind of unit*, and a kind of unit is now declared by the
+property itself:
+- `PropertyUnitType` (`property_unit_types`) — `propertyId`, `code` ("1B"), `name` ("One Bedroom"), the beds and
+  baths. `Unit.unitTypeId` replaces the free-text `Unit.type` string, which could disagree with the unit's own
+  bedroom count and gave a rule nothing controlled to hang off.
+- `PropertyDepositRule` (`property_deposit_rules`) — `unitTypeId` (unique), `amount`, `basis`
+  (`FIXED` | `RENT_MONTHS`), `months`. **A rule of zero is a decision** ("this kind of unit takes no deposit");
+  **no rule at all** is "nobody has decided yet", and the agreement screen refuses to guess.
+- `PropertySecurityDeposit` is **dropped**: one value and four booleans, no per-type key, and zero rows
+  everywhere. Migration `20261019203000_module5_deposits`.
+
+**The rule is one number, and it is worked out when an agreement starts.** `deposit-rule.ts` is pure arithmetic
+and unit-tested: `FIXED` is the amount, `RENT_MONTHS` is that many months of *that agreement's* rent, so an
+escalation does not leave the deposit securing nothing. The number is copied onto the agreement, and the rule's
+number is copied beside it, so the register can show that they differed.
+
+**The money actually moves.** A deposit is billed on **its own invoice** (`transactionClass = 'DEPOSIT'`, due at
+move-in, no billing period — so the recurring run and the arrears sweep never touch it) and is paid like any
+other bill, including in the move-in payment that covers the first month's rent and the deposit together
+(`allocate` already splits one payment across invoices).
+- `1300 Security Deposits Receivable` (what the resident owes) and `2400 Security Deposits Held` (what the estate
+  holds) had **no postings at all** before this. They now carry the deposit: charged Dr 1300 / Cr 2400, received
+  Dr Cash / Cr 1300, refunded and claimed at the move-out.
+- The refund is still the move-out's derived amount (`deposit − claims − unpaid rent`), and the claims are
+  applied in that order, so what the deposit did not reach is still owed by the resident and is reported.
+
+**The gate.** An agreement does not go live until the deposit is settled. The only way past it is on the record:
+the deposit is paid, or somebody records a **waiver** with a reason (`POST /agreements/:id/deposit/waive`).
+
+**A renewal does not re-charge it.** The resident is not moving in and keeps the money they paid, so the
+successor inherits the deposit; but the rule is re-applied, so when the rent moves and the rule is a multiple of
+it, the difference is recorded on the successor as an adjustment — what the resident owes, or what the estate owes
+back.
+
+**Endpoints**
+- `GET /security-deposits` — the register: one row per tenancy carrying a deposit, with **three different
+  numbers** (required by rule / agreed / received), the deductions, the rent absorbed, the refund due, the
+  carried-forward debt and the disposition (`HELD` / `PART_DEDUCTED` / `DEDUCTED` / `REFUNDED` / `WAIVED`).
+  Totals are **per currency**, because adding KES to USD is not a number anybody can act on.
+- `GET /security-deposits/policies` — the rules, per kind of unit.
+- `GET /security-deposits/rule?unitId=` — what the rule works out to for a unit, and whether anybody has decided.
+- `PUT|DELETE /security-deposits/unit-types/:unitTypeId/rule` — set or clear a rule.
+- `GET|POST /properties/:id/unit-types`, `PATCH|DELETE /properties/unit-types/:unitTypeId` — the kinds of unit.
+- `POST /agreements/:id/deposit/waive`, `POST /agreements/:id/deposit/invoice`.
+
+**RBAC** — a new `deposits` permission module (view / create / update): Company Admin and Property Manager full,
+Leasing Officer view, Accountant view + create. The rule is the property manager's (it is the owner's policy);
+the money is the accountant's. `permission-keys.spec.ts` fails the build if a controller names a key the matrix
+does not contain, so this module cannot be forgotten.
+
+**Frontend** — `/security-deposits` (the register, per-currency totals, search, disposition filter, the rules
+table), a **Unit types & deposits** tab on the property screen, the unit form's kind-of-unit select (the
+property's own types, fetched when the property is chosen), and the agreement form pre-filling the deposit from
+the rule and saying whose rule it is. The `security-deposits` module key is registered in the sidebar, the
+platform's per-organization toggle, `lib/route-modules.ts` and the demo seed's `ALL_MODULE_KEYS`.
+
+**Data** — `npm run db:backfill:unit-types` gives the units that already exist a kind and a deposit rule without
+touching anything else, for an estate that was created before the kinds existed.
 
 ## Verification Performed
 - `npx tsc --noEmit` clean (backend and frontend); `next build` succeeds; `npx jest` — **319/319** across 23

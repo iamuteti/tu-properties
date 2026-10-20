@@ -62,6 +62,7 @@ See `01-DATABASE-SCHEMA.md`, domain(s): HR & Payroll.
 - Every state change is a **named action**, never a `PATCH` with a `status` field: `leave/:id/approve|reject|cancel`, `payroll-runs/:id/calculate|approve|post|pay|void`. `PUT /hr/payroll-runs/:id` does not exist, so no client can skip past the ledger posting.
 - `status` is in no update DTO.
 - `payroll.pay` is a separate permission from `payroll.approve`: the person who signs off the figures and the person who releases the money are two acts, and collapsing them is how a payroll gets approved by whoever built it.
+- `employees.compensation` is a **declared action**, not just a `view` that means "and the money too". It was demanded by `employees.controller.ts` on every path that returns or changes pay, and `full()` never emitted it, so `hasPermission` read `modules.employees.compensation` — a key no role's JSON contained — and refused every compensation route to every customer. The `HR_COMPENSATION_ROLES` list said an administrator, an accountant and an HR manager, and the matrix said the same in prose, and the answer was 403 for all three. It is now a first-class action (`ModulePermissions.compensation`) granted by `employeesFull()` to exactly those three roles; the operational half of the product still stops at `employees: view()`.
 
 ## Frontend: Next.js Notes
 - Routes under `(dashboard)/hr/` — bare `/hr/...`, **no `/dashboard` prefix** (route groups do not contribute to URLs; master doc §3.3).

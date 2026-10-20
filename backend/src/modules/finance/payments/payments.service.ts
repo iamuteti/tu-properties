@@ -16,6 +16,8 @@ import { CreditsService } from '../credits/credits.service';
 import { allocateToInvoice, round2 } from '../invoice-allocation';
 import { syncInvoiceSettlement } from '../invoice-settlement';
 import { withheldOn } from '../tax/withheld';
+import { TRANSACTION_CLASS } from '../transaction-class';
+import { ACCOUNT_CODES } from '../accounting/chart-of-accounts';
 
 @Injectable()
 export class PaymentsService {
@@ -104,6 +106,7 @@ export class PaymentsService {
           landlordId: true,
           taxWithheldAmount: true,
           taxSummary: true,
+          transactionClass: true,
           agreement: { select: { tenantId: true } },
         },
       });
@@ -186,6 +189,14 @@ export class PaymentsService {
             reference: payment.paymentReference ?? undefined,
             description: `Payment applied to invoice ${invoice.invoiceNumber}`,
             taxWithheld: withheldOn(invoice),
+            // A deposit is money the estate holds on the resident's behalf, so
+            // it relieves the deposit receivable rather than ordinary
+            // receivables. Crediting the wrong one leaves the deposit invoice
+            // looking unpaid while the cash is plainly in the bank.
+            reliefAccountCode:
+              invoice.transactionClass === TRANSACTION_CLASS.DEPOSIT
+                ? ACCOUNT_CODES.SECURITY_DEPOSITS_RECEIVABLE
+                : undefined,
             source: JournalEntrySource.PAYMENT,
             sourceRef: {
               type: 'PAYMENT',
@@ -353,6 +364,33 @@ export class PaymentsService {
             createdBy: options?.allocatedBy,
           },
         });
+
+        // The money that arrived on account was credited to ordinary
+        // receivables. A deposit has its own receivable — the deposit invoice
+        // booked it there — so the deposit's share of the payment is moved
+        // across. Without this the deposit invoice looks unpaid while the cash
+        // is plainly in the bank.
+        //
+        // Unless the payment was made *against* that deposit invoice, in which
+        // case it was credited to the deposit receivable in the first place.
+        if (
+          tenantId &&
+          invoice.transactionClass === TRANSACTION_CLASS.DEPOSIT &&
+          payment.invoice?.id !== invoice.id
+        ) {
+          await this.accountingService.postDepositRecognised(
+            {
+              amount: allocation.applied,
+              invoiceNumber: invoice.invoiceNumber,
+              paymentId: payment.id,
+              recognisedOn: payment.paymentDate,
+              description: `Deposit recognised against invoice ${invoice.invoiceNumber}`,
+            },
+            tenantId,
+            tx,
+          );
+        }
+
         unallocated = round2(unallocated - allocation.applied);
       }
 

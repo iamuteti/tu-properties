@@ -27,6 +27,21 @@ import { CleanOptional, ToBoolean, ToNumber } from '@/common/dto/transforms';
  * agreements endpoints used to accept, which let any column be set from the
  * browser and validated nothing.
  */
+
+/**
+ * Record that a resident is not paying a deposit.
+ *
+ * A waiver is the only way past the activation gate without paying, so it
+ * carries a reason. The reason is not decoration: it is what makes the
+ * decision reviewable later, when somebody asks why this resident paid
+ * nothing.
+ */
+export class WaiveDepositDto {
+  @IsString()
+  @MaxLength(500)
+  @CleanOptional()
+  reason!: string;
+}
 export class AgreementFieldsDto {
   @IsOptional()
   @IsEnum(AgreementType)

@@ -279,13 +279,21 @@ export async function seedPayrollRules(
   const key = countryCode.toUpperCase();
   const rules = SAMPLE_JURISDICTIONS[key];
   if (!rules) {
-    throw new Error(
-      `No sample configuration is bundled for ${countryCode}. The available ones are ${Object.keys(
-        SAMPLE_JURISDICTIONS,
-      ).join(
-        ', ',
-      )} — a country with no bundled rules is the supported case, not a gap: add them through the payroll rules screen.`,
+    // A jurisdiction with no bundled rules is the supported case, not a gap —
+    // the header of this file says so, and the engine answers it with a loud
+    // `NO_RULES_RESOLVED` warning on every payslip, which is a far better
+    // failure than a confident wrong number nobody checked.
+    //
+    // Throwing here used to be defensible, when the only country that could be
+    // seeded was Kenya. It is not defensible now: the demo runs in fifteen
+    // markets, and a seed that cannot start in a market without a bundled
+    // sample configuration is a seed that cannot demonstrate the product
+    // outside the three countries somebody happened to write rates for.
+    console.warn(
+      `  Payroll: no sample rules bundled for ${countryCode} — every payslip in this jurisdiction will carry NO_RULES_RESOLVED. ` +
+        `Bundled samples: ${Object.keys(SAMPLE_JURISDICTIONS).join(', ')}.`,
     );
+    return { created: 0, inForce: 0 };
   }
 
   let created = 0;

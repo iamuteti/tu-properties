@@ -83,6 +83,7 @@ const MODULE_GROUPS = [
             { key: 'leases', label: 'Leases' },
             { key: 'tenant-requests', label: 'Tenant requests' },
             { key: 'moving-out', label: 'Moving Out' },
+            { key: 'security-deposits', label: 'Security deposits' },
         ],
     },
     {

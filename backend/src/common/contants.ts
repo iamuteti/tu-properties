@@ -21,8 +21,13 @@ export const COUNTRIES = [
   { value: 'FR', label: 'France' },
   { value: 'IT', label: 'Italy' },
   { value: 'ES', label: 'Spain' },
-  { value: 'JP', label: 'Japan' },
+  { value: 'IN', label: 'India' },
   { value: 'CN', label: 'China' },
+  { value: 'JP', label: 'Japan' },
+  { value: 'KR', label: 'South Korea' },
+  { value: 'BR', label: 'Brazil' },
+  { value: 'MX', label: 'Mexico' },
+  { value: 'AE', label: 'United Arab Emirates' },
 ];
 
 export const MULTI_STORY_TYPES = [

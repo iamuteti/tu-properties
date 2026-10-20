@@ -8,6 +8,7 @@ import { AgreementStatus } from '@prisma/client';
 import { AgreementsService } from './agreements.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UnitsService } from '@/modules/units/units.service';
+import { InvoicesService } from '@/modules/finance/invoices/invoices.service';
 
 /**
  * Lifecycle behaviour the service owns (the rules themselves are tested
@@ -51,21 +52,55 @@ describe('AgreementsService (lifecycle)', () => {
       successor: null as unknown,
       // Shape returned by findUniqueOrThrow in remove(): status + invoices.
       units: { status: AgreementStatus.DRAFT, invoices: [] } as unknown,
+      // The unit the agreement is raised on. It carries a kind of unit with a
+      // deposit rule — "one month's rent" — because the deposit is worked out
+      // from the rule rather than typed in.
+      unit: {
+        id: 'unit-1',
+        unitType: {
+          id: 'ut-1',
+          code: '2B',
+          name: 'Two Bedroom',
+          depositRule: { amount: 0, basis: 'RENT_MONTHS', months: 1 },
+        },
+      } as unknown,
+      // The deposit invoice. Paid unless a test says otherwise, because a
+      // deposit that is paid is the normal case.
+      depositInvoice: {
+        id: 'inv-dep',
+        invoiceNumber: 'INV-DEP',
+        status: 'PAID',
+        totalAmount: 90_000,
+        paidAmount: 90_000,
+        balanceAmount: 0,
+      } as unknown,
+      // The agreement that was just raised, if one was.
+      created: null as unknown,
     };
 
     const leaseModel = {
-      create: jest.fn().mockImplementation(({ data }: any) => ({
-        ...activeLease,
-        ...data,
-        id: 'lease-2',
-        code: 'RA-000002',
-      })),
+      create: jest.fn().mockImplementation(({ data }: any) => {
+        const created = {
+          ...activeLease,
+          ...data,
+          id: 'lease-2',
+          code: 'RA-000002',
+        };
+        // The agreement that was just raised is what the deposit is billed
+        // against, so the mock has to hand it back.
+        state.created = created;
+        return created;
+      }),
       findMany: jest.fn().mockResolvedValue([activeLease]),
       count: jest.fn().mockResolvedValue(1),
       findFirst: jest
         .fn()
         .mockImplementation(({ where }: any) =>
-          Promise.resolve('status' in where ? state.openLease : state.lease),
+          Promise.resolve(
+            'status' in where
+              ? state.openLease
+              : (state.created ?? state.lease),
+          ),
         ),
       findUniqueOrThrow: jest
         .fn()
@@ -75,12 +110,17 @@ describe('AgreementsService (lifecycle)', () => {
         ...data,
       })),
       delete: jest.fn().mockResolvedValue(activeLease),
+      findUnique: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ code: 'RA-000001' })),
     };
     return {
       agreement: leaseModel,
       state,
       unit: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'unit-1' }),
+        findFirst: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve(state.unit)),
         findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'unit-1' }),
       },
       tenant: {
@@ -94,6 +134,9 @@ describe('AgreementsService (lifecycle)', () => {
           .mockImplementation(() => Promise.resolve(state.moveOut)),
       },
       invoice: {
+        findFirst: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve(state.depositInvoice)),
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
@@ -103,11 +146,15 @@ describe('AgreementsService (lifecycle)', () => {
 
   let prisma: ReturnType<typeof mockPrisma>;
   let units: { syncOccupancyStatus: jest.Mock };
+  let invoices: { create: jest.Mock };
 
   beforeEach(async () => {
     prisma = mockPrisma();
     units = {
       syncOccupancyStatus: jest.fn().mockResolvedValue({ changed: true }),
+    };
+    invoices = {
+      create: jest.fn().mockResolvedValue({ id: 'inv-dep' }),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -115,6 +162,7 @@ describe('AgreementsService (lifecycle)', () => {
         AgreementsService,
         { provide: PrismaService, useValue: prisma },
         { provide: UnitsService, useValue: units },
+        { provide: InvoicesService, useValue: invoices },
       ],
     }).compile();
     service = moduleRef.get(AgreementsService);
@@ -162,6 +210,40 @@ describe('AgreementsService (lifecycle)', () => {
       expect(args.data.tenant).toEqual({ connect: { id: 'tenant-1' } });
       expect(args.data.organization).toEqual({ connect: { id: 'org-1' } });
     });
+
+    it('copies the rule onto the agreement and bills the deposit', async () => {
+      // No deposit invoice exists yet, so the agreement raises one.
+      prisma.state.depositInvoice = null;
+
+      await service.create(
+        { unitId: 'unit-1', tenantId: 'tenant-1', rentAmount: 45_000 },
+        'org-1',
+      );
+
+      const data = prisma.agreement.create.mock.calls[0][0].data;
+      // "One month's rent" on a 45,000 rent is 45,000.
+      expect(data.depositRuleAmount).toBe(45_000);
+      expect(data.securityDeposit).toBe(45_000);
+
+      const invoice = invoices.create.mock.calls[0][0];
+      expect(invoice.transactionClass).toBe('DEPOSIT');
+      expect(invoice.amount).toBe(45_000);
+      // A deposit is not a monthly bill, so it carries no billing period —
+      // the recurring run must not skip the month because of it.
+      expect(invoice).not.toHaveProperty('billingPeriod');
+    });
+
+    it('refuses to raise an agreement when nobody has decided the deposit', async () => {
+      prisma.state.unit = { id: 'unit-1' };
+
+      await expect(
+        service.create(
+          { unitId: 'unit-1', tenantId: 'tenant-1', rentAmount: 45_000 },
+          'org-1',
+        ),
+      ).rejects.toThrow(/deposit/i);
+      expect(prisma.agreement.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('activate', () => {
@@ -196,6 +278,35 @@ describe('AgreementsService (lifecycle)', () => {
       await expect(service.activate('lease-x', 'org-2')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('refuses to hand over the unit while the deposit is unpaid', async () => {
+      prisma.state.lease = { ...activeLease, status: AgreementStatus.DRAFT };
+      prisma.state.depositInvoice = {
+        id: 'inv-dep',
+        invoiceNumber: 'INV-DEP',
+        status: 'PENDING',
+        totalAmount: 90_000,
+        paidAmount: 0,
+        balanceAmount: 90_000,
+      };
+
+      await expect(service.activate('lease-1', 'org-1')).rejects.toThrow(
+        /has not been paid/i,
+      );
+      expect(prisma.agreement.update).not.toHaveBeenCalled();
+    });
+
+    it('hands over the unit when the deposit has been waived', async () => {
+      prisma.state.lease = {
+        ...activeLease,
+        status: AgreementStatus.DRAFT,
+        depositWaived: true,
+      };
+
+      await service.activate('lease-1', 'org-1');
+
+      expect(prisma.agreement.update).toHaveBeenCalled();
     });
   });
 

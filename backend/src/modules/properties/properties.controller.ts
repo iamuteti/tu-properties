@@ -31,6 +31,7 @@ import {
   ReplaceAmenitiesDto,
   UpdatePropertyDto,
 } from './dto/property.dto';
+import { CreateUnitTypeDto, UpdateUnitTypeDto } from './dto/unit-type.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('properties')
@@ -162,6 +163,53 @@ export class PropertiesController {
   @Permissions('properties.delete')
   remove(@Param('id') id: string, @Request() req) {
     return this.propertiesService.remove(id, getTenantId(req));
+  }
+
+  // ---------------------------------------------------------------- unit types
+
+  /**
+   * The property's own kinds of unit.
+   *
+   * Declared per property rather than globally, because two estates call the
+   * same kind of unit different things and the deposit for a "2B" in one is
+   * not the deposit for a "2B" in another.
+   */
+  @Get(':id/unit-types')
+  listUnitTypes(@Param('id') id: string, @Request() req) {
+    return this.propertiesService.listUnitTypes(id, getTenantId(req));
+  }
+
+  @Post(':id/unit-types')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('properties.update')
+  createUnitType(
+    @Param('id') id: string,
+    @Body() body: CreateUnitTypeDto,
+    @Request() req,
+  ) {
+    return this.propertiesService.createUnitType(id, body, getTenantId(req));
+  }
+
+  @Patch('unit-types/:unitTypeId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('properties.update')
+  updateUnitType(
+    @Param('unitTypeId') unitTypeId: string,
+    @Body() body: UpdateUnitTypeDto,
+    @Request() req,
+  ) {
+    return this.propertiesService.updateUnitType(
+      unitTypeId,
+      body,
+      getTenantId(req),
+    );
+  }
+
+  @Delete('unit-types/:unitTypeId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPERTY_MANAGER)
+  @Permissions('properties.update')
+  removeUnitType(@Param('unitTypeId') unitTypeId: string, @Request() req) {
+    return this.propertiesService.removeUnitType(unitTypeId, getTenantId(req));
   }
 
   // ---------------------------------------------------------------- amenities

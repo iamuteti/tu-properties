@@ -471,6 +471,13 @@ async function main() {
         'receipts',
         'arrears',
         'utilities',
+        // The Tenants group's other three screens. Without these keys the
+        // sidebar filters them out for everyone in this org (the nav items
+        // carry `module: 'tenant-requests'` / `'moving-out'` /
+        // `'security-deposits'`), leaving `/tenants` as the only visible child.
+        'tenant-requests',
+        'moving-out',
+        'security-deposits',
       ],
     },
   });
@@ -545,7 +552,36 @@ async function main() {
     },
   });
 
-  // ── 6. Units ───────────────────────────────────────────────────────────
+  // ── 6. Unit types, deposit rules and units ─────────────────────────────
+  console.log('Creating unit types and deposit rules...');
+  // Jedan's two kinds of unit, and what the owner asks as a deposit for each:
+  // one month's rent for the 1B and two months for the 2B, both expressed as a
+  // multiple of the rent so an escalation does not leave the deposit stale.
+  const unitTypeIds = new Map<string, string>();
+  for (const spec of [
+    { code: '1B', name: 'One Bedroom', bedrooms: 1, months: 1 },
+    { code: '2B', name: 'Two Bedroom', bedrooms: 2, months: 2 },
+  ]) {
+    const unitType = await prisma.propertyUnitType.create({
+      data: {
+        propertyId: property.id,
+        code: spec.code,
+        name: spec.name,
+        bedrooms: spec.bedrooms,
+        bathrooms: spec.bedrooms,
+      },
+    });
+    unitTypeIds.set(spec.code, unitType.id);
+    await prisma.propertyDepositRule.create({
+      data: {
+        unitTypeId: unitType.id,
+        amount: 0,
+        basis: 'RENT_MONTHS',
+        months: spec.months,
+      },
+    });
+  }
+
   console.log('Creating units...');
   const units: Array<{
     id: string;
@@ -569,7 +605,7 @@ async function main() {
           code,
           name,
           propertyId: property.id,
-          type: bedrooms === 2 ? 'two-bedroom' : 'one-bedroom',
+          unitTypeId: unitTypeIds.get(bedrooms === 2 ? '2B' : '1B'),
           baseRent,
           currency: 'KES',
           floor: floor.floor,

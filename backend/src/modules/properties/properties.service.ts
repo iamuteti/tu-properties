@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma, PropertyStatus, UnitStatus } from '@prisma/client';
@@ -13,6 +14,7 @@ import type {
   ImportPropertiesDto,
   UpdatePropertyDto,
 } from './dto/property.dto';
+import type { CreateUnitTypeDto, UpdateUnitTypeDto } from './dto/unit-type.dto';
 
 export interface PaginationParams {
   page?: number;
@@ -215,7 +217,13 @@ export class PropertiesService {
           branch: true,
           amenities: { orderBy: { name: 'asc' } },
           standingCharges: true,
-          securityDeposits: true,
+          // The property's own unit types and the deposit each of them
+          // carries. This is the onboarding picture: a property declares
+          // "1B, 2B, 3B" and what each is worth as a deposit.
+          unitTypes: {
+            orderBy: { code: 'asc' },
+            include: { depositRule: true },
+          },
           units: {
             orderBy: [{ status: 'asc' }, { name: 'asc' }],
             include: {
@@ -311,6 +319,138 @@ export class PropertiesService {
     }
 
     return this.prisma.property.delete({ where: { id } });
+  }
+
+  // ---------------------------------------------------------------- unit types
+
+  /**
+   * The property's own kinds of unit, with the deposit rule on each.
+   *
+   * This is the onboarding picture: a property declares "1B, 2B, 3B" and what
+   * each of them costs as a deposit. A type with **no rule** is "nobody has
+   * decided the deposit yet", which is a different thing from a rule of zero —
+   * "this kind of unit takes no deposit" — and the two are kept apart.
+   */
+  async listUnitTypes(id: string, tenantId?: string) {
+    await assertTenantRecord(this.prisma.property, {
+      id,
+      ...(tenantId ? { organizationId: tenantId } : {}),
+    });
+
+    return this.prisma.propertyUnitType.findMany({
+      where: { propertyId: id },
+      orderBy: { code: 'asc' },
+      include: {
+        depositRule: true,
+        _count: { select: { units: true } },
+      },
+    });
+  }
+
+  async createUnitType(id: string, dto: CreateUnitTypeDto, tenantId?: string) {
+    await assertTenantRecord(this.prisma.property, {
+      id,
+      ...(tenantId ? { organizationId: tenantId } : {}),
+    });
+
+    const code = dto.code.trim();
+    if (!code) {
+      throw new BadRequestException('A unit type needs a code.');
+    }
+
+    const existing = await this.prisma.propertyUnitType.findFirst({
+      where: { propertyId: id, code: { equals: code, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `This property already has a unit type called "${code}".`,
+      );
+    }
+
+    return this.prisma.propertyUnitType.create({
+      data: {
+        propertyId: id,
+        code,
+        name: dto.name.trim(),
+        bedrooms: dto.bedrooms ?? null,
+        bathrooms: dto.bathrooms ?? null,
+      },
+      include: { depositRule: true, _count: { select: { units: true } } },
+    });
+  }
+
+  async updateUnitType(
+    unitTypeId: string,
+    dto: UpdateUnitTypeDto,
+    tenantId?: string,
+  ) {
+    const unitType = await this.prisma.propertyUnitType.findFirst({
+      where: {
+        id: unitTypeId,
+        ...(tenantId ? { property: { organizationId: tenantId } } : {}),
+      },
+      select: { id: true, propertyId: true },
+    });
+    if (!unitType) {
+      throw new NotFoundException('Unit type not found.');
+    }
+
+    if (dto.code !== undefined) {
+      const code = dto.code.trim();
+      const clash = await this.prisma.propertyUnitType.findFirst({
+        where: {
+          propertyId: unitType.propertyId,
+          code: { equals: code, mode: 'insensitive' },
+          NOT: { id: unitTypeId },
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new ConflictException(
+          `This property already has a unit type called "${code}".`,
+        );
+      }
+    }
+
+    return this.prisma.propertyUnitType.update({
+      where: { id: unitTypeId },
+      data: {
+        ...(dto.code !== undefined ? { code: dto.code.trim() } : {}),
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.bedrooms !== undefined ? { bedrooms: dto.bedrooms } : {}),
+        ...(dto.bathrooms !== undefined ? { bathrooms: dto.bathrooms } : {}),
+      },
+      include: { depositRule: true, _count: { select: { units: true } } },
+    });
+  }
+
+  /**
+   * Remove a kind of unit.
+   *
+   * The units that were of this kind keep existing and lose their type — they
+   * are not deleted, because a unit is somebody's home. The deposit rule goes
+   * with the type, which puts that kind of unit back to "nobody has decided"
+   * rather than silently to "no deposit".
+   */
+  async removeUnitType(unitTypeId: string, tenantId?: string) {
+    const unitType = await this.prisma.propertyUnitType.findFirst({
+      where: {
+        id: unitTypeId,
+        ...(tenantId ? { property: { organizationId: tenantId } } : {}),
+      },
+      select: { id: true, _count: { select: { units: true } } },
+    });
+    if (!unitType) {
+      throw new NotFoundException('Unit type not found.');
+    }
+
+    await this.prisma.propertyUnitType.delete({ where: { id: unitTypeId } });
+    return {
+      id: unitTypeId,
+      removed: true,
+      unitsLeftUntyped: unitType._count.units,
+    };
   }
 
   // ---------------------------------------------------------------- amenities

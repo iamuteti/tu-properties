@@ -6,6 +6,7 @@ import { AccountingService } from '../accounting/accounting.service';
 import { ACCOUNT_CODES } from '../accounting/chart-of-accounts';
 import { TaxService } from '../tax/tax.service';
 import { round2 } from '../invoice-allocation';
+import { TRANSACTION_CLASS } from '../transaction-class';
 
 @Injectable()
 export class InvoicesService {
@@ -215,43 +216,61 @@ export class InvoicesService {
       const invoice = await tx.invoice.create({ data: invoiceData });
 
       if (tenantId) {
-        await this.accountingService.postInvoiceIssued(
-          {
-            invoiceId: invoice.id,
-            invoiceNumber: invoice.invoiceNumber,
-            issueDate: invoice.issueDate,
-            totalAmount,
-            vatAmount: chargedTax,
-            netAmount: amount,
-            taxes: priced?.summary
-              ?.filter(
-                (entry) => entry.treatment !== 'WITHHELD' && entry.amount > 0,
-              )
-              .map((entry) => ({
-                code: entry.code,
-                name: entry.name,
-                amount: entry.amount,
-                accountCode: entry.account,
-              })),
-            taxWithheld:
-              priced && priced.withheldTax > 0
-                ? {
-                    amount: priced.withheldTax,
-                    code: priced.summary.find(
-                      (entry) => entry.treatment === 'WITHHELD',
-                    )?.code,
-                  }
-                : undefined,
-            status: invoice.status,
-            incomeAccountCode:
-              data.transactionClass === 'SALE'
-                ? ACCOUNT_CODES.SALE_OF_PROPERTY_INCOME
-                : undefined,
-            memo: `Invoice ${invoice.invoiceNumber} issued`,
-          },
-          tenantId,
-          tx,
-        );
+        // A deposit is not rent. It is money the estate will be holding on the
+        // resident's behalf, so it is booked against the deposit receivable and
+        // the deposit liability — never as revenue, and never on the ordinary
+        // rent path.
+        if (data.transactionClass === TRANSACTION_CLASS.DEPOSIT) {
+          await this.accountingService.postDepositCharged(
+            {
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              issueDate: invoice.issueDate,
+              amount: totalAmount,
+              memo: `Deposit on invoice ${invoice.invoiceNumber} charged`,
+            },
+            tenantId,
+            tx,
+          );
+        } else {
+          await this.accountingService.postInvoiceIssued(
+            {
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              issueDate: invoice.issueDate,
+              totalAmount,
+              vatAmount: chargedTax,
+              netAmount: amount,
+              taxes: priced?.summary
+                ?.filter(
+                  (entry) => entry.treatment !== 'WITHHELD' && entry.amount > 0,
+                )
+                .map((entry) => ({
+                  code: entry.code,
+                  name: entry.name,
+                  amount: entry.amount,
+                  accountCode: entry.account,
+                })),
+              taxWithheld:
+                priced && priced.withheldTax > 0
+                  ? {
+                      amount: priced.withheldTax,
+                      code: priced.summary.find(
+                        (entry) => entry.treatment === 'WITHHELD',
+                      )?.code,
+                    }
+                  : undefined,
+              status: invoice.status,
+              incomeAccountCode:
+                data.transactionClass === 'SALE'
+                  ? ACCOUNT_CODES.SALE_OF_PROPERTY_INCOME
+                  : undefined,
+              memo: `Invoice ${invoice.invoiceNumber} issued`,
+            },
+            tenantId,
+            tx,
+          );
+        }
       }
 
       return invoice;

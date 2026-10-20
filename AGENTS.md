@@ -21,6 +21,15 @@ npm run dev
 - Connection: `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` (see `backend/.env`).
 - Apply schema changes → `npx prisma db push --accept-data-loss` (dev workflow; regenerates the client).
 - Seed demo data → `npm run db:seed:demo` (ts-node demo-data script).
+- Seed the role matrix only → `npm run db:seed:roles`. **A permission change is not live until this runs** — the
+  matrix lives in `backend/src/prisma/roles-seed.ts` and the twelve system roles are rows in the `roles` table.
+  `backend/src/security/permission-keys.spec.ts` fails the build if a controller asks for a permission module the
+  matrix does not declare, so add the module to `PERMISSION_MODULES` and to the roles that should hold it, then
+  run this.
+- Give existing units a kind of unit and a deposit rule → `npm run db:backfill:unit-types`. Safe to run twice; a
+  property that already has unit types is left alone. This is the path for an estate that was created before
+  `PropertyUnitType` existed.
+- The demo seed covers 15 markets (KE, ZA, US, GB, CA, AU, DE, FR, IN, CN, JP, KR, BR, MX, AE) — Africa is Kenya and South Africa only. `DEMO_COUNTRY=XX` makes XX the primary market (Rohi + Westhill); `DEMO_COUNTRIES=KE,ZA,IN` seeds a subset. Both take ISO-3166-1 alpha-2 codes and an unknown code fails the seed loudly. Market data comes from `backend/src/prisma/jurisdictions.ts` — add a country there, not as a constant in the seeder.
 - **Hand-maintained indexes are invisible to Prisma and `migrate dev` will try to DROP them.** `notifications_landlordId_readAt_idx` and `utility_charges_no_double_bill_bulk` (partial unique) exist only as raw SQL in their own migrations — the schema cannot express the partial predicate, so every generated migration proposes both DROPs. 2026-10-11: a generated migration was applied with the DROPs in it and both guards silently vanished (restored same day, no violating rows). Always delete those two DROP statements from a generated migration before applying, and verify with `SELECT indexname FROM pg_indexes WHERE indexname IN (...)` afterwards.
 
 ## Testing / verification

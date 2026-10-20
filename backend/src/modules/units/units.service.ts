@@ -216,7 +216,16 @@ export class UnitsService {
     if (filters) {
       if (filters.propertyId) where.propertyId = filters.propertyId;
       if (filters.status) where.status = filters.status as UnitStatus;
-      if (filters.type) where.type = filters.type;
+      if (filters.type) {
+        // The type is now the property's own unit type, so the filter matches
+        // its code ("1B") or its name ("One Bedroom"), case-insensitively.
+        where.unitType = {
+          OR: [
+            { code: { equals: filters.type, mode: 'insensitive' } },
+            { name: { contains: filters.type, mode: 'insensitive' } },
+          ],
+        };
+      }
       if (filters.branchId) where.property = { branchId: filters.branchId };
       if (filters.floor) where.floor = Number(filters.floor);
       if (filters.bedrooms) where.bedrooms = Number(filters.bedrooms);
@@ -230,6 +239,7 @@ export class UnitsService {
           take: limit,
           include: {
             property: { select: { id: true, name: true, code: true } },
+            unitType: { select: { id: true, code: true, name: true } },
             agreements: {
               where: { status: AgreementStatus.ACTIVE },
               orderBy: { startDate: 'desc' },
@@ -487,7 +497,7 @@ export class UnitsService {
         status: unit.status,
         propertyCode: unit.property?.code ?? '',
         propertyName: unit.property?.name ?? '',
-        type: unit.type ?? '',
+        type: unit.unitType?.code ?? '',
         floor: unit.floor ?? '',
         bedrooms: unit.bedrooms ?? '',
         bathrooms: unit.bathrooms ?? '',
@@ -535,6 +545,40 @@ export class UnitsService {
     }> = [];
 
     const propertyCache = new Map<string, string | null>();
+    const unitTypeCache = new Map<string, string | null>();
+
+    /**
+     * The unit type a row names, by its code.
+     *
+     * The type is created when it is missing, because the file is the estate's
+     * own inventory: "12 × 1B" is how a property is onboarded, and a type that
+     * has no deposit rule yet is a decision somebody still has to make, not an
+     * import failure. The type is created **without** a rule on purpose —
+     * "nobody has decided the deposit" must not arrive as "no deposit".
+     */
+    const resolveUnitTypeId = async (propertyId: string, code: string) => {
+      const key = `${propertyId}:${code.toLowerCase()}`;
+      if (unitTypeCache.has(key)) {
+        return unitTypeCache.get(key) ?? undefined;
+      }
+
+      const existing = await this.prisma.propertyUnitType.findFirst({
+        where: { propertyId, code: { equals: code, mode: 'insensitive' } },
+        select: { id: true },
+      });
+
+      if (existing) {
+        unitTypeCache.set(key, existing.id);
+        return existing.id;
+      }
+
+      const created = await this.prisma.propertyUnitType.create({
+        data: { propertyId, code, name: code },
+        select: { id: true },
+      });
+      unitTypeCache.set(key, created.id);
+      return created.id;
+    };
 
     const resolvePropertyId = async (propertyCode: string) => {
       if (propertyCache.has(propertyCode)) {
@@ -613,11 +657,15 @@ export class UnitsService {
           continue;
         }
 
+        const unitTypeId = row.type
+          ? await resolveUnitTypeId(propertyId, row.type)
+          : undefined;
+
         const created = await this.createWithGeneratedCode(
           {
             name,
             property: { connect: { id: propertyId } },
-            type: row.type || undefined,
+            unitType: unitTypeId ? { connect: { id: unitTypeId } } : undefined,
             floor: row.floor ? Number(row.floor) : undefined,
             bedrooms: row.bedrooms ? Number(row.bedrooms) : undefined,
             bathrooms: row.bathrooms ? Number(row.bathrooms) : undefined,
@@ -675,7 +723,7 @@ interface UnitExportRow {
   name: string;
   status: string;
   property?: { code?: string | null; name?: string | null } | null;
-  type?: string | null;
+  unitType?: { id?: string; code?: string; name?: string } | null;
   floor?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;

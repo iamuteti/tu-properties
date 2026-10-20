@@ -492,7 +492,8 @@ export interface Property {
     // Related entities
     units?: any[];
     standingCharges?: any[];
-    securityDeposits?: any[];
+    /** The property's own kinds of unit, with the deposit rule on each. */
+    unitTypes?: PropertyUnitType[];
     
     createdAt: string;
     updatedAt: string;
@@ -512,6 +513,14 @@ export interface Unit {
     propertyId: string;
     property?: Property;
 
+    /**
+     * Which kind of unit this is — the property's own type ("1B", "2B"),
+     * rather than a free-text label. The deposit rule hangs off the type, so
+     * this has to be a controlled value.
+     */
+    unitTypeId?: string | null;
+    unitType?: PropertyUnitType;
+
     // Pricing
     quotedPrice?: number;
     baseRent?: number;
@@ -528,7 +537,6 @@ export interface Unit {
     bathrooms?: number;
     furnished?: boolean;
     outSourceParking?: string;
-    type?: any;
 
     // Ownership
     ownerOccupied?: boolean;
@@ -1817,6 +1825,159 @@ export interface TenantRequest {
         email?: string | null;
     } | null;
     decidedBy?: { id: string; firstName: string; lastName: string } | null;
+}
+
+// ============================================
+// SECURITY DEPOSITS (Module 5, read side)
+// ============================================
+
+/**
+ * Where a deposit stands.
+ *
+ * `HELD` — taken and still in hand. `PART_DEDUCTED` — deductions recorded but
+ * not settled. `DEDUCTED` — the deductions use it all up. `REFUNDED` — paid
+ * back; only the deductions stayed behind. `WAIVED` — the owner let this
+ * resident off it, on the record.
+ */
+export type DepositDisposition =
+    | 'HELD'
+    | 'PART_DEDUCTED'
+    | 'DEDUCTED'
+    | 'REFUNDED'
+    | 'WAIVED';
+
+export interface SecurityDepositRow {
+    agreementId: string;
+    agreementCode: string;
+    agreementStatus: string;
+    agreementType: string;
+    startDate: string;
+    endDate: string | null;
+    currency: string;
+    rentAmount: number;
+    /**
+     * What the property's rule said this deposit should be, and what this
+     * resident agreed to, and what actually turned up. Three numbers, because
+     * they answer three different questions.
+     */
+    requiredAmount: number | null;
+    depositAmount: number;
+    receivedAmount: number;
+    invoiceId: string | null;
+    invoiceNumber: string | null;
+    waived: boolean;
+    waiverReason: string | null;
+    tenant: { id: string; code: string; name: string; accountNumber: string };
+    property: { id: string; name: string; code: string } | null;
+    unit: { id: string; name: string; code: string } | null;
+    /** The kind of unit, which is what the rule hangs off. */
+    unitType: { id: string; code: string; name: string } | null;
+    disposition: DepositDisposition;
+    /** Deductions recorded against this deposit. */
+    deductionsTotal: number;
+    /** Rent still unpaid on the agreement, which comes off the deposit first. */
+    unpaidRent: number;
+    /** What goes back if the deposit is settled now — derived, never typed. */
+    refundDue: number;
+    /** The excess the deductions and arrears run past the deposit. */
+    carriedForward: number;
+    /** The refund actually paid out, once it has been. */
+    refundedAmount: number;
+    /** What the company still holds on this deposit. */
+    netHeld: number;
+    moveOut: {
+        id: string;
+        status: string;
+        moveoutDate: string;
+        deductionsTotal: number;
+        refunded: boolean;
+        refundedAmount: number | null;
+        refundedAt: string | null;
+    } | null;
+}
+
+/** The register's totals, one line per currency. */
+export interface DepositSummaryLine {
+    currency: string;
+    deposits: number;
+    refunded: number;
+    deductions: number;
+    netHeld: number;
+    received: number;
+    count: number;
+}
+
+export interface SecurityDepositRegister {
+    data: SecurityDepositRow[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+    summary: DepositSummaryLine[];
+}
+
+/**
+ * A kind of unit a property has — "1B", "2B", "3B".
+ *
+ * Declared per property rather than globally, because two estates call the
+ * same kind of unit different things and the deposit for a "2B" in one is not
+ * the deposit for a "2B" in another.
+ */
+export interface PropertyUnitType {
+    id: string;
+    propertyId: string;
+    code: string;
+    name: string;
+    bedrooms?: number | null;
+    bathrooms?: number | null;
+    /** The deposit rule on this kind of unit, if one has been set. */
+    depositRule?: PropertyDepositRule | null;
+    _count?: { units: number };
+}
+
+/**
+ * What the owner requires as a deposit for one kind of unit.
+ *
+ * One number, or a number of months of the rent. A rule of **zero** means
+ * "this kind of unit takes no deposit", said on the record; **no rule at all**
+ * means "nobody has decided yet", and the agreement screen says so rather
+ * than charging nothing silently.
+ */
+export interface PropertyDepositRule {
+    id: string;
+    unitTypeId?: string;
+    amount: number;
+    basis: 'FIXED' | 'RENT_MONTHS';
+    months?: number | null;
+}
+
+/** The rule that applies to a unit, and what it works out to. */
+export interface UnitDepositRule {
+    unitId: string | null;
+    unitTypeId: string | null;
+    unitTypeCode: string | null;
+    unitTypeName: string | null;
+    /** False when nobody has set a rule for this kind of unit yet. */
+    decided: boolean;
+    rule: {
+        id: string;
+        amount: number;
+        basis: string;
+        months: number | null;
+    } | null;
+    /** What the rule works out to for this rent. */
+    amount: number;
+}
+
+/** The deposit rules, per kind of unit. */
+export interface PropertyDepositPolicy {
+    id: string;
+    propertyId: string;
+    propertyName: string;
+    unitTypeId: string;
+    unitTypeCode: string;
+    unitTypeName: string;
+    amount: number;
+    basis: string;
+    months: number | null;
+    unitCount: number;
 }
 
 // ============================================

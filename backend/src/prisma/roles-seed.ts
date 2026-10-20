@@ -17,8 +17,30 @@ export const PERMISSION_MODULES = [
   'units',
   'landlords',
   'tenants',
-  'leases',
+  // Module 5. The key is `agreements`, and it is spelled that way on purpose.
+  //
+  // Every other key in this list is the snake_case plural of the model it
+  // governs (`CrmLead` → `crm_leads`, `WorkOrder` → `work_orders`,
+  // `TenantRequest` → `tenant_requests`), and the model here is `Agreement`
+  // (table `agreements`, routes `/agreements`). The key used to be `leases` —
+  // the word the module was called before the rename — while every controller
+  // asked for `agreements.create` / `.update` / `.delete`, so `hasPermission`
+  // read `modules.agreements`, which no role's JSON contained, and refused
+  // every agreement write to every customer. SUPER_ADMIN was the only way in,
+  // because `all: true` bypasses the check.
+  //
+  // The two words are still both true of the product — the screen is called
+  // "Leases" in the sidebar and the register is called "Agreements" in the
+  // API — but a permission key has to match one of them exactly, and the
+  // matrix's own convention says it has to be the model's name. `permission-keys.spec.ts`
+  // now fails the build if a controller asks for a key this list does not
+  // contain, so the next rename cannot fail silently.
+  'agreements',
   'moveouts',
+  // Module 5, deposit side. Its own module because the rule, the waiver and
+  // the register are a subject of their own — a deposit is money the company
+  // is holding on a resident's behalf, and it is neither rent nor a lease.
+  'deposits',
   'invoices',
   'payments',
   'receipts',
@@ -31,7 +53,6 @@ export const PERMISSION_MODULES = [
   'crm_leads',
   'crm_contacts',
   'sales',
-  'leases',
   'tenant_requests',
   'owner_statements',
   'owner_payouts',
@@ -161,6 +182,23 @@ export interface ModulePermissions {
   /** Release the money. Always narrower than `approve`. */
   pay?: boolean;
   /**
+   * Module 12. **Salaries, bank details, national identifiers.**
+   *
+   * Separate from `view` for the same reason `payroll.approve` is separate from
+   * `payroll.pay`: the directory is "who works here", and this is "what they are
+   * paid" — a property manager needs the first and must not have the second.
+   *
+   * It was also a permission nobody could hold. `employees.controller.ts` has
+   * asked for `employees.compensation` on every path that returns or changes pay
+   * since the module landed, and `full()` never emitted the key, so
+   * `hasPermission` read `modules.employees.compensation` — which no role's JSON
+   * contained — and refused every compensation route to every customer. The
+   * `HR_COMPENSATION_ROLES` list on the controller said an administrator, an
+   * accountant and an HR manager, and the matrix said the same thing in prose,
+   * and the answer was 403 for all three.
+   */
+  compensation?: boolean;
+  /**
    * Module 17. **Operate the notification system**: configure a provider, activate a
    * channel, send a test, and run the reminder sweep by hand.
    *
@@ -278,6 +316,25 @@ const notificationsFull = (): ModulePermissions => ({
 });
 
 /**
+ * Module 12's employees, which need the one action `full()` deliberately omits.
+ *
+ * `compensation` is salaries, bank details and national identifiers, and it is
+ * kept out of `full()` for the same reason `run` is: it means nothing to the
+ * other modules, and the whole point of the split is that the roles who run
+ * the company are not the roles who get to read a payslip. Only the three roles
+ * in `HR_COMPENSATION_ROLES` — an administrator, an accountant and an HR
+ * manager — hold it, and the operational half of this product stops at
+ * `employees: view()`.
+ */
+const employeesFull = (): ModulePermissions => ({
+  view: true,
+  create: true,
+  update: true,
+  delete: true,
+  compensation: true,
+});
+
+/**
  * Module 12's payroll, which needs the two actions `full()` deliberately omits.
  *
  * Not a generalisation of `full()`: giving every module `approve` and `pay` would
@@ -379,8 +436,11 @@ export const SYSTEM_ROLES: {
       units: full(),
       landlords: full(),
       tenants: full(),
-      leases: full(),
+      agreements: full(),
       moveouts: full(),
+      // Module 5, deposit side: the administrator sets the deposit rules and
+      // answers for the money.
+      deposits: full(),
       invoices: full(),
       payments: full(),
       receipts: full(),
@@ -431,7 +491,7 @@ export const SYSTEM_ROLES: {
       // Module 12. Full HR: this role may have to fix a misconfigured
       // statutory rule without waiting for an accountant. Salary visibility
       // follows ADMIN throughout this product.
-      employees: full(),
+      employees: employeesFull(),
       leave_requests: full(),
       leave_policies: full(),
       holidays: full(),
@@ -478,7 +538,10 @@ export const SYSTEM_ROLES: {
       // Module 4: a property manager can run a sale to handover.
       sales: full(),
       // Module 5: leases, renewals and move-outs are daily property work.
-      leases: full(),
+      agreements: full(),
+      // ...and so is the deposit: the property manager sets what each kind of
+      // unit in their buildings costs as a deposit, and reads the register.
+      deposits: full(),
       // Resident requests raised from the tenant portal.
       tenant_requests: full(),
       // Module 18: refund and purchase approvals arrive at a property manager,
@@ -547,8 +610,12 @@ export const SYSTEM_ROLES: {
     permissions: set({
       tenants: viewWrite(),
       units: view(),
-      leases: viewWrite(),
+      agreements: viewWrite(),
       moveouts: viewWrite(),
+      // Module 5: a leasing officer raises agreements, so they need to see what
+      // the deposit is for the unit they are letting — but the rule belongs to
+      // the property manager, and the money belongs to whoever records it.
+      deposits: view(),
       documents: viewWrite(),
       // Enquiries and viewings are how a leasing officer's day starts.
       crm_leads: full(),
@@ -655,7 +722,12 @@ export const SYSTEM_ROLES: {
       payments: full(),
       receipts: full(),
       tenants: view(),
-      leases: view(),
+      agreements: view(),
+      // Module 5: the accountant records the money — a deposit is received,
+      // applied and refunded through the finance module — and reads the
+      // register that says how much the estate is holding. They do **not** set
+      // the rule: what a deposit costs is the owner's policy, not finance's.
+      deposits: { view: true, create: true },
       landlords: view(),
       documents: viewWrite(),
       // Module 6: statements and payouts are finance work.
@@ -719,7 +791,7 @@ export const SYSTEM_ROLES: {
       // their job — and they own the statutory rules, because a rule's figures
       // are a legal matter and the person who posts the liability is better
       // placed to enter them than a system administrator.
-      employees: full(),
+      employees: employeesFull(),
       leave_requests: view(),
       holidays: view(),
       payroll: payrollFull(),
@@ -950,11 +1022,11 @@ export const SYSTEM_ROLES: {
       // role has permissions nobody uses and nothing for the job it names. It is
       // the role this module exists to give something to.
       //
-      // `employees: full()` is compensation: salaries, bank details and national
-      // identifiers. That is correct for an HR manager and *only* for an HR
+      // `employees: employeesFull()` is compensation: salaries, bank details and
+      // national identifiers. That is correct for an HR manager and *only* for an HR
       // manager among the operational roles, which is why the rest of this matrix
       // stops at `employees: view()`.
-      employees: full(),
+      employees: employeesFull(),
       leave_requests: full(),
       leave_policies: full(),
       holidays: full(),

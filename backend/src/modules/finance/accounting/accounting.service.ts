@@ -817,6 +817,212 @@ export class AccountingService {
   }
 
   /**
+   * A deposit charged: the resident now owes us the deposit, and we will be
+   * holding it for them.
+   *
+   * Dr Security Deposits Receivable (1300) / Cr Security Deposits Held (2400).
+   *
+   * Not income. A deposit is money we hold on somebody's behalf, and booking
+   * it as rent revenue is how a balance sheet ends up claiming the estate
+   * earned money it is holding. The liability rises when the deposit is
+   * charged and falls when it is refunded, so the balance of 2400 is the
+   * answer to "how much deposit money is the estate holding".
+   */
+  async postDepositCharged(
+    args: {
+      invoiceId: string;
+      invoiceNumber: string;
+      issueDate: Date;
+      amount: number;
+      memo?: string;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const amount = round2(Number(args.amount));
+    if (amount <= 0) return null;
+
+    return this.postEntry(
+      {
+        entryDate: args.issueDate,
+        memo: args.memo ?? `Deposit charged on invoice ${args.invoiceNumber}`,
+        reference: args.invoiceNumber,
+        source: JournalEntrySource.INVOICE,
+        sourceRef: {
+          type: 'INVOICE',
+          id: args.invoiceId,
+          number: args.invoiceNumber,
+        },
+        lines: [
+          {
+            accountCode: ACCOUNT_CODES.SECURITY_DEPOSITS_RECEIVABLE,
+            debit: amount,
+            description: `Deposit receivable on invoice ${args.invoiceNumber}`,
+          },
+          {
+            accountCode: ACCOUNT_CODES.SECURITY_DEPOSITS_HELD,
+            credit: amount,
+            description: `Deposit held on invoice ${args.invoiceNumber}`,
+          },
+        ],
+      },
+      tenantId,
+      tx,
+    );
+  }
+
+  /**
+   * A deposit recognised out of money that arrived "on account".
+   *
+   * The common case is the move-in payment: one amount covering the first
+   * month's rent and the deposit. The payment is credited to ordinary
+   * receivables when it lands, and this entry moves the deposit's share of it
+   * across to the deposit receivable, which is where the deposit invoice put
+   * it in the first place. Without it the deposit invoice looks half unpaid
+   * while the cash is plainly in the bank.
+   */
+  async postDepositRecognised(
+    args: {
+      amount: number;
+      invoiceNumber: string;
+      paymentId?: string;
+      recognisedOn: Date;
+      description?: string;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const amount = round2(Number(args.amount));
+    if (amount <= 0) return null;
+
+    return this.postEntry(
+      {
+        entryDate: args.recognisedOn,
+        memo:
+          args.description ??
+          `Deposit recognised against invoice ${args.invoiceNumber}`,
+        source: JournalEntrySource.PAYMENT,
+        sourceRef: args.paymentId
+          ? { type: 'PAYMENT', id: args.paymentId }
+          : { type: 'INVOICE', number: args.invoiceNumber },
+        lines: [
+          {
+            accountCode: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+            debit: amount,
+            description: `Deposit recognised on invoice ${args.invoiceNumber}`,
+          },
+          {
+            accountCode: ACCOUNT_CODES.SECURITY_DEPOSITS_RECEIVABLE,
+            credit: amount,
+            description: `Deposit receivable on invoice ${args.invoiceNumber}`,
+          },
+        ],
+      },
+      tenantId,
+      tx,
+    );
+  }
+
+  /**
+   * A deposit settled at the end of a tenancy.
+   *
+   * The deposit leaves the estate, and the ledger says where it went: what was
+   * refunded went out in cash, what the claims took was given back to the
+   * resident in value, and what the deposit reached of the unpaid rent
+   * extinguished the rent receivable.
+   *
+   * The order the claims are applied in is the deposit's own: the itemised
+   * deductions first, the rent second. So when the deductions alone use up the
+   * deposit, the rent is still owed and stays on the account where the rent
+   * invoice put it, and the part of the deductions the deposit did not reach
+   * becomes a receivable from the departing resident.
+   *
+   * The claims are credited to `Refunds And Allowances` — the contra-revenue
+   * account this codebase already uses for money handed back to a customer —
+   * because a deposit is money the resident paid us in advance, and spending it
+   * on their damage is an allowance against what they paid, not revenue the
+   * estate earned.
+   */
+  async postDepositSettled(
+    args: {
+      amount: number;
+      refundAmount: number;
+      deductionsAmount: number;
+      rentCoveredAmount: number;
+      unpaidDeductionsAmount: number;
+      agreementCode: string;
+      settledOn: Date;
+      description?: string;
+    },
+    tenantId: string,
+    tx: Tx = this.prisma,
+  ) {
+    const held = round2(Number(args.amount));
+    if (held <= 0) return null;
+
+    const refund = round2(Number(args.refundAmount));
+    const deductions = round2(Number(args.deductionsAmount));
+    const rentCovered = round2(Number(args.rentCoveredAmount));
+    const unpaidDeductions = round2(Number(args.unpaidDeductionsAmount));
+    const description =
+      args.description ?? `Deposit settled on ${args.agreementCode}`;
+
+    const lines: JournalLineInput[] = [
+      {
+        // The liability falls by the whole deposit: after this the estate
+        // holds nothing for this resident.
+        accountCode: ACCOUNT_CODES.SECURITY_DEPOSITS_HELD,
+        debit: held,
+        description,
+      },
+    ];
+
+    if (refund > 0) {
+      lines.push({
+        accountCode: '1010',
+        credit: refund,
+        description: `Deposit refunded to the resident on ${args.agreementCode}`,
+      });
+    }
+
+    if (deductions > 0) {
+      lines.push({
+        accountCode: ACCOUNT_CODES.REFUNDS_AND_ALLOWANCES,
+        credit: deductions,
+        description: `Claims met from the deposit on ${args.agreementCode}`,
+      });
+    }
+
+    if (rentCovered > 0) {
+      lines.push({
+        accountCode: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+        credit: rentCovered,
+        description: `Unpaid rent taken from the deposit on ${args.agreementCode}`,
+      });
+    }
+
+    if (unpaidDeductions > 0) {
+      lines.push({
+        accountCode: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+        debit: unpaidDeductions,
+        description: `Claims the deposit did not cover on ${args.agreementCode}`,
+      });
+    }
+
+    return this.postEntry(
+      {
+        entryDate: args.settledOn,
+        memo: description,
+        source: JournalEntrySource.PAYMENT,
+        sourceRef: { type: 'AGREEMENT', number: args.agreementCode },
+        lines,
+      },
+      tenantId,
+      tx,
+    );
+  }
+
+  /**
    * Tax remitted to the authority *by us*: debit the liability, credit the bank.
    *
    * Only for the flow where the company collects the money and pays the

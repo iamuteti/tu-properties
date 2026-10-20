@@ -11,8 +11,9 @@ import { Select } from '@/components/ui/simple-select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ErrorState } from '@/components/ui/entity-states';
-import { CURRENCIES, UNIT_TYPES } from '@/lib/constants';
-import type { Property, Unit, UnitFeature } from '@/types';
+import { CURRENCIES } from '@/lib/constants';
+import { propertiesApi } from '@/lib/api';
+import type { Property, PropertyUnitType, Unit, UnitFeature } from '@/types';
 
 /**
  * Shared unit form for create and edit.
@@ -28,7 +29,13 @@ import type { Property, Unit, UnitFeature } from '@/types';
 const unitSchema = z.object({
     propertyId: z.string().min(1, 'Property is required'),
     name: z.string().trim().min(1, 'Unit name/number is required'),
-    type: z.string().optional(),
+    /**
+     * Which kind of unit this is. It used to be a free-text label typed from a
+     * global list, which is why the deposit rule had nothing controlled to
+     * hang off and why "1B" and "1 Bedroom" could be two different things. It
+     * is now the property's own type.
+     */
+    unitTypeId: z.string().optional(),
     sequence: z.number().int().min(0).optional().or(z.literal(NaN)),
     floor: z.number().int().min(0).max(200).optional().or(z.literal(NaN)),
     bedrooms: z.number().int().min(0).max(50).optional().or(z.literal(NaN)),
@@ -50,7 +57,7 @@ const unitSchema = z.object({
 export type UnitFormValues = z.infer<typeof unitSchema>;
 
 const STEPS = [
-    { id: 'identity', label: 'Unit', fields: ['propertyId', 'name', 'type', 'sequence', 'floor'] },
+    { id: 'identity', label: 'Unit', fields: ['propertyId', 'name', 'unitTypeId', 'sequence', 'floor'] },
     { id: 'specs', label: 'Specifications', fields: ['bedrooms', 'bathrooms', 'areaSqFt', 'furnished', 'ownerOccupied'] },
     { id: 'pricing', label: 'Pricing', fields: ['baseRent', 'currency', 'chargePlan'] },
     {
@@ -95,7 +102,7 @@ export function UnitForm({
         const base: Partial<UnitFormValues> = {
             propertyId: defaultPropertyId ?? '',
             name: '',
-            type: '',
+            unitTypeId: '',
             currency: 'KES',
             chargePlan: '',
             outSourceParking: '',
@@ -109,7 +116,7 @@ export function UnitForm({
             ...base,
             propertyId: initial.propertyId,
             name: initial.name,
-            type: initial.type ?? '',
+            unitTypeId: initial.unitTypeId ?? '',
             sequence: initial.sequence,
             floor: initial.floor,
             bedrooms: initial.bedrooms,
@@ -143,6 +150,36 @@ export function UnitForm({
     });
 
     const watched = watch();
+
+    /**
+     * The kinds of unit the selected property has.
+     *
+     * They are the property's own, not a global list, because two estates call
+     * the same kind of unit different things — and because the deposit rule
+     * hangs off them.
+     */
+    const [unitTypes, setUnitTypes] = useState<PropertyUnitType[]>([]);
+    useEffect(() => {
+        const propertyId = watched.propertyId;
+        if (!propertyId) {
+            setUnitTypes([]);
+            return;
+        }
+        let active = true;
+        propertiesApi
+            .listUnitTypes(propertyId)
+            .then((response) => {
+                if (active) setUnitTypes(response.data);
+            })
+            .catch(() => {
+                // A property with no types yet is normal; the select simply
+                // offers "no type" and the property screen sets them up.
+                if (active) setUnitTypes([]);
+            });
+        return () => {
+            active = false;
+        };
+    }, [watched.propertyId]);
 
     useEffect(() => {
         if (mode !== 'create') return;
@@ -276,12 +313,12 @@ export function UnitForm({
                     <Field label="Unit name / number" id="name" error={errors.name?.message} required>
                         <Input id="name" placeholder="e.g. Flat 12" {...register('name')} disabled={isSubmitting} />
                     </Field>
-                    <Field label="Type" id="type">
-                        <Select id="type" {...register('type')} disabled={isSubmitting}>
-                            <option value="">Select type</option>
-                            {UNIT_TYPES.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
+                    <Field label="Kind of unit" id="unitTypeId">
+                        <Select id="unitTypeId" {...register('unitTypeId')} disabled={isSubmitting}>
+                            <option value="">No type</option>
+                            {unitTypes.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                    {option.code} — {option.name}
                                 </option>
                             ))}
                         </Select>

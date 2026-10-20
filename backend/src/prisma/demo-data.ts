@@ -104,12 +104,23 @@ import {
 import {
   setActiveProfile,
   getActiveProfile,
+  getProfile,
+  PROFILES,
+  demoMarkets,
+  orgEmailDomain,
+  rentInRange,
+  randomFrom,
   randomPhone as profileRandomPhone,
   randomName as profileRandomName,
   randomAddress as profileRandomAddress,
   randomEmail as profileRandomEmail,
   randomTaxId as profileRandomTaxId,
   randomPropertyName as profileRandomPropertyName,
+  randomBank as profileRandomBank,
+  randomBankBranch as profileRandomBankBranch,
+  randomCity as profileRandomCity,
+  randomDistrict as profileRandomDistrict,
+  randomPostalCode as profileRandomPostalCode,
   utilityRate,
 } from './jurisdictions';
 
@@ -336,70 +347,139 @@ export async function generateDemoData(
   }
   console.log('Utility meters and rates generated.');
 
-  // ========== Units (1500+ units) ==========
-  console.log('Generating units...');
+  // ========== Unit types, deposit rules and units (1500+ units) ==========
+  console.log('Generating unit types, deposit rules and units...');
   const units: Unit[] = [];
+
+  /**
+   * The kinds of unit a property has, and what the owner asks as a deposit
+   * for each one.
+   *
+   * This is the onboarding picture: a property declares "1B, 2B, 3B" and the
+   * deposit that goes with each. A fifth of the properties take no deposit at
+   * all — that is a rule of zero, said on the record — and a few leave one of
+   * their kinds of unit with **no rule at all**, which is the "nobody has
+   * decided yet" case the agreement screen refuses to guess at.
+   */
+  interface DemoUnitType {
+    code: string;
+    name: string;
+    bedrooms: number | null;
+    bathrooms: number | null;
+    /** How many months of rent the owner asks for. */
+    months: number;
+  }
+
+  const RESIDENTIAL_UNIT_TYPES: DemoUnitType[] = [
+    { code: 'studio', name: 'Studio', bedrooms: 0, bathrooms: 1, months: 1 },
+    { code: '1B', name: 'One Bedroom', bedrooms: 1, bathrooms: 1, months: 1 },
+    { code: '2B', name: 'Two Bedroom', bedrooms: 2, bathrooms: 2, months: 2 },
+    { code: '3B', name: 'Three Bedroom', bedrooms: 3, bathrooms: 2, months: 2 },
+  ];
+  const COMMERCIAL_UNIT_TYPES: DemoUnitType[] = [
+    {
+      code: 'office',
+      name: 'Office',
+      bedrooms: null,
+      bathrooms: null,
+      months: 3,
+    },
+    {
+      code: 'shop',
+      name: 'Retail Space',
+      bedrooms: null,
+      bathrooms: null,
+      months: 3,
+    },
+    {
+      code: 'warehouse',
+      name: 'Warehouse',
+      bedrooms: null,
+      bathrooms: null,
+      months: 6,
+    },
+  ];
+
   for (const property of properties) {
     // Determine number of units per property
     const unitsPerProperty = Math.floor(Math.random() * 30) + 10; // 10-40 units
 
+    const catalogue =
+      property.category === 'residential'
+        ? RESIDENTIAL_UNIT_TYPES
+        : COMMERCIAL_UNIT_TYPES;
+
+    const takesNoDeposit = Math.random() < 0.2;
+    const undecidedCode = takesNoDeposit
+      ? null
+      : catalogue[Math.floor(Math.random() * catalogue.length)].code;
+
+    const unitTypeIds = new Map<string, string>();
+    for (const spec of catalogue) {
+      const unitType = await prisma.propertyUnitType.create({
+        data: {
+          propertyId: property.id,
+          code: spec.code,
+          name: spec.name,
+          bedrooms: spec.bedrooms,
+          bathrooms: spec.bathrooms,
+        },
+      });
+      unitTypeIds.set(spec.code, unitType.id);
+
+      if (takesNoDeposit) {
+        // "This kind of unit takes no deposit" — a decision, on the record.
+        await prisma.propertyDepositRule.create({
+          data: {
+            unitTypeId: unitType.id,
+            amount: 0,
+            basis: 'FIXED',
+            months: null,
+          },
+        });
+      } else if (spec.code !== undecidedCode) {
+        // "One month's rent" and the like: the rule follows the rent, so an
+        // escalation does not leave the deposit securing nothing.
+        await prisma.propertyDepositRule.create({
+          data: {
+            unitTypeId: unitType.id,
+            amount: 0,
+            basis: 'RENT_MONTHS',
+            months: spec.months,
+          },
+        });
+      }
+    }
+
     for (let i = 1; i <= unitsPerProperty; i++) {
       // Determine base rent and unit type based on property category
       let baseRent: number;
-      let unitType;
+      const spec = catalogue[Math.floor(Math.random() * catalogue.length)];
 
-      if (property.category === 'residential') {
-        // Residential unit types
-        const residentialTypes = UNIT_TYPES.filter((t) =>
-          ['two-bedroom', 'one-bedroom', 'studio', 'executive-suite'].includes(
-            t.value,
-          ),
-        );
-        unitType =
-          residentialTypes[Math.floor(Math.random() * residentialTypes.length)];
-
-        switch (unitType.value) {
-          case 'studio':
-            baseRent = Math.floor(Math.random() * 30000) + 15000; // 15k-45k
-            break;
-          case 'one-bedroom':
-            baseRent = Math.floor(Math.random() * 50000) + 25000; // 25k-75k
-            break;
-          case 'two-bedroom':
-            baseRent = Math.floor(Math.random() * 80000) + 40000; // 40k-120k
-            break;
-          case 'executive-suite':
-            baseRent = Math.floor(Math.random() * 200000) + 100000; // 100k-300k
-            break;
-          default:
-            baseRent = Math.floor(Math.random() * 50000) + 20000;
-        }
-      } else {
-        // Commercial unit types
-        const commercialTypes = UNIT_TYPES.filter((t) =>
-          ['commercial-space', 'warehouse', 'office', 'retail'].includes(
-            t.value,
-          ),
-        );
-        unitType =
-          commercialTypes[Math.floor(Math.random() * commercialTypes.length)];
-
-        switch (unitType.value) {
-          case 'office':
-            baseRent = Math.floor(Math.random() * 300000) + 50000; // 50k-350k
-            break;
-          case 'commercial-space':
-            baseRent = Math.floor(Math.random() * 200000) + 30000; // 30k-230k
-            break;
-          case 'retail':
-            baseRent = Math.floor(Math.random() * 150000) + 40000; // 40k-190k
-            break;
-          case 'warehouse':
-            baseRent = Math.floor(Math.random() * 500000) + 100000; // 100k-600k
-            break;
-          default:
-            baseRent = Math.floor(Math.random() * 100000) + 30000;
-        }
+      switch (spec.code) {
+        case 'studio':
+          baseRent = Math.floor(Math.random() * 30000) + 15000; // 15k-45k
+          break;
+        case '1B':
+          baseRent = Math.floor(Math.random() * 50000) + 25000; // 25k-75k
+          break;
+        case '2B':
+          baseRent = Math.floor(Math.random() * 80000) + 40000; // 40k-120k
+          break;
+        case '3B':
+          baseRent = Math.floor(Math.random() * 120000) + 60000; // 60k-180k
+          break;
+        case 'office':
+          baseRent = Math.floor(Math.random() * 300000) + 50000; // 50k-350k
+          break;
+        case 'shop':
+          baseRent = Math.floor(Math.random() * 200000) + 30000; // 30k-230k
+          break;
+        case 'warehouse':
+          baseRent = Math.floor(Math.random() * 500000) + 100000; // 100k-600k
+          break;
+        default:
+          baseRent = Math.floor(Math.random() * 100000) + 30000;
       }
 
       const unit = await prisma.unit.create({
@@ -407,8 +487,10 @@ export async function generateDemoData(
           code: `${property.code}-${String(i).padStart(3, '0')}`,
           name: `Unit ${i}`,
           propertyId: property.id,
-          type: unitType.value,
+          unitTypeId: unitTypeIds.get(spec.code),
           baseRent,
+          bedrooms: spec.bedrooms,
+          bathrooms: spec.bathrooms,
           status: UnitStatus.VACANT, // Will be updated based on rental agreement
         },
       });
@@ -3694,7 +3776,52 @@ async function generateInventoryData(
 // Main function to run demo data generation standalone
 export interface SeedDemoDataOptions {
   country?: string; // ISO-3166-1 alpha-2 jurisdiction code
+  /**
+   * The markets to cover, by ISO-3166-1 alpha-2 code. Defaults to every market
+   * in `DEMO_MARKETS`; the primary `country` gets the two full demo
+   * organizations and each remaining market gets a market organization.
+   */
+  countries?: string[];
   multiBranch?: boolean; // create an international enterprise org with branches
+}
+
+/**
+ * The markets the demo covers, minus the primary one.
+ *
+ * An unknown code is an error rather than a skipped market: a typo in
+ * `DEMO_COUNTRIES` that quietly seeds fourteen countries instead of fifteen is
+ * the kind of mistake nobody notices until a demo fails to show a country it
+ * promised.
+ */
+function resolveMarketCodes(
+  options: SeedDemoDataOptions,
+  primary: string,
+): string[] {
+  const requested =
+    options.countries ??
+    (process.env.DEMO_COUNTRIES
+      ? process.env.DEMO_COUNTRIES.split(',')
+          .map((code) => code.trim())
+          .filter(Boolean)
+      : undefined);
+
+  const codes = (
+    requested
+      ? requested.map((code) => code.toUpperCase())
+      : demoMarkets(primary)
+  ).filter((code, index, all) => all.indexOf(code) === index);
+
+  const unknown = codes.filter((code) => !PROFILES[code]);
+  if (unknown.length > 0) {
+    throw new Error(
+      `Demo seed: unknown jurisdiction ${unknown.join(', ')}. ` +
+        `Known markets: ${Object.keys(PROFILES).join(', ')}.`,
+    );
+  }
+
+  // The primary market already has Rohi and Westhill; a second organization
+  // for it would only duplicate them.
+  return codes.filter((code) => code !== primary);
 }
 
 export async function seedDemoData(options: SeedDemoDataOptions = {}) {
@@ -3736,6 +3863,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     'leases',
     'tenant-requests',
     'moving-out',
+    'security-deposits',
     'invoices',
     'payments',
     'arrears',
@@ -3873,7 +4001,8 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     await prisma.utilityMeter.deleteMany();
     await prisma.unitServiceCharge.deleteMany();
     await prisma.unit.deleteMany();
-    await prisma.propertySecurityDeposit.deleteMany();
+    await prisma.propertyDepositRule.deleteMany();
+    await prisma.propertyUnitType.deleteMany();
     await prisma.propertyStandingCharge.deleteMany();
     await prisma.property.deleteMany();
     await prisma.landlord.deleteMany();
@@ -4010,6 +4139,63 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         `Created international organization with ${branches.length} branches.`,
       );
     }
+
+    // One market organization per remaining market.
+    //
+    // Rohi and Westhill carry the whole dataset — payroll, utilities,
+    // contracts, workflows — and that is where the detail belongs. What the
+    // market organizations add is *coverage*: the demo of a multi-country
+    // product has to show that a Kenyan organization and an Indian one are not
+    // the same rows with a different label on them, and the cheapest honest
+    // way to show that is to seed both with their own currency, locale,
+    // timezone, tax jurisdiction, rent band, names, addresses, phone formats,
+    // banks and utility tariffs.
+    console.log('Creating market organizations...');
+    const marketOrgs: MarketOrg[] = [];
+    for (const code of resolveMarketCodes(options, country)) {
+      const profile = getProfile(code);
+      // The market's first corporate name, not a random one. The organization
+      // slug and the administrator's email address are derived from it, and a
+      // demo login that changes on every seed run is a login you have to look
+      // up before you can use it. Each market has its own list, so the markets
+      // still differ from one another.
+      const name = profile.corporateNames[0];
+      const slug = marketSlug(name, code);
+      const org = await prisma.organization.create({
+        data: {
+          name,
+          slug,
+          subdomain: `m${code.toLowerCase()}`,
+          plan: 'PROFESSIONAL',
+          maxUsers: 10,
+          maxProperties: 50,
+          isActive: true,
+          currency: profile.currency,
+          timezone: profile.timezone,
+          taxCountryCode: profile.code,
+          taxRegionCode: null,
+          defaultLocale: profile.locale,
+          weekendDays: profile.weekendDays,
+        },
+      });
+
+      await prisma.subscription.create({
+        data: {
+          organizationId: org.id,
+          plan: 'PROFESSIONAL',
+          enabledModules: ALL_MODULE_KEYS,
+        },
+      });
+
+      marketOrgs.push({
+        code,
+        name,
+        slug,
+        organizationId: org.id,
+        emailDomain: orgEmailDomain(profile),
+      });
+    }
+    console.log(`Created ${marketOrgs.length} market organizations.`);
 
     // Seed the 12 system roles (idempotent; organization-scoped roles were
     // cleaned above)
@@ -4248,6 +4434,36 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
       });
     }
 
+    // Market organization admins.
+    //
+    // Every market organization needs a login, for the same reason the two
+    // primary ones do: an organization nobody can sign into is an organization
+    // the platform administrator can see but not demonstrate.
+    for (const market of marketOrgs) {
+      const email = `admin@${market.slug}.${market.emailDomain}`;
+      const user = await prisma.user.create({
+        data: {
+          email,
+          firstName: 'Market',
+          lastName: 'Admin',
+          phone: profileRandomPhone(getProfile(market.code)),
+          passwordHash,
+          role: UserRole.ADMIN,
+          organizationId: market.organizationId,
+        },
+      });
+
+      const adminRole = systemRoles.find((r) => r.name === 'Company Admin');
+      if (!adminRole) {
+        throw new Error(
+          'Demo seed: the "Company Admin" system role was not seeded, so market admins cannot be assigned one.',
+        );
+      }
+      await prisma.roleAssignment.create({
+        data: { userId: user.id, roleId: adminRole.id },
+      });
+    }
+
     // Item 7 — Minimal Westhill business data so both demo orgs have something
     // to look at (Westhill stays a "starter" dataset, not a clone of Rohi).
     await generateWesthillData(prisma, defaultOrg.id);
@@ -4342,6 +4558,14 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         },
       });
       console.log(`  Portal login: ${email} (password: Password123!)`);
+    }
+
+    // Market business data. Last, because each market needs its organization,
+    // its administrator and its jurisdiction profile to exist first, and
+    // because it is independent of everything the two primary organizations
+    // generated.
+    for (const market of marketOrgs) {
+      await generateMarketOrgData(prisma, market, passwordHash);
     }
 
     console.log('Demo data generation completed successfully!');
@@ -4447,14 +4671,27 @@ async function generateHrData(prisma: PrismaClient, organizationId: string) {
 
   // Public holidays for the year, so a leave request that spans one loses a day
   // and the calendar screen has something to explain.
-  const holidays: { date: string; name: string }[] = [
-    { date: '2026-01-01', name: "New Year's Day" },
-    { date: '2026-05-01', name: 'Labour Day' },
-    { date: '2026-06-01', name: 'Madaraka Day' },
-    { date: '2026-10-20', name: 'Huduma Day' },
-    { date: '2026-12-25', name: 'Christmas Day' },
-    { date: '2026-12-26', name: 'Boxing Day' },
-  ];
+  //
+  // Kenya's list is the real one. Every other market gets only the two dates
+  // that are observed everywhere in the shortlist: a calendar showing
+  // "Madaraka Day" in an Indian demo is a demo claiming a holiday the country
+  // does not have, and inventing a full calendar per country here would be a
+  // bigger claim than a seeding script should make. A market's own holidays
+  // belong in the holidays screen, which is where they are configured for real.
+  const holidays: { date: string; name: string }[] =
+    country === 'KE'
+      ? [
+          { date: '2026-01-01', name: "New Year's Day" },
+          { date: '2026-05-01', name: 'Labour Day' },
+          { date: '2026-06-01', name: 'Madaraka Day' },
+          { date: '2026-10-20', name: 'Huduma Day' },
+          { date: '2026-12-25', name: 'Christmas Day' },
+          { date: '2026-12-26', name: 'Boxing Day' },
+        ]
+      : [
+          { date: '2026-01-01', name: "New Year's Day" },
+          { date: '2026-12-25', name: 'Christmas Day' },
+        ];
   for (const holiday of holidays) {
     await prisma.holiday.create({
       data: {
@@ -7087,6 +7324,26 @@ async function generateWesthillData(
     },
   });
 
+  // The property's own kind of unit, and the deposit the owner asks for it:
+  // one month's rent, which follows the rent when it is escalated.
+  const westhillUnitType = await prisma.propertyUnitType.create({
+    data: {
+      propertyId: property.id,
+      code: '2B',
+      name: 'Two Bedroom',
+      bedrooms: 2,
+      bathrooms: 2,
+    },
+  });
+  await prisma.propertyDepositRule.create({
+    data: {
+      unitTypeId: westhillUnitType.id,
+      amount: 0,
+      basis: 'RENT_MONTHS',
+      months: 1,
+    },
+  });
+
   const units = await Promise.all(
     [1, 2].map((n) =>
       prisma.unit.create({
@@ -7094,7 +7351,7 @@ async function generateWesthillData(
           propertyId: property.id,
           code: `WG-0${n}`,
           name: `Unit 0${n}`,
-          type: 'two-bedroom',
+          unitTypeId: westhillUnitType.id,
           baseRent: n === 1 ? 85000 : 95000,
           status: n === 1 ? UnitStatus.OCCUPIED : UnitStatus.VACANT,
         },
@@ -7859,4 +8116,328 @@ async function generateAuditData(prisma: PrismaClient, organizationId: string) {
   }
 
   console.log(`  Audit log: ${count} entries`);
+}
+
+/**
+ * A market organization: the demo's presence in one country.
+ *
+ * The two primary demo organizations (Rohi, Westhill) carry the whole dataset —
+ * payroll, utilities, contracts, workflows, notifications. A market
+ * organization is deliberately *smaller*: one landlord, one property, three
+ * units, two tenancies and three months of billing. Its job is to be correct
+ * about its country, not to be deep. The depth lives in the primary
+ * organizations; the coverage lives here.
+ */
+type MarketOrg = {
+  code: string; // ISO-3166-1 alpha-2
+  name: string;
+  slug: string;
+  organizationId: string;
+  emailDomain: string;
+};
+
+const slugify = (value: string): string =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/**
+ * The organization slug for a market.
+ *
+ * Organization slugs are unique columns, and two markets can carry the same
+ * corporate name, so the country code — the one thing that cannot collide
+ * between two markets — is part of the slug.
+ */
+const marketSlug = (name: string, code: string): string =>
+  `${slugify(name)}-${code.toLowerCase()}`;
+
+/**
+ * Seed one market: a landlord, a property, three units, two tenancies and
+ * three months of billing, all in that market's currency, locale and calendar.
+ *
+ * Everything here comes from the jurisdiction profile rather than from a
+ * constant in this file, which is the whole point: a Johannesburg rent is
+ * 12,000 rand and not 12,000 dollars, a Seoul telephone number is eleven
+ * digits and not nine, and an Indian tax number is a GSTIN and not a KRA PIN.
+ * A market seeded with the primary country's figures is a market that claims
+ * to be somewhere it has never been.
+ */
+async function generateMarketOrgData(
+  prisma: PrismaClient,
+  market: MarketOrg,
+  passwordHash: string,
+): Promise<void> {
+  const profile = getProfile(market.code);
+  const prefix = market.code;
+
+  // ── Landlord ───────────────────────────────────────────────────────────
+  const landlordFirst = randomFrom(profile.firstNames);
+  const landlordLast = randomFrom(profile.lastNames);
+  const landlordName = `${landlordFirst} ${landlordLast}`;
+  const landlord = await prisma.landlord.create({
+    data: {
+      code: `${prefix}-LL-001`,
+      name: landlordName,
+      email: profileRandomEmail(landlordName, profile),
+      phone: profileRandomPhone(profile),
+      address: profileRandomAddress(profile),
+      city: profileRandomCity(profile),
+      country: profile.name,
+      postalCode: profileRandomPostalCode(profile),
+      bankName: profileRandomBank(profile),
+      bankBranch: profileRandomBankBranch(profile),
+      accountNumber: String(Math.floor(Math.random() * 10000000000)),
+      accountName: landlordName,
+      taxPin: profileRandomTaxId(profile),
+      vatRegistered: false,
+      organizationId: market.organizationId,
+    },
+  });
+
+  // ── Property ───────────────────────────────────────────────────────────
+  const city = profileRandomCity(profile);
+  const district = profileRandomDistrict(profile);
+  const property = await prisma.property.create({
+    data: {
+      code: `${prefix}-PROP-001`,
+      name: profileRandomPropertyName(1, profile),
+      country: profile.name,
+      estateArea: district,
+      areaRegion: city,
+      roadStreet: profileRandomAddress(profile),
+      category: 'residential',
+      type: 'apartment',
+      specification: 'multi-unit',
+      multiStoryType: 'low-rise',
+      numberOfFloors: 3,
+      notes: `Residential apartments in ${district}, ${city}, ${profile.name}.`,
+      landlordId: landlord.id,
+      organizationId: market.organizationId,
+    },
+  });
+
+  // ── Units ──────────────────────────────────────────────────────────────
+  // Three units, two of them let and one deliberately vacant — a portfolio
+  // with no vacancy cannot show a vacancy rate.
+  const unitSpecs = [
+    { code: '1B', name: 'One Bedroom', bedrooms: 1, months: 1 },
+    { code: '2B', name: 'Two Bedroom', bedrooms: 2, months: 2 },
+    { code: '3B', name: 'Three Bedroom', bedrooms: 3, months: 2 },
+  ];
+  const units: { id: string; rent: number }[] = [];
+  for (let i = 0; i < unitSpecs.length; i++) {
+    const spec = unitSpecs[i];
+    const rent = rentInRange(profile);
+    // Each kind of unit carries its own deposit rule — the same kind of unit
+    // in two properties can have two different deposits.
+    const unitType = await prisma.propertyUnitType.create({
+      data: {
+        propertyId: property.id,
+        code: spec.code,
+        name: spec.name,
+        bedrooms: spec.bedrooms,
+        bathrooms: spec.bedrooms,
+      },
+    });
+    await prisma.propertyDepositRule.create({
+      data: {
+        unitTypeId: unitType.id,
+        amount: 0,
+        basis: 'RENT_MONTHS',
+        months: spec.months,
+      },
+    });
+    const unit = await prisma.unit.create({
+      data: {
+        code: `${prefix}-U-${String(i + 1).padStart(2, '0')}`,
+        name: `Unit ${String(i + 1).padStart(2, '0')}`,
+        propertyId: property.id,
+        unitTypeId: unitType.id,
+        baseRent: rent,
+        currency: profile.currency,
+        floor: i,
+        bedrooms: spec.bedrooms,
+        bathrooms: spec.bedrooms,
+        furnished: false,
+        status: i < 2 ? UnitStatus.OCCUPIED : UnitStatus.VACANT,
+      },
+    });
+    units.push({ id: unit.id, rent });
+  }
+
+  // ── Tenants ────────────────────────────────────────────────────────────
+  const tenants: {
+    id: string;
+    surname: string;
+    otherNames: string | null;
+  }[] = [];
+  for (let i = 0; i < 2; i++) {
+    const first = randomFrom(profile.firstNames);
+    const last = randomFrom(profile.lastNames);
+    const tenant = await prisma.tenant.create({
+      data: {
+        accountNumber: `${prefix}-TEN-${String(i + 1).padStart(4, '0')}`,
+        code: `${prefix}-T${String(i + 1).padStart(4, '0')}`,
+        tenantType: 'Individual',
+        surname: last,
+        otherNames: first,
+        email: profileRandomEmail(`${first} ${last}`, profile),
+        phone: profileRandomPhone(profile),
+        town: profileRandomCity(profile),
+        status: TenantStatus.ACTIVE,
+        idNoRegNo: profileRandomTaxId(profile),
+        taxPin: profileRandomTaxId(profile),
+        postalAddress: profileRandomAddress(profile),
+        postalCode: profileRandomPostalCode(profile),
+        country: profile.name,
+        organizationId: market.organizationId,
+      },
+    });
+    tenants.push(tenant);
+  }
+
+  // ── Leases and three months of billing ────────────────────────────────
+  // Two months back, one month back, and the current month — settled, overdue
+  // and pending, so the arrears and the collection screens have something in
+  // them to show in this market too.
+  const monthStart = (offset: number): Date => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  };
+  const periodLabel = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+  for (let leaseIndex = 0; leaseIndex < 2; leaseIndex++) {
+    const unit = units[leaseIndex];
+    const tenant = tenants[leaseIndex];
+
+    const agreement = await prisma.agreement.create({
+      data: {
+        code: `${prefix}-RA-${String(leaseIndex + 1).padStart(4, '0')}`,
+        unitId: unit.id,
+        tenantId: tenant.id,
+        agreementType: AgreementType.RENTAL,
+        startDate: monthStart(-14),
+        endDate: monthStart(10),
+        termMonths: 24,
+        rentAmount: unit.rent,
+        currency: profile.currency,
+        paymentDay: 1,
+        securityDeposit: unit.rent,
+        noticePeriodDays: 30,
+        status: AgreementStatus.ACTIVE,
+        organizationId: market.organizationId,
+      },
+    });
+
+    for (const offset of [-2, -1, 0]) {
+      const issue = monthStart(offset);
+      const status =
+        offset === -2
+          ? InvoiceStatus.PAID
+          : offset === -1
+            ? InvoiceStatus.OVERDUE
+            : InvoiceStatus.PENDING;
+      const paidAmount = status === InvoiceStatus.PAID ? unit.rent : 0;
+
+      const invoice = await prisma.invoice.create({
+        data: {
+          invoiceNumber: `INV-${prefix}-${periodLabel(issue)}-${String(
+            leaseIndex + 1,
+          ).padStart(2, '0')}`,
+          agreementId: agreement.id,
+          landlordId: landlord.id,
+          issueDate: issue,
+          dueDate: new Date(issue.getFullYear(), issue.getMonth(), 6),
+          amount: unit.rent,
+          totalAmount: unit.rent,
+          paidAmount,
+          balanceAmount: unit.rent - paidAmount,
+          currency: profile.currency,
+          transactionClass: 'RENT',
+          billingPeriod: periodLabel(issue),
+          status,
+          organizationId: market.organizationId,
+        },
+      });
+
+      if (status !== InvoiceStatus.PAID) continue;
+
+      // M-PESA is a Kenyan instrument; every other market settles by bank
+      // transfer or card, and saying so is the point of a market demo.
+      const method =
+        prefix === 'KE'
+          ? PaymentMethod.MPESA
+          : Math.random() < 0.6
+            ? PaymentMethod.BANK_TRANSFER
+            : PaymentMethod.CARD;
+      const paymentDate = new Date(issue.getFullYear(), issue.getMonth(), 3);
+
+      const payment = await prisma.payment.create({
+        data: {
+          agreementId: agreement.id,
+          invoiceId: invoice.id,
+          paymentDate,
+          amount: unit.rent,
+          currency: profile.currency,
+          paymentMethod: method,
+          paymentReference: `${method}-${randomString(8)}`,
+          payee: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          paidFrom:
+            method === PaymentMethod.MPESA
+              ? 'M-PESA'
+              : method === PaymentMethod.CARD
+                ? 'Card'
+                : 'Bank Transfer',
+          paidTo: `${market.name} Operating Account`,
+          paymentType: PaymentType.ApplyToBill,
+          recordedBy: landlordName,
+          organizationId: market.organizationId,
+        },
+      });
+
+      await prisma.receipt.create({
+        data: {
+          receiptId: `REC-${prefix}-${periodLabel(issue)}-${String(
+            leaseIndex + 1,
+          ).padStart(2, '0')}`,
+          receiptType: ReceiptType.ApplyToInvoice,
+          receiptCategory: ReceiptCategory.Rent,
+          receivedFrom: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          paymentMethod: method,
+          recordingDate: paymentDate,
+          amountReceived: unit.rent,
+          currency: profile.currency,
+          tenantId: tenant.id,
+          landlordId: landlord.id,
+          receiptTo: ReceiptTo.Landlord,
+          drtOrDrf: DRTOrDRF.DirectReceipt,
+          recordedBy: landlordName,
+          payments: { connect: { id: payment.id } },
+          organizationId: market.organizationId,
+        },
+      });
+    }
+  }
+
+  // A resident login, so the portal can be demonstrated in this market too.
+  const portalTenant = tenants[0];
+  await prisma.user.create({
+    data: {
+      email: `tenant@${market.slug}.${market.emailDomain}`,
+      firstName: (portalTenant.otherNames ?? '').trim() || 'Tenant',
+      lastName: portalTenant.surname,
+      passwordHash,
+      role: UserRole.USER,
+      organizationId: market.organizationId,
+      portalTenantId: portalTenant.id,
+    },
+  });
+
+  console.log(
+    `  ${profile.name}: 1 property, ${units.length} units, ${tenants.length} tenants, 2 leases, 6 invoices (${profile.currency})`,
+  );
 }

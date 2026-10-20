@@ -71,11 +71,15 @@ export class UnitFieldsDto {
   @ToNumber()
   sequence?: number;
 
+  /**
+   * Which kind of unit this is — the property's own type ("1B", "2B"), not a
+   * free-text label. The deposit rule hangs off the type, so this has to be a
+   * controlled value: a string let "1B" and "1b" and "1 Bedroom" become three
+   * rules for one kind of unit.
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(60)
-  @CleanOptional()
-  type?: string;
+  unitTypeId?: string;
 
   @IsOptional()
   @IsString()
