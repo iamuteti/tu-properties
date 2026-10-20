@@ -10,13 +10,14 @@ export const Testimonials: React.FC = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs font-bold uppercase tracking-wider mb-3">
-            <span>Customer Case Studies</span>
+            <span>From The Demo Organizations</span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white font-display tracking-tight">
             Built for modern property enterprises.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-600 dark:text-slate-300">
-            How multi-branch property firms replace error-prone spreadsheets with audited derived ledgers.
+            What each seeded market organization actually holds — and what you can verify by
+            signing into it yourself.
           </p>
         </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AxiosError } from "axios";
-import { moveoutsApi } from "@/lib/api";
+import { moveOutsApi } from "@/lib/api";
 import { useAuth } from "./use-auth";
 import { MoveOutRequest } from "@/types";
 
@@ -18,6 +18,8 @@ export interface UseMoveoutsParams {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     status?: string;
+    tenantCode?: string;
+    tenantName?: string;
 }
 
 export function useMoveouts(params?: UseMoveoutsParams) {
@@ -36,13 +38,15 @@ export function useMoveouts(params?: UseMoveoutsParams) {
         params?.sortBy,
         params?.sortOrder,
         params?.status,
+        params?.tenantCode,
+        params?.tenantName,
     ]);
 
     const fetchMoveouts = useCallback(async () => {
         if (!user) return;
         setIsLoading(true);
         try {
-            const response = await moveoutsApi.findAll(paramsRef.current);
+            const response = await moveOutsApi.findAll(paramsRef.current);
             setMoveouts(response.data.data);
             setPaginationMeta(response.data.meta);
             setError(null);

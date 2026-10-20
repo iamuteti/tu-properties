@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Building2,
   TrendingUp,
@@ -9,23 +9,48 @@ import {
   CheckCircle,
   ArrowRight,
   Play,
-  Sparkles,
-  Smartphone,
   Globe2,
   Lock,
-  ChevronRight,
-  Clock,
-  Layers
+  Clock
 } from 'lucide-react';
+import {
+  MARKETS,
+  MARKET_CODES,
+  getMarket,
+  marketMidRent,
+  formatMoney,
+  type MarketProfile
+} from './data/landingData';
 
 interface HeroProps {
   onStartTrial: () => void;
   onSeeHowItWorks: () => void;
 }
 
+/** The public deployment origin (`DEPLOYMENT.md` → nginx `server_name`). */
+const APP_ORIGIN = 'properties.tuhame.co.ke';
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'payments' | 'payouts'>('overview');
-  const [activeBranch, setActiveBranch] = useState<'London' | 'New York' | 'Nairobi' | 'Dubai'>('London');
+  const [marketCode, setMarketCode] = useState<string>(MARKET_CODES[0]);
+
+  const market = useMemo(() => getMarket(marketCode), [marketCode]);
+  const midRent = useMemo(() => marketMidRent(market), [market]);
+
+  /** The portfolio rent roll the mockup shows: the market's own units and rent band. */
+  const rentRoll = useMemo(
+    () => market.properties.reduce((sum, property) => sum + property.unitCount, 0) * midRent,
+    [market, midRent]
+  );
+
+  const money = (amount: number) => formatMoney(amount, market);
 
   return (
     <section className="relative pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden bg-slate-50 dark:bg-[#070B14]">
@@ -46,13 +71,13 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-300/80 dark:border-slate-700/80 shadow-inner">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-              Built for Modern Multi-Entity Property Portfolios
+              One Organization Per Market — {MARKETS.length} Jurisdictions
             </span>
           </div>
 
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-300 text-xs font-medium">
+          <div className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-300 text-xs font-medium">
             <Globe2 className="w-3.5 h-3.5" />
-            <span>London • New York • Dubai • Nairobi • Singapore</span>
+            <span className="font-mono">{MARKET_CODES.join(' · ')}</span>
           </div>
         </div>
 
@@ -67,7 +92,11 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
 
           {/* Sub-headline */}
           <p className="mt-6 text-lg sm:text-xl text-slate-600 dark:text-slate-300 font-normal leading-relaxed max-w-3xl mx-auto">
-            From <strong className="text-slate-900 dark:text-white font-semibold">boutique 12-unit residential apartments</strong> to <strong className="text-slate-900 dark:text-white font-semibold">multi-story residential towers and high-rise commercial complexes</strong>. Properties, tenants, money, and staff unified in one audited platform with multi-branch and multi-currency controls.
+            From <strong className="text-slate-900 dark:text-white font-semibold">boutique 12-unit residential apartments</strong> to <strong className="text-slate-900 dark:text-white font-semibold">multi-story residential towers and high-rise commercial complexes</strong>. Properties, tenants, money and staff unified in one platform where{' '}
+            <strong className="text-slate-900 dark:text-white font-semibold">
+              every market is its own organization
+            </strong>{' '}
+            with its own currency, locale, tax rules and telephone formats.
           </p>
 
           {/* CTAs */}
@@ -118,7 +147,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
         <div className="mt-14 max-w-6xl mx-auto">
           <div className="relative rounded-2xl p-1 md:p-2 bg-gradient-to-b from-slate-200/60 dark:from-slate-700/60 via-slate-100/40 dark:via-slate-800/40 to-amber-500/20 shadow-2xl shadow-black/80">
             <div className="rounded-xl bg-white dark:bg-[#0B1120] border border-slate-200/90 dark:border-slate-800/90 overflow-hidden text-slate-700 dark:text-slate-200">
-              
+
               {/* Window Header bar */}
               <div className="bg-white dark:bg-[#080D1A] px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -130,30 +159,30 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                   <div className="h-4 w-px bg-slate-100 dark:bg-slate-800 hidden sm:block" />
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5">
                     <Lock className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                    app.tuproperties.com / organization: <span className="text-slate-700 dark:text-slate-200">apex-holdings-global</span>
+                    {APP_ORIGIN} / organization:{' '}
+                    <span className="text-slate-700 dark:text-slate-200">{slugify(market.organization)}</span>
                   </span>
                 </div>
 
-                {/* Branch selector & interactive switcher */}
+                {/* Market selector & interactive switcher */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:inline">
-                    Active Entity / Branch:
-                  </span>
-                  <div className="flex p-0.5 bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-700/80 rounded-lg text-xs font-medium">
-                    {(['London', 'New York', 'Nairobi', 'Dubai'] as const).map((branch) => (
-                      <button
-                        key={branch}
-                        onClick={() => setActiveBranch(branch)}
-                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                          activeBranch === branch
-                            ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                        }`}
-                      >
-                        {branch}
-                      </button>
+                  <label
+                    htmlFor="hero-market-switcher"
+                    className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:inline"
+                  >
+                    Active Market / Organization:
+                  </label>
+                  <select
+                    id="hero-market-switcher"
+                    value={market.code}
+                    onChange={(event) => setMarketCode(event.target.value)}                    className="text-xs font-mono font-bold bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-700/80 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-200 focus:border-amber-400 focus:outline-none cursor-pointer"
+                  >
+                    {MARKETS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.code} — {option.country} ({option.currency})
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
               </div>
 
@@ -180,7 +209,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                     }`}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    Global Payments & FIFO Allocation
+                    Payment Recording & FIFO Allocation
                   </button>
                   <button
                     onClick={() => setActiveTab('payouts')}
@@ -203,7 +232,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
 
               {/* Mockup Body Content */}
               <div className="p-5 md:p-6 space-y-6">
-                
+
                 {/* Top Stat Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
                   <div className="bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5">
@@ -225,16 +254,10 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                       <CreditCard className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div className="mt-2 text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white font-display">
-                      {activeBranch === 'London'
-                        ? '£482,500'
-                        : activeBranch === 'New York'
-                        ? '$628,400'
-                        : activeBranch === 'Nairobi'
-                        ? 'KES 14.8M'
-                        : 'AED 2,340,000'}
+                      {money(rentRoll)}
                     </div>
                     <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <span>FIFO auto-allocation active</span>
+                      <span>FIFO allocation active</span>
                     </div>
                   </div>
 
@@ -243,14 +266,8 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                       <span>Statutory Withholding / Tax</span>
                       <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <div className="mt-2 text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white font-display">
-                      {activeBranch === 'London'
-                        ? '20% HMRC VAT'
-                        : activeBranch === 'New York'
-                        ? 'State & City Tax'
-                        : activeBranch === 'Nairobi'
-                        ? '10% KRA WHT'
-                        : '5% FTA VAT'}
+                    <div className="mt-2 text-base md:text-xl font-extrabold text-slate-900 dark:text-white font-display">
+                      {market.taxLabel}
                     </div>
                     <div className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 flex items-center gap-1">
                       <span>Engine: Configured as data</span>
@@ -277,7 +294,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        Active Managed Properties ({activeBranch} Branch)
+                        Active Managed Properties ({market.code} · {market.city})
                       </h4>
                       <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                         CSV dry-run: 0 errors on last sync
@@ -297,163 +314,63 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-slate-600 dark:text-slate-300">
-                          <tr className="hover:bg-slate-100/30 dark:hover:bg-slate-800/30 transition-colors">
-                            <td className="py-3 px-3 font-sans font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                              {activeBranch === 'London'
-                                ? 'Mayfair Central Residences'
-                                : activeBranch === 'New York'
-                                ? 'Manhattan View Tower'
-                                : activeBranch === 'Nairobi'
-                                ? 'Westlands Ridge Towers'
-                                : 'Marina Gateway Heights'}
-                            </td>
-                            <td className="py-3 px-3 font-sans text-slate-600 dark:text-slate-300">64 Units (Commercial/Res)</td>
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="w-[96%] h-full bg-emerald-400 rounded-full" />
-                                </div>
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">96.8%</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-slate-900 dark:text-white font-bold">
-                              {activeBranch === 'London'
-                                ? '£165,000'
-                                : activeBranch === 'New York'
-                                ? '$215,000'
-                                : activeBranch === 'Nairobi'
-                                ? 'KES 4,850,000'
-                                : 'AED 820,000'}
-                            </td>
-                            <td className="py-3 px-3 font-sans">
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30">
-                                {activeBranch === 'London' ? 'VAT 20% Standard' : activeBranch === 'New York' ? 'Direct Ledger Sync' : activeBranch === 'Nairobi' ? 'WHT 10% Withheld' : 'VAT 5% FTA Compliant'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-right font-sans">
-                              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">Verified Derived</span>
-                            </td>
-                          </tr>
-
-                          <tr className="hover:bg-slate-100/30 dark:hover:bg-slate-800/30 transition-colors">
-                            <td className="py-3 px-3 font-sans font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                              {activeBranch === 'London'
-                                ? 'Kensington Park Lofts'
-                                : activeBranch === 'New York'
-                                ? 'Brooklyn Heights Suites'
-                                : activeBranch === 'Nairobi'
-                                ? 'Kilimani Heights Apartments'
-                                : 'Downtown Boulevard Suites'}
-                            </td>
-                            <td className="py-3 px-3 font-sans text-slate-600 dark:text-slate-300">48 Units (Residential)</td>
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="w-[92%] h-full bg-emerald-400 rounded-full" />
-                                </div>
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">91.6%</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-slate-900 dark:text-white font-bold">
-                              {activeBranch === 'London'
-                                ? '£128,000'
-                                : activeBranch === 'New York'
-                                ? '$164,000'
-                                : activeBranch === 'Nairobi'
-                                ? 'KES 3,240,000'
-                                : 'AED 610,000'}
-                            </td>
-                            <td className="py-3 px-3 font-sans">
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30">
-                                {activeBranch === 'London' ? 'Residential Exempt' : activeBranch === 'New York' ? 'Property Tax Accrual' : activeBranch === 'Nairobi' ? '16% VAT Configured' : 'FTA Audited'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-right font-sans">
-                              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">Verified Derived</span>
-                            </td>
-                          </tr>
-
-                          <tr className="hover:bg-slate-100/30 dark:hover:bg-slate-800/30 transition-colors">
-                            <td className="py-3 px-3 font-sans font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                              {activeBranch === 'London'
-                                ? 'Canary Wharf Commercial Plaza'
-                                : activeBranch === 'New York'
-                                ? 'Hudson Yards Mixed Center'
-                                : activeBranch === 'Nairobi'
-                                ? 'Lavington Green Villas'
-                                : 'Business Bay Executive Hub'}
-                            </td>
-                            <td className="py-3 px-3 font-sans text-slate-600 dark:text-slate-300">24 Units (Mixed Use)</td>
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="w-[100%] h-full bg-emerald-400 rounded-full" />
-                                </div>
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">100.0%</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-slate-900 dark:text-white font-bold">
-                              {activeBranch === 'London'
-                                ? '£189,500'
-                                : activeBranch === 'New York'
-                                ? '$249,400'
-                                : activeBranch === 'Nairobi'
-                                ? 'KES 2,900,000'
-                                : 'AED 910,000'}
-                            </td>
-                            <td className="py-3 px-3 font-sans">
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30">
-                                {activeBranch === 'London' ? 'Option to Tax Elect' : activeBranch === 'New York' ? 'Commercial Rent Tax' : activeBranch === 'Nairobi' ? 'WHT 10% Deducted' : 'Reverse Charge VAT'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-right font-sans">
-                              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">Verified Derived</span>
-                            </td>
-                          </tr>
-
-                          <tr className="hover:bg-slate-100/30 dark:hover:bg-slate-800/30 transition-colors">
-                            <td className="py-3 px-3 font-sans font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                              {activeBranch === 'London'
-                                ? 'Chelsea Mews Boutique Apartments'
-                                : activeBranch === 'New York'
-                                ? 'Greenwich Village Brownstone'
-                                : activeBranch === 'Nairobi'
-                                ? 'Riverside Courtyard Apartments'
-                                : 'Jumeirah Palm Residences'}
-                            </td>
-                            <td className="py-3 px-3 font-sans text-slate-600 dark:text-slate-300">
-                              <span className="font-semibold text-amber-600 dark:text-amber-400">12 Units</span> (Boutique Multi-Family)
-                            </td>
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="w-[100%] h-full bg-emerald-400 rounded-full" />
-                                </div>
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">100.0%</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-slate-900 dark:text-white font-bold">
-                              {activeBranch === 'London'
-                                ? '£28,800'
-                                : activeBranch === 'New York'
-                                ? '$36,000'
-                                : activeBranch === 'Nairobi'
-                                ? 'KES 720,000'
-                                : 'AED 144,000'}
-                            </td>
-                            <td className="py-3 px-3 font-sans">
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 font-medium">
-                                Direct Lease Ledger
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-right font-sans">
-                              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">Verified Derived</span>
-                            </td>
-                          </tr>
+                          {market.properties.map((property, index) => {
+                            const occupancy = parseFloat(property.occupancy);
+                            const isBoutique = property.unitCount <= 12;
+                            return (
+                              <tr
+                                key={property.name}
+                                className="hover:bg-slate-100/30 dark:hover:bg-slate-800/30 transition-colors"
+                              >
+                                <td className="py-3 px-3 font-sans font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                  {property.name}
+                                </td>
+                                <td className="py-3 px-3 font-sans text-slate-600 dark:text-slate-300">
+                                  {isBoutique ? (
+                                    <>
+                                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                        {property.unitCount} Units
+                                      </span>{' '}
+                                      (Boutique Multi-Family)
+                                    </>
+                                  ) : (
+                                    <>
+                                      {property.unitCount} Units ({property.type})
+                                    </>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-emerald-400 rounded-full"
+                                        style={{ width: `${occupancy}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                      {property.occupancy}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3 text-slate-900 dark:text-white font-bold">
+                                  {money(property.unitCount * midRent)}
+                                </td>
+                                <td className="py-3 px-3 font-sans">
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30">
+                                    {index === 3
+                                      ? 'Direct Lease Ledger'
+                                      : `${market.taxName} ${market.vatRate}% Configured`}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right font-sans">
+                                  <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                                    Verified Derived
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -467,15 +384,21 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                       <div>
                         <div className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
                           <CreditCard className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                          Multi-Rail Payments & Smart FIFO Allocation Engine
+                          Payment Recording & Smart FIFO Allocation Engine
                         </div>
                         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 max-w-xl">
-                          Every incoming payment (Stripe, Direct Debit, Card, or Mobile Money) resolves the tenant&apos;s oldest invoice balance first. Any surplus is instantly booked to the tenant&apos;s spendable wallet credit balance.
+                          Every recorded payment — bank transfer, card, M-Pesa, cash or cheque —
+                          resolves the tenant&apos;s oldest invoice balance first. Any surplus is
+                          instantly booked to the tenant&apos;s spendable wallet credit balance.
                         </p>
                       </div>
                       <div className="bg-white dark:bg-slate-950 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-right">
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Auto-Reconciliation Rate</span>
-                        <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">99.8% (1,420/1,423)</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                          Auto-Reconciliation Rate
+                        </span>
+                        <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                          99.8% (1,420/1,423)
+                        </span>
                       </div>
                     </div>
 
@@ -483,7 +406,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 bg-white/40 dark:bg-slate-900/40">
-                            <th className="py-2 px-3">Gateway Ref</th>
+                            <th className="py-2 px-3">Payment Ref</th>
                             <th className="py-2 px-3">Tenant & Unit</th>
                             <th className="py-2 px-3">Amount Paid</th>
                             <th className="py-2 px-3">Invoice Settled</th>
@@ -493,11 +416,21 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-slate-600 dark:text-slate-300">
                           <tr>
-                            <td className="py-2.5 px-3 text-emerald-600 dark:text-emerald-400">STRIPE_pi_3N92k</td>
-                            <td className="py-2.5 px-3 font-sans">E. Thorne (Mayfair #4B)</td>
-                            <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">£3,500.00</td>
-                            <td className="py-2.5 px-3 font-sans text-slate-600 dark:text-slate-300">INV-2026-0042 (Oldest: £3,200)</td>
-                            <td className="py-2.5 px-3 text-amber-600 dark:text-amber-400 font-semibold">+£300.00 Credit</td>
+                            <td className="py-2.5 px-3 text-emerald-600 dark:text-emerald-400">
+                              {market.code === 'KE' ? 'MPESA_QM82K4' : 'BANK_TRF_99182'}
+                            </td>
+                            <td className="py-2.5 px-3 font-sans">
+                              E. Thorne ({market.properties[0].name} #4B)
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">
+                              {money(midRent)}
+                            </td>
+                            <td className="py-2.5 px-3 font-sans text-slate-600 dark:text-slate-300">
+                              INV-2026-0042 (Oldest: {money(Math.round(midRent * 0.91))})
+                            </td>
+                            <td className="py-2.5 px-3 text-amber-600 dark:text-amber-400 font-semibold">
+                              +{money(Math.round(midRent * 0.09))} Credit
+                            </td>
                             <td className="py-2.5 px-3 text-right">
                               <span className="text-[11px] text-slate-500 dark:text-slate-400 font-sans hover:text-slate-900 dark:hover:text-white cursor-pointer underline">
                                 REC-9281.pdf
@@ -505,11 +438,21 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                             </td>
                           </tr>
                           <tr>
-                            <td className="py-2.5 px-3 text-blue-600 dark:text-blue-400">ACH_SEC_99182</td>
-                            <td className="py-2.5 px-3 font-sans">M. Harrison (Unit 12A)</td>
-                            <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">$4,800.00</td>
-                            <td className="py-2.5 px-3 font-sans text-slate-600 dark:text-slate-300">INV-2026-0089 (Full settlement)</td>
-                            <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-semibold">$0.00 (Exact)</td>
+                            <td className="py-2.5 px-3 text-blue-600 dark:text-blue-400">
+                              CARD_4117_0082
+                            </td>
+                            <td className="py-2.5 px-3 font-sans">
+                              M. Harrison ({market.properties[1].name} Unit 12A)
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">
+                              {money(Math.round(midRent * 0.8))}
+                            </td>
+                            <td className="py-2.5 px-3 font-sans text-slate-600 dark:text-slate-300">
+                              INV-2026-0089 (Full settlement)
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-semibold">
+                              {money(0)} (Exact)
+                            </td>
                             <td className="py-2.5 px-3 text-right">
                               <span className="text-[11px] text-slate-500 dark:text-slate-400 font-sans hover:text-slate-900 dark:hover:text-white cursor-pointer underline">
                                 REC-1044.pdf
@@ -532,77 +475,45 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                           Owner Income Computation: Zero Manual Typing
                         </div>
                         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 max-w-xl">
-                          Owner gross revenue is mathematically aggregated from matched payment rows. Management fees and approved work order bills are automatically deducted to generate net bank transfers.
+                          Owner gross revenue is mathematically aggregated from matched payment rows.
+                          Management fees and approved work order bills are automatically deducted to
+                          generate net bank transfers.
                         </p>
                       </div>
                       <div className="bg-emerald-950/60 border border-emerald-800/80 px-3 py-2 rounded-lg text-right">
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-300 block">Bank Dispatch Status</span>
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">All References Validated</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-300 block">
+                          Bank Dispatch Status
+                        </span>
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          All References Validated
+                        </span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-                          <span className="font-sans font-bold text-slate-900 dark:text-white">Owner: Grosvenor Real Estate LLP</span>
-                          <span>Property: Mayfair Central</span>
-                        </div>
-                        <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                          <span>Gross Collected (Derived):</span>
-                          <span className="text-slate-900 dark:text-white font-bold">£165,000.00</span>
-                        </div>
-                        <div className="flex justify-between text-rose-400">
-                          <span>Management Fee (8%):</span>
-                          <span>- £13,200.00</span>
-                        </div>
-                        <div className="flex justify-between text-rose-400">
-                          <span>Maintenance Work Orders (2 bills):</span>
-                          <span>- £2,140.00</span>
-                        </div>
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                          <span>VAT on Fee (20% HMRC):</span>
-                          <span>- £2,640.00</span>
-                        </div>
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-sm">
-                          <span className="text-amber-600 dark:text-amber-400 font-sans">Net Payout Transferred:</span>
-                          <span className="text-emerald-600 dark:text-emerald-400">£147,020.00</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 font-sans flex items-center justify-between">
-                          <span>BACS Ref: BARC-TRX-99410</span>
-                          <span className="text-emerald-600 dark:text-emerald-400">Statement Sent via Email Portal</span>
-                        </div>
-                      </div>
+                      <OwnerPayoutCard
+                        market={market}
+                        propertyName={market.properties[0].name}
+                        gross={market.properties[0].unitCount * midRent}
+                        feeRate={0.08}
+                        workOrders={market.properties[0].unitCount * midRent * 0.013}
+                        taxOnFee={market.properties[0].unitCount * midRent * 0.08 * (market.vatRate / 100)}
+                        taxLabel={`${market.taxName} on fee (${market.vatRate}%)`}
+                        reserveLabel=""
+                        reserve={0}
+                      />
 
-                      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-                          <span className="font-sans font-bold text-slate-900 dark:text-white">Owner: Hudson River Capital LLC</span>
-                          <span>Property: Manhattan View</span>
-                        </div>
-                        <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                          <span>Gross Collected (Derived):</span>
-                          <span className="text-slate-900 dark:text-white font-bold">$215,000.00</span>
-                        </div>
-                        <div className="flex justify-between text-rose-400">
-                          <span>Management Fee (7.5%):</span>
-                          <span>- $16,125.00</span>
-                        </div>
-                        <div className="flex justify-between text-rose-400">
-                          <span>HVAC Servicing Work Order:</span>
-                          <span>- $3,450.00</span>
-                        </div>
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                          <span>Escrow Reserve Contribution:</span>
-                          <span>- $5,000.00</span>
-                        </div>
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-sm">
-                          <span className="text-amber-600 dark:text-amber-400 font-sans">Net Payout Transferred:</span>
-                          <span className="text-emerald-600 dark:text-emerald-400">$190,425.00</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 font-sans flex items-center justify-between">
-                          <span>Fedwire Ref: JPMC-WIRE-204192</span>
-                          <span className="text-emerald-600 dark:text-emerald-400">Statement Sent via Email Portal</span>
-                        </div>
-                      </div>
+                      <OwnerPayoutCard
+                        market={market}
+                        propertyName={market.properties[1].name}
+                        gross={market.properties[1].unitCount * midRent}
+                        feeRate={0.075}
+                        workOrders={market.properties[1].unitCount * midRent * 0.016}
+                        taxOnFee={0}
+                        taxLabel=""
+                        reserveLabel="Escrow Reserve Contribution"
+                        reserve={market.properties[1].unitCount * midRent * 0.023}
+                      />
                     </div>
                   </div>
                 )}
@@ -616,12 +527,12 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                     Isolated Tenant DB: Secure
                   </span>
                   <span className="hidden sm:inline-block">•</span>
-                  <span className="hidden sm:inline">12 Admin Roles Active</span>
+                  <span className="hidden sm:inline">13 System Roles Active</span>
                   <span className="hidden sm:inline-block">•</span>
                   <span className="hidden sm:inline">Audit Log: Append-Only</span>
                 </div>
                 <div className="text-slate-500 dark:text-slate-400 text-[11px]">
-                  TU Properties Engine v4.2 • High-Availability Cloud
+                  Derived Ledger • {market.timezone} • {market.locale}
                 </div>
               </div>
 
@@ -630,5 +541,75 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
         </div>
       </div>
     </section>
+  );
+};
+
+interface OwnerPayoutCardProps {
+  market: MarketProfile;
+  propertyName: string;
+  gross: number;
+  feeRate: number;
+  workOrders: number;
+  taxOnFee: number;
+  taxLabel: string;
+  reserveLabel: string;
+  reserve: number;
+}
+
+/** One landlord's derived payout, priced in the active market's own currency. */
+const OwnerPayoutCard: React.FC<OwnerPayoutCardProps> = ({
+  market,
+  propertyName,
+  gross,
+  feeRate,
+  workOrders,
+  taxOnFee,
+  taxLabel,
+  reserveLabel,
+  reserve
+}) => {
+  const money = (amount: number) => formatMoney(amount, market, 2);
+  const fee = gross * feeRate;
+  const net = gross - fee - workOrders - taxOnFee - reserve;
+
+  return (
+    <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
+      <div className="flex justify-between text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <span className="font-sans font-bold text-slate-900 dark:text-white">{market.organization}</span>
+        <span>Property: {propertyName}</span>
+      </div>
+      <div className="flex justify-between text-slate-600 dark:text-slate-300">
+        <span>Gross Collected (Derived):</span>
+        <span className="text-slate-900 dark:text-white font-bold">{money(gross)}</span>
+      </div>
+      <div className="flex justify-between text-rose-400">
+        <span>Management Fee ({(feeRate * 100).toFixed(1).replace(/\.0$/, '')}%):</span>
+        <span>- {money(fee)}</span>
+      </div>
+      <div className="flex justify-between text-rose-400">
+        <span>Maintenance Work Orders (2 bills):</span>
+        <span>- {money(workOrders)}</span>
+      </div>
+      {taxOnFee > 0 ? (
+        <div className="flex justify-between text-slate-500 dark:text-slate-400">
+          <span>{taxLabel}:</span>
+          <span>- {money(taxOnFee)}</span>
+        </div>
+      ) : null}
+      {reserve > 0 ? (
+        <div className="flex justify-between text-slate-500 dark:text-slate-400">
+          <span>{reserveLabel}:</span>
+          <span>- {money(reserve)}</span>
+        </div>
+      ) : null}
+      <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-sm">
+        <span className="text-amber-600 dark:text-amber-400 font-sans">Net Payout Transferred:</span>
+        <span className="text-emerald-600 dark:text-emerald-400">{money(net)}</span>
+      </div>
+      <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 font-sans flex items-center justify-between">
+        <span>Transfer Ref: {market.code}-TRX-{slugify(propertyName).slice(0, 6).toUpperCase()}-99410</span>
+        <span className="text-emerald-600 dark:text-emerald-400">Statement Sent via Email & SMS</span>
+      </div>
+    </div>
   );
 };

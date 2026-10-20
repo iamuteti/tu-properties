@@ -95,7 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenTrialModal, onOpenDemoModa
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400">
-                          10 Core Modules
+                          20 Core Modules
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400">
                           Properties, leases, utilities, maintenance & HR
@@ -149,10 +149,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenTrialModal, onOpenDemoModa
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400">
-                          Multi-Entity Architecture
+                          Multi-Market Architecture
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Multi-branch isolation with global consolidations
+                          One organization per market, 15 jurisdictions
                         </div>
                       </div>
                     </a>

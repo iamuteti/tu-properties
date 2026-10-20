@@ -1095,20 +1095,22 @@ export interface CreatePaymentData {
 
 export interface MoveOutRequest {
     id: string;
-    organizationId: string;
+    organizationId?: string | null;
     tenantId: string;
-    AgreementId: string;
+    /** The tenancy this move-out belongs to — the API names the relation `agreement`. */
+    agreementId: string;
     moveoutDate: string;
     approvalDate?: string;
     approvedBy?: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
     depositRefunded: boolean;
-    depositRefundAmount?: number;
+    /** A decimal column: the API may hand it over as a string. */
+    depositRefundAmount?: number | string;
     notes?: string;
     createdAt: string;
     updatedAt: string;
     tenant?: Tenant;
-    Agreement?: Agreement;
+    agreement?: Agreement;
     /** Itemised deductions behind the refund (Module 5). */
     deductions?: MoveOutDeduction[];
     /** Detail endpoint only: the derived deposit position. */

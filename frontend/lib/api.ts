@@ -1442,40 +1442,6 @@ export const dashboardApi = {
         api.get<DashboardStats>('/dashboard/stats'),
 };
 
-// Moveouts API
-export const moveoutsApi = {
-    create: (data: Partial<MoveOutRequest>) =>
-        api.post<MoveOutRequest>('/moveouts', data),
-
-    findAll: (params?: {
-        page?: number;
-        limit?: number;
-        search?: string;
-        sortBy?: string;
-        sortOrder?: 'asc' | 'desc';
-        status?: string;
-    }) => {
-        const queryParams = new URLSearchParams();
-        if (params?.page) queryParams.append('page', params.page.toString());
-        if (params?.limit) queryParams.append('limit', params.limit.toString());
-        if (params?.search) queryParams.append('search', params.search);
-        if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
-        if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
-        if (params?.status) queryParams.append('status', params.status);
-        const query = queryParams.toString();
-        return api.get<PaginatedResponse<MoveOutRequest>>(`/moveouts${query ? `?${query}` : ''}`);
-    },
-
-    findOne: (id: string) =>
-        api.get<MoveOutRequest>(`/moveouts/${id}`),
-
-    update: (id: string, data: Partial<MoveOutRequest>) =>
-        api.patch<MoveOutRequest>(`/moveouts/${id}`, data),
-
-    remove: (id: string) =>
-        api.delete(`/moveouts/${id}`),
-};
-
 // ============================================
 // SECURITY DEPOSITS API (Module 5, read side)
 // ============================================
@@ -1843,14 +1809,34 @@ export const agreementsApi = {
     },
 };
 
+/**
+ * Move-outs.
+ *
+ * The route is `move-outs` (the backend's `MoveoutsController`), and it is the
+ * only move-out client: there used to be a second one pointing at `/moveouts`,
+ * a route that does not exist, so the list screen 404'd on every load.
+ */
 export const moveOutsApi = {
-    create: (data: { AgreementId: string; moveoutDate: string; notes?: string }) =>
+    create: (data: { agreementId: string; moveoutDate: string; notes?: string }) =>
         api.post<MoveOutRequest>('/move-outs', data),
 
-    findAll: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
-        api.get<PaginatedResponse<MoveOutRequest>>('/move-outs', { params }),
+    findAll: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        status?: string;
+        tenantCode?: string;
+        tenantName?: string;
+    }) => api.get<PaginatedResponse<MoveOutRequest>>('/move-outs', { params }),
 
     findOne: (id: string) => api.get<MoveOutRequest>(`/move-outs/${id}`),
+
+    update: (id: string, data: { moveoutDate?: string; notes?: string }) =>
+        api.patch<MoveOutRequest>(`/move-outs/${id}`, data),
+
+    remove: (id: string) => api.delete(`/move-outs/${id}`),
 
     /** The auditable deposit position — always derived, never typed in. */
     deposit: (id: string) => api.get<DepositBreakdown>(`/move-outs/${id}/deposit`),

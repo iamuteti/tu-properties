@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { useTenants } from "@/hooks/use-tenants";
 import { useProperties } from "@/hooks/use-properties";
 import { useAuth } from "@/hooks/use-auth";
-import { moveoutsApi } from "@/lib/api";
+import { moveOutsApi } from "@/lib/api";
 import { toast } from "sonner";
 
 const moveOutRequestSchema = z.object({
@@ -91,13 +91,14 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
   useEffect(() => {
     if (watchedTenantId) {
       const tenant = filteredTenants.find(t => t.id === watchedTenantId);
-      if (tenant?.Agreement) {
-        setAgreements([tenant.Agreement]);
-        setValue("AgreementId", tenant.Agreement.id);
-      } else {
-        setAgreements([]);
-        setValue("AgreementId", "");
-      }
+      // A tenant comes back with every tenancy they have had, and a move-out
+      // belongs to the one that is live — the rest are history.
+      const tenantAgreements = tenant?.agreements ?? [];
+      setAgreements(tenantAgreements);
+      const live =
+        tenantAgreements.find((agreement: any) => agreement.status === 'ACTIVE') ??
+        tenantAgreements[0];
+      setValue("AgreementId", live?.id ?? "");
     } else {
       setAgreements([]);
       setValue("AgreementId", "");
@@ -122,12 +123,17 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
   const onSubmit = async (data: MoveOutRequestFormData) => {
     setIsSubmitting(true);
     try {
-      const { propertyId, ...payload } = data;
-      payload.moveoutDate = new Date(payload.moveoutDate).toISOString();
-      await moveoutsApi.create(payload);
-      toast.success("Move-out request created successfully!");
-      onSuccess?.();
-      onClose();
+        // The tenancy comes from the lease, not from the tenant: the backend
+        // refuses a move-out raised against somebody else's tenancy, so the
+        // request only carries the agreement it belongs to.
+        await moveOutsApi.create({
+            agreementId: data.AgreementId,
+            moveoutDate: new Date(data.moveoutDate).toISOString(),
+            notes: data.notes || undefined,
+        });
+        toast.success("Move-out request created successfully!");
+        onSuccess?.();
+        onClose();
     } catch (error) {
       console.error("Failed to create move-out request:", error);
       toast.error("Failed to create move-out request. Please try again.");

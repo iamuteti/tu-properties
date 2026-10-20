@@ -1,5 +1,6 @@
 import React from 'react';
 import { Building2, Globe2, ShieldCheck, Lock, Mail, ArrowUp } from 'lucide-react';
+import { MARKETS } from './data/landingData';
 
 export const Footer: React.FC = () => {
   const scrollToTop = () => {
@@ -23,25 +24,20 @@ export const Footer: React.FC = () => {
             </div>
 
             <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              The modern multi-entity SaaS platform for property management companies, landlords, and institutional trusts worldwide. Run your properties, tenants, money, and staff from one audited system.
+              The modern multi-market SaaS platform for property management companies, landlords, and institutional trusts worldwide. One organization per market, with its own currency, locale and tax rules. Run your properties, tenants, money, and staff from one audited system.
             </p>
 
             <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                London
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                New York
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Dubai
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Nairobi
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                Singapore
-              </span>
+              {MARKETS.map((market) => (
+                <a
+                  key={market.code}
+                  href="#markets"
+                  title={`${market.country} — ${market.currency}`}
+                  className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-500/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  {market.code}
+                </a>
+              ))}
             </div>
           </div>
 
@@ -68,12 +64,12 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  General Ledger & Multi-Country Tax
+                  General Ledger & Jurisdiction Tax
                 </a>
               </li>
               <li>
                 <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  M-Pesa STK & FIFO Payments
+                  Payment Recording & FIFO Allocation
                 </a>
               </li>
               <li>
@@ -97,7 +93,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  12 Admin-Defined Roles
+                  13 System Roles &amp; Boundary Control
                 </a>
               </li>
               <li>
@@ -156,7 +152,7 @@ export const Footer: React.FC = () => {
                 </a>
               </li>
               <li className="pt-2 text-[11px] text-slate-500 font-mono">
-                Inquiries: support@tuproperties.io
+                Inquiries: support@tuhame.co.ke
               </li>
             </ul>
           </div>

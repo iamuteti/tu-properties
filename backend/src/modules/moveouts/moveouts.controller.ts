@@ -67,6 +67,8 @@ export class MoveoutsController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('status') status?: string,
+    @Query('tenantCode') tenantCode?: string,
+    @Query('tenantName') tenantName?: string,
   ) {
     return this.moveoutsService.findAll(
       requireTenantId(req),
@@ -77,7 +79,7 @@ export class MoveoutsController {
         sortBy,
         sortOrder,
       },
-      { status },
+      { status, tenantCode, tenantName },
     );
   }
 

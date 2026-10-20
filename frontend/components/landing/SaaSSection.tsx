@@ -47,7 +47,7 @@ export const SaaSSection: React.FC<SaaSSectionProps> = ({ onStartTrial }) => {
               14-Day Free Trial Per Organization
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Every newly created organization receives full unconstrained access to all 10 modules, multi-branch provisioning, and live payment gateway hooks. No credit card required to begin.
+              Every newly created organization receives full unconstrained access to all 20 modules, multi-market provisioning, and the same derived ledger. No credit card required to begin.
             </p>
             <div className="pt-2 flex items-center gap-2 text-xs font-mono text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -61,14 +61,14 @@ export const SaaSSection: React.FC<SaaSSectionProps> = ({ onStartTrial }) => {
               <Sparkles className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              Trial-to-Paid Conversion
+              Trial-to-Paid Continuity
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Zero data wipes upon upgrading. All created properties, verified lease agreements, tenant balances, and custom tax rules persist seamlessly into your production subscription.
+              Zero data wipes when a trial converts. Properties, lease agreements, tenant balances, and custom tax rules persist into the paid subscription — the trial ends, the organization does not restart.
             </p>
             <div className="pt-2 flex items-center gap-2 text-xs font-mono text-blue-600 dark:text-blue-400">
               <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>100% data continuity guaranteed</span>
+              <span>Data continuity across the trial boundary</span>
             </div>
           </div>
 
@@ -81,7 +81,7 @@ export const SaaSSection: React.FC<SaaSSectionProps> = ({ onStartTrial }) => {
               Organization Suspension Handling
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Graceful degradation: if a subscription lapses, organizations enter a protected read-only state. Data remains securely preserved and immediately restores the moment payment clears.
+              Graceful degradation: if a subscription lapses, organizations enter a protected read-only state. Data remains securely preserved and is restored the moment the organization is reactivated.
             </p>
             <div className="pt-2 flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400">
               <CheckCircle2 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -104,8 +104,8 @@ export const SaaSSection: React.FC<SaaSSectionProps> = ({ onStartTrial }) => {
               </h3>
             </div>
             <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
-              Multi-Channel: Portal + Email + SMS
-            </span>
+                Channels: In-App + Email + SMS
+              </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -139,7 +139,7 @@ export const SaaSSection: React.FC<SaaSSectionProps> = ({ onStartTrial }) => {
 
           <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Reminders are dispatched deterministically according to your branch time zone.
+              Reminders are dispatched deterministically according to your organization&apos;s time zone.
             </p>
             <button
               onClick={onStartTrial}

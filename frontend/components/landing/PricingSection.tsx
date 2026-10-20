@@ -1,22 +1,40 @@
 import React, { useState } from 'react';
-import { PRICING_PLANS } from './data/landingData';
+import { PRICING_PLANS, PRICING_CURRENCIES, type PricingCurrency } from './data/landingData';
 import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface PricingSectionProps {
   onStartTrial: () => void;
 }
 
-type Currency = 'USD' | 'KES' | 'NGN' | 'ZAR';
-
 export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
-  const [currency, setCurrency] = useState<Currency>('USD');
+  const [currency, setCurrency] = useState<PricingCurrency>('USD');
 
-  const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  /**
+   * The switcher only offers the currencies `NEXT_PUBLIC_LANDING_CURRENCIES`
+   * enables. If the selected one is no longer on the list, fall back to the
+   * first that is — so the card never shows a currency the switcher has
+   * dropped.
+   */
+  const activeCurrency: PricingCurrency = PRICING_CURRENCIES.includes(currency)
+    ? currency
+    : PRICING_CURRENCIES[0];
+
+  const CURRENCY_SYMBOLS: Record<PricingCurrency, string> = {
     USD: '$',
     KES: 'KES ',
-    NGN: '₦',
-    ZAR: 'R '
+    ZAR: 'R ',
+    GBP: '£',
+    CAD: 'CA$',
+    AUD: 'A$',
+    EUR: '€',
+    INR: '₹',
+    JPY: '¥',
+    CNY: 'CN¥',
+    KRW: '₩',
+    BRL: 'R$',
+    MXN: 'MX$',
+    AED: 'AED '
   };
 
   return (
@@ -67,13 +85,13 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
           </div>
 
           {/* Currency Switcher */}
-          <div className="flex items-center p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-            {(['USD', 'KES', 'NGN', 'ZAR'] as const).map((curr) => (
+          <div className="flex flex-wrap items-center justify-center gap-1 p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+            {PRICING_CURRENCIES.map((curr) => (
               <button
                 key={curr}
                 onClick={() => setCurrency(curr)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                  currency === curr
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  activeCurrency === curr
                     ? 'bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-300 border border-amber-500/30'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
@@ -88,7 +106,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
         {/* Pricing Cards Grid */}
         <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
           {PRICING_PLANS.map((plan, idx) => {
-            const planPricing = plan.pricing[currency];
+            const planPricing = plan.pricing[activeCurrency] ?? plan.pricing.USD;
             const price = billingCycle === 'annual' ? planPricing.annual : planPricing.monthly;
 
             return (
@@ -123,7 +141,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
                   <div className="mt-6 pt-6 border-t border-slate-200/80 dark:border-slate-800/80">
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-display">
-                        {CURRENCY_SYMBOLS[currency]}
+                        {CURRENCY_SYMBOLS[activeCurrency]}
                         {price.toLocaleString()}
                       </span>
                       <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">

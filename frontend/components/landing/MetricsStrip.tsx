@@ -13,6 +13,10 @@ export const MetricsStrip: React.FC = () => {
           <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white mt-1">
             Engineered for all portfolio sizes — from boutique 12-unit buildings to high-rise towers
           </h3>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Seeded demo figures, rounded: the seed randomises, so the counts move a few percent
+            between runs.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
@@ -60,7 +64,7 @@ export const MetricsStrip: React.FC = () => {
               Invoices Processed & Reconciled
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Settled via multi-rail gateways & cards
+              Allocated oldest-first against tenant invoices
             </div>
           </div>
         </div>

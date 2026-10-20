@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { DoorOpen, Search, X } from "lucide-react";
 import { DataTable, type PaginationMeta } from "@/components/ui/data-table";
@@ -11,12 +11,7 @@ import { Select } from "@/components/ui/select";
 import { ColumnDef } from "@tanstack/react-table";
 import { useMoveouts } from "@/hooks/use-moveouts";
 import { useAuth } from "@/context/auth-context";
-
-const statusOptions = [
-    { value: "PENDING", label: "Pending" },
-    { value: "APPROVED", label: "Approved" },
-    { value: "REJECTED", label: "Rejected" }
-];
+import { MOVE_OUT_STATUSES } from "@/lib/constants";
 
 interface MoveOutTableData {
   id: string;
@@ -30,14 +25,14 @@ interface MoveOutTableData {
   moveoutDate: string;
   approvalDate?: string;
   approvedBy?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
   depositRefunded: boolean;
   depositRefundAmount?: number;
   notes?: string;
 }
 
 export default function MovingOutPage() {
-    const { user, organization } = useAuth();
+    const { organization } = useAuth();
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [sortBy, setSortBy] = useState<string>("createdAt");
@@ -58,19 +53,15 @@ export default function MovingOutPage() {
 
     const [search, setSearch] = useState("");
 
-    // Build effective search from applied filters
-    const effectiveSearch = useMemo(() => {
-        const parts = [appliedFilters.tenantCode, appliedFilters.tenantName].filter(Boolean);
-        return parts.join(" ") || undefined;
-    }, [appliedFilters.tenantCode, appliedFilters.tenantName]);
-
-    const { moveouts, paginationMeta, isLoading, error } = useMoveouts({
+    const { moveouts, paginationMeta, isLoading, error, refetch } = useMoveouts({
         page,
         limit,
-        search: search || effectiveSearch,
+        search: search || undefined,
         sortBy,
         sortOrder,
         status: appliedFilters.status || undefined,
+        tenantCode: appliedFilters.tenantCode || undefined,
+        tenantName: appliedFilters.tenantName || undefined,
     });
 
     const handlePaginationChange = useCallback((newPagination: { page: number; limit: number }) => {
@@ -91,8 +82,8 @@ export default function MovingOutPage() {
 
     const handleApplyFilters = useCallback(() => {
         setAppliedFilters({
-            tenantCode: filterTenantCode,
-            tenantName: filterTenantName,
+            tenantCode: filterTenantCode.trim(),
+            tenantName: filterTenantName.trim(),
             status: filterStatus,
         });
         setPage(1);
@@ -128,6 +119,9 @@ export default function MovingOutPage() {
                 </span>
             ),
             size: 120,
+            // The list is ordered by the request's own columns; the tenant's
+            // code lives on the tenant, so the server cannot order by it.
+            enableSorting: false,
         },
         {
             accessorKey: 'status',
@@ -137,6 +131,7 @@ export default function MovingOutPage() {
                 const colorMap = {
                     PENDING: 'bg-yellow-100 text-yellow-800',
                     APPROVED: 'bg-green-100 text-green-800',
+                    COMPLETED: 'bg-blue-100 text-blue-800',
                     REJECTED: 'bg-red-100 text-red-800',
                 };
                 return (
@@ -156,6 +151,7 @@ export default function MovingOutPage() {
                 </div>
             ),
             size: 180,
+            enableSorting: false,
         },
         {
             id: 'propertyUnit',
@@ -244,7 +240,7 @@ export default function MovingOutPage() {
                     <div className="flex-1 min-w-[200px] max-w-xs">
                         <label className="text-sm font-medium text-foreground mb-1.5 block">Status</label>
                         <Select
-                            options={statusOptions}
+                            options={MOVE_OUT_STATUSES}
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                             placeholder="All statuses"
@@ -269,20 +265,28 @@ export default function MovingOutPage() {
                     tenantId: moveout.tenant?.id || '',
                     tenantName: `${moveout.tenant?.surname || ''} ${moveout.tenant?.otherNames || ''}`.trim(),
                     tenantCode: moveout.tenant?.code || '',
-                    unitName: moveout.Agreement?.unit?.name || '',
-                    unitId: moveout.Agreement?.unitId || '',
-                    propertyName: moveout.Agreement?.unit?.property?.name || '',
-                    propertyId: moveout.Agreement?.unit?.propertyId || '',
+                    unitName: moveout.agreement?.unit?.name || '',
+                    unitId: moveout.agreement?.unitId || '',
+                    propertyName: moveout.agreement?.unit?.property?.name || '',
+                    propertyId: moveout.agreement?.unit?.propertyId || '',
                     moveoutDate: moveout.moveoutDate,
                     approvalDate: moveout.approvalDate || undefined,
                     approvedBy: moveout.approvedBy || undefined,
                     status: moveout.status,
                     depositRefunded: moveout.depositRefunded,
-                    depositRefundAmount: moveout.depositRefundAmount || undefined,
+                    // A decimal column: it may arrive as a string.
+                    depositRefundAmount:
+                        moveout.depositRefundAmount != null
+                            ? Number(moveout.depositRefundAmount)
+                            : undefined,
                     notes: moveout.notes || undefined,
                 }))}
                 columns={moveOutColumns}
                 searchPlaceholder="Search move-out requests..."
+                searchColumns={[
+                    { id: 'tenantCode', label: 'Tenant code' },
+                    { id: 'tenantName', label: 'Tenant name' },
+                ]}
                 emptyMessage="No move-out requests found. Create one to get started."
                 emptyIcon={<DoorOpen className="h-12 w-12 text-slate-400" />}
                 serverSidePagination
@@ -296,8 +300,8 @@ export default function MovingOutPage() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSuccess={() => {
-                    // Refresh the data
-                    // window.location.reload();
+                    setPage(1);
+                    refetch();
                 }}
             />}
         </div>

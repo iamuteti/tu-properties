@@ -281,8 +281,8 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 |----------|---------|----------|-------|
 | `PORT` | `3003` | No | Single source of truth; nginx proxies to this |
 | `NODE_ENV` | `development` | No | `production` disables dev-only behaviour |
-| `FRONTEND_URL` | `https://app.tu-properties.co.ke` | Yes | Exact production origin; used by the frontend / nginx proxying |
-| `CORS_ORIGINS` | `https://app.tu-properties.co.ke` | Yes | Comma-separated origins allowed by CORS; drives the allowlist in `src/security/cors.ts` |
+| `FRONTEND_URL` | `https://properties.tuhame.co.ke` | Yes | Exact production origin; used by the frontend / nginx proxying |
+| `CORS_ORIGINS` | `https://properties.tuhame.co.ke` | Yes | Comma-separated origins allowed by CORS; drives the allowlist in `src/security/cors.ts` |
 | `DATABASE_URL` | `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` | Yes | |
 | `SHADOW_DATABASE_URL` | `postgresql://.../tu-properies-shadow` | No | Only for `prisma migrate diff --from-migrations` |
 | `JWT_SECRET` | — | **Yes** | `openssl rand -base64 48`; rotate per environment |
@@ -310,7 +310,7 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `PORT` | `3002` | Read for `dev`/`build`/`start` |
-| `NEXT_PUBLIC_BACKEND_URL` | `https://api.tu-properties.co.ke` | Backend base URL; baked at build time |
+| `NEXT_PUBLIC_BACKEND_URL` | `https://api-properties.tuhame.co.ke` | Backend base URL; baked at build time |
 
 ---
 
@@ -366,8 +366,8 @@ No automated `api:gen` pipeline exists in this repo. Frontend types are hand-wri
 | Proxy | nginx | 80/443 | systemd |
 | Storage | Local disk (`backend/uploads/`) by default; S3/MinIO via `STORAGE_DRIVER=s3` | — | Backend serves files |
 
-- Domains: `app.tu-properties.co.ke` (frontend), `api.tu-properties.co.ke` (backend) — replace with your real domain.
-- Multi-tenant organizations can use subdomains/custom domains (`Organization.subdomain`, `Organization.customDomain`); plan wildcard DNS (`*.app.<domain>`) if using org subdomains.
+- Domains: `properties.tuhame.co.ke` (frontend), `api-properties.tuhame.co.ke` (backend) — see the nginx and certbot blocks below.
+- Multi-tenant organizations can use subdomains/custom domains (`Organization.subdomain`, `Organization.customDomain`); plan wildcard DNS (`*.properties.tuhame.co.ke`) if using org subdomains.
 - Payments: M-Pesa STK push configured per property (`mpesaPropertyPayNumber`). Switch to live credentials in production.
 - No Redis/Bull dependency — nothing to install or harden for caching/queues.
 
@@ -418,7 +418,7 @@ Always back up before migrations: `pg_dump tu-properies > backup_$(date +%F).sql
 Write `backend/.env` and `frontend/.env` with production values (see Environment Variables Reference above). Key changes from dev:
 
 - `NODE_ENV=production`
-- `FRONTEND_URL="https://app.tu-properties.co.ke"` (exact origin)
+- `FRONTEND_URL="https://properties.tuhame.co.ke"` (exact origin)
 - `DATABASE_URL` pointing to production DB with strong password
 - `JWT_SECRET` regenerated (`openssl rand -base64 48`)
 - `MPESA_ENV="production"` with live keys

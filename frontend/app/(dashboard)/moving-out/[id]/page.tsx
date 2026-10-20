@@ -172,14 +172,14 @@ export default function MoveOutDetailPage() {
                         <p className="text-sm text-muted-foreground">
                             {request.tenant &&
                                 `${request.tenant.surname} ${request.tenant.otherNames ?? ""}`.trim()}
-                            {request.Agreement?.unit && (
+                            {request.agreement?.unit && (
                                 <>
                                     {" · "}
                                     <Link
-                                        href={`/units/${request.Agreement.unit.id}`}
+                                        href={`/units/${request.agreement.unit.id}`}
                                         className="hover:underline"
                                     >
-                                        {request.Agreement.unit.name}
+                                        {request.agreement.unit.name}
                                     </Link>
                                 </>
                             )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FEATURES, FeatureItem } from './data/landingData';
+import { FEATURES, FEATURE_CATEGORIES } from './data/landingData';
 import {
   Building2,
   FileCheck2,
@@ -14,9 +14,17 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
-  Layers,
-  Sparkles,
-  ArrowRight
+  ArrowRight,
+  Target,
+  Handshake,
+  ShoppingCart,
+  Boxes,
+  CalendarCheck,
+  FolderLock,
+  BellRing,
+  ClipboardCheck,
+  ServerCog,
+  PiggyBank
 } from 'lucide-react';
 
 interface FeaturesListProps {
@@ -35,31 +43,50 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Users2: <Users2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
   BarChart3: <BarChart3 className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
   ShieldCheck: <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  Target: <Target className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  Handshake: <Handshake className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  ShoppingCart: <ShoppingCart className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  Boxes: <Boxes className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  CalendarCheck: <CalendarCheck className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  FolderLock: <FolderLock className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  BellRing: <BellRing className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  ClipboardCheck: <ClipboardCheck className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  ServerCog: <ServerCog className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+  PiggyBank: <PiggyBank className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+};
+
+/** Which feature ids belong to each filter tab. */
+const CATEGORY_MEMBERS: Record<string, string[]> = {
+  operations: [
+    'property-units',
+    'leasing-portal',
+    'maintenance-engine',
+    'security-deposits',
+    'tenant-requests-moveouts'
+  ],
+  finance: [
+    'owner-statements',
+    'finance-accounting',
+    'payments-allocation',
+    'reports-analytics'
+  ],
+  'utilities-workforce': [
+    'utilities-engine',
+    'hr-payroll',
+    'approvals-governance',
+    'documents-legal'
+  ],
+  growth: ['crm-lead-capture', 'sales-pipeline', 'procurement', 'inventory'],
+  platform: ['facilities-bookings', 'notifications-comms', 'platform-administration']
 };
 
 export const FeaturesList: React.FC<FeaturesListProps> = ({ onOpenTrialModal, onExploreModule }) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>('property-units');
 
-  const categories = [
-    { id: 'all', label: 'All 10 Features' },
-    { id: 'operations', label: 'Property & Leasing' },
-    { id: 'finance', label: 'Payments, Ledger & Tax' },
-    { id: 'utilities-workforce', label: 'Utilities, HR & Workflows' }
-  ];
-
   const filteredFeatures = FEATURES.filter((feat) => {
     if (activeCategory === 'all') return true;
-    if (activeCategory === 'operations') {
-      return ['property-units', 'leasing-portal', 'maintenance-engine'].includes(feat.id);
-    }
-    if (activeCategory === 'finance') {
-      return ['owner-statements', 'finance-accounting', 'payments-allocation', 'reports-analytics'].includes(feat.id);
-    }
-    if (activeCategory === 'utilities-workforce') {
-      return ['utilities-engine', 'hr-payroll', 'approvals-governance'].includes(feat.id);
-    }
-    return true;
+    return (CATEGORY_MEMBERS[activeCategory] ?? []).includes(feat.id);
   });
 
   const toggleExpand = (id: string) => {
@@ -75,7 +102,7 @@ export const FeaturesList: React.FC<FeaturesListProps> = ({ onOpenTrialModal, on
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs font-bold uppercase tracking-wider mb-3">
-            <span>The 10 Core Modules</span>
+            <span>The 20 Core Modules</span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white font-display tracking-tight">
             Engineered with zero fluff.{' '}
@@ -90,7 +117,7 @@ export const FeaturesList: React.FC<FeaturesListProps> = ({ onOpenTrialModal, on
 
         {/* Category Filters */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
-          {categories.map((cat) => (
+          {FEATURE_CATEGORIES.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
@@ -232,10 +259,10 @@ export const FeaturesList: React.FC<FeaturesListProps> = ({ onOpenTrialModal, on
         <div className="mt-12 text-center p-6 rounded-2xl bg-gradient-to-r from-white dark:from-slate-900 via-slate-100-[#0E1528] dark:via-[#0E1528] to-white dark:to-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-left">
             <h4 className="text-base font-bold text-slate-900 dark:text-white">
-              Every one of these 10 modules is included in all tiers.
+              Every one of these 20 modules is included in all tiers.
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              No locked modules or surprise add-ons. Full general ledger, M-Pesa push, and payroll out of the box.
+              No locked modules or surprise add-ons. Full general ledger, payment recording with FIFO allocation, and statutory payroll as dated rulesets.
             </p>
           </div>
           <button

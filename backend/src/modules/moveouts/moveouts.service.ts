@@ -20,7 +20,27 @@ export interface PaginationParams {
 
 export interface MoveOutFilters {
   status?: string;
+  /** The tenant's own code — the account code shown on the list. */
+  tenantCode?: string;
+  /** The tenant's name — surname or other names. */
+  tenantName?: string;
 }
+
+/**
+ * The columns the list may be ordered by.
+ *
+ * The list sends a column id, and a column id is not necessarily a column on
+ * the record (`tenantCode` belongs to the tenant, not to the request). Ordering
+ * by an unknown field is a database error, so the list is asked to name one of
+ * these and anything else falls back to the order the queue is read in.
+ */
+const SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'moveoutDate',
+  'approvalDate',
+  'status',
+] as const;
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -108,22 +128,50 @@ export class MoveoutsService {
       ? { organizationId: tenantId }
       : {};
 
+    // The tenant's own details are filtered here rather than in the list,
+    // because the code and the name are the resident's, not the request's.
+    const tenantFilter: Prisma.TenantWhereInput = {};
+
     if (search) {
-      where.tenant = {
-        is: {
+      tenantFilter.OR = [
+        { surname: { contains: search, mode: 'insensitive' } },
+        { otherNames: { contains: search, mode: 'insensitive' } },
+        { accountNumber: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (filters?.tenantCode) {
+      tenantFilter.code = {
+        contains: filters.tenantCode,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filters?.tenantName) {
+      tenantFilter.AND = [
+        {
           OR: [
-            { surname: { contains: search, mode: 'insensitive' } },
-            { otherNames: { contains: search, mode: 'insensitive' } },
-            { accountNumber: { contains: search, mode: 'insensitive' } },
-            { code: { contains: search, mode: 'insensitive' } },
+            { surname: { contains: filters.tenantName, mode: 'insensitive' } },
+            {
+              otherNames: { contains: filters.tenantName, mode: 'insensitive' },
+            },
           ],
         },
-      };
+      ];
+    }
+
+    if (Object.keys(tenantFilter).length > 0) {
+      where.tenant = { is: tenantFilter };
     }
 
     if (filters) {
       if (filters.status) where.status = filters.status as never;
     }
+
+    const sortField = (SORTABLE_FIELDS as readonly string[]).includes(sortBy)
+      ? sortBy
+      : 'createdAt';
 
     return this.prisma.$transaction(async (tx) => {
       const [data, total] = await Promise.all([
@@ -131,7 +179,7 @@ export class MoveoutsService {
           where,
           skip,
           take: limit,
-          orderBy: { [sortBy]: sortOrder as never },
+          orderBy: { [sortField]: sortOrder as never },
           include: this.relationInclude(),
         }),
         tx.moveOutRequest.count({ where }),

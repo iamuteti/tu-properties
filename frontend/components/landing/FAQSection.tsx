@@ -22,7 +22,7 @@ export const FAQSection: React.FC = () => {
             Frequently Asked Questions
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-600 dark:text-slate-300">
-            Clear, technical answers to the 4 most critical questions property managers ask us.
+            Clear, technical answers to the 5 questions property managers ask us first.
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export const FAQSection: React.FC = () => {
                     </p>
                     <div className="mt-4 flex items-center gap-2 text-xs font-mono text-amber-600/90 dark:text-amber-400/90">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <span>Validated across production African tenant instances</span>
+                      <span>Validated against the seeded demo organizations</span>
                     </div>
                   </div>
                 )}

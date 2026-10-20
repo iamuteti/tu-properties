@@ -72,12 +72,12 @@ export const ContactSection: React.FC = () => {
               Talk to a human about your portfolio.
             </h2>
             <p className="mt-4 text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
-              Pricing for multi-branch groups, migration from your current
+              Pricing for multi-market groups, migration from your current
               system, a tax configuration question — write it here and it lands
               directly in the platform team&apos;s queue.
             </p>
             <a
-              href="mailto:support@tuproperties.io"
+              href="mailto:support@tuhame.co.ke"
               className="mt-6 flex items-center gap-3 p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-amber-500/40 transition-all"
             >
               <span className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
@@ -88,7 +88,7 @@ export const ContactSection: React.FC = () => {
                   Prefer email?
                 </span>
                 <span className="block text-sm font-bold text-slate-900 dark:text-white">
-                  support@tuproperties.io
+                  support@tuhame.co.ke
                 </span>
               </span>
             </a>
@@ -154,7 +154,7 @@ export const ContactSection: React.FC = () => {
                       type="text"
                       required
                       maxLength={160}
-                      placeholder="e.g. Multi-branch pricing"
+                      placeholder="e.g. Multi-market pricing"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       className={inputClass}
