@@ -313,12 +313,12 @@ export function UnitForm({
                     <Field label="Unit name / number" id="name" error={errors.name?.message} required>
                         <Input id="name" placeholder="e.g. Flat 12" {...register('name')} disabled={isSubmitting} />
                     </Field>
-                    <Field label="Kind of unit" id="unitTypeId">
+                    <Field label="Type" id="unitTypeId">
                         <Select id="unitTypeId" {...register('unitTypeId')} disabled={isSubmitting}>
                             <option value="">No type</option>
                             {unitTypes.map((option) => (
                                 <option key={option.id} value={option.id}>
-                                    {option.code} — {option.name}
+                                    {option.name}
                                 </option>
                             ))}
                         </Select>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/simple-select";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/entity-states";
 import { moveOutsApi } from "@/lib/api";
-import { DEDUCTION_CATEGORIES, MOVE_OUT_STATUSES } from "@/lib/constants";
+import { DEDUCTION_CATEGORIES } from "@/lib/constants";
 import type { DepositBreakdown, MoveOutRequest } from "@/types";
 
 /**
@@ -36,6 +37,19 @@ export default function MoveOutDetailPage() {
     const [category, setCategory] = useState("DAMAGE");
     const [description, setDescription] = useState("");
     const [amount, setAmount] = useState("");
+
+    /**
+     * The refund reference is collected in a dialog rather than a
+     * `window.prompt`: a native prompt cannot show what is about to be paid,
+     * cannot be styled, and cannot be validated before the money leaves.
+     */
+    const [refundMode, setRefundMode] = useState<"refund" | "approve-and-refund" | null>(null);
+    const [paidRef, setPaidRef] = useState("");
+    const paidRefInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (refundMode !== null) paidRefInputRef.current?.focus();
+    }, [refundMode]);
 
     const load = useCallback(async () => {
         if (!id) return;
@@ -74,10 +88,12 @@ export default function MoveOutDetailPage() {
             });
             setDescription("");
             setAmount("");
-            toast.success("Deduction recorded");
+            toast.success("Deduction recorded", { position: "top-right" });
             await load();
         } catch (err: any) {
-            toast.error(err.response?.data?.message || "Could not record that deduction.");
+            toast.error(err.response?.data?.message || "Could not record that deduction.", {
+                position: "top-right",
+            });
         } finally {
             setIsBusy(false);
         }
@@ -90,42 +106,52 @@ export default function MoveOutDetailPage() {
             await moveOutsApi.removeDeduction(id, deductionId);
             await load();
         } catch (err: any) {
-            toast.error(err.response?.data?.message || "Could not remove that deduction.");
+            toast.error(err.response?.data?.message || "Could not remove that deduction.", {
+                position: "top-right",
+            });
         }
     };
 
-    const refund = async () => {
-        if (!id || !deposit) return;
-        const reference = window.prompt("Refund reference (bank / M-Pesa code):");
-        if (!reference?.trim()) {
-            toast.error("A payment reference is required to refund a deposit.");
-            return;
-        }
-        setIsBusy(true);
-        try {
-            await moveOutsApi.refund(id, reference.trim());
-            toast.success("Deposit refunded");
-            await load();
-        } catch (err: any) {
-            toast.error(err.response?.data?.message || "The refund was refused.");
-        } finally {
-            setIsBusy(false);
-        }
+    /** Open the dialog that collects the reference. The action waits for it. */
+    const openRefund = (mode: "refund" | "approve-and-refund") => {
+        setPaidRef("");
+        setRefundMode(mode);
     };
 
-    const approve = async () => {
-        if (!id) return;
+    /**
+     * Pay the refund out, and — when the move-out is still pending — approve it
+     * first, so the lease is terminated and the unit vacated before the money
+     * moves. The reference is required: it is what makes the payout traceable.
+     */
+    const confirmRefund = async () => {
+        const mode = refundMode;
+        const reference = paidRef.trim();
+        if (!mode || !id || !deposit) return;
+        if (deposit.refund > 0 && !reference) return;
+        setRefundMode(null);
         setIsBusy(true);
         try {
-            const response = await moveOutsApi.approve(id);
-            toast.success(
-                response.data.unitVacated
-                    ? "Move-out approved — the unit is vacant"
-                    : "Move-out approved — a successor tenancy keeps the unit",
-            );
+            if (mode === "approve-and-refund") {
+                await moveOutsApi.approve(id);
+                if (deposit.refund > 0) {
+                    await moveOutsApi.refund(id, reference);
+                }
+                toast.success(
+                    deposit.refund > 0
+                        ? `Move-out approved — ${currency} ${deposit.refund.toLocaleString()} refunded`
+                        : "Move-out approved — there is nothing to refund",
+                    { position: "top-right" },
+                );
+            } else {
+                await moveOutsApi.refund(id, reference);
+                toast.success("Deposit refunded", { position: "top-right" });
+            }
             await load();
         } catch (err: any) {
-            toast.error(err.response?.data?.message || "The move-out was refused.");
+            await load();
+            toast.error(err.response?.data?.message || "The move-out was refused.", {
+                position: "top-right",
+            });
         } finally {
             setIsBusy(false);
         }
@@ -151,7 +177,7 @@ export default function MoveOutDetailPage() {
     const currency = deposit.currency || "KES";
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24">
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <Button
@@ -188,11 +214,6 @@ export default function MoveOutDetailPage() {
                         </p>
                     </div>
                 </div>
-                {request.status === "PENDING" && (
-                    <Button onClick={approve} disabled={isBusy}>
-                        Approve move-out
-                    </Button>
-                )}
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
@@ -366,22 +387,99 @@ export default function MoveOutDetailPage() {
                         </ul>
                     )}
 
-                    {deposit.refundPaid ? (
-                        <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                    {request.status === "PENDING" ? (
+                        <></>
+                    ) : null}
+                </CardContent>
+            </Card>
+
+            {/* Sticky action bar: consolidate move-out lifecycle actions at the bottom */}
+            <div className="sticky bottom-0 z-40 flex items-center justify-between gap-3 p-4 border-t border-border bg-card shadow-[0_-1px_3px_rgba(0,0,0,0.08)]">
+                <div className="flex-1 text-sm text-foreground">
+                    {request.status === "PENDING" && (
+                        <p>
+                            Refund {currency} {deposit.refund.toLocaleString()} will be paid to the tenant
+                            and the move-out approved.
+                        </p>
+                    )}
+                    {request.status === "APPROVED" && (
+                        <p>
+                            Refund {currency} {deposit.refund.toLocaleString()} to the tenant.
+                        </p>
+                    )}
+                    {request.status === "COMPLETED" && (
+                        <p>
                             Refunded {currency}{" "}
-                            {Number(deposit.refundRecordedAmount ?? 0).toLocaleString()}{" "}
+                            {Number(deposit.refundRecordedAmount ?? deposit.refund).toLocaleString()}{" "}
                             {deposit.refundPaidAt
                                 ? `on ${new Date(deposit.refundPaidAt).toLocaleDateString()}`
                                 : ""}
                             .
                         </p>
-                    ) : (
-                        <Button onClick={refund} disabled={isBusy || deposit.refund <= 0}>
-                            Refund {currency} {deposit.refund.toLocaleString()}
-                        </Button>
                     )}
-                </CardContent>
-            </Card>
+                    {request.status === "REJECTED" && (
+                        <p>Rejected.</p>
+                    )}
+                </div>
+                {request.status === "PENDING" && (
+                    <Button onClick={() => openRefund("approve-and-refund")} disabled={isBusy}>
+                        Refund & Approve · {currency} {deposit.refund.toLocaleString()}
+                    </Button>
+                )}
+                {request.status === "APPROVED" && (
+                    <Button
+                        onClick={() => openRefund("refund")}
+                        disabled={isBusy || deposit.refund <= 0}
+                    >
+                        Refund {currency} {deposit.refund.toLocaleString()}
+                    </Button>
+                )}
+            </div>
+
+            <ConfirmDialog
+                isOpen={refundMode !== null}
+                onClose={() => setRefundMode(null)}
+                onConfirm={confirmRefund}
+                title={
+                    refundMode === "approve-and-refund"
+                        ? "Refund and approve this move-out?"
+                        : "Refund the deposit?"
+                }
+                message={
+                    refundMode === "approve-and-refund"
+                        ? deposit.refund > 0
+                            ? `${currency} ${deposit.refund.toLocaleString()} will be paid to the tenant, the lease terminated and the unit marked vacant. The reference is recorded against the payment so the payout can be traced later.`
+                            : "There is nothing to refund — the deductions and unpaid rent use up the whole deposit. Approving will terminate the lease and mark the unit vacant."
+                        : `${currency} ${deposit.refund.toLocaleString()} will be paid to the tenant. The reference is recorded against the payment so the payout can be traced later.`
+                }
+                confirmText={
+                    refundMode === "approve-and-refund"
+                        ? deposit.refund > 0
+                            ? `Refund & approve ${currency} ${deposit.refund.toLocaleString()}`
+                            : "Approve move-out"
+                        : `Refund ${currency} ${deposit.refund.toLocaleString()}`
+                }
+                tone="default"
+                confirmDisabled={deposit.refund > 0 && !paidRef.trim()}
+            >
+                {deposit.refund > 0 && (
+                    <div className="mt-4 space-y-2">
+                        <label htmlFor="paid-ref" className="text-sm font-medium text-foreground">
+                            Payment reference
+                        </label>
+                        <Input
+                            id="paid-ref"
+                            ref={paidRefInputRef}
+                            value={paidRef}
+                            onChange={(e) => setPaidRef(e.target.value)}
+                            placeholder="Bank / M-Pesa code"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Recorded on the move-out and the lease. Required.
+                        </p>
+                    </div>
+                )}
+            </ConfirmDialog>
         </div>
     );
 }

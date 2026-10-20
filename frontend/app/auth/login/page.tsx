@@ -1,7 +1,7 @@
 "use client";
 
 import { Building2, Eye, EyeOff, KeyRound, Sparkles } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LoadingState } from "@/components/ui/entity-states";
 import { authApi } from "@/lib/api";
 
 // Zod schema for validation
@@ -20,7 +21,20 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+/**
+ * `useSearchParams` opts the page out of static rendering, so the part of the
+ * page that reads the query string has to sit behind a Suspense boundary —
+ * otherwise the build fails to prerender this route.
+ */
 export default function LoginPage() {
+    return (
+        <Suspense fallback={<LoadingState label="Loading sign-in…" />}>
+            <LoginForm />
+        </Suspense>
+    );
+}
+
+function LoginForm() {
     const { login } = useAuth();
     const searchParams = useSearchParams();
     const [error, setError] = useState<string | null>(null);

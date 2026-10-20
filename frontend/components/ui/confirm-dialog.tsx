@@ -13,8 +13,10 @@ interface ConfirmDialogProps {
   children?: ReactNode;
   confirmText?: string;
   cancelText?: string;
-  /** Style the confirm button as destructive (default) or neutral. */
-  tone?: 'danger' | 'default';
+    /** Style the confirm button as destructive (default) or neutral. */
+    tone?: 'danger' | 'default';
+    /** Block the confirm button — for a required field the user has not filled yet. */
+    confirmDisabled?: boolean;
 }
 
 export default function ConfirmDialog({
@@ -24,9 +26,10 @@ export default function ConfirmDialog({
   title,
   message,
   children,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  tone = 'danger',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    tone = 'danger',
+    confirmDisabled = false,
 }: ConfirmDialogProps) {
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
@@ -53,10 +56,11 @@ export default function ConfirmDialog({
               {cancelText}
             </button>
             <button
-              onClick={() => { onConfirm(); onClose(); }}
-              className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
-                tone === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'
-              }`}
+                onClick={() => { onConfirm(); onClose(); }}
+                disabled={confirmDisabled}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                    tone === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'
+                }`}
             >
               {confirmText}
             </button>

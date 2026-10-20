@@ -142,11 +142,22 @@ the data.
 
 | Role | Email | Password | Organization |
 | :--- | :--- | :--- | :--- |
+| **Admin** | `admin@jedan-apartments.co.ke` | `Password123!` | Jedan Apartments |
 | **Manager** | `manager@jedan-apartments.co.ke` | `Password123!` | Jedan Apartments |
 
 **Purpose:** the immersive one-estate dataset (1 property, 44 units, 53
 tenants). Seeded by `npm run db:seed:jedan`, which is a **separate script** —
 the demo seed deletes every organization, so run it afterwards.
+
+The manager login holds the **Property Manager** system role through a
+`RoleAssignment` row, and the seed writes the role matrix itself, so the
+account works after a standalone `db:seed:jedan` even if `db:seed:roles` has
+never been run on that database. Note what the Property Manager role does
+**not** carry: the finance register (`invoices`, `payments`, `arrears`) belongs
+to an administrator or an accountant, so this account does not open those
+screens. What it does open: properties and units, tenants and their requests,
+agreements, the security-deposit register, receipt capture (Billing & Finance →
+Capture Manually), and the utility meter register and billing.
 
 ## 3. Multi-Tenancy Test Scenarios
 

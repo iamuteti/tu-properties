@@ -194,6 +194,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
             options={tenantOptions}
             placeholder={tenantsLoading ? "Loading tenants..." : "Select a tenant"}
             disabled={tenantsLoading}
+            search
             onChange={(e) => setValue("tenantId", e.target.value)}
           />
           {errors.tenantId && (

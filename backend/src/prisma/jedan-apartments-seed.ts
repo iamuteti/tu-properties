@@ -16,7 +16,6 @@ import {
   MeterScope,
   MeterStatus,
   MeterReadingSource,
-  UtilityChargeStatus,
   UtilityBillingMode,
   VacancyPolicy,
 } from '@prisma/client';
@@ -24,6 +23,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
+import { seedRoles } from './roles-seed';
 
 dotenv.config();
 
@@ -539,21 +539,90 @@ async function main() {
     },
   });
 
-  // ── 5. Property manager user ───────────────────────────────────────────
-  console.log('Creating property manager user...');
+  // ── 5. Manager and admin accounts ──────────────────────────────────────
+  //
+  // Two logins for this organization: an administrator (Company Admin) who
+  // owns the finance register and settings, and a property manager who runs
+  // the estate day to day. Both must be *working* logins, not accounts that
+  // authenticate and then do nothing — see the role-assignment note below.
+  console.log('Creating manager and admin accounts...');
   const passwordHash = await bcrypt.hash('Password123!', 10);
-  await prisma.user.create({
+
+  const admin = await prisma.user.create({
+    data: {
+      email: 'admin@jedan-apartments.co.ke',
+      firstName: 'Jedan',
+      lastName: 'Admin',
+      phone: '+254700000017',
+      passwordHash,
+      role: UserRole.ADMIN,
+      organizationId: organization.id,
+      isActive: true,
+      emailVerified: true,
+    },
+  });
+
+  const manager = await prisma.user.create({
     data: {
       email: 'manager@jedan-apartments.co.ke',
       firstName: 'Jedan',
       lastName: 'Manager',
-      phone: kenyanPhone(),
+      phone: '+254700000016',
       passwordHash,
       role: UserRole.PROPERTY_MANAGER,
       organizationId: organization.id,
       isActive: true,
       emailVerified: true,
     },
+  });
+
+  // Structured `RoleAssignment` rows, not just the legacy `UserRole` enum.
+  //
+  // `PermissionsService` resolves a user's permissions from `user_roles` and
+  // only falls back to the legacy enum when there is **no** assignment at all.
+  // That fallback then needs the matching system role to already be a row in
+  // the database: `LEGACY_ROLE_TO_SYSTEM_ROLE` maps `ADMIN` to "Company Admin"
+  // and `PROPERTY_MANAGER` to "Property Manager", and if either row is missing
+  // the user is denied everything and the backend logs a warning.
+  //
+  // It is not safe to assume those rows are there. `db:seed:jedan` is a
+  // standalone script — the demo seed deletes every organization, so this one
+  // is meant to run *afterwards* — and `db:seed:roles` is a separate script a
+  // developer may never have run on this database. Skipping this is a login
+  // that signs in and can do nothing, indistinguishable from a broken install.
+  //
+  // `seedRoles` is the same idempotent matrix upsert the demo seed uses, so
+  // the permission JSON comes from `roles-seed.ts` — one source of truth — and
+  // both accounts work whether or not the roles seed has been run.
+  await seedRoles(prisma);
+
+  const systemRoles = await prisma.role.findMany({
+    where: {
+      organizationId: null,
+      name: { in: ['Company Admin', 'Property Manager'] },
+    },
+    select: { id: true, name: true },
+  });
+  const adminRole = systemRoles.find((r) => r.name === 'Company Admin');
+  const managerRole = systemRoles.find((r) => r.name === 'Property Manager');
+  if (!adminRole) {
+    throw new Error(
+      'Jedan seed: the "Company Admin" system role is missing after the role ' +
+        'matrix was seeded. Check SYSTEM_ROLES in roles-seed.ts.',
+    );
+  }
+  if (!managerRole) {
+    throw new Error(
+      'Jedan seed: the "Property Manager" system role is missing after the role ' +
+        'matrix was seeded. Check SYSTEM_ROLES in roles-seed.ts.',
+    );
+  }
+
+  await prisma.roleAssignment.create({
+    data: { userId: admin.id, roleId: adminRole.id },
+  });
+  await prisma.roleAssignment.create({
+    data: { userId: manager.id, roleId: managerRole.id },
   });
 
   // ── 6. Unit types, deposit rules and units ─────────────────────────────
@@ -1145,6 +1214,15 @@ async function main() {
       `${leases.length} leases, ${billingMonths.length} billing months (Mar 2025–${monthLabel(WINDOW_END)}), ` +
       `${invoiceCount} invoices. Rent due by the ${PAYMENT_DAY}th. Garbage: KES ${GARBAGE}/unit/month. ` +
       'Metered water (bulk) + electricity (per-floor sub-meters) ready for separate billing.',
+  );
+
+  console.log(
+    `Manager login: manager@jedan-apartments.co.ke / Password123! ` +
+      `(Property Manager role, assigned on this organization).`,
+  );
+  console.log(
+    `Admin login: admin@jedan-apartments.co.ke / Password123! ` +
+      `(Company Admin role, assigned on this organization).`,
   );
 }
 

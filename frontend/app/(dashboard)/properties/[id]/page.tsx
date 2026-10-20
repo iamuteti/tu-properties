@@ -134,7 +134,7 @@ export default function PropertyDetailPage() {
                     )}
                     {property.status === "ACTIVE" && (
                         <Button variant="outline" onClick={() => handleStatusChange("INACTIVE")} disabled={isBusy}>
-                            Mark inactive
+                            Mark In-Active
                         </Button>
                     )}
                     {property.status !== "ARCHIVED" && (
@@ -169,8 +169,8 @@ export default function PropertyDetailPage() {
                     [
                         { id: "overview", label: "Overview" },
                         { id: "units", label: `Units (${units.length})` },
-                        { id: "deposits", label: "Unit types & deposits" },
-                        { id: "files", label: "Photos & documents" },
+                        { id: "deposits", label: "Unit Types & Deposits" },
+                        { id: "files", label: "Photos & Documents" },
                     ] as Array<{ id: Tab; label: string }>
                 ).map((item) => (
                     <button
