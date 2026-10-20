@@ -11,6 +11,7 @@ import { Receipt } from "@/types";
 import { useState, useMemo } from "react";
 import { RentReceiptFilters, type RentReceiptFiltersState } from "@/components/filters/rent-receipts-filter";
 import { getDateRangeForPeriod } from "@/components/filters/period-selector";
+import { paymentMethodLabel } from "@/lib/constants";
 
 // Define columns for the DataTable
 const columns: ColumnDef<Receipt>[] = [
@@ -52,13 +53,18 @@ const columns: ColumnDef<Receipt>[] = [
         case "CARD":
           methodColor = "bg-indigo-100 text-indigo-800";
           break;
+        // Money that never reached an account of ours. It is deliberately not
+        // green: nothing of ours is holding it.
+        case "DIRECT_REMIT":
+          methodColor = "bg-amber-100 text-amber-800";
+          break;
         default:
           methodColor = "bg-gray-100 text-foreground";
       }
       
       return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${methodColor}`}>
-          {method}
+          {paymentMethodLabel(method)}
         </span>
       );
     },

@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
+import { DIRECT_REMIT_METHOD } from '@/common/contants';
 import { AccountingService } from '../accounting/accounting.service';
 import { CreditsService } from '../credits/credits.service';
 import { allocateToInvoice } from '../invoice-allocation';
@@ -48,7 +49,8 @@ export class ReceiptsService {
         | 'CHEQUE'
         | 'MPESA'
         | 'CARD'
-        | 'OTHER';
+        | 'OTHER'
+        | 'DIRECT_REMIT';
       depositIntoAc?: string;
       refNo?: string;
       chequeNo?: string;
@@ -92,7 +94,8 @@ export class ReceiptsService {
           | 'CHEQUE'
           | 'MPESA'
           | 'CARD'
-          | 'OTHER';
+          | 'OTHER'
+          | 'DIRECT_REMIT';
         paymentReference?: string;
         payee?: string;
         paidFrom?: string;
@@ -128,8 +131,16 @@ export class ReceiptsService {
       bankingDate: data.bankingDate ? new Date(data.bankingDate) : undefined,
       paymentRefNo: data.paymentRefNo,
       amountVatInclusive: data.amountVatInclusive ?? true,
-      receiptTo: (data.receiptTo as any) || 'Landlord',
-      drtOrDrf: (data.drtOrDrf as any) || 'DepositRefund',
+      // Money that bypassed the estate was collected for the owner, so the
+      // receipt says so — the client does not get to decide this one.
+      receiptTo:
+        data.paymentMethod === DIRECT_REMIT_METHOD
+          ? 'Landlord'
+          : (data.receiptTo as any) || 'Landlord',
+      // A receipt recorded when money arrived is a direct receipt. The old
+      // default was "deposit refund", which described the opposite event and
+      // disagreed with every seeded receipt in this product.
+      drtOrDrf: (data.drtOrDrf as any) || 'DirectReceipt',
       memo: data.memo,
       paymentBank: data.paymentBank,
       currency: data.currency || 'KES',

@@ -61,6 +61,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
     "/finance/credits": "credits",
     "/finance/receipts": "receipts",
     "/finance/rent-receipts": "rent-receipts",
+    "/finance/capture-manually": "receipts",
     "/finance/chart-of-accounts": "chart-of-accounts",
     "/finance/journal-entries": "journal-entries",
     "/finance/trial-balance": "trial-balance",

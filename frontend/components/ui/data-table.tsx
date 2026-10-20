@@ -56,6 +56,16 @@ interface DataTableProps<T> {
   onPaginationChange?: (pagination: { page: number; limit: number }) => void;
   onSearchChange?: (search: string) => void;
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
+  /**
+   * The page the server is showing, 1-based.
+   *
+   * A server-side table owns its own page index, so a parent that pulls the
+   * page back to the first one (because a filter narrowed the results) needs
+   * a way to drag the table with it — otherwise the table keeps highlighting
+   * the old page while showing the new page's rows, and clicking that page
+   * again does nothing. Optional: left out, the table keeps its own page.
+   */
+  page?: number;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -76,6 +86,7 @@ export function DataTable<T extends Record<string, any>>({
   onPaginationChange,
   onSearchChange,
   onSortChange,
+  page,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -132,6 +143,19 @@ export function DataTable<T extends Record<string, any>>({
     }
     prevPaginationRef.current = current;
   }, [pagination.pageIndex, pagination.pageSize, serverSidePagination]);
+
+  // Follow the server's page when the parent moves it — a filter that narrows
+  // the register sends the reader back to the first page, and the table has to
+  // go with them.
+  React.useEffect(() => {
+    if (!serverSidePagination || page === undefined) return;
+    const nextIndex = Math.max(0, page - 1);
+    setPagination((previous) =>
+      previous.pageIndex === nextIndex
+        ? previous
+        : { ...previous, pageIndex: nextIndex },
+    );
+  }, [page, serverSidePagination]);
 
   // Notify parent of sort changes in server-side mode
   const prevSortingRef = React.useRef<SortingState | null>(null);

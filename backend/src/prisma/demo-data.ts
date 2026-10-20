@@ -85,6 +85,7 @@ import * as bcrypt from 'bcrypt';
 import {
   PROPERTY_CATEGORIES,
   PROPERTY_TYPES,
+  SETTLED_PAYMENT_METHODS,
   UNIT_TYPES,
 } from '@/common/contants';
 import { seedRoles } from './roles-seed';
@@ -558,6 +559,8 @@ export async function generateDemoData(
   console.log('Generating rental agreements...');
   const agreements: (Agreement & { tenant: Tenant; unit: Unit })[] = [];
   let agreementIndex = 0;
+  let depositInvoiceCount = 0;
+  let depositReceiptCount = 0;
 
   for (let i = 0; i < occupiedUnits.length; i++) {
     const unit = occupiedUnits[i];
@@ -627,6 +630,108 @@ export async function generateDemoData(
         organizationId,
       },
     });
+
+    // The deposit is billed on its own invoice and paid at move-in, the way the
+    // live flow does it when a lease is raised. The register reads "received"
+    // off that invoice, so a tenancy seeded without one shows a deposit nobody
+    // has paid.
+    if (securityDeposit && securityDeposit > 0) {
+      const depositAmount = Number(securityDeposit);
+      const depositInvoice = await prisma.invoice.create({
+        data: {
+          invoiceNumber: `INV-DEP-${String(depositInvoiceCount + 1).padStart(4, '0')}${randomString(4)}`,
+          agreementId: agreement.id,
+          billTo: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          issueDate: startDate,
+          dueDate: startDate,
+          amount: depositAmount,
+          totalAmount: depositAmount,
+          paidAmount: depositAmount,
+          balanceAmount: 0,
+          currency: activeProfile.currency,
+          transactionClass: 'DEPOSIT',
+          status: InvoiceStatus.PAID,
+          memo: `Security deposit for agreement ${agreement.code}`,
+          invoiceItems: {
+            create: [
+              {
+                description: `Security deposit — ${unit.name}`,
+                quantity: 1,
+                unitPrice: depositAmount,
+                amount: depositAmount,
+                revenueExpenseItem: 'Deposit',
+              },
+            ],
+          },
+          organizationId,
+        },
+      });
+      depositInvoiceCount++;
+
+      // The estate received this deposit, so it is one of the methods where
+      // the money lands in an account of ours — never `DIRECT_REMIT`, which
+      // would say the money never reached us.
+      const depositMethod = SETTLED_PAYMENT_METHODS[
+        Math.floor(Math.random() * SETTLED_PAYMENT_METHODS.length)
+      ] as PaymentMethod;
+      const depositPayment = await prisma.payment.create({
+        data: {
+          agreementId: agreement.id,
+          invoiceId: depositInvoice.id,
+          paymentDate: startDate,
+          amount: depositAmount,
+          currency: activeProfile.currency,
+          paymentMethod: depositMethod,
+          paymentReference:
+            depositMethod === PaymentMethod.MPESA
+              ? randomString(10)
+              : `REF-${randomString(8)}`,
+          payee: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          paidFrom:
+            depositMethod === PaymentMethod.MPESA ? 'M-PESA' : 'Bank Transfer',
+          paidTo: 'Operating Account',
+          paymentType: PaymentType.ApplyToBill,
+          recordedBy: 'Admin User',
+          organizationId,
+        },
+      });
+
+      await prisma.receipt.create({
+        data: {
+          receiptId: `REC-DEP-${String(depositReceiptCount + 1).padStart(4, '0')}${randomString(4)}`,
+          receiptType: ReceiptType.ApplyToInvoice,
+          receiptCategory: ReceiptCategory.General,
+          receivedFrom: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          paymentMethod: depositMethod,
+          recordingDate: startDate,
+          amountReceived: depositAmount,
+          currency: activeProfile.currency,
+          tenantId: tenant.id,
+          landlordId: property.landlordId,
+          receiptTo: ReceiptTo.Landlord,
+          drtOrDrf: DRTOrDRF.DirectReceipt,
+          recordedBy: 'Admin User',
+          payments: { connect: { id: depositPayment.id } },
+          receiptLines: {
+            create: [
+              {
+                date: startDate,
+                invNo: depositInvoice.invoiceNumber,
+                particular: `Security deposit — ${unit.name}`,
+                invoiceTotal: depositAmount,
+                prevReceipts: 0,
+                amtDue: depositAmount,
+                payment: depositAmount,
+                newBalance: 0,
+                whtTax: 0,
+              },
+            ],
+          },
+          organizationId,
+        },
+      });
+      depositReceiptCount++;
+    }
 
     // Update unit status based on rental agreement status
     const unitStatus =
@@ -746,10 +851,12 @@ export async function generateDemoData(
           paymentDate.getDate() + Math.floor(Math.random() * 10) + 1,
         ); // Payment 1-10 days after invoice
 
-        const paymentMethod =
-          Object.values(PaymentMethod)[
-            Math.floor(Math.random() * Object.values(PaymentMethod).length)
-          ];
+        // The estate received this rent, so it is one of the methods where the
+        // money lands in an account of ours — never `DIRECT_REMIT`, which would
+        // say the money never reached us.
+        const paymentMethod = SETTLED_PAYMENT_METHODS[
+          Math.floor(Math.random() * SETTLED_PAYMENT_METHODS.length)
+        ] as PaymentMethod;
 
         const payment = await prisma.payment.create({
           data: {
@@ -3871,6 +3978,11 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     'finance/suppliers',
     'refunds',
     'credits',
+    // The Billing & Finance group's own key. The sidebar filters a group out
+    // when its key is not enabled, so without it the whole finance section is
+    // invisible to everyone who is not a super admin — even though every child
+    // key below is enabled.
+    'billing',
     'receipts',
     'rent-receipts',
     'chart-of-accounts',
@@ -7413,6 +7525,46 @@ async function generateWesthillData(
   });
 
   const now = new Date();
+
+  // The deposit is billed and paid at move-in, the way the live flow does it.
+  // The register reads "received" off that invoice, so a lease seeded without
+  // one shows a deposit nobody has paid.
+  const depositInvoice = await prisma.invoice.create({
+    data: {
+      organizationId,
+      agreementId: agreement.id,
+      currency: activeProfile.currency,
+      invoiceNumber: `INV-WESTHILL-${now.getFullYear()}-0000`,
+      issueDate: new Date(Date.UTC(2026, 7, 1)),
+      dueDate: new Date(Date.UTC(2026, 7, 1)),
+      amount: unitRent,
+      totalAmount: unitRent,
+      balanceAmount: 0,
+      paidAmount: unitRent,
+      transactionClass: 'DEPOSIT',
+      status: InvoiceStatus.PAID,
+      memo: `Security deposit for agreement ${agreement.code}`,
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      organizationId,
+      agreementId: agreement.id,
+      invoiceId: depositInvoice.id,
+      paymentDate: new Date(Date.UTC(2026, 7, 1)),
+      amount: unitRent,
+      currency: activeProfile.currency,
+      paymentMethod: PaymentMethod.MPESA,
+      paymentReference: `MPESA-${randomString(10)}`,
+      payee: `${tenants[0].surname} ${tenants[0].otherNames}`,
+      paidFrom: 'M-PESA',
+      paidTo: 'Operating Account',
+      paymentType: PaymentType.ApplyToBill,
+      recordedBy: 'Rohi Admin',
+    },
+  });
+
   const paidInvoice = await prisma.invoice.create({
     data: {
       organizationId,
@@ -8329,6 +8481,78 @@ async function generateMarketOrgData(
         securityDeposit: unit.rent,
         noticePeriodDays: 30,
         status: AgreementStatus.ACTIVE,
+        organizationId: market.organizationId,
+      },
+    });
+
+    // The deposit is billed and paid at move-in, the way the live flow does it.
+    // The register reads "received" off that invoice, so a lease seeded without
+    // one shows a deposit nobody has paid.
+    const depositInvoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber: `INV-${prefix}-DEP-${String(leaseIndex + 1).padStart(2, '0')}`,
+        agreementId: agreement.id,
+        landlordId: landlord.id,
+        billTo: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+        issueDate: monthStart(-14),
+        dueDate: monthStart(-14),
+        amount: unit.rent,
+        totalAmount: unit.rent,
+        paidAmount: unit.rent,
+        balanceAmount: 0,
+        currency: profile.currency,
+        transactionClass: 'DEPOSIT',
+        status: InvoiceStatus.PAID,
+        memo: `Security deposit for agreement ${agreement.code}`,
+        organizationId: market.organizationId,
+      },
+    });
+
+    const depositMethod =
+      prefix === 'KE'
+        ? PaymentMethod.MPESA
+        : Math.random() < 0.6
+          ? PaymentMethod.BANK_TRANSFER
+          : PaymentMethod.CARD;
+    const depositPayment = await prisma.payment.create({
+      data: {
+        agreementId: agreement.id,
+        invoiceId: depositInvoice.id,
+        paymentDate: monthStart(-14),
+        amount: unit.rent,
+        currency: profile.currency,
+        paymentMethod: depositMethod,
+        paymentReference: `${depositMethod}-${randomString(8)}`,
+        payee: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+        paidFrom:
+          depositMethod === PaymentMethod.MPESA
+            ? 'M-PESA'
+            : depositMethod === PaymentMethod.CARD
+              ? 'Card'
+              : 'Bank Transfer',
+        paidTo: `${market.name} Operating Account`,
+        paymentType: PaymentType.ApplyToBill,
+        recordedBy: landlordName,
+        organizationId: market.organizationId,
+      },
+    });
+
+    await prisma.receipt.create({
+      data: {
+        receiptId: `REC-${prefix}-DEP-${String(leaseIndex + 1).padStart(2, '0')}`,
+        receiptType: ReceiptType.ApplyToInvoice,
+        receiptCategory: ReceiptCategory.General,
+        receivedFrom: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+        paymentMethod: depositMethod,
+        recordingDate: monthStart(-14),
+        amountReceived: unit.rent,
+        currency: profile.currency,
+        tenantId: tenant.id,
+        landlordId: landlord.id,
+        receiptTo: ReceiptTo.Landlord,
+        drtOrDrf: DRTOrDRF.DirectReceipt,
+        recordedBy: landlordName,
+        payments: { connect: { id: depositPayment.id } },
         organizationId: market.organizationId,
       },
     });

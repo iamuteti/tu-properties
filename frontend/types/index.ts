@@ -830,6 +830,23 @@ export interface Invoice {
     payments?: Payment[];
 }
 
+/**
+ * How money was paid.
+ *
+ * `DIRECT_REMIT` is the one that is not an instrument: it says the payer sent
+ * the money straight to the party it was due to — usually the owner — and it
+ * never reached an account of ours. It cannot be filed under `CASH`, because
+ * "cash" says the estate is holding the money and here it never held it.
+ */
+export type PaymentMethodValue =
+    | 'CASH'
+    | 'BANK_TRANSFER'
+    | 'CHEQUE'
+    | 'MPESA'
+    | 'CARD'
+    | 'OTHER'
+    | 'DIRECT_REMIT';
+
 export interface Receipt {
     id: string;
     receiptId: string;
@@ -838,7 +855,7 @@ export interface Receipt {
     
     // Common fields
     receivedFrom: string;
-    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+    paymentMethod: PaymentMethodValue;
     depositIntoAc?: string;
     refNo?: string;
     chequeNo?: string;
@@ -886,7 +903,7 @@ export interface Payment {
     amount: number;
     currency?: string;
     spotRate?: number;
-    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+    paymentMethod: PaymentMethodValue;
     paymentReference?: string;
     payee?: string;
     paidFrom?: string;
@@ -953,7 +970,7 @@ export interface CreateReceiptData {
     receiptType?: 'ApplyToInvoice' | 'CashReceipt';
     receiptCategory?: 'Rent' | 'General';
     receivedFrom: string;
-    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+    paymentMethod: PaymentMethodValue;
     depositIntoAc?: string;
     refNo?: string;
     chequeNo?: string;
@@ -982,7 +999,7 @@ export interface CreateReceiptData {
         amount: number;
         currency?: string;
         spotRate?: number;
-        paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'MPESA' | 'CARD' | 'OTHER';
+        paymentMethod: PaymentMethodValue;
         paymentReference?: string;
         payee?: string;
         paidFrom?: string;

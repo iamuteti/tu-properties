@@ -542,6 +542,24 @@ export const SYSTEM_ROLES: {
       // ...and so is the deposit: the property manager sets what each kind of
       // unit in their buildings costs as a deposit, and reads the register.
       deposits: full(),
+      // Module 5/8 — **capture, not accounting.**
+      //
+      // The property manager is the person who is actually at the estate and
+      // receives the money, so they may record that it arrived: `create` is
+      // the right to write the receipt that says a tenant handed over cash,
+      // sent a transfer, or paid the owner directly.
+      //
+      // It is deliberately not `full()` — there is no `update` and no
+      // `delete`, because a receipt is evidence and the person who witnessed
+      // the handover is not the person who may quietly remove it. Reversing a
+      // receipt is finance's job and stays with the accountant.
+      //
+      // `view` is there for the resident's file, which is where a property
+      // manager reads a receipt and prints it. The organization-wide register
+      // under `/finance/receipts` is finance's, and the controller's own role
+      // list is what keeps it that way — the same arrangement the accountant
+      // has with `deposits`.
+      receipts: { view: true, create: true },
       // Resident requests raised from the tenant portal.
       tenant_requests: full(),
       // Module 18: refund and purchase approvals arrive at a property manager,

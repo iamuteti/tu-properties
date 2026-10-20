@@ -216,7 +216,12 @@ const navItems: NavItem[] = [
     {
         label: "Billing & Finance",
         icon: CreditCard,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
+        // A property manager is on this list for one reason: they are the
+        // person at the estate who receives the money, so they may capture it.
+        // Their child items are filtered by their own role lists, so what they
+        // see here is the capture and nothing else — the register, the chart of
+        // accounts and the journal stay with finance.
+        roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER'],
         module: 'billing',
         children: [
             { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'invoices' },
@@ -228,6 +233,11 @@ const navItems: NavItem[] = [
             { href: "/finance/credits", label: "Customer Credits", icon: PiggyBank, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'credits' },
             { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'receipts' },
             { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'rent-receipts' },
+            // Module 5/8. Money that arrives outside the system — a tenant at
+            // the office with an envelope of cash, a tenant who paid the owner
+            // directly — is captured by hand. It sits beside the receipts
+            // because it writes one.
+            { href: "/finance/capture-manually", label: "Capture Manually", icon: Banknote, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER'], module: 'receipts' },
             { href: "/finance/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'chart-of-accounts' },
             { href: "/finance/journal-entries", label: "Journal Entries", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'journal-entries' },
             { href: "/finance/trial-balance", label: "Trial Balance", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'trial-balance' }

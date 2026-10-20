@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CreditCard, ShieldCheck } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable, type PaginationMeta } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +18,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { EmptyState, ErrorState, LoadingState } from "@/components/ui/entity-states";
+import { ErrorState, LoadingState } from "@/components/ui/entity-states";
 import { securityDepositsApi } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/currency";
 import {
@@ -63,6 +65,7 @@ export default function SecurityDepositsPage() {
     const [appliedSearch, setAppliedSearch] = useState("");
     const [status, setStatus] = useState("");
     const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(20);
 
     const load = useCallback(async () => {
         setIsLoading(true);
@@ -70,7 +73,7 @@ export default function SecurityDepositsPage() {
         try {
             const response = await securityDepositsApi.findAll({
                 page,
-                limit: 20,
+                limit,
                 search: appliedSearch || undefined,
                 status: status || undefined,
             });
@@ -85,7 +88,7 @@ export default function SecurityDepositsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [page, appliedSearch, status]);
+    }, [page, limit, appliedSearch, status]);
 
     useEffect(() => {
         load();
@@ -122,6 +125,14 @@ export default function SecurityDepositsPage() {
         setPage(1);
     }, []);
 
+    const handlePaginationChange = useCallback(
+        (pagination: { page: number; limit: number }) => {
+            setPage(pagination.page);
+            setLimit(pagination.limit);
+        },
+        [],
+    );
+
     const hasFilters = Boolean(appliedSearch || status);
     const total = meta.total;
     const from = total === 0 ? 0 : (meta.page - 1) * meta.limit + 1;
@@ -133,6 +144,199 @@ export default function SecurityDepositsPage() {
             ...DEPOSIT_DISPOSITION_OPTIONS,
         ],
         [],
+    );
+
+    /**
+     * The register's columns.
+     *
+     * The register is ordered by the lease's own start date and the server
+     * cannot order it by anything else, so no column is sortable: a column
+     * that offered an order the server would not honour is a lie about the
+     * data. Every amount is the row's own currency.
+     */
+    const columns = useMemo<ColumnDef<SecurityDepositRow>[]>(
+        () => [
+            {
+                id: "tenant",
+                header: "Tenant",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div>
+                        <Link
+                            href={`/agreements/${row.original.agreementId}`}
+                            className="font-medium hover:underline"
+                        >
+                            {row.original.tenant.name || row.original.tenant.code}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                            {row.original.tenant.accountNumber} ·{" "}
+                            {row.original.agreementCode}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                id: "unit",
+                header: "Unit",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div>
+                        {row.original.unit?.name ?? "—"}
+                        <p className="text-xs text-muted-foreground">
+                            {row.original.property?.name ?? "—"}
+                            {row.original.unitType
+                                ? ` · ${row.original.unitType.code}`
+                                : ""}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                id: "agreed",
+                header: "Agreed",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="text-right tabular-nums">
+                        {formatMoney(
+                            row.original.depositAmount,
+                            row.original.currency,
+                            locale,
+                        )}
+                        {row.original.waived && (
+                            <p className="text-xs text-muted-foreground">
+                                waived
+                            </p>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                id: "received",
+                header: "Received",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="text-right tabular-nums">
+                        {row.original.invoiceNumber
+                            ? formatMoney(
+                                  row.original.receivedAmount,
+                                  row.original.currency,
+                                  locale,
+                              )
+                            : "—"}
+                        {row.original.invoiceNumber ? (
+                            <p className="text-xs text-muted-foreground">
+                                {row.original.invoiceNumber}
+                            </p>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                not billed
+                            </p>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                id: "deductions",
+                header: "Deductions",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="text-right tabular-nums">
+                        {row.original.deductionsTotal > 0
+                            ? formatMoney(
+                                  row.original.deductionsTotal,
+                                  row.original.currency,
+                                  locale,
+                              )
+                            : "—"}
+                        {row.original.unpaidRent > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                plus {formatMoney(row.original.unpaidRent, row.original.currency, locale)}{" "}
+                                unpaid rent
+                            </p>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                id: "refundDue",
+                header: "Refund due",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="text-right tabular-nums">
+                        {row.original.disposition === "REFUNDED"
+                            ? formatMoney(
+                                  row.original.refundedAmount,
+                                  row.original.currency,
+                                  locale,
+                              )
+                            : formatMoney(
+                                  row.original.refundDue,
+                                  row.original.currency,
+                                  locale,
+                              )}
+                        {row.original.carriedForward > 0 && (
+                            <p className="text-xs text-amber-700">
+                                {formatMoney(
+                                    row.original.carriedForward,
+                                    row.original.currency,
+                                    locale,
+                                )}{" "}
+                                carried forward
+                            </p>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                id: "moveOut",
+                header: "Move-out",
+                enableSorting: false,
+                cell: ({ row }) =>
+                    row.original.moveOut ? (
+                        <div>
+                            <Link
+                                href={`/moving-out/${row.original.moveOut.id}`}
+                                className="text-sm hover:underline"
+                            >
+                                {row.original.moveOut.status.toLowerCase()}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">
+                                {formatDate(
+                                    row.original.moveOut.moveoutDate,
+                                    locale,
+                                )}
+                            </p>
+                        </div>
+                    ) : (
+                        <span className="text-muted-foreground">—</span>
+                    ),
+            },
+            {
+                id: "status",
+                header: "Status",
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div>
+                        <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                DEPOSIT_DISPOSITION_STYLES[
+                                    row.original.disposition
+                                ] ?? "bg-muted"
+                            }`}
+                        >
+                            {DEPOSIT_DISPOSITION_LABELS[
+                                row.original.disposition
+                            ] ?? row.original.disposition}
+                        </span>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Lease {row.original.agreementStatus.toLowerCase()} · from{" "}
+                            {formatDate(row.original.startDate, locale)}
+                        </p>
+                    </div>
+                ),
+            },
+        ],
+        [locale],
     );
 
     return (
@@ -211,209 +415,38 @@ export default function SecurityDepositsPage() {
 
             {error && <ErrorState message={error} onRetry={load} />}
 
-            {isLoading ? (
+            {isLoading && rows.length === 0 ? (
                 <LoadingState label="Loading the deposit register…" />
-            ) : rows.length === 0 ? (
-                <EmptyState
-                    title={hasFilters ? "Nothing matches" : "No deposits recorded"}
-                    description={
-                        hasFilters
-                            ? "No deposit in the register matches what you have narrowed it to."
-                            : "A deposit appears here once a lease records one. Tenancies without a deposit are not shown."
-                    }
-                    icon={<ShieldCheck className="h-10 w-10" aria-hidden="true" />}
-                    action={
-                        hasFilters ? (
-                            <Button onClick={clearFilters}>Clear the filters</Button>
-                        ) : undefined
-                    }
-                />
             ) : (
-                <Card>
-                    <CardContent className="pt-6">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Tenant</TableHead>
-                                    <TableHead>Unit</TableHead>
-                                    <TableHead className="text-right">Required</TableHead>
-                                    <TableHead className="text-right">Agreed</TableHead>
-                                    <TableHead className="text-right">Received</TableHead>
-                                    <TableHead className="text-right">Deductions</TableHead>
-                                    <TableHead className="text-right">Refund due</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Move-out</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rows.map((row) => (
-                                    <TableRow key={row.agreementId}>
-                                        <TableCell>
-                                            <Link
-                                                href={`/agreements/${row.agreementId}`}
-                                                className="font-medium hover:underline"
-                                            >
-                                                {row.tenant.name || row.tenant.code}
-                                            </Link>
-                                            <p className="text-xs text-muted-foreground">
-                                                {row.tenant.accountNumber} ·{" "}
-                                                {row.agreementCode}
-                                            </p>
-                                        </TableCell>
-                                        <TableCell>
-                                            {row.unit?.name ?? "—"}
-                                            <p className="text-xs text-muted-foreground">
-                                                {row.property?.name ?? "—"}
-                                                {row.unitType
-                                                    ? ` · ${row.unitType.code}`
-                                                    : ""}
-                                            </p>
-                                        </TableCell>
-                                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                                            {row.requiredAmount === null
-                                                ? "—"
-                                                : formatMoney(
-                                                      row.requiredAmount,
-                                                      row.currency,
-                                                      locale,
-                                                  )}
-                                        </TableCell>
-                                        <TableCell className="text-right tabular-nums">
-                                            {formatMoney(
-                                                row.depositAmount,
-                                                row.currency,
-                                                locale,
-                                            )}
-                                            {row.waived && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    waived
-                                                </p>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right tabular-nums">
-                                            {formatMoney(
-                                                row.receivedAmount,
-                                                row.currency,
-                                                locale,
-                                            )}
-                                            {row.invoiceNumber && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {row.invoiceNumber}
-                                                </p>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right tabular-nums">
-                                            {row.deductionsTotal > 0
-                                                ? formatMoney(
-                                                      row.deductionsTotal,
-                                                      row.currency,
-                                                      locale,
-                                                  )
-                                                : "—"}
-                                            {row.unpaidRent > 0 && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    plus {formatMoney(row.unpaidRent, row.currency, locale)}{" "}
-                                                    unpaid rent
-                                                </p>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right tabular-nums">
-                                            {row.disposition === "REFUNDED"
-                                                ? formatMoney(
-                                                      row.refundedAmount,
-                                                      row.currency,
-                                                      locale,
-                                                  )
-                                                : formatMoney(
-                                                      row.refundDue,
-                                                      row.currency,
-                                                      locale,
-                                                  )}
-                                            {row.carriedForward > 0 && (
-                                                <p className="text-xs text-amber-700">
-                                                    {formatMoney(
-                                                        row.carriedForward,
-                                                        row.currency,
-                                                        locale,
-                                                    )}{" "}
-                                                    carried forward
-                                                </p>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <span
-                                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                                    DEPOSIT_DISPOSITION_STYLES[
-                                                        row.disposition
-                                                    ] ?? "bg-muted"
-                                                }`}
-                                            >
-                                                {DEPOSIT_DISPOSITION_LABELS[
-                                                    row.disposition
-                                                ] ?? row.disposition}
-                                            </span>
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Lease {row.agreementStatus.toLowerCase()} · from{" "}
-                                                {formatDate(row.startDate, locale)}
-                                            </p>
-                                        </TableCell>
-                                        <TableCell>
-                                            {row.moveOut ? (
-                                                <Link
-                                                    href={`/moving-out/${row.moveOut.id}`}
-                                                    className="text-sm hover:underline"
-                                                >
-                                                    {row.moveOut.status.toLowerCase()}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    —
-                                                </span>
-                                            )}
-                                            {row.moveOut && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {formatDate(
-                                                        row.moveOut.moveoutDate,
-                                                        locale,
-                                                    )}
-                                                </p>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
-
-            {!isLoading && rows.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                    <p>
-                        Showing {from}–{to} of {total}
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={meta.page <= 1}
-                            onClick={() => setPage((previous) => previous - 1)}
-                        >
-                            Previous
-                        </Button>
-                        <span>
-                            Page {meta.page} of {Math.max(1, meta.totalPages)}
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={meta.page >= meta.totalPages}
-                            onClick={() => setPage((previous) => previous + 1)}
-                        >
-                            Next
-                        </Button>
-                    </div>
-                </div>
+                <>
+                    {rows.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                            Showing {from}–{to} of {total}
+                        </p>
+                    )}
+                    <DataTable
+                        data={rows}
+                        columns={columns}
+                        enableSearch={false}
+                        emptyMessage={
+                            hasFilters
+                                ? "No deposit in the register matches what you have narrowed it to."
+                                : "A deposit appears here once a lease records one. Tenancies without a deposit are not shown."
+                        }
+                        emptyIcon={
+                            <ShieldCheck
+                                className="h-12 w-12 text-muted-foreground"
+                                aria-hidden="true"
+                            />
+                        }
+                        serverSidePagination
+                        paginationMeta={meta as PaginationMeta}
+                        page={page}
+                        onPaginationChange={handlePaginationChange}
+                        defaultPageSize={20}
+                        pageSizeOptions={[10, 20, 30, 40, 50]}
+                    />
+                </>
             )}
 
             {policies.length > 0 && (
@@ -424,8 +457,9 @@ export default function SecurityDepositsPage() {
                             <h2 className="font-semibold">Deposit rules by property</h2>
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            What each property asks for each kind of unit, against what
-                            the register above says was actually taken.
+                            What each property asks for each kind of unit — the rule
+                            every tenancy of that kind in the register above was
+                            agreed against.
                         </p>
                         <Table className="mt-4">
                             <TableHeader>

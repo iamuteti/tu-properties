@@ -1,0 +1,22 @@
+-- Capture Manually — a new payment method.
+--
+-- `DIRECT_REMIT` is money the payer sent straight to the party it was due to
+-- (usually the owner) instead of into an account of the estate. It needed its
+-- own value rather than being filed under `CASH` because "cash" says the estate
+-- is holding the money, and here it never held it.
+--
+-- Hand-written rather than generated, and it is one statement on purpose: the
+-- two hand-maintained indexes that Prisma cannot express —
+--
+--   notifications_landlordId_readAt_idx
+--   utility_charges_no_double_bill_bulk
+--
+-- are left alone, because a migration that proposes dropping them is proposing
+-- to remove two guards that are not in the schema. Verify after applying:
+--
+--   SELECT indexname FROM pg_indexes
+--    WHERE indexname IN ('notifications_landlordId_readAt_idx',
+--                         'utility_charges_no_double_bill_bulk');
+
+-- AlterEnum
+ALTER TYPE "PaymentMethod" ADD VALUE 'DIRECT_REMIT';

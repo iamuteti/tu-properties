@@ -7,6 +7,7 @@ import {
 import { AccountType, JournalEntrySource, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { assertTenantRecord, requireRecord } from '@/common/utils';
+import { DIRECT_REMIT_METHOD } from '@/common/contants';
 import {
   ACCOUNT_CODES,
   DEFAULT_CHART_OF_ACCOUNTS,
@@ -770,7 +771,16 @@ export class AccountingService {
     const amount = round2(Number(args.amount));
     if (amount <= 0) return null;
 
-    const cashCode = PAYMENT_METHOD_ACCOUNT[args.paymentMethod] ?? '1010';
+    // Money the payer remitted straight to the party it was due to never
+    // reached an account of ours, so it cannot debit our cash or our bank —
+    // saying "cash" would claim the estate is holding money it has never
+    // seen. What it leaves behind is a receivable from the party that took it
+    // (the owner, in practice), and the credit side still settles whoever the
+    // money was owed to.
+    const directRemit = args.paymentMethod === DIRECT_REMIT_METHOD;
+    const debitCode = directRemit
+      ? ACCOUNT_CODES.RENT_RECEIVABLE_LANDLORDS
+      : (PAYMENT_METHOD_ACCOUNT[args.paymentMethod] ?? '1010');
     const creditCode = args.onBehalfOfLandlord
       ? ACCOUNT_CODES.RENT_HELD_FOR_LANDLORDS
       : (args.reliefAccountCode ?? ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
@@ -779,7 +789,7 @@ export class AccountingService {
 
     const lines: JournalLineInput[] = [
       {
-        accountCode: cashCode,
+        accountCode: debitCode,
         debit: amount,
         description: args.description,
       },

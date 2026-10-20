@@ -446,7 +446,19 @@ export const ACCOUNT_CODES = {
   OTHER_EXPENSE: '5900',
 } as const;
 
-/** Default cash/bank account for each payment method. */
+/**
+ * Default cash/bank account for each payment method.
+ *
+ * **`DIRECT_REMIT` is deliberately absent.** It is money the payer sent
+ * straight to the party it was due to, so it never reached a cash box or a
+ * bank account of ours and there is no account of ours to debit. It posts to
+ * 1400 (Rent Receivable from Landlords) instead — see `postPaymentReceived`.
+ *
+ * Adding it here with a cash or bank code would be the easiest way to make
+ * this map look complete and the ledger wrong at the same time, so it is left
+ * out on purpose. A new payment method has to answer the question "which
+ * account of ours did this money land in?" before it gets a line in this map.
+ */
 export const PAYMENT_METHOD_ACCOUNT: Record<string, string> = {
   CASH: ACCOUNT_CODES.CASH_ON_HAND,
   MPESA: ACCOUNT_CODES.MPESA,

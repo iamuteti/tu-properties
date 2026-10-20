@@ -470,6 +470,10 @@ async function main() {
         'payments',
         'receipts',
         'arrears',
+        // The Billing & Finance group's own key. The sidebar filters a group
+        // out when its key is not enabled, so without it the whole finance
+        // section is invisible to everyone who is not a super admin.
+        'billing',
         'utilities',
         // The Tenants group's other three screens. Without these keys the
         // sidebar filters them out for everyone in this org (the nav items
@@ -748,6 +752,9 @@ async function main() {
 
   const leases: LeaseCtx[] = [];
 
+  let depositInvoiceCount = 0;
+  let depositReceiptCount = 0;
+
   for (const unit of units) {
     const tenancies = generateUnitTenancies(unit.code);
 
@@ -826,6 +833,103 @@ async function main() {
           organizationId: organization.id,
         },
       });
+
+      // The deposit is billed on its own invoice and paid at move-in, before the
+      // keys change hands — which is what the live flow does when a lease is
+      // raised, and it is where the register reads "received" from. A seeded
+      // lease that skipped it shows a deposit nobody has ever paid.
+      const depositInvoice = await prisma.invoice.create({
+        data: {
+          invoiceNumber: `INV-JEDAN-DEP-${String(depositInvoiceCount + 1).padStart(4, '0')}`,
+          agreementId: agreement.id,
+          billTo: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          issueDate: moveIn,
+          dueDate: moveIn,
+          amount: deposit,
+          totalAmount: deposit,
+          paidAmount: deposit,
+          balanceAmount: 0,
+          currency: 'KES',
+          transactionClass: 'DEPOSIT',
+          status: InvoiceStatus.PAID,
+          memo: `Security deposit for agreement ${agreement.code}`,
+          invoiceItems: {
+            create: [
+              {
+                description: `Security deposit — ${unit.name}`,
+                quantity: 1,
+                unitPrice: deposit,
+                amount: deposit,
+                revenueExpenseItem: 'DEPOSIT',
+              },
+            ],
+          },
+          organizationId: organization.id,
+        },
+      });
+      depositInvoiceCount++;
+
+      const depositPaymentMethod =
+        r(100) < 70 ? PaymentMethod.MPESA : PaymentMethod.BANK_TRANSFER;
+      const depositPayment = await prisma.payment.create({
+        data: {
+          agreementId: agreement.id,
+          invoiceId: depositInvoice.id,
+          paymentDate: moveIn,
+          amount: deposit,
+          currency: 'KES',
+          paymentMethod: depositPaymentMethod,
+          paymentReference:
+            depositPaymentMethod === PaymentMethod.MPESA
+              ? `MPESA-DEP-${String(r(999999)).padStart(6, '0')}`
+              : `REF-DEP-${String(r(99999999)).padStart(8, '0')}`,
+          payee: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          paidFrom:
+            depositPaymentMethod === PaymentMethod.MPESA
+              ? 'M-PESA'
+              : 'Bank Transfer',
+          paidTo: 'Jedan Apartments Operating Account',
+          paymentType: PaymentType.ApplyToBill,
+          recordedBy: 'Jedidah Adhiambo',
+          organizationId: organization.id,
+        },
+      });
+
+      await prisma.receipt.create({
+        data: {
+          receiptId: `REC-JEDAN-DEP-${String(depositReceiptCount + 1).padStart(4, '0')}`,
+          receiptType: ReceiptType.ApplyToInvoice,
+          receiptCategory: ReceiptCategory.General,
+          receivedFrom: `${tenant.surname} ${tenant.otherNames ?? ''}`.trim(),
+          paymentMethod: depositPaymentMethod,
+          recordingDate: moveIn,
+          amountReceived: deposit,
+          currency: 'KES',
+          tenantId: tenant.id,
+          landlordId: landlord.id,
+          receiptTo: ReceiptTo.Landlord,
+          drtOrDrf: DRTOrDRF.DirectReceipt,
+          recordedBy: 'Jedidah Adhiambo',
+          payments: { connect: { id: depositPayment.id } },
+          receiptLines: {
+            create: [
+              {
+                date: moveIn,
+                invNo: depositInvoice.invoiceNumber,
+                particular: `Security deposit — ${unit.name}`,
+                invoiceTotal: deposit,
+                prevReceipts: 0,
+                amtDue: deposit,
+                payment: deposit,
+                newBalance: 0,
+                whtTax: 0,
+              },
+            ],
+          },
+          organizationId: organization.id,
+        },
+      });
+      depositReceiptCount++;
 
       leases.push({
         unitId: unit.id,

@@ -16,6 +16,24 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { UserRole } from '@prisma/client';
 
+/**
+ * How the money was paid.
+ *
+ * `DIRECT_REMIT` is the one that is not an instrument: it says the payer sent
+ * the money straight to the party it was due to — usually the owner — and it
+ * never reached an account of ours. It is here rather than being left as
+ * "cash" because a receipt that says cash when no cash arrived is a ledger
+ * that claims the estate holds money it has never seen.
+ */
+type PaymentMethod =
+  | 'CASH'
+  | 'BANK_TRANSFER'
+  | 'CHEQUE'
+  | 'MPESA'
+  | 'CARD'
+  | 'OTHER'
+  | 'DIRECT_REMIT';
+
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT)
 @Permissions('receipts.view')
@@ -23,7 +41,24 @@ import { UserRole } from '@prisma/client';
 export class ReceiptsController {
   constructor(private readonly receiptsService: ReceiptsService) {}
 
+  /**
+   * Capture money that arrived.
+   *
+   * The property manager is on this route and not on the ones below, and the
+   * difference is deliberate. They are the person who is actually at the
+   * estate and receives the money, so they may record that it arrived — but
+   * the register is finance's: reading every receipt in the organization and
+   * reversing one are two things the person who witnessed the handover should
+   * not be able to do. A receipt the property manager cannot quietly remove is
+   * evidence; a receipt they can is a note.
+   */
   @Post()
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.ACCOUNTANT,
+    UserRole.PROPERTY_MANAGER,
+  )
   @Permissions('receipts.create')
   create(
     @Body()
@@ -32,13 +67,7 @@ export class ReceiptsController {
       receiptType?: 'ApplyToInvoice' | 'CashReceipt';
       receiptCategory?: 'Rent' | 'General';
       receivedFrom: string;
-      paymentMethod:
-        | 'CASH'
-        | 'BANK_TRANSFER'
-        | 'CHEQUE'
-        | 'MPESA'
-        | 'CARD'
-        | 'OTHER';
+      paymentMethod: PaymentMethod;
       depositIntoAc?: string;
       refNo?: string;
       chequeNo?: string;
@@ -76,13 +105,7 @@ export class ReceiptsController {
         amount: number;
         currency?: string;
         spotRate?: number;
-        paymentMethod:
-          | 'CASH'
-          | 'BANK_TRANSFER'
-          | 'CHEQUE'
-          | 'MPESA'
-          | 'CARD'
-          | 'OTHER';
+        paymentMethod: PaymentMethod;
         paymentReference?: string;
         payee?: string;
         paidFrom?: string;

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { EmptyState } from '@/components/ui/entity-states';
 import { tenantsApi } from '@/lib/api';
+import { paymentMethodLabel } from '@/lib/constants';
 import { useOrgFormat } from '@/hooks/use-org-format';
 import type { Receipt } from '@/types';
 
@@ -72,7 +73,7 @@ export function ReceiptDetailModal({
                         </p>
                         <p className="text-sm text-muted-foreground">
                             Received {fmt.date(receipt.recordingDate)} by{' '}
-                            {humanise(receipt.paymentMethod)}
+                            {paymentMethodLabel(receipt.paymentMethod)}
                         </p>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
@@ -90,7 +91,7 @@ export function ReceiptDetailModal({
                 {/* Payment details */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     <Row label="Received from" value={receipt.receivedFrom} />
-                    <Row label="Payment method" value={humanise(receipt.paymentMethod)} />
+                    <Row label="Payment method" value={paymentMethodLabel(receipt.paymentMethod)} />
                     <Row label="Currency" value={currency} />
                     {receipt.chequeNo && (
                         <Row
@@ -202,7 +203,7 @@ export function ReceiptDetailModal({
                                                 {payment.invoice?.invoiceNumber ?? 'On account'}
                                             </td>
                                             <td className="py-2 px-3">
-                                                {humanise(payment.paymentMethod)}
+                                                {paymentMethodLabel(payment.paymentMethod)}
                                             </td>
                                             <td className="py-2 px-3 text-muted-foreground">
                                                 {payment.paymentReference ?? '—'}

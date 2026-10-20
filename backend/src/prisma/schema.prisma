@@ -2458,6 +2458,13 @@ enum PaymentMethod {
   MPESA
   CARD
   OTHER
+  /// The payer remitted the money straight to the party it was due to — usually
+  /// the owner — and it never reached an account of ours.
+  ///
+  /// It is its own method rather than `CASH` because "cash" says the estate is
+  /// holding the money, and here it is not. Nothing of ours moved, so the only
+  /// honest booking is a receivable from the party that took it.
+  DIRECT_REMIT
 }
 
 enum ReceiptType {

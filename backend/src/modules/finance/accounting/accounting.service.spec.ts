@@ -71,6 +71,13 @@ describe('AccountingService', () => {
         isPostable: true,
         normalBalance: 'CREDIT',
       },
+      {
+        id: 'acc-landlord-receivable',
+        code: '1400',
+        name: 'Rent Receivable from Landlords',
+        isPostable: true,
+        normalBalance: 'DEBIT',
+      },
     ];
 
     const account = {
@@ -286,5 +293,36 @@ describe('AccountingService', () => {
       ['acc-mpesa', 500, 0],
       ['acc-held', 0, 500],
     ]);
+  });
+
+  it('books money remitted straight to the owner as a receivable, never as cash', async () => {
+    await service.postPaymentReceived(
+      {
+        amount: 500,
+        paymentDate: new Date('2026-10-02'),
+        paymentMethod: 'DIRECT_REMIT',
+        description: 'Receipt REC-9 — paid direct to the owner',
+      },
+      org.id,
+    );
+    const { data } = prisma.journalEntry.create.mock.calls[0][0];
+    const posted = data.lines.create.map((line: any) => [
+      line.account.connect.id,
+      Number(line.debit),
+      Number(line.credit),
+    ]);
+    // Debited "rent receivable from landlords" (1400); credited AR, because the
+    // tenant's bill is settled either way. It is **not** cash on hand and
+    // **not** the bank: no account of ours ever saw this money, and a receipt
+    // that says "cash" would claim the estate is holding it.
+    expect(posted).toEqual([
+      ['acc-landlord-receivable', 500, 0],
+      ['acc-ar', 0, 500],
+    ]);
+    // And it is not one of our money accounts: no account of ours ever saw
+    // this money, and a receipt that says "cash" would claim the estate is
+    // holding it.
+    expect(posted[0][0]).not.toBe('acc-cash');
+    expect(posted[0][0]).not.toBe('acc-mpesa');
   });
 });

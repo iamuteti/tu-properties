@@ -130,7 +130,41 @@ export const PAYMENT_METHODS = [
   { value: 'MPESA', label: 'M-Pesa' },
   { value: 'CARD', label: 'Card' },
   { value: 'OTHER', label: 'Other' },
+  // Money the payer sent straight to the party it was due to — usually the
+  // owner — so it never reached an account of ours.
+  { value: 'DIRECT_REMIT', label: 'Paid Directly to the Owner' },
 ];
+
+/**
+ * The payment methods where the money lands in an account of ours.
+ *
+ * `DIRECT_REMIT` is deliberately absent: it is money the payer sent straight to
+ * the party it was due to, so a payment the estate actually received must never
+ * be seeded with it — that would be seeding a receipt which claims the estate
+ * is holding money it has never seen, in every seeded ledger in the product.
+ *
+ * Seeded rent and deposits were received by the estate, so they are seeded
+ * with one of these.
+ */
+export const SETTLED_PAYMENT_METHODS = [
+  'CASH',
+  'BANK_TRANSFER',
+  'CHEQUE',
+  'MPESA',
+  'CARD',
+  'OTHER',
+] as const;
+
+/**
+ * The payment method for money that bypassed the estate.
+ *
+ * Named once, because three places have to agree on it: the receipt and
+ * payment controllers accept it, the ledger routes it away from our cash and
+ * bank accounts, and the capture form offers it in the dropdown. A spelling
+ * that is right in three of those places is a receipt that says "cash" while
+ * the ledger says "the owner took it".
+ */
+export const DIRECT_REMIT_METHOD = 'DIRECT_REMIT';
 
 export const PERIODS = [
   { value: 'custom', label: 'Custom Dates' },

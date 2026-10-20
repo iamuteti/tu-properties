@@ -85,6 +85,23 @@ Three consequences worth knowing, each of which was found by running it:
 
 `POST /finance/tax/remit` (`Dr payable / Cr bank`) is for the other flow, where the company collects the money and pays the authority later. Calling it when the customer already remitted takes the account negative rather than silently doing nothing — deliberate.
 
+### Money that bypassed the estate: `DIRECT_REMIT`
+A payer does not always send the rent where it was supposed to go. The tenant may pay the owner directly — the owner's bank details were easier, the owner asked for it, the estate was closed — and the money then never reaches an account of ours.
+
+The instinct is to file that under "cash". It must not be: "cash" says the estate is holding the money, and here it never held it. A receipt that says cash, with a ledger that debits our cash box, is a receipt and a ledger agreeing with each other and both wrong.
+
+So `DIRECT_REMIT` is a `PaymentMethod` of its own (added 2026-10-20, migration `20261020120000_capture_manually_direct_remit`) and it posts differently:
+
+```
+Direct remittance:  Dr 1400 Rent Receivable from Landlords   Cr 1200 Accounts Receivable
+```
+
+The debit is not 1000 and not 1010, because **no account of ours ever saw this money**. What the entry says is: the tenant's bill is settled (the credit), and the party that took the money — the owner, in practice — now owes us for it (the debit). 1400 already existed for exactly this and had no writer.
+
+The same routing applies to the standalone payment path, because `PaymentsService` posts through `postPaymentReceived` too — one decision, one place, so a receipt and a payment cannot disagree about where the money went.
+
+One consequence to remember: the credit side still settles whoever the money was owed to, so a receipt applied to an invoice credits AR (1200) and a receipt held on an owner's behalf credits 2500 (Rent Collected on Behalf of Landlords). The direct remittance changes the **debit** — where the money came from — and not the credit.
+
 - Recurring billing is built. `@nestjs/schedule` was **not** installed and has been added, with `ScheduleModule.forRoot()` in `app.module.ts` (a `@Cron()` only fires if the scheduler is in the application context). Two things that cost time and should not be rediscovered: the job is *daily*, not monthly, because leases bill on their own `paymentDay`; and idempotency is enforced by the database unique constraint rather than by the job being careful, so any new billing path must set `billingPeriod` **at insert**.
 
 ## Frontend: Next.js Notes
@@ -99,6 +116,7 @@ Three consequences worth knowing, each of which was found by running it:
 - ✅ A trial balance balances to zero — `/finance/accounting/trial-balance` reports `balanced` and refuses nothing silently; `postEntry` rejects any entry that would unbalance it
 - ✅ Invoices issued in one jurisdiction stay explicable after the rules change — the invoice snapshots `taxJurisdiction`, `taxBasis` and a per-rule `taxSummary`, and each line snapshots `taxRuleId`/`taxCode`, so a superseded rate does not rewrite an issued document
 - ✅ Withheld tax reaches the ledger — recognised as a liability on the invoice, discharged by the payment, with the invoice's own columns counting it as settled (see Backend Notes for the entries and why each line is there)
+- ✅ Money that never reached the estate is booked as money owed by the party that took it — `DIRECT_REMIT` debits 1400 and credits AR, and touches neither cash on hand nor the bank, so the ledger never claims we are holding money we have never seen
 
 ## Dependencies on Other Modules
 - Feeds: Landlord Management (owner statements), Reports & Analytics, Sales (installments)

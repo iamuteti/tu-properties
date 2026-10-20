@@ -387,7 +387,8 @@ export const Hero: React.FC<HeroProps> = ({ onStartTrial, onSeeHowItWorks }) => 
                           Payment Recording & Smart FIFO Allocation Engine
                         </div>
                         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 max-w-xl">
-                          Every recorded payment — bank transfer, card, M-Pesa, cash or cheque —
+                          Every recorded payment — bank transfer, card, M-Pesa, cash, cheque, or paid
+                          straight to the owner —
                           resolves the tenant&apos;s oldest invoice balance first. Any surplus is
                           instantly booked to the tenant&apos;s spendable wallet credit balance.
                         </p>

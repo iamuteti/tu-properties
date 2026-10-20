@@ -25,7 +25,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onStartTrial, onSeeHowItWork
           </h2>
 
           <p className="mt-4 text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Eliminate manual calculations, dispatch automated owner statements, and record rent against the tenant ledger — by card, bank transfer, M-Pesa, cash or cheque — in minutes.
+            Eliminate manual calculations, dispatch automated owner statements, and record rent against the tenant ledger — by card, bank transfer, M-Pesa, cash, cheque, or paid straight to the owner — in minutes.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">

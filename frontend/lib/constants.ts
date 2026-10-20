@@ -277,13 +277,34 @@ export const INCOME_ACCOUNTS = [
 ];
 
 export const PAYMENT_METHODS = [
-  { value: "CASH", label: "Cash" },
-  { value: "BANK_TRANSFER", label: "Bank Transfer" },
-  { value: "CHEQUE", label: "Cheque" },
-  { value: "MPESA", label: "M-Pesa" },
-  { value: "CARD", label: "Card" },
-  { value: "OTHER", label: "Other" },
+    { value: "CASH", label: "Cash" },
+    { value: "BANK_TRANSFER", label: "Bank Transfer" },
+    { value: "CHEQUE", label: "Cheque" },
+    { value: "MPESA", label: "M-Pesa" },
+    { value: "CARD", label: "Card" },
+    // The payer sent the money straight to the party it was due to — usually the
+    // owner — so it never reached an account of ours. It is not "cash": the
+    // estate is not holding this money, the owner is.
+    { value: "DIRECT_REMIT", label: "Paid Directly to the Owner" },
+    { value: "OTHER", label: "Other" },
 ];
+
+/**
+ * The readable name of a payment method.
+ *
+ * The enum value is not the label: `DIRECT_REMIT` is a database value, and a
+ * receipt a resident keeps should say what happened to the money rather than
+ * what the column is called. Falls back to the raw value for a method this
+ * build has not heard of, because showing the code is better than showing
+ * nothing.
+ */
+export const paymentMethodLabel = (value: string | null | undefined): string => {
+    if (!value) return "—";
+    return (
+        PAYMENT_METHODS.find((m) => m.value === value)?.label ??
+        value.replace(/_/g, " ").toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase())
+    );
+};
 
 export const PERIODS = [
   { value: "custom", label: "Custom Dates" },

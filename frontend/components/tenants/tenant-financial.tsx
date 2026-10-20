@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/entity-states';
 import { Detail, Pill, SectionTitle, humanise } from './shared';
+import { paymentMethodLabel } from '@/lib/constants';
 import { useOrgFormat } from '@/hooks/use-org-format';
 import type { Agreement, CreditNote, CustomerCredit, Invoice, Receipt } from '@/types';
 
@@ -259,7 +260,7 @@ export function TenantFinancialSection({
                                     {receipts.map((r) => (
                                         <tr key={r.id} className="border-b last:border-0">
                                             <td className="py-2 pr-3 font-medium">{r.receiptId}</td>
-                                            <td className="py-2 pr-3">{humanise(r.paymentMethod)}</td>
+                                                <td className="py-2 pr-3">{paymentMethodLabel(r.paymentMethod)}</td>
                                             <td className="py-2 pr-3 text-muted-foreground">
                                                 {r.refNo ?? r.paymentRefNo ?? '—'}
                                             </td>
@@ -327,7 +328,7 @@ export function TenantFinancialSection({
                                                 {payment.invoice?.invoiceNumber ?? 'On account'}
                                             </td>
                                             <td className="py-2 pr-3">
-                                                {humanise(payment.paymentMethod)}
+                                                {paymentMethodLabel(payment.paymentMethod)}
                                             </td>
                                             <td className="py-2 pr-3 text-muted-foreground">
                                                 {payment.paymentReference ?? '—'}

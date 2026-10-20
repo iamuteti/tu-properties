@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Pencil, User } from 'lucide-react';
+import { Banknote, ChevronLeft, Pencil, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -148,6 +148,10 @@ export default function TenantDetailPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => router.push(`/tenants/${tenant.id}/capture`)}>
+                        <Banknote className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Capture Manually
+                    </Button>
                     <Button variant="outline" onClick={() => router.push(`/tenants/${tenant.id}/edit`)}>
                         <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
                         Edit
