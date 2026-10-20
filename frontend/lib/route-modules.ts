@@ -101,7 +101,4 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
     // Notifications / Approvals
     "/notifications": "notifications",
     "/approvals": "approvals",
-
-    // Organizations (SUPER_ADMIN only)
-    "/organizations": "organizations",
 };

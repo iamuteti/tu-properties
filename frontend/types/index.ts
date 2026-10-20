@@ -4543,6 +4543,16 @@ export interface LandlordRoiReport {
 }
 
 /** Module 19 Phase C — platform-owned SaaS administration (SUPER_ADMIN only). */
+
+/** The plan tiers. `FREE` is the schema default and a real tier, not a placeholder. */
+export type SubscriptionPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+
+/**
+ * The state of the relationship, which is not the same thing as the plan: a
+ * tenant can be on a paid plan and still be suspended for non-payment.
+ */
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED';
+
 export interface PlatformOrganization {
     id: string;
     name: string;
@@ -4558,7 +4568,7 @@ export interface PlatformOrganization {
     subscription?: {
         id: string;
         plan: string;
-        status: 'TRIALING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED';
+        status: SubscriptionStatus;
         trialEndsAt?: string | null;
         renewsAt?: string | null;
         statusReason?: string | null;

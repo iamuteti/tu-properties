@@ -1,5 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -49,6 +50,7 @@ describe('PlatformService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
+      upsert: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -116,6 +118,7 @@ describe('PlatformService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        upsert: jest.fn(),
       },
       // Make the "transaction" an identity: invoke the callback against this same
       // mock, which is what makes the tx methods observable. Typed so the callback's
@@ -433,6 +436,229 @@ describe('PlatformService', () => {
       NotFoundException,
     );
     expect(prisma.user.count).not.toHaveBeenCalled();
+  });
+
+  // ── Subscription terms ───────────────────────────────────────────────────
+  //
+  // The plan, the limits and the dates are denormalised across two rows, and
+  // the status has a second effect on the organization (access) and a third
+  // on the sessions. The tests pin all three: the two rows move together, a
+  // block needs a reason, and a block without a reason never reaches the
+  // database.
+
+  interface SubscriptionRow {
+    id: string;
+    plan: string;
+    status: SubscriptionStatus;
+    trialEndsAt: Date | null;
+    renewsAt: Date | null;
+    statusReason: string | null;
+    enabledModules: string[];
+  }
+
+  function mockOrgWithSubscription(
+    status: SubscriptionStatus,
+    overrides: Partial<SubscriptionRow> = {},
+  ) {
+    const subscription: SubscriptionRow = {
+      id: 'sub-1',
+      plan: 'STARTER',
+      status,
+      trialEndsAt: new Date('2026-11-01T00:00:00.000Z'),
+      renewsAt: null,
+      statusReason: null,
+      enabledModules: ['properties'],
+      ...overrides,
+    };
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      slug: 'test',
+      plan: subscription.plan,
+      maxUsers: 3,
+      maxProperties: 10,
+      isActive: true,
+      subscription,
+    });
+    prisma.subscription.upsert.mockResolvedValue(subscription);
+    return subscription;
+  }
+
+  it('updateSubscription writes the plan and the limits to both rows', async () => {
+    mockOrgWithSubscription(SubscriptionStatus.TRIALING);
+
+    await service.updateSubscription(
+      'org-new',
+      { plan: 'ENTERPRISE', maxUsers: 50, maxProperties: 500 },
+      'sup-1',
+    );
+
+    const subCall = callArg<{
+      where: { organizationId: string };
+      update: Record<string, unknown>;
+    }>(prisma.subscription.upsert, 0);
+    expect(subCall.where).toEqual({ organizationId: 'org-new' });
+    expect(subCall.update).toMatchObject({
+      plan: 'ENTERPRISE',
+      status: SubscriptionStatus.TRIALING,
+    });
+
+    const orgCall = callArg<{
+      where: { id: string };
+      data: Record<string, unknown>;
+    }>(prisma.organization.update, 0);
+    expect(orgCall.data).toEqual({
+      plan: 'ENTERPRISE',
+      maxUsers: 50,
+      maxProperties: 500,
+    });
+
+    expect(callArg<{ action: string }>(audit.logAction, 0).action).toBe(
+      'ORGANIZATION_SUBSCRIPTION_UPDATED',
+    );
+  });
+
+  it('updateSubscription converts a trial to a paid subscription without a reason', async () => {
+    mockOrgWithSubscription(SubscriptionStatus.TRIALING);
+
+    await service.updateSubscription(
+      'org-new',
+      { status: SubscriptionStatus.ACTIVE },
+      'sup-1',
+    );
+
+    const subCall = callArg<{ update: Record<string, unknown> }>(
+      prisma.subscription.upsert,
+      0,
+    );
+    expect(subCall.update).toMatchObject({ status: SubscriptionStatus.ACTIVE });
+    // Access is untouched by a conversion — the tenant was never blocked.
+    expect(prisma.organization.update).not.toHaveBeenCalled();
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('updateSubscription refuses to block a tenant without a reason', async () => {
+    mockOrgWithSubscription(SubscriptionStatus.ACTIVE);
+
+    await expect(
+      service.updateSubscription(
+        'org-new',
+        { status: SubscriptionStatus.SUSPENDED },
+        'sup-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('updateSubscription blocking a tenant moves the organization and the sessions with it', async () => {
+    mockOrgWithSubscription(SubscriptionStatus.ACTIVE);
+
+    await service.updateSubscription(
+      'org-new',
+      { status: SubscriptionStatus.SUSPENDED, statusReason: 'non-payment' },
+      'sup-1',
+    );
+
+    const subCall = callArg<{ update: Record<string, unknown> }>(
+      prisma.subscription.upsert,
+      0,
+    );
+    expect(subCall.update).toMatchObject({
+      status: SubscriptionStatus.SUSPENDED,
+      statusReason: 'non-payment',
+    });
+
+    const orgCall = callArg<{ data: Record<string, unknown> }>(
+      prisma.organization.update,
+      0,
+    );
+    expect(orgCall.data).toEqual({ isActive: false });
+
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org-new', revokedAt: null },
+      data: { revokedAt: expect.any(Date) as Date },
+    });
+  });
+
+  it('updateSubscription refuses to restore a blocked tenant without a reason', async () => {
+    mockOrgWithSubscription(SubscriptionStatus.SUSPENDED);
+
+    await expect(
+      service.updateSubscription(
+        'org-new',
+        { status: SubscriptionStatus.ACTIVE },
+        'sup-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it('updateSubscription restoring a blocked tenant gives access back and clears the reason', async () => {
+    mockOrgWithSubscription(SubscriptionStatus.SUSPENDED, {
+      statusReason: 'non-payment',
+    });
+
+    await service.updateSubscription(
+      'org-new',
+      { status: SubscriptionStatus.ACTIVE, statusReason: 'payment received' },
+      'sup-1',
+    );
+
+    const subCall = callArg<{ update: Record<string, unknown> }>(
+      prisma.subscription.upsert,
+      0,
+    );
+    expect(subCall.update).toMatchObject({
+      status: SubscriptionStatus.ACTIVE,
+      statusReason: null,
+    });
+
+    const orgCall = callArg<{ data: Record<string, unknown> }>(
+      prisma.organization.update,
+      0,
+    );
+    expect(orgCall.data).toEqual({ isActive: true });
+    // A restore revokes nothing: the sessions were revoked when it was blocked.
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('setEnabledModules creates the subscription for a tenant that has none', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org-new',
+      name: 'Test',
+      slug: 'test',
+      plan: 'STARTER',
+      subscription: null,
+    });
+    prisma.subscription.upsert.mockResolvedValue({
+      id: 'sub-1',
+      enabledModules: ['properties'],
+    });
+
+    const result = await service.setEnabledModules(
+      'org-new',
+      ['properties'],
+      'sup-1',
+    );
+
+    expect(result).toEqual(['properties']);
+    const subCall = callArg<{
+      where: { organizationId: string };
+      create: {
+        plan: string;
+        status: SubscriptionStatus;
+        enabledModules: string[];
+      };
+      update: { enabledModules: { set: string[] } };
+    }>(prisma.subscription.upsert, 0);
+    expect(subCall.where).toEqual({ organizationId: 'org-new' });
+    expect(subCall.create).toMatchObject({
+      plan: 'STARTER',
+      status: SubscriptionStatus.TRIALING,
+      enabledModules: ['properties'],
+    });
+    expect(subCall.update).toEqual({ enabledModules: { set: ['properties'] } });
   });
 
   // ── Impersonation (Phase C) ──────────────────────────────────────────────

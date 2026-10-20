@@ -113,7 +113,9 @@ async function main() {
     touched += 1;
   }
 
-  console.log(`Done. ${touched} propert${touched === 1 ? 'y' : 'ies'} updated.`);
+  console.log(
+    `Done. ${touched} propert${touched === 1 ? 'y' : 'ies'} updated.`,
+  );
   await pool.end();
 }
 

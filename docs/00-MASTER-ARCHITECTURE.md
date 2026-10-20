@@ -113,6 +113,7 @@ the user's role allows it **and** the module key is present in the organization'
 - Chosen when a SUPER_ADMIN creates/edits a subscription (`OnboardOrganizationDto.enabledModules`, `PATCH /platform/organizations/:id/modules`).
 - Default for existing/demo organizations: **all modules enabled** (`ALL_MODULE_KEYS` in `backend/src/prisma/demo-data.ts`), so the seeded Westhill, Rohi, International and per-market organizations show the full sidebar.
 - `GET /auth/profile` now includes `organization.subscription.enabledModules`, so the frontend reads it from `useAuth()`.
+- **The key names the module, and the module is `agreements`** (a lease is one kind of agreement; the other is a rental/residential letting). The table, the routes (`/agreements`), the RBAC matrix key and the enablement key are now all the same word. It was `leases` in the enablement namespace until 2026-10-20 — the one place that disagreed with everything else — and that disagreement is what made `ModuleGuard` bounce every non-super-admin off `/agreements`: the route map looked for `agreements` while the subscription held `leases`. Migration `20261020040000_rename_leases_module_key_to_agreements` rewrites the stored arrays in place.
 
 ### Frontend behavior
 - `NavItem.module` is set on every leaf item; always-on items (Dashboard, Settings, Support) and the Platform group (SUPER_ADMIN only) have no module key and are role-gated only.
@@ -126,7 +127,7 @@ the user's role allows it **and** the module key is present in the organization'
 ### Always-on vs togglable
 | Always-on (role-gated only, no module key) | Togglable per organization |
 |---|---|
-| Dashboard, Settings (+ tax/notifications/workflows), Support | Maintenance, Procurement, Inventory, Landlords, Properties & Units, CRM, Sales, Tenants & Leases, Billing & Finance, HR & Payroll, Facilities, Utilities, Contracts, Reports, Users, Branches, Documents, Notifications, Approvals |
+| Dashboard, Settings (+ tax/notifications/workflows), Support | Maintenance, Procurement, Inventory, Landlords, Properties & Units, CRM, Sales, Tenants & Agreements, Billing & Finance, HR & Payroll, Facilities, Utilities, Contracts, Reports, Users, Branches, Documents, Notifications, Approvals |
 | Platform (SUPER_ADMIN only) | — |
 
 **Dead / incomplete code:**

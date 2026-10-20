@@ -3860,7 +3860,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     'sales',
     'sales/commissions',
     'tenants',
-    'leases',
+    'agreements',
     'tenant-requests',
     'moving-out',
     'security-deposits',

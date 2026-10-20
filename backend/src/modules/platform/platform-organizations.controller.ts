@@ -22,6 +22,7 @@ import {
 import { ImpersonateDto } from './dto/impersonate.dto';
 import { PlatformService } from './platform.service';
 import { SetEnabledModulesDto } from './dto/set-enabled-modules.dto';
+import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 
 /**
  * The platform-admin surface (Module 19).
@@ -140,5 +141,23 @@ export class PlatformOrganizationsController {
       dto.enabledModules,
       getUserId(req),
     );
+  }
+
+  /**
+   * Edit the subscription: plan, seat/property limits, the trial and renewal
+   * dates, and the status.
+   *
+   * Separate from `:id/modules` because they are separate facts — the module
+   * set is what the tenant can see, the subscription is what they pay for —
+   * and because the terms are edited far more rarely than the module toggles.
+   */
+  @Patch(':id/subscription')
+  @HttpCode(200)
+  updateSubscription(
+    @Param('id') id: string,
+    @Body() dto: UpdateSubscriptionDto,
+    @Request() req: any,
+  ) {
+    return this.platformService.updateSubscription(id, dto, getUserId(req));
   }
 }

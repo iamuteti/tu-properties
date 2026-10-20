@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -20,6 +21,7 @@ import {
   OnboardOrganizationDto,
   SuspendOrganizationDto,
 } from './dto/onboarding.dto';
+import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { ImpersonateDto } from './dto/impersonate.dto';
 
 /** An impersonation session lasts 15 minutes — long enough to reproduce a
@@ -493,17 +495,30 @@ export class PlatformService {
   /**
    * Set the enabled modules for one organization. Replaces the whole list —
    * the caller sends the full desired set each time. Audited.
+   *
+   * An upsert rather than an update, because an organization created through
+   * the legacy `POST /organizations` has no subscription row at all: a plain
+   * `update` threw Prisma's "record to update not found" as a 500, and the
+   * operator's only way to give that tenant a working sidebar was to fix it
+   * in the database. The subscription is created here, with the tenant's own
+   * plan and the modules being set — the same shape onboarding writes.
    */
   async setEnabledModules(
     id: string,
     enabledModules: string[],
     actorId?: string,
   ) {
-    await this.findOne(id); // 404 if unknown
+    const org = await this.findOne(id); // 404 if unknown
 
-    const subscription = await this.prisma.subscription.update({
+    const subscription = await this.prisma.subscription.upsert({
       where: { organizationId: id },
-      data: { enabledModules: { set: enabledModules } },
+      create: {
+        organizationId: id,
+        plan: org.plan,
+        status: SubscriptionStatus.TRIALING,
+        enabledModules,
+      },
+      update: { enabledModules: { set: enabledModules } },
     });
 
     await this.safeAudit({
@@ -515,6 +530,165 @@ export class PlatformService {
     });
 
     return subscription.enabledModules;
+  }
+
+  /**
+   * Edit one organization's subscription: the plan, its limits, the trial and
+   * renewal dates, and the status.
+   *
+   * This is the operation that was missing. `Subscription.plan`, `trialEndsAt`,
+   * `renewsAt` and `status` were written once at onboarding and never again:
+   * the only other way to move a subscription was to suspend the tenant, which
+   * is a punishment, not a conversion. A trial that converts to a paid
+   * subscription, a plan upgrade, a trial extension — none of them had a door,
+   * so they happened by editing the database by hand.
+   *
+   * Two rules make it safe to expose:
+   *
+   * 1. **The Organization and the Subscription are written together.** The plan
+   *    is denormalised into both rows (the schema says so), and
+   *    `Organization.isActive` is the flag the login path consults while
+   *    `Subscription.status` is the relationship's own state. A status that
+   *    blocks access writes both and revokes the sessions, exactly like
+   *    `setSuspended` — the invariant that the two cannot disagree holds
+   *    because this is now one of the two places that writes them deliberately.
+   *
+   * 2. **A status change needs a reason.** Blocking a tenant's access is a
+   *    decision with a record, so it is refused without one; restoring a
+   *    blocked tenant needs one too, for the same reason `activate` does. A
+   *    reason on a restore is kept in the audit log rather than in
+   *    `statusReason`, because a live subscription has no reason to be in a
+   *    state — the same clearing `activate` does.
+   */
+  async updateSubscription(
+    id: string,
+    dto: UpdateSubscriptionDto,
+    actorId?: string,
+  ) {
+    const org = await this.findOne(id); // 404 if unknown
+    const current = org.subscription;
+
+    const nextStatus =
+      dto.status ?? current?.status ?? SubscriptionStatus.TRIALING;
+    const statusChanged = current ? nextStatus !== current.status : true;
+
+    // The two statuses that take the tenant's access away. SUSPENDED is a
+    // punishment, CANCELLED is the end of the relationship; both are decisions
+    // that need a reason on the record.
+    const blocking: SubscriptionStatus[] = [
+      SubscriptionStatus.SUSPENDED,
+      SubscriptionStatus.CANCELLED,
+    ];
+    const isBlocking = blocking.includes(nextStatus);
+    const isRestoring = current
+      ? blocking.includes(current.status) && !isBlocking
+      : false;
+
+    if (statusChanged && isBlocking && !dto.statusReason?.trim()) {
+      throw new BadRequestException(
+        "A reason is required before a tenant's access can be blocked.",
+      );
+    }
+    if (statusChanged && isRestoring && !dto.statusReason?.trim()) {
+      throw new BadRequestException(
+        'A reason is required before a blocked tenant can be restored.',
+      );
+    }
+
+    // `undefined` means "not mentioned" (keep the current value); `null` means
+    // "clear it". The two are different edits and the DTO carries both.
+    const trialEndsAt =
+      dto.trialEndsAt === undefined
+        ? undefined
+        : dto.trialEndsAt
+          ? new Date(dto.trialEndsAt)
+          : null;
+    const renewsAt =
+      dto.renewsAt === undefined
+        ? undefined
+        : dto.renewsAt
+          ? new Date(dto.renewsAt)
+          : null;
+    const statusReason =
+      statusChanged && isRestoring
+        ? null
+        : dto.statusReason === undefined
+          ? undefined
+          : dto.statusReason;
+
+    const orgData: Prisma.OrganizationUpdateInput = {};
+    if (dto.plan !== undefined) orgData.plan = dto.plan;
+    if (dto.maxUsers !== undefined) orgData.maxUsers = dto.maxUsers;
+    if (dto.maxProperties !== undefined) {
+      orgData.maxProperties = dto.maxProperties;
+    }
+    if (statusChanged && isBlocking) orgData.isActive = false;
+    if (statusChanged && isRestoring) orgData.isActive = true;
+
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.subscription.upsert({
+        where: { organizationId: id },
+        create: {
+          organizationId: id,
+          plan: dto.plan ?? org.plan,
+          status: nextStatus,
+          trialEndsAt: trialEndsAt ?? null,
+          renewsAt: renewsAt ?? null,
+          statusReason: statusReason ?? null,
+          enabledModules: [],
+        },
+        update: {
+          ...(dto.plan !== undefined ? { plan: dto.plan } : {}),
+          status: nextStatus,
+          ...(trialEndsAt !== undefined ? { trialEndsAt } : {}),
+          ...(renewsAt !== undefined ? { renewsAt } : {}),
+          ...(statusReason !== undefined ? { statusReason } : {}),
+        },
+      });
+
+      if (Object.keys(orgData).length > 0) {
+        await tx.organization.update({ where: { id }, data: orgData });
+      }
+
+      // A blocked tenant's live sessions have to die with the block, or the
+      // access survives until the JWT expires on its own.
+      if (statusChanged && isBlocking) {
+        await tx.session.updateMany({
+          where: { organizationId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+
+      return updated;
+    });
+
+    const changed = [
+      `plan ${dto.plan ?? subscription.plan}`,
+      `status ${nextStatus}`,
+      dto.maxUsers !== undefined ? `seats ${dto.maxUsers}` : null,
+      dto.maxProperties !== undefined
+        ? `properties ${dto.maxProperties}`
+        : null,
+      trialEndsAt !== undefined
+        ? `trial ends ${trialEndsAt ? trialEndsAt.toISOString() : 'never'}`
+        : null,
+      renewsAt !== undefined
+        ? `renews ${renewsAt ? renewsAt.toISOString() : 'never'}`
+        : null,
+      dto.statusReason ? `reason: ${dto.statusReason}` : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    await this.safeAudit({
+      action: 'ORGANIZATION_SUBSCRIPTION_UPDATED',
+      entity: 'Subscription',
+      entityId: subscription.id,
+      details: `Subscription updated for ${org.name}: ${changed}`,
+      actorId,
+    });
+
+    return subscription;
   }
 
   /** Read the enabled modules for one organization. */

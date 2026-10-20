@@ -40,6 +40,8 @@ import { AuthResponse, User, Property, Unit, Tenant, Agreement, Invoice, Payment
     ImpersonationSession,
     SupportTicket,
     TicketStatus,
+    SubscriptionPlan,
+    SubscriptionStatus,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
@@ -279,6 +281,28 @@ export const platformApi = {
         api.get<string[]>(`/platform/organizations/${id}/modules`),
     setEnabledModules: (id: string, enabledModules: string[]) =>
         api.patch<string[]>(`/platform/organizations/${id}/modules`, { enabledModules }),
+
+    /**
+     * The commercial terms of the relationship: plan, seat/property limits,
+     * the trial and renewal dates, and the status. A partial update — a field
+     * left out keeps its current value.
+     */
+    updateSubscription: (
+        id: string,
+        payload: {
+            plan?: SubscriptionPlan;
+            status?: SubscriptionStatus;
+            trialEndsAt?: string | null;
+            renewsAt?: string | null;
+            statusReason?: string | null;
+            maxUsers?: number;
+            maxProperties?: number;
+        },
+    ) =>
+        api.patch<PlatformOrganization['subscription']>(
+            `/platform/organizations/${id}/subscription`,
+            payload,
+        ),
 
     usage: (id: string) =>
         api.get<OrganizationUsage>(`/platform/organizations/${id}/usage`),

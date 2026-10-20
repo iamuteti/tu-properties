@@ -98,7 +98,13 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
-    { href: "/organizations", label: "Organizations", icon: Building, roles: ['SUPER_ADMIN'], module: 'organizations' },
+// There is no `/organizations` entry here on purpose. That page is the
+// tenant-style CRUD list (name, slug, subdomain) and it is a near-duplicate of
+// the platform list under Platform → Organizations, which is the one that
+// carries the subscription state, the module toggles and the suspend action.
+// Two sidebar items both called "Organizations", one of which showed no
+// subscription and no modules, is how a Super Admin ends up believing there is
+// nowhere to manage a tenant's plan. The platform surface is the only one.
 // Module 9 — Maintenance. The queue is where the work is; the register and the
     // service calendar are what the queue is judged against, so a technician gets
     // all three but a leasing officer only needs to see that the queue exists.
@@ -206,7 +212,7 @@ const navItems: NavItem[] = [
     // controller names them too. The nav list and the API are the same list,
     // because a role shown a nav item it cannot use — or given an API it is
     // not shown — is the inconsistency this file's role lists exist to avoid.
-    { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'leases' },
+    { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'agreements' },
     {
         label: "Billing & Finance",
         icon: CreditCard,
@@ -365,6 +371,7 @@ const navItems: NavItem[] = [
         roles: ['SUPER_ADMIN'],
         children: [
             { href: '/platform/organizations', label: 'Organizations', icon: Building, roles: ['SUPER_ADMIN'] },
+            { href: '/platform/subscriptions', label: 'Subscriptions', icon: CreditCard, roles: ['SUPER_ADMIN'] },
             { href: '/platform/support-tickets', label: 'Support tickets', icon: MessageSquare, roles: ['SUPER_ADMIN'] },
         ],
     },

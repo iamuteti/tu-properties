@@ -1,10 +1,4 @@
-import {
-  IsIn,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { CleanOptional, ToNumber } from '@/common/dto/transforms';
 import { DEPOSIT_BASIS } from '../deposit-rule';
 

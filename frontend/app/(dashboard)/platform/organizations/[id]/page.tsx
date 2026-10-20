@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { platformApi, setImpersonation } from "@/lib/api";
-import { PlatformOrganization, PlatformOrgUser, OrganizationUsage } from "@/types";
+import {
+    PlatformOrganization,
+    PlatformOrgUser,
+    OrganizationUsage,
+    SubscriptionPlan,
+    SubscriptionStatus,
+} from "@/types";
+import { toast } from "sonner";
 
 /** Module keys organized by sidebar group, for the per-org toggle UI.
  *  Keys match `NavItem.module` in `components/layout/sidebar.tsx` and
@@ -76,11 +83,11 @@ const MODULE_GROUPS = [
         ],
     },
     {
-        label: 'Tenants & Leases',
+        label: 'Tenants & Agreements',
         key: 'tenants',
         children: [
             { key: 'tenants', label: 'Tenants' },
-            { key: 'leases', label: 'Leases' },
+            { key: 'agreements', label: 'Agreements' },
             { key: 'tenant-requests', label: 'Tenant requests' },
             { key: 'moving-out', label: 'Moving Out' },
             { key: 'security-deposits', label: 'Security deposits' },
@@ -193,6 +200,68 @@ function UsageBar({ used, max }: { used: number; max: number }) {
     );
 }
 
+/** The plan tiers the platform sells. `FREE` is the schema default, not a placeholder. */
+const PLANS: SubscriptionPlan[] = ['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'];
+
+const SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
+    'TRIALING',
+    'ACTIVE',
+    'SUSPENDED',
+    'CANCELLED',
+];
+
+const STATUS_STYLES: Record<SubscriptionStatus, string> = {
+    TRIALING: 'bg-blue-100 text-blue-800',
+    ACTIVE: 'bg-green-100 text-green-800',
+    SUSPENDED: 'bg-red-100 text-red-800',
+    CANCELLED: 'bg-gray-200 text-gray-700',
+};
+
+/**
+ * A calendar date, not an instant.
+ *
+ * The input gives `YYYY-MM-DD` and the server stores midnight UTC of that
+ * day, so the day that comes back out is the day that went in — read in UTC
+ * rather than the browser's zone, which would show the previous day to
+ * everyone west of Greenwich.
+ */
+function calendarDay(iso?: string | null): string {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+}
+
+function displayDate(iso?: string | null): string {
+    if (!iso) return "—";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleDateString("en-GB", { timeZone: "UTC" });
+}
+
+/**
+ * The message the API failed with, if there is one.
+ *
+ * Nest sends `{ message }` in the body and axios nests that under `response`,
+ * so a refusal ("A reason is required...") arrives two hops away from a thrown
+ * error. Typed rather than `any`, because the reason this error is surfaced
+ * at all is that it says what went wrong.
+ */
+function errorMessage(err: unknown, fallback: string): string {
+    if (typeof err === "object" && err !== null) {
+        const candidate = err as {
+            response?: { data?: { message?: unknown } };
+            message?: unknown;
+        };
+        const fromBody = candidate.response?.data?.message;
+        if (typeof fromBody === "string" && fromBody) return fromBody;
+        if (typeof candidate.message === "string" && candidate.message) {
+            return candidate.message;
+        }
+    }
+    return fallback;
+}
+
 export default function PlatformOrganizationDetailPage() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
@@ -210,6 +279,16 @@ export default function PlatformOrganizationDetailPage() {
     const [impersonating, setImpersonating] = useState<string | null>(null);
     const [impReason, setImpReason] = useState("");
     const [showImpDialog, setShowImpDialog] = useState<string | null>(null);
+    const [subForm, setSubForm] = useState({
+        plan: "STARTER" as SubscriptionPlan,
+        status: "TRIALING" as SubscriptionStatus,
+        trialEndsAt: "",
+        renewsAt: "",
+        statusReason: "",
+        maxUsers: 3,
+        maxProperties: 10,
+    });
+    const [subSaving, setSubSaving] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -223,6 +302,19 @@ export default function PlatformOrganizationDetailPage() {
             setUsage(usageRes.data);
             setUsers(usersRes.data);
             setEnabledModules(modulesRes.data);
+            // The subscription terms are edited in a form, so the form starts
+            // from what is on the record — not from a blank that would quietly
+            // propose wiping a trial date the operator never looked at.
+            const sub = orgRes.data.subscription;
+            setSubForm({
+                plan: (sub?.plan ?? orgRes.data.plan) as SubscriptionPlan,
+                status: sub?.status ?? "TRIALING",
+                trialEndsAt: calendarDay(sub?.trialEndsAt),
+                renewsAt: calendarDay(sub?.renewsAt),
+                statusReason: sub?.statusReason ?? "",
+                maxUsers: orgRes.data.maxUsers ?? 3,
+                maxProperties: orgRes.data.maxProperties ?? 10,
+            });
         } catch (err: any) {
             setError(err.response?.data?.message || err.message || "Failed to load tenant");
         } finally {
@@ -296,6 +388,35 @@ export default function PlatformOrganizationDetailPage() {
         }
     };
 
+    /**
+     * Save the subscription terms.
+     *
+     * The whole form is sent rather than the fields that changed: the server
+     * treats a missing field as "keep it", and a form that only ever sends the
+     * fields somebody touched is a form that cannot clear a date.
+     */
+    const saveSubscription = async () => {
+        setSubSaving(true);
+        setError("");
+        try {
+            await platformApi.updateSubscription(id, {
+                plan: subForm.plan,
+                status: subForm.status,
+                trialEndsAt: subForm.trialEndsAt || null,
+                renewsAt: subForm.renewsAt || null,
+                statusReason: subForm.statusReason.trim() || null,
+                maxUsers: Number(subForm.maxUsers),
+                maxProperties: Number(subForm.maxProperties),
+            });
+            toast.success("Subscription updated");
+            await load();
+        } catch (err) {
+            setError(errorMessage(err, "Failed to update the subscription"));
+        } finally {
+            setSubSaving(false);
+        }
+    };
+
     if (isLoading || loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -315,7 +436,20 @@ export default function PlatformOrganizationDetailPage() {
                     ← All tenants
                 </button>
                 <h1 className="text-2xl font-bold">{org.name}</h1>
-                <p className="text-sm text-muted-foreground">{org.slug} · plan {org.plan} · subscription {org.subscription?.status ?? "—"}</p>
+                <p className="text-sm text-muted-foreground">
+                    {org.slug} · plan {org.subscription?.plan ?? org.plan} ·{" "}
+                    {org.subscription ? (
+                        <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${STATUS_STYLES[org.subscription.status]}`}
+                        >
+                            {org.subscription.status}
+                        </span>
+                    ) : (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                            NO SUBSCRIPTION
+                        </span>
+                    )}
+                </p>
             </div>
 
             {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
@@ -372,6 +506,140 @@ export default function PlatformOrganizationDetailPage() {
                             Reactivate
                         </button>
                     )}
+                </div>
+            </div>
+
+            {/* Subscription terms */}
+            <div className="p-6 bg-card rounded-lg shadow">
+                <h2 className="text-lg font-semibold mb-1">Subscription</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                    What {org.name} is on and what it pays for. The plan and the limits
+                    decide what the tenant can do; the dates decide how long they
+                    have it. Moving a tenant to SUSPENDED or CANCELLED here blocks
+                    their access and revokes their sessions — a reason is required,
+                    and the reason is kept on the record.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="sub-plan">
+                            Plan
+                        </label>
+                        <select
+                            id="sub-plan"
+                            value={subForm.plan}
+                            onChange={(e) =>
+                                setSubForm({ ...subForm, plan: e.target.value as SubscriptionPlan })
+                            }
+                            className="w-full px-3 py-2 border rounded-lg bg-background"
+                        >
+                            {PLANS.map((p) => (
+                                <option key={p} value={p}>
+                                    {p}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="sub-status">
+                            Status
+                        </label>
+                        <select
+                            id="sub-status"
+                            value={subForm.status}
+                            onChange={(e) =>
+                                setSubForm({ ...subForm, status: e.target.value as SubscriptionStatus })
+                            }
+                            className="w-full px-3 py-2 border rounded-lg bg-background"
+                        >
+                            {SUBSCRIPTION_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="sub-reason">
+                            Reason
+                        </label>
+                        <input
+                            id="sub-reason"
+                            type="text"
+                            value={subForm.statusReason}
+                            onChange={(e) => setSubForm({ ...subForm, statusReason: e.target.value })}
+                            placeholder="Required to block or restore access"
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="sub-trial">
+                            Trial ends
+                        </label>
+                        <input
+                            id="sub-trial"
+                            type="date"
+                            value={subForm.trialEndsAt}
+                            onChange={(e) => setSubForm({ ...subForm, trialEndsAt: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="sub-renews">
+                            Renews
+                        </label>
+                        <input
+                            id="sub-renews"
+                            type="date"
+                            value={subForm.renewsAt}
+                            onChange={(e) => setSubForm({ ...subForm, renewsAt: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1" htmlFor="sub-users">
+                                Seats
+                            </label>
+                            <input
+                                id="sub-users"
+                                type="number"
+                                min={1}
+                                value={subForm.maxUsers}
+                                onChange={(e) =>
+                                    setSubForm({ ...subForm, maxUsers: Number(e.target.value) })
+                                }
+                                className="w-full px-3 py-2 border rounded-lg"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1" htmlFor="sub-properties">
+                                Properties
+                            </label>
+                            <input
+                                id="sub-properties"
+                                type="number"
+                                min={1}
+                                value={subForm.maxProperties}
+                                onChange={(e) =>
+                                    setSubForm({ ...subForm, maxProperties: Number(e.target.value) })
+                                }
+                                className="w-full px-3 py-2 border rounded-lg"
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                        onClick={saveSubscription}
+                        disabled={subSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {subSaving ? "Saving..." : "Save subscription"}
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                        Trial ends {displayDate(org.subscription?.trialEndsAt)} · renews{" "}
+                        {displayDate(org.subscription?.renewsAt)}
+                    </span>
                 </div>
             </div>
 

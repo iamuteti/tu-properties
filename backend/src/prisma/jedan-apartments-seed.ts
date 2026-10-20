@@ -465,7 +465,7 @@ async function main() {
         'properties',
         'properties/units',
         'tenants',
-        'leases',
+        'agreements',
         'invoices',
         'payments',
         'receipts',
