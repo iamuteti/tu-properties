@@ -1134,6 +1134,7 @@ enum TenantStatus {
   ACTIVE
   INACTIVE
   ARCHIVED
+  TERMINATED
 }
 
 model UnitServiceCharge {

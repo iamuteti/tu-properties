@@ -201,6 +201,7 @@ const navItems: NavItem[] = [
         module: 'tenants',
         children: [
             { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
+            { href: "/terminal-tenants", label: "Terminal Tenants", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
             { href: "/tenant-requests", label: "Tenant Requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'tenant-requests' },
             { href: "/security-deposits", label: "Security Deposits", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'security-deposits' },
             { href: "/moving-out", label: "Move Out Processings", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
