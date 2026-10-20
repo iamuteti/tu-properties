@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "postinstall": "prisma generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -18,6 +19,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:generate": "prisma generate",
     "db:drop": "ts-node -r tsconfig-paths/register scripts/db-admin.ts drop",
     "db:create": "ts-node -r tsconfig-paths/register scripts/db-admin.ts create",
     "db:migrate": "prisma migrate deploy",

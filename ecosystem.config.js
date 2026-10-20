@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'properties-backend',
+      name: 'properties-api-prod',
       cwd: './backend',
       script: 'dist/main.js',
       instances: 1,
@@ -13,7 +13,7 @@ module.exports = {
       },
     },
     {
-      name: 'properties-frontend',
+      name: 'properties-front-prod',
       cwd: './frontend',
       script: 'npm',
       args: 'run start',

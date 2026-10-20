@@ -19,6 +19,12 @@ npm run dev
 
 ## Database
 - Connection: `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` (see `backend/.env`).
+- **Prisma 7 does not generate the client on install** — `@prisma/client` has no `postinstall` hook and
+  `prisma migrate deploy` no longer generates it. After any `npm install`/`npm ci` run `npm run db:generate`
+  (from `backend/`, which resolves the schema via `backend/prisma.config.ts` → `src/prisma/schema.prisma`).
+  A missing client fails as `Cannot find module '.prisma/client/default'` in every script that imports
+  `@prisma/client` (seeds, and the API at boot). `backend/package.json` has a `postinstall` hook for it, but
+  `npm ci` deletes the generated client before reinstalling, so the deploy script still calls it explicitly.
 - Apply schema changes → `npx prisma db push --accept-data-loss` (dev workflow; regenerates the client).
 - Seed demo data → `npm run db:seed:demo` (ts-node demo-data script).
 - Seed the role matrix only → `npm run db:seed:roles`. **A permission change is not live until this runs** — the
