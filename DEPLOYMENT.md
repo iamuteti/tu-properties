@@ -226,8 +226,9 @@ single source of truth. An exported `PORT` in the shell still overrides them.
    in place, and the build fails with the confusing
    `Property 'tenant' does not exist on type 'PrismaService'` instead of with
    an install error. Always install the backend with
-   `npm ci --include=dev --legacy-peer-deps` (the frontend already uses
-   `--legacy-peer-deps`).
+   `npm ci --include=dev --legacy-peer-deps`. The frontend needs no such flag:
+   its tree resolves cleanly against React 19, so `npm ci` works there (this is
+   what Vercel runs).
 
 4. **`ecosystem.config.js` (repo root)** — it uses **relative** `cwd` paths
    (`./backend`, `./frontend`), so PM2 must be started **from the repo root**
@@ -471,7 +472,7 @@ PostgreSQL (5432) stays bound to localhost.
 6. Backend:
    `cd backend && npm ci --include=dev --legacy-peer-deps && npm run db:generate && npm run build`,
    then `npm run db:migrate` and `npm run db:seed` (step 2)
-7. Frontend: `cd frontend && npm ci --legacy-peer-deps && npm run build`
+7. Frontend: `cd frontend && npm ci && npm run build`
    (the production `.env` must already be in place — `NEXT_PUBLIC_*` is baked
    in at build time)
 8. Start the processes **from the repo root** (the `cwd` paths in
@@ -534,7 +535,7 @@ bash /var/www/tu-properties/server_deploy_script.sh
 
 # or manually
 cd /var/www/tu-properties/backend && git pull && npm ci --include=dev --legacy-peer-deps && npm run db:generate && npm run build && npm run db:migrate && pm2 restart properties-api-prod
-cd /var/www/tu-properties/frontend && git pull && npm ci --legacy-peer-deps && npm run build && pm2 restart properties-front-prod
+cd /var/www/tu-properties/frontend && git pull && npm ci && npm run build && pm2 restart properties-front-prod
 pm2 save
 ```
 

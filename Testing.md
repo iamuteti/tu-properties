@@ -302,7 +302,7 @@ row here; the table is the full set.
   - `common/utils.spec.ts` — `getTenantId` fail-closed, `requireRecord`, `assertTenantRecord`.
 - **CI** (`.github/workflows/ci.yml`, runs on push to `main` + PRs):
   backend: `npm ci` → `prisma generate` → `tsc --noEmit` → `jest`;
-  frontend: `npm ci --legacy-peer-deps` → `tsc --noEmit` → `next build`.
+  frontend: `npm ci` → `tsc --noEmit` → `next build`.
 
 ## 7. Auth Hardening Behaviors (2026-10-03)
 

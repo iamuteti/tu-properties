@@ -26,6 +26,6 @@ cd "$ROOT/backend" && git pull && npm ci --include=dev --legacy-peer-deps && npm
 # "Property '<model>' does not exist on type 'PrismaService'".
 node -e "const fs=require('fs');const c='node_modules/.prisma/client/index.d.ts',s='src/prisma/schema.prisma';if(!fs.existsSync(c)||fs.statSync(c).mtimeMs<=fs.statSync(s).mtimeMs){console.error('stale Prisma client - run npm run db:generate');process.exit(1)}"
 
-cd "$ROOT/frontend" && git pull && npm ci --legacy-peer-deps && npm run build && pm2 restart properties-front-prod
+cd "$ROOT/frontend" && git pull && npm ci && npm run build && pm2 restart properties-front-prod
 
 pm2 save

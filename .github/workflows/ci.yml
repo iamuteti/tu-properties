@@ -57,11 +57,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # react-quill@2 declares a React <=18 peer dep; the lockfile already
-      # resolves the tree, but keep the flag so installs never re-resolve
-      # peers against React 19.
+      # The tree resolves cleanly against React 19 (the editor is
+      # `react-quill-new`, which supports React 16-19), so a plain `npm ci`
+      # installs the lockfile as committed.
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Typecheck
         run: npx tsc --noEmit

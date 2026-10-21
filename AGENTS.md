@@ -30,9 +30,16 @@ npm run dev
   install: `Missing: react@19.3.1 from lock file`. npm validates the lockfile *before* it wipes `node_modules`, so
   the failed install leaves the previous `node_modules` — and its stale Prisma client — in place, and the build then
   fails with `Property 'tenant' does not exist on type 'PrismaService'` for every model added since. Use
-  `npm ci --include=dev --legacy-peer-deps` in `backend/` (the frontend already does). The Prisma types come only
+  `npm ci --include=dev --legacy-peer-deps` in `backend/`. The frontend needs no flag — its tree resolves cleanly
+  against React 19, so a plain `npm ci`/`npm install` works (this is what Vercel runs). The Prisma types come only
   from `backend/node_modules/.prisma/client/index.d.ts`; check it with
   `grep -c "get tenant()" node_modules/.prisma/client/index.d.ts`.
+- **The frontend rich-text editor is `react-quill-new`, not `react-quill`** — the original `react-quill@2.0.0` declares a
+  React ≤18 peer dep (which broke `npm install` on Vercel with `ERESOLVE`) and calls `ReactDOM.findDOMNode`, removed in
+  React 19. `react-quill-new@3.x` supports React 16-19, uses a ref instead, and bundles Quill 2. `onChange` emits Quill 2
+  *semantic* HTML (`getSemanticHTML()`), not the old `root.innerHTML` — set `useSemanticHTML={false}` for the old shape.
+  Quill 2 has no `bullet` format (the `list` format covers ordered and bullet), so a `formats` whitelist naming `bullet`
+  logs a Quill "Cannot register" error.
 - Apply schema changes → `npx prisma db push --accept-data-loss` (dev workflow; regenerates the client).
 - Seed demo data → `npm run db:seed:demo` (ts-node demo-data script).
 - Seed the role matrix only → `npm run db:seed:roles`. **A permission change is not live until this runs** — the

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 
 interface RichTextEditorProps {
   value?: string;
@@ -14,7 +14,7 @@ interface RichTextEditorProps {
 }
 
 const RichTextEditor = React.forwardRef<HTMLDivElement, RichTextEditorProps>(
-  ({ value = "", onChange, className, ...props }, ref) => {
+  ({ value = "", onChange, disabled, className, ...props }, ref) => {
     const [content, setContent] = useState(value);
 
     useEffect(() => {
@@ -49,7 +49,6 @@ const RichTextEditor = React.forwardRef<HTMLDivElement, RichTextEditorProps>(
       "underline",
       "strike",
       "list",
-      "bullet",
       "indent",
       "align",
       "link",
@@ -63,6 +62,7 @@ const RichTextEditor = React.forwardRef<HTMLDivElement, RichTextEditorProps>(
           onChange={handleChange}
           modules={modules}
           formats={formats}
+          readOnly={disabled}
           {...props}
         />
       </div>
