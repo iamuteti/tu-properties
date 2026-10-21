@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { authApi } from "@/lib/api";
+import { authApi, setAuthToken } from "@/lib/api";
 
 // Zod schema for validation
 const registerSchema = z
@@ -50,11 +50,14 @@ export default function RegisterPage() {
 
             const response = await authApi.register(payload);
 
-            const { user } = response.data;
+            const { user, accessToken } = response.data;
             if (!user) {
                 setError("Registration failed: invalid server response.");
                 return;
             }
+            // Present only when the API runs in bearer mode; `null` clears any
+            // token from an earlier session, which is what cookie mode wants.
+            setAuthToken(accessToken ?? null);
             login(user);
         } catch (err: any) {
             setError(

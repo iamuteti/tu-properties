@@ -17,6 +17,25 @@ npm run start          # or: npm run start:dev  (watch mode)
 npm run dev
 ```
 
+## Auth transport (`AUTH_MODE`)
+- The session credential is an httpOnly cookie **or** a bearer token, and which one is a **deployment switch**,
+  not a code change: `AUTH_MODE=cookie` (default) or `AUTH_MODE=bearer` in `backend/.env`.
+- **`cookie`** — the backend sets `auth_token` (`httpOnly`, `sameSite: strict`, `secure` in production, 1h) and
+  the browser sends it by itself. JavaScript never sees the token. **Only works when the frontend and the API are
+  same-site** (same registrable domain): a `SameSite=Strict` cookie is never sent on a cross-site request, so a
+  frontend on `*.vercel.app` calling `api-properties.tuhame.co.ke` logs in and is then bounced straight back to
+  `/auth/login` by the 401 interceptor.
+- **`bearer`** — the backend returns the JWT as `accessToken` in the login/register/MFA-verify response and clears
+  any stale cookie; the frontend stores it in `localStorage['tu_auth_token']` and sends `Authorization: Bearer`
+  (`frontend/lib/api.ts` request interceptor). Works from any origin. The JWT strategy accepts both
+  (`backend/src/modules/auth/jwt.strategy.ts`).
+- The frontend **auto-detects**: it stores `accessToken` when the response carries one and clears it when it does
+  not, so the two modes never fight over the same browser. No frontend env var, no rebuild — flip `AUTH_MODE` on
+  the API and log in again. The impersonation token (Module 19) always wins over the session token: it is set on
+  `api.defaults.headers.common` and the request interceptor leaves an existing `Authorization` header alone.
+- Session lifetime is 1 hour in both modes (the `Session` row's `expiresAt` is what the JWT strategy checks), so
+  either way the user signs in again hourly.
+
 ## Database
 - Connection: `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` (see `backend/.env`).
 - **Prisma 7 does not generate the client on install** — `@prisma/client` has no `postinstall` hook and

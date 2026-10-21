@@ -54,6 +54,69 @@ export const api = axios.create({
   withCredentials: true, // auth token now lives in an httpOnly cookie
 });
 
+/**
+ * The session token, when the API is running in bearer mode
+ * (`AUTH_MODE=bearer` on the server).
+ *
+ * Cookie mode (the default): there is no token here — the browser holds it in
+ * an httpOnly cookie and sends it by itself, and JavaScript cannot read it.
+ *
+ * Bearer mode: the server returns the JWT in the login response and the
+ * client keeps it here and sends it as `Authorization: Bearer`. That works
+ * from any origin (a Vercel `*.vercel.app` frontend against a VPS API), at
+ * the cost of the token being readable by any script on the page.
+ *
+ * The key is deliberately different from the cookie's name (`auth_token`) so
+ * the two transports can never be confused for one another.
+ */
+const AUTH_TOKEN_KEY = 'tu_auth_token';
+
+export function getAuthToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        return window.localStorage.getItem(AUTH_TOKEN_KEY);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Store (or clear) the bearer token.
+ *
+ * Pass `null` to clear it — that is what happens when the server answers a
+ * login without a token, i.e. it is in cookie mode, and any token left over
+ * from a previous bearer-mode session has to go, or it would keep being sent
+ * as an `Authorization` header and shadow the cookie.
+ */
+export function setAuthToken(token: string | null) {
+    if (typeof window === 'undefined') return;
+    try {
+        if (token) {
+            window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+        } else {
+            window.localStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+    } catch {
+        // Storage unavailable (private mode, disabled cookies): the cookie
+        // transport still works, so this is not worth failing a login over.
+    }
+}
+
+// Attach the bearer token to every request, when there is one.
+//
+// The impersonation token (Module 19) is set on `api.defaults.headers.common`
+// and must win: it identifies the tenant being impersonated, and the
+// operator's own session has to stay underneath it. Axios flattens the
+// defaults into `config.headers` before the request interceptors run, so an
+// Authorization header that is already there is the impersonation token.
+api.interceptors.request.use((config) => {
+    const token = getAuthToken();
+    if (token && !config.headers.get('Authorization')) {
+        config.headers.set('Authorization', `Bearer ${token}`);
+    }
+    return config;
+});
+
 // No request interceptor is needed: the httpOnly cookie is sent automatically
 // by the browser on same-origin requests, and there is no token to read out
 // of localStorage. This closes the XSS token-theft vector.
@@ -85,6 +148,16 @@ api.interceptors.response.use(
     // Protected routes do not need this event: `(dashboard)/layout.tsx` redirects
     // on `!user` itself once loading settles.
     const url: string | undefined = error.config?.url;
+    const isAuthAttempt =
+      url?.endsWith('/auth/login') || url?.endsWith('/auth/register');
+    if (error.response?.status === 401 && !isAuthAttempt) {
+      // The credential is dead — expired, revoked, or the session was killed.
+      // Drop the stored token so the next login starts from a clean slate.
+      // (A failed *login attempt* is not a dead credential, so it is left
+      // alone: typing a wrong password must not sign the user out of a
+      // session that is still valid.)
+      setAuthToken(null);
+    }
     if (
       error.response?.status === 401 &&
       !url?.includes('/auth/logout') &&
@@ -121,7 +194,7 @@ export const authApi = {
     mfaDisable: (code: string) =>
         api.post<{ message: string }>('/auth/mfa/disable', { code }),
     verifyMfa: (mfaToken: string, code: string) =>
-        api.post<{ user: User; sessionId: string }>('/auth/mfa/verify', { mfaToken, code }),
+        api.post<{ user: User; sessionId: string; accessToken?: string }>('/auth/mfa/verify', { mfaToken, code }),
 
     // Sessions (revocation)
     listSessions: () =>

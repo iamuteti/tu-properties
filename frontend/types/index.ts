@@ -335,6 +335,12 @@ export interface AuthResponse {
     mfaRequired?: boolean;
     /** Short-lived challenge token for the MFA verify step. */
     mfaToken?: string;
+    /**
+     * The session JWT. Returned only when the API runs in bearer mode
+     * (`AUTH_MODE=bearer`); in cookie mode the token is an httpOnly cookie the
+     * client never sees.
+     */
+    accessToken?: string;
 }
 
 export interface ApiResponse<T> {

@@ -112,6 +112,23 @@ NODE_ENV=production
 # be listed too: CORS_ORIGINS="https://properties.tuhame.co.ke,https://www.properties.tuhame.co.ke"
 CORS_ORIGINS="https://properties.tuhame.co.ke"
 
+# How the session token reaches the browser: `cookie` (default) or `bearer`.
+#
+# `cookie` sets an httpOnly, SameSite=Strict cookie. The browser only sends a
+# Strict cookie to the SAME site, so this requires the frontend to share the
+# registrable domain with the API (properties.tuhame.co.ke +
+# api-properties.tuhame.co.ke). Point the frontend at a different domain
+# (a Vercel *.vercel.app deployment) and every authenticated call comes back
+# 401 — the login succeeds, the dashboard does not.
+#
+# `bearer` returns the token in the login response instead; the client keeps
+# it in localStorage and sends `Authorization: Bearer`. Works from any origin.
+# Use it for a frontend hosted on a different domain than the API.
+#
+# Switching this needs no code change and no frontend rebuild — but users must
+# log in again afterwards.
+AUTH_MODE="cookie"
+
 # Database (created in step 2)
 DATABASE_URL="postgresql://tu_properties:STRONG_PASSWORD@127.0.0.1:5432/tu-properies?schema=public"
 
@@ -644,6 +661,52 @@ seed. Full account list: `Testing.md`.
 
 > Never point the demo seed at a production database: every seeded account
 > shares the password `Password123!`.
+
+## 12. Frontend on Vercel (cross-site deployment)
+
+The frontend can live on Vercel while the API stays on the VPS. The one thing
+that changes is **same-site vs cross-site**:
+
+| Frontend origin | API origin | Same site? | `AUTH_MODE` |
+|-----------------|------------|------------|--------------|
+| `properties.tuhame.co.ke` | `api-properties.tuhame.co.ke` | yes | `cookie` (default) |
+| `tu-properties.vercel.app` | `api-properties.tuhame.co.ke` | **no** | `bearer` |
+
+A `SameSite=Strict` cookie is never sent on a cross-site request, so with the
+frontend on `*.vercel.app` the cookie transport logs in and is then bounced
+straight back to `/auth/login` (the login response itself is fine — the
+session cookie is what never arrives). `AUTH_MODE=bearer` moves the token into
+the login response and the client sends it as `Authorization: Bearer`, which
+works from any origin.
+
+Steps for the Vercel frontend:
+
+1. **Vercel** → project → Settings → Environment Variables:
+   - `NEXT_PUBLIC_BACKEND_URL=https://api-properties.tuhame.co.ke/`
+   - `NEXT_PUBLIC_LANDING_MARKETS=...` and `NEXT_PUBLIC_LANDING_CURRENCIES=...`
+     (see `frontend/.env.example`)
+
+   `NEXT_PUBLIC_*` values are inlined at build time, so changing one needs a
+   redeploy, not just a restart.
+2. **Root directory**: set it to `frontend` — the Vercel project installs from
+   `frontend/package.json` and runs `next build` there.
+3. **On the VPS** (`backend/.env`):
+   - `AUTH_MODE=bearer`
+   - `CORS_ORIGINS` must list the Vercel origin, e.g.
+     `CORS_ORIGINS="https://properties.tuhame.co.ke,https://tu-properties.vercel.app"`.
+     CORS compares origins exactly; a `*.vercel.app` wildcard is supported by
+     the allowlist parser, but listing the exact origin is better — every
+     `*.vercel.app` subdomain is a different site as far as cookies go.
+
+   Then `pm2 restart properties-api-prod` (the API reads `.env` at boot).
+4. Log in again. The transport change invalidates the session the old mode
+   created, and the frontend picks the new transport up from the login
+   response — no frontend rebuild.
+
+Switching back to cookies once the frontend has its own domain on
+`tuhame.co.ke`: set `AUTH_MODE=cookie`, restart the API, log in again. The
+frontend needs no change and no rebuild; it stores the token when the response
+carries one and clears it when it does not.
 
 ## Known Blockers / Pre-Launch Summary
 

@@ -118,6 +118,29 @@ export class AuthService {
   }
 
   /**
+   * How the session credential is handed to the browser.
+   *
+   * - `cookie` (default): the JWT is set as an httpOnly cookie and the browser
+   *   sends it by itself. Strongest option — JavaScript cannot read the token —
+   *   but it only works when the frontend and the API are **same-site**, because
+   *   the cookie is `SameSite=Strict` and a browser refuses to send a Strict
+   *   cookie on a cross-site request. A Vercel `*.vercel.app` frontend calling
+   *   `api-properties.tuhame.co.ke` is cross-site, so the cookie is never sent
+   *   and every authenticated call 401s.
+   * - `bearer`: the JWT is returned in the login response body and the client
+   *   keeps it (localStorage) and sends it as `Authorization: Bearer`. Works
+   *   from any origin, at the cost of the token being readable by JavaScript.
+   *
+   * The JWT strategy accepts both (`jwt.strategy.ts`), so this is a deployment
+   * switch, not a protocol change.
+   */
+  private get authMode(): 'cookie' | 'bearer' {
+    return (process.env.AUTH_MODE || 'cookie').toLowerCase() === 'bearer'
+      ? 'bearer'
+      : 'cookie';
+  }
+
+  /**
    * Issue a JWT + httpOnly cookie and persist the server-side session row
    * that backs it. The `jti` claim ties the token to exactly one session,
    * so revoking the session row invalidates the token.
@@ -152,7 +175,18 @@ export class AuthService {
       },
     });
 
-    this.setAuthCookie(res, token);
+    const bearerMode = this.authMode === 'bearer';
+
+    if (bearerMode) {
+      // Cross-site deployment: the browser will not send a SameSite=Strict
+      // cookie to another registrable domain, so the cookie is useless here.
+      // Hand the JWT to the client instead — and drop any stale cookie from an
+      // earlier cookie-mode login, because the JWT strategy reads the cookie
+      // first and a leftover one would shadow the Authorization header.
+      this.clearAuthCookie(res);
+    } else {
+      this.setAuthCookie(res, token);
+    }
 
     // Best-effort audit log. Never let a failed audit write break login.
     try {
@@ -169,10 +203,14 @@ export class AuthService {
         userAgent: meta?.userAgent,
       });
     } catch (err) {
-      this.logger.warn('Failed to write login audit log', err as Error);
+      this.logger.warn(
+        `Failed to write login audit log for ${user.id}: ${(err as Error).message}`,
+      );
     }
 
-    return { sessionId: jti };
+    return bearerMode
+      ? { sessionId: jti, accessToken: token }
+      : { sessionId: jti };
   }
 
   async register(data: Prisma.UserCreateInput, res: Response) {

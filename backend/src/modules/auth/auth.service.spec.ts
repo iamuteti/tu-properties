@@ -201,6 +201,75 @@ describe('AuthService', () => {
     });
   });
 
+  describe('session transport (AUTH_MODE)', () => {
+    // The transport is a deployment switch, not a protocol change: the JWT
+    // strategy accepts both the cookie and an `Authorization: Bearer` header.
+    // `cookie` is the default and is only usable when the frontend and the API
+    // are same-site; `bearer` is for a cross-site deployment (a Vercel
+    // frontend against a VPS API), where a SameSite=Strict cookie is never
+    // sent by the browser.
+    const originalAuthMode = process.env.AUTH_MODE;
+
+    afterEach(() => {
+      if (originalAuthMode === undefined) {
+        delete process.env.AUTH_MODE;
+      } else {
+        process.env.AUTH_MODE = originalAuthMode;
+      }
+    });
+
+    it('cookie mode (the default) sets the httpOnly cookie and returns no token', async () => {
+      delete process.env.AUTH_MODE;
+      const res = mockRes();
+      const result = await service.login(plainUser, res as any);
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        'auth_token',
+        'signed-jwt',
+        expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
+      );
+      expect(res.clearCookie).not.toHaveBeenCalled();
+      expect(result).not.toHaveProperty('accessToken');
+    });
+
+    it('bearer mode returns the token, sets no cookie, and clears a stale one', async () => {
+      process.env.AUTH_MODE = 'bearer';
+      const res = mockRes();
+      const result = await service.login(plainUser, res as any);
+
+      expect(res.cookie).not.toHaveBeenCalled();
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'auth_token',
+        expect.objectContaining({ httpOnly: true }),
+      );
+      expect(result.accessToken).toBe('signed-jwt');
+
+      // The session row is still the one the token points at — revoking it
+      // still kills the bearer token.
+      expect(prisma.session.create).toHaveBeenCalledTimes(1);
+      const sessionData = prisma.session.create.mock.calls[0][0].data;
+      const signCall = jwtService.sign.mock.calls[0][0];
+      expect(sessionData.jti).toBe(signCall.jti);
+    });
+
+    it('bearer mode also applies to the MFA verify step', async () => {
+      process.env.AUTH_MODE = 'bearer';
+      const secret = 'ABCDEFGHIJKLMNOPQRSTUVWX';
+      jwtService.verify.mockReturnValue({ sub: 'user-1', mfa: 'verify' });
+      usersService.findOne.mockResolvedValue({ ...mfaUser, mfaSecret: secret });
+      const res = mockRes();
+
+      const result = await service.verifyMfa(
+        'challenge-token',
+        freshCode(secret),
+        res as any,
+      );
+
+      expect(result.accessToken).toBe('signed-jwt');
+      expect(res.cookie).not.toHaveBeenCalled();
+    });
+  });
+
   describe('login (MFA enabled)', () => {
     it('returns a 5-minute challenge token and no session', async () => {
       const res = mockRes();

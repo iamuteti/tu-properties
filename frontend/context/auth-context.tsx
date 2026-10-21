@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { User, Organization } from "@/types";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, setAuthToken } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -111,6 +111,10 @@ const logout = useCallback(async () => {
             // Best-effort: clear the local state regardless. The session is already
             // invalid by the time we get here, so a failure carries no new information.
         }
+        // The stored bearer token (bearer mode) goes with the session — the
+        // server has just revoked it, and keeping it would leave a dead
+        // credential in storage.
+        setAuthToken(null);
 setUser(null);
         setOrganization(null);
         router.push("/auth/login");

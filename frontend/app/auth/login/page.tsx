@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/entity-states";
-import { authApi } from "@/lib/api";
+import { authApi, setAuthToken } from "@/lib/api";
 
 // Zod schema for validation
 const loginSchema = z.object({
@@ -69,7 +69,7 @@ function LoginForm() {
         setError(null);
         try {
             const response = await authApi.login(data.email, data.password);
-            const { user, mfaRequired, mfaToken } = response.data;
+            const { user, mfaRequired, mfaToken, accessToken } = response.data;
             if (mfaRequired && mfaToken) {
                 setMfa({ mfaToken, email: data.email });
                 setMfaCode("");
@@ -79,6 +79,9 @@ function LoginForm() {
                 setError("Login failed: invalid server response.");
                 return;
             }
+            // Present only when the API runs in bearer mode; `null` clears any
+            // token from an earlier session, which is what cookie mode wants.
+            setAuthToken(accessToken ?? null);
             login(user);
         } catch (err: any) {
             setError(
@@ -93,6 +96,7 @@ function LoginForm() {
         setMfaBusy(true);
         try {
             const response = await authApi.verifyMfa(mfa.mfaToken, mfaCode);
+            setAuthToken(response.data.accessToken ?? null);
             login(response.data.user);
         } catch (err: any) {
             setError(
