@@ -25,6 +25,14 @@ npm run dev
   A missing client fails as `Cannot find module '.prisma/client/default'` in every script that imports
   `@prisma/client` (seeds, and the API at boot). `backend/package.json` has a `postinstall` hook for it, but
   `npm ci` deletes the generated client before reinstalling, so the deploy script still calls it explicitly.
+- **The backend lockfile must be installed with `--legacy-peer-deps`** — it was produced with it (the `prisma` CLI
+  pulls in `@prisma/studio-core`, whose react peer deps are not in the lockfile), so a plain `npm ci` refuses to
+  install: `Missing: react@19.3.1 from lock file`. npm validates the lockfile *before* it wipes `node_modules`, so
+  the failed install leaves the previous `node_modules` — and its stale Prisma client — in place, and the build then
+  fails with `Property 'tenant' does not exist on type 'PrismaService'` for every model added since. Use
+  `npm ci --include=dev --legacy-peer-deps` in `backend/` (the frontend already does). The Prisma types come only
+  from `backend/node_modules/.prisma/client/index.d.ts`; check it with
+  `grep -c "get tenant()" node_modules/.prisma/client/index.d.ts`.
 - Apply schema changes → `npx prisma db push --accept-data-loss` (dev workflow; regenerates the client).
 - Seed demo data → `npm run db:seed:demo` (ts-node demo-data script).
 - Seed the role matrix only → `npm run db:seed:roles`. **A permission change is not live until this runs** — the

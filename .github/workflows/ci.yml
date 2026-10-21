@@ -26,7 +26,11 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        # `--legacy-peer-deps` is required: the committed lockfile was produced
+        # with it (the `prisma` CLI pulls in `@prisma/studio-core`, whose react
+        # peer deps are not in the lockfile) and a plain `npm ci` refuses to
+        # install an out-of-sync lockfile.
+        run: npm ci --include=dev --legacy-peer-deps
 
       # The tests use mocked Prisma services — no database required.
       - name: Generate Prisma client

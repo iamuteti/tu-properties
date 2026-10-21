@@ -193,6 +193,15 @@ single source of truth. An exported `PORT` in the shell still overrides them.
    `npm run build` and before `npm run db:migrate`. Skipping it fails the API
    and every seed with `Cannot find module '.prisma/client/default'`.
 
+   > A **stale** client (generated before the models were added) fails
+   > differently: the build reports
+   > `Property '<model>' does not exist on type 'PrismaService'` for every
+   > model added since. The Prisma types come from
+   > `backend/node_modules/.prisma/client/index.d.ts` — that is the file
+   > `prisma generate` writes, and the only place the model delegates come from.
+   > Check it with
+   > `grep -c "get tenant()" node_modules/.prisma/client/index.d.ts`.
+
 2. **Dev dependencies must be installed** — the `prisma` CLI and `@nestjs/cli`
    are devDependencies. `npm ci` omits them when `NODE_ENV=production` is set
    in the shell that runs npm (npm's `omit` default), and `nest build` then has
@@ -201,33 +210,52 @@ single source of truth. An exported `PORT` in the shell still overrides them.
    sets `NODE_ENV=production` for the app process itself, which is where it
    belongs.
 
-3. **`ecosystem.config.js` (repo root)** — it uses **relative** `cwd` paths
+3. **`--legacy-peer-deps` is mandatory for the backend** — the committed
+   `backend/package-lock.json` was produced with `--legacy-peer-deps`: the
+   `prisma` CLI depends on `@prisma/studio-core`, whose react peer deps are not
+   in the lockfile. A plain `npm ci` therefore refuses to install:
+
+   ```
+   npm error `npm ci` can only install packages when your package.json and
+   package-lock.json ... are in sync.
+   npm error Missing: react@19.3.1 from lock file
+   ```
+
+   npm validates the lockfile **before** it wipes `node_modules`, so the failed
+   install leaves the previous `node_modules` — and its stale Prisma client —
+   in place, and the build fails with the confusing
+   `Property 'tenant' does not exist on type 'PrismaService'` instead of with
+   an install error. Always install the backend with
+   `npm ci --include=dev --legacy-peer-deps` (the frontend already uses
+   `--legacy-peer-deps`).
+
+4. **`ecosystem.config.js` (repo root)** — it uses **relative** `cwd` paths
    (`./backend`, `./frontend`), so PM2 must be started **from the repo root**
    (`/var/www/tu-properties`). Starting it from anywhere else resolves the
    wrong directories. A plain `pm2 restart properties-api-prod` keeps the
    originally resolved paths; use `pm2 restart ecosystem.config.js --update-env`
    from the repo root after changing the file.
 
-4. **`STORAGE_DIR` must be absolute and owned by the PM2 user**:
+5. **`STORAGE_DIR` must be absolute and owned by the PM2 user**:
 
    ```bash
    sudo mkdir -p /var/lib/tu-properties/uploads
    sudo chown -R $USER:$USER /var/lib/tu-properties/uploads
    ```
 
-5. **CORS is already locked down** — `backend/src/security/cors.ts` reads
+6. **CORS is already locked down** — `backend/src/security/cors.ts` reads
    `CORS_ORIGINS` and denies everything in production when the list is empty;
    it never falls back to `*`. Just make sure
    `CORS_ORIGINS="https://properties.tuhame.co.ke"` is set (section 3).
 
-6. **No Swagger** — the API does not mount `/api-docs` in any environment.
+7. **No Swagger** — the API does not mount `/api-docs` in any environment.
    Verify a live instance with `GET /` (returns `Hello World!`).
 
-7. **Frontend API URL has no fallback** — `frontend/lib/api.ts` falls back to
+8. **Frontend API URL has no fallback** — `frontend/lib/api.ts` falls back to
    `http://localhost:3003` when `NEXT_PUBLIC_BACKEND_URL` is unset. Always set
    it explicitly (section 3); the fallback never works in production.
 
-8. **Hand-maintained indexes** — `notifications_landlordId_readAt_idx` and
+9. **Hand-maintained indexes** — `notifications_landlordId_readAt_idx` and
    `utility_charges_no_double_bill_bulk` exist only as raw SQL in their own
    migrations; Prisma cannot express the partial predicate. A generated
    migration proposes DROPs for both — delete those two DROP statements before
@@ -440,7 +468,8 @@ PostgreSQL (5432) stays bound to localhost.
 4. Write production `backend/.env` and `frontend/.env` with nano (step 3)
 5. Create + chown the upload dir:
    `sudo mkdir -p /var/lib/tu-properties/uploads && sudo chown -R $USER:$USER /var/lib/tu-properties/uploads` (step 4.4)
-6. Backend: `cd backend && npm ci --include=dev && npm run db:generate && npm run build`,
+6. Backend:
+   `cd backend && npm ci --include=dev --legacy-peer-deps && npm run db:generate && npm run build`,
    then `npm run db:migrate` and `npm run db:seed` (step 2)
 7. Frontend: `cd frontend && npm ci --legacy-peer-deps && npm run build`
    (the production `.env` must already be in place — `NEXT_PUBLIC_*` is baked
@@ -504,17 +533,25 @@ PostgreSQL (5432) stays bound to localhost.
 bash /var/www/tu-properties/server_deploy_script.sh
 
 # or manually
-cd /var/www/tu-properties/backend && git pull && npm ci --include=dev && npm run db:generate && npm run build && npm run db:migrate && pm2 restart properties-api-prod
+cd /var/www/tu-properties/backend && git pull && npm ci --include=dev --legacy-peer-deps && npm run db:generate && npm run build && npm run db:migrate && pm2 restart properties-api-prod
 cd /var/www/tu-properties/frontend && git pull && npm ci --legacy-peer-deps && npm run build && pm2 restart properties-front-prod
 pm2 save
 ```
 
-> `server_deploy_script.sh` runs a plain `npm ci`. It therefore assumes the
-> deploy shell has `NODE_ENV` unset — with `NODE_ENV=production` exported, npm
-> omits the devDependencies and `nest build` fails. Run it as
-> `env -u NODE_ENV bash server_deploy_script.sh` (unset, not `development` —
-> the app process gets `NODE_ENV=production` from `ecosystem.config.js`, and a
-> plain `pm2 restart` keeps that stored env), or use the manual commands above.
+> **The backend install must use `--legacy-peer-deps`** (step 4.3). A plain
+> `npm ci` fails on the committed lockfile and — because npm validates the
+> lockfile before it wipes `node_modules` — leaves the *previous* `node_modules`
+> and its stale Prisma client in place. The build then fails with
+> `Property 'tenant' does not exist on type 'PrismaService'` for every model
+> added since that client was generated. If you see that error, the client is
+> stale: `rm -rf node_modules && npm ci --include=dev --legacy-peer-deps &&
+> npm run db:generate && npm run build`.
+
+> `server_deploy_script.sh` unsets `NODE_ENV` itself. With `NODE_ENV=production`
+> exported, npm omits the devDependencies (the `prisma` CLI and `nest` live
+> there) and `nest build` has nothing to build with. The app process still gets
+> `NODE_ENV=production` from `ecosystem.config.js`, and a plain
+> `pm2 restart` keeps that stored env.
 
 - **Always back up before migrating**:
   `pg_dump -U tu_properties tu-properies > backup_$(date +%F).sql`
