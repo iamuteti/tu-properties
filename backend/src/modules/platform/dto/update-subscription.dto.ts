@@ -42,6 +42,12 @@ export class UpdateSubscriptionDto {
   @IsIn(SUBSCRIPTION_PLANS)
   plan?: SubscriptionPlan;
 
+  /** The id of the plan row in `subscription_plans`, when the org is on a
+   * catalog plan. `null` clears it. */
+  @IsOptional()
+  @IsString()
+  planId?: string | null;
+
   /**
    * The relationship's state. Moving a tenant out of TRIALING/ACTIVE into
    * SUSPENDED or CANCELLED blocks their access (and needs a reason); moving

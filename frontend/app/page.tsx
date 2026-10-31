@@ -28,8 +28,12 @@ import { TrialModal } from '@/components/landing/TrialModal';
  */
 export default function LandingPage() {
   const [trialModalOpen, setTrialModalOpen] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(undefined);
+  const [selectedCurrency, setSelectedCurrency] = useState<string | undefined>(undefined);
 
-  const handleOpenTrial = () => {
+  const handleOpenTrial = (planId?: string, currency?: string) => {
+    setSelectedPlanId(planId);
+    setSelectedCurrency(currency);
     setTrialModalOpen(true);
   };
 
@@ -99,7 +103,7 @@ export default function LandingPage() {
 
       <Footer />
 
-      <TrialModal isOpen={trialModalOpen} onClose={handleCloseTrial} />
+      <TrialModal isOpen={trialModalOpen} onClose={handleCloseTrial} selectedPlan={selectedPlanId} selectedCurrency={selectedCurrency} />
     </div>
   );
 }

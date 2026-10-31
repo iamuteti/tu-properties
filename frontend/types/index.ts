@@ -225,7 +225,12 @@ export interface Organization {
      * Drives the dynamic sidebar: a NavItem shows only if its `module` key is in
      * this list (and the user's role allows it). SUPER_ADMIN sees all regardless.
      */
-    subscription?: { enabledModules: string[] } | null;
+    subscription?: {
+        id: string;
+        plan: string;
+        planRecord?: { id: string; name: string; enabledModules: string[] } | null;
+        enabledModules: string[];
+    } | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -4573,6 +4578,29 @@ export interface LandlordRoiReport {
 export type SubscriptionPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
 /**
+ * One row in the subscription plan catalog (Module 19 Phase D). Returned by
+ * `GET /platform/plans` and sent to `POST/PATCH /platform/plans`.
+ */
+export interface SubscriptionPlanRecord {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    prices: Record<string, number>;
+    enabledModules: string[];
+    interval: string;
+    maxUsers: number;
+    maxProperties: number;
+    features: string[];
+    isActive: boolean;
+    isPopular: boolean;
+    sortOrder: number;
+    createdAt: string;
+    updatedAt: string;
+    _count?: { subscriptions: number };
+}
+
+/**
  * The state of the relationship, which is not the same thing as the plan: a
  * tenant can be on a paid plan and still be suspended for non-payment.
  */
@@ -4593,6 +4621,7 @@ export interface PlatformOrganization {
     subscription?: {
         id: string;
         plan: string;
+        planRecord?: { id: string; name: string; enabledModules: string[] } | null;
         status: SubscriptionStatus;
         trialEndsAt?: string | null;
         renewsAt?: string | null;

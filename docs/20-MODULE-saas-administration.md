@@ -41,7 +41,7 @@ The original audit's two findings are resolved:
 | Piece | State | Evidence |
 |---|---|---|
 | `Organization` platform fields | ✅ present, inert | `slug`, `subdomain`, `customDomain`, `plan`, `maxUsers`, `maxProperties`, `isActive`, `logoUrl`, `primaryColor`, `contactEmail`, `contactPhone`, `legalName`, `taxId` in `schema.prisma`; `plan`/`maxUsers`/`maxProperties` only ever set in `demo-data.ts` |
-| `organizations.view/create/update/delete` permissions | ⚠️ no role holds any of them | `roles-seed.ts`: zero roles with an `organizations` module — issue 121 inverted |
+| `organizations.view/create/update/delete` permissions | ⚠️ no role holds any of them | `role-permissions.ts`: zero roles with an `organizations` module — issue 121 inverted |
 | `GET /organizations` as SUPER_ADMIN | ✅ platform-wide, all 2 | live: returns Rohi + Westhill; as a tenant admin it is 403 only because of the vacuous permission |
 | `POST /organizations/me` self-service profile | ✅ works, whitelisted | `organizations.service.updateProfile` — plan, limits, subdomain and custom domain stay platform-managed |
 | `Organization.isActive` suspending users | ✅ **enforced 2026-10-07** | Phase A: `validateUser` (login 403 + `LOGIN_REFUSED_SUSPENDED_ORG`) + `JwtStrategy.validate` (every request 401); SUPER_ADMIN exempt |

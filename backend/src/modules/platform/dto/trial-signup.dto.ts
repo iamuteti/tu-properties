@@ -11,11 +11,13 @@ import {
  * Public trial signup (Module 19) — what the marketing site's form may hand in.
  *
  * Deliberately narrower than `OnboardOrganizationDto`: a stranger on the internet
- * chooses no `plan`, no `subdomain`, no `trialDays`, and — critically — no `slug`.
+ * chooses no `subdomain`, no `trialDays`, and — critically — no `slug`.
  * The slug is derived server-side from the name (see `TrialSignupService`), because a
  * client-chosen slug is a squatting vector and a client-retried 409 loop is a
- * shape the API should not need. `plan` is always STARTER and the trial always 14
- * days; anything else is a sales conversation, not a form field.
+ * shape the API should not need.
+ *
+ * `planId` references a row in `subscription_plans` (the catalog). When provided,
+ * the organization starts on that plan; otherwise it defaults to `STARTER`.
  */
 export class TrialSignupDto {
   /** Public name shown in the dashboard and on printouts. */
@@ -47,4 +49,9 @@ export class TrialSignupDto {
   @IsOptional()
   @IsEmail()
   contactEmail?: string;
+
+  /** The id of the plan the visitor picked on the pricing page. */
+  @IsOptional()
+  @IsString()
+  planId?: string;
 }

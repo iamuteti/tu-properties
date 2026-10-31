@@ -52,7 +52,7 @@ See `01-DATABASE-SCHEMA.md`, domain(s): Identity & Organization
 
 ## Tasks Checklist
 - [x] Most auth/security hardening (CORS, JWT storage, password reset, MFA, rate limiting, AuditLog wiring) is covered in Module 0 Stabilization — done 2026-10-03, Module 0 is complete (see `01-MODULE-stabilization.md`); this module's remaining tasks assume it's done
-- [x] Audit existing Organization/User/Role models against `01-DATABASE-SCHEMA.md`; reconcile gaps → structured `Role`/`RoleAssignment` added (`schema.prisma` models `Role` with `permissions Json`, `RoleAssignment` on table `user_roles`); 12 system roles seeded via `backend/src/prisma/roles-seed.ts`
+- [x] Audit existing Organization/User/Role models against `01-DATABASE-SCHEMA.md`; reconcile gaps → structured `Role`/`RoleAssignment` added (`schema.prisma` models `Role` with `permissions Json`, `RoleAssignment` on table `user_roles`); 12 system roles seeded via `backend/src/prisma/role-permissions.ts`
 - [x] Confirm Branch/department support exists or add it → `BackendModule: branches` added (`Branch` model, tenant-scoped CRUD routes `GET/POST /branches`, `GET/PATCH/DELETE /branches/:id`)
 - [x] Build a real, structured permissions model (`Role.permissions Json` with granular per-module CRUD flags) — current roles appear to be name-based only, not enforced per-action → `PermissionsGuard` (`backend/src/security/guards/permissions.guard.ts`) + `@Permissions()` decorator + `PermissionsService`; legacy `UserRole` enum mapped to a fallback structured role
 - [x] Add login history tracking — every login now writes an audited `LOGIN` row (entity `User`, entityId = userId); MFA/SESSIONS_REVOKED/PASSWORD_RESET events audited too. `ipAddress`/`userAgent` captured on audit rows (`AuditInterceptor`); `GET /auth/login-history` and `GET /audit/user/:userId` expose them. (Login-history **UI** remains a frontend task, out of scope for this backend pass.)
@@ -82,7 +82,7 @@ it landed here rather than in the leasing module.
 
 ## Backend: NestJS Notes
 - Modules live at `backend/src/modules/{organizations,users,permissions,branches,documents}/` plus shared guards in `backend/src/security/guards/` (`permissions.guard.ts`) and the storage abstraction in `backend/src/modules/documents/storage/`.
-- Roles: seed the 12 standard roles from the master doc's role table (Super Admin, Company Admin, Property Manager, Leasing Officer, Sales Agent, Accountant, Maintenance Manager, Technician, Landlord, Tenant, Procurement Officer, HR Manager) — seeded via `src/prisma/roles-seed.ts` with `organizationId = null` (system roles).
+- Roles: seed the 12 standard roles from the master doc's role table (Super Admin, Company Admin, Property Manager, Leasing Officer, Sales Agent, Accountant, Maintenance Manager, Technician, Landlord, Tenant, Procurement Officer, HR Manager) — seeded via `src/prisma/role-permissions.ts` with `organizationId = null` (system roles).
 - Document storage: local filesystem driver is the default (`LocalStorage`, rooted at `<backend>/uploads`, path-traversal guarded). To use S3/MinIO, set `STORAGE_DRIVER=s3` and provide `S3_ENDPOINT/S3_REGION/S3_BUCKET/S3_ACCESS_KEY/S3_SECRET_KEY/S3_FORCE_PATH_STYLE`. The `@aws-sdk/client-s3` package is a declared dependency.
 
 ## Frontend: Next.js Notes

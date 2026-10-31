@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -46,11 +47,36 @@ export class TrialSignupService {
       const slug =
         attempt === 0 ? base : `${base}-${randomBytes(2).toString('hex')}`;
       try {
+        let planName: string = 'STARTER';
+        let planId: string | undefined;
+        if (dto.planId) {
+          const plan = await this.prisma.subscriptionPlan.findUnique({
+            where: { id: dto.planId },
+            select: { id: true, name: true },
+          });
+          if (plan) {
+            planName = plan.name;
+            planId = plan.id;
+          } else if (dto.planId === 'enterprise') {
+            // Enterprise is hardcoded on the landing page (not in the plan
+            // catalog), so it won't exist in `subscription_plans`. Allow it by
+            // name instead of rejecting the signup.
+            planName = 'ENTERPRISE';
+          } else {
+            throw new BadRequestException(
+              `Plan "${dto.planId}" does not exist`,
+            );
+          }
+        }
         const org = await this.platformService.onboard(
           {
             name: dto.name,
             slug,
-            plan: 'STARTER',
+            plan: planName as unknown as
+              | 'STARTER'
+              | 'PROFESSIONAL'
+              | 'ENTERPRISE',
+            planId,
             adminEmail: dto.adminEmail,
             adminFirstName: dto.adminFirstName,
             adminLastName: dto.adminLastName,

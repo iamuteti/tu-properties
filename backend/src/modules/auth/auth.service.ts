@@ -243,7 +243,7 @@ export class AuthService {
       where: { id: userId },
       include: {
         organization: {
-          include: { subscription: true },
+          include: { subscription: { include: { planRecord: true } } },
         },
       },
     });

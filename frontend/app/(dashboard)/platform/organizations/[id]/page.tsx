@@ -9,180 +9,12 @@ import {
     PlatformOrgUser,
     OrganizationUsage,
     SubscriptionPlan,
+    SubscriptionPlanRecord,
     SubscriptionStatus,
 } from "@/types";
 import { toast } from "sonner";
 
-/** Module keys organized by sidebar group, for the per-org toggle UI.
- *  Keys match `NavItem.module` in `components/layout/sidebar.tsx` and
- *  `Subscription.enabledModules` on the backend. Always-on items
- *  (Dashboard, Settings, Support) and Platform (SUPER_ADMIN only) are
- *  intentionally absent — they are not togglable.
- */
-const MODULE_GROUPS = [
-    {
-        label: 'Maintenance',
-        key: 'maintenance',
-        children: [
-            { key: 'maintenance/work-orders', label: 'Work orders' },
-            { key: 'maintenance/work-orders/board', label: 'Board' },
-            { key: 'maintenance/assets', label: 'Plant register' },
-            { key: 'maintenance/schedules', label: 'Service schedule' },
-        ],
-    },
-    {
-        label: 'Procurement',
-        key: 'procurement',
-        children: [
-            { key: 'procurement/purchase-requests', label: 'Purchase requests' },
-            { key: 'procurement/rfqs', label: 'Quotations' },
-            { key: 'procurement/purchase-orders', label: 'Purchase orders' },
-            { key: 'procurement/suppliers', label: 'Suppliers' },
-        ],
-    },
-    {
-        label: 'Inventory',
-        key: 'inventory',
-        children: [
-            { key: 'inventory/items', label: 'Items' },
-            { key: 'inventory/warehouses', label: 'Stores' },
-            { key: 'inventory/stock-movements', label: 'Stock ledger' },
-        ],
-    },
-    {
-        label: 'Landlords',
-        key: 'landlords',
-        children: [
-            { key: 'landlords', label: 'Owners' },
-            { key: 'landlords/statements', label: 'Owner statements' },
-            { key: 'landlords/payouts', label: 'Owner payouts' },
-        ],
-    },
-    {
-        label: 'Properties',
-        key: 'properties',
-        children: [
-            { key: 'properties', label: 'All Properties' },
-            { key: 'properties/units', label: 'All Units' },
-        ],
-    },
-    {
-        label: 'CRM',
-        key: 'crm',
-        children: [
-            { key: 'crm/leads', label: 'Leads & pipeline' },
-            { key: 'crm/contacts', label: 'Contacts' },
-        ],
-    },
-    {
-        label: 'Sales',
-        key: 'sales',
-        children: [
-            { key: 'sales', label: 'Sales pipeline' },
-            { key: 'sales/commissions', label: 'Commissions' },
-        ],
-    },
-    {
-        label: 'Tenants & Agreements',
-        key: 'tenants',
-        children: [
-            { key: 'tenants', label: 'Tenants' },
-            { key: 'agreements', label: 'Agreements' },
-            { key: 'tenant-requests', label: 'Tenant requests' },
-            { key: 'moving-out', label: 'Moving Out' },
-            { key: 'security-deposits', label: 'Security deposits' },
-        ],
-    },
-    {
-        label: 'Billing & Finance',
-        key: 'billing',
-        children: [
-            { key: 'invoices', label: 'Invoices' },
-            { key: 'payments', label: 'Payments' },
-            { key: 'arrears', label: 'Arrears' },
-            { key: 'payables', label: 'Payables' },
-            { key: 'finance/suppliers', label: 'Suppliers' },
-            { key: 'refunds', label: 'Refunds' },
-            { key: 'credits', label: 'Customer Credits' },
-            { key: 'receipts', label: 'Receipts' },
-            { key: 'rent-receipts', label: 'Rent Receipts' },
-            { key: 'chart-of-accounts', label: 'Chart of Accounts' },
-            { key: 'journal-entries', label: 'Journal Entries' },
-            { key: 'trial-balance', label: 'Trial Balance' },
-        ],
-    },
-    {
-        label: 'HR & Payroll',
-        key: 'hr',
-        children: [
-            { key: 'hr/employees', label: 'Employees' },
-            { key: 'hr/leave', label: 'Leave' },
-            { key: 'hr/payroll', label: 'Payroll runs' },
-            { key: 'hr/settings/payroll-rules', label: 'Statutory rules' },
-            { key: 'hr/me', label: 'My account' },
-        ],
-    },
-    {
-        label: 'Facilities',
-        key: 'facilities',
-        children: [
-            { key: 'facilities', label: 'Facility register' },
-            { key: 'facilities/bookings', label: 'Bookings' },
-            { key: 'facilities/visits', label: 'The gate book' },
-            { key: 'facilities/visitors', label: 'Visitors' },
-            { key: 'facilities/access-cards', label: 'Access cards' },
-        ],
-    },
-    {
-        label: 'Utilities',
-        key: 'utilities',
-        children: [
-            { key: 'utilities', label: 'Meter register' },
-            { key: 'utilities/readings', label: 'Readings' },
-            { key: 'utilities/tariffs', label: 'Tariffs' },
-            { key: 'utilities/billing', label: 'Billing' },
-        ],
-    },
-    {
-        label: 'Contracts',
-        key: 'contracts',
-        children: [
-            { key: 'contracts', label: 'Contract register' },
-            { key: 'contracts/expiry-report', label: 'Expiry report' },
-            { key: 'contracts/new', label: 'File a contract' },
-        ],
-    },
-    {
-        label: 'Reports',
-        key: 'reports',
-        children: [],
-    },
-    {
-        label: 'Users',
-        key: 'users',
-        children: [],
-    },
-    {
-        label: 'Branches',
-        key: 'branches',
-        children: [],
-    },
-    {
-        label: 'Documents',
-        key: 'documents',
-        children: [],
-    },
-    {
-        label: 'Notifications',
-        key: 'notifications',
-        children: [],
-    },
-    {
-        label: 'Approvals',
-        key: 'approvals',
-        children: [],
-    },
-] as const;
+import { MODULE_GROUPS } from "@/lib/module-groups";
 
 function UsageBar({ used, max }: { used: number; max: number }) {
     const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 100;
@@ -201,8 +33,6 @@ function UsageBar({ used, max }: { used: number; max: number }) {
 }
 
 /** The plan tiers the platform sells. `FREE` is the schema default, not a placeholder. */
-const PLANS: SubscriptionPlan[] = ['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'];
-
 const SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
     'TRIALING',
     'ACTIVE',
@@ -289,25 +119,47 @@ export default function PlatformOrganizationDetailPage() {
         maxProperties: 10,
     });
     const [subSaving, setSubSaving] = useState(false);
+    const [availablePlans, setAvailablePlans] = useState<SubscriptionPlanRecord[]>([]);
+    const [planModules, setPlanModules] = useState<string[]>([]);
+    const [initialEnabledModules, setInitialEnabledModules] = useState<string[]>([]);
 
     const load = useCallback(async () => {
         try {
-            const [orgRes, usageRes, usersRes, modulesRes] = await Promise.all([
-                platformApi.get(id),
-                platformApi.usage(id),
-                platformApi.users(id),
-                platformApi.getEnabledModules(id),
-            ]);
+            const [orgRes, usageRes, usersRes, modulesRes, plansRes] =
+                await Promise.all([
+                    platformApi.get(id),
+                    platformApi.usage(id),
+                    platformApi.users(id),
+                    platformApi.getEnabledModules(id),
+                    platformApi.plans(),
+                ]);
             setOrg(orgRes.data);
             setUsage(usageRes.data);
             setUsers(usersRes.data);
-            setEnabledModules(modulesRes.data);
+            const catalogPlans = plansRes.data;
+            setAvailablePlans(catalogPlans);
             // The subscription terms are edited in a form, so the form starts
             // from what is on the record — not from a blank that would quietly
             // propose wiping a trial date the operator never looked at.
             const sub = orgRes.data.subscription;
+            const orgPlan = sub?.plan ?? orgRes.data.plan;
+            // Prefer a catalog plan whose name matches the org's current plan.
+            const catalogPlan = catalogPlans.find((p) => p.name === orgPlan);
+            const planModuleList = (
+                catalogPlan?.enabledModules ?? sub?.planRecord?.enabledModules ?? []
+            ).slice();
+            setPlanModules(planModuleList);
+            // If the org has no explicit modules enabled, start from the plan
+            // baseline so the toggle grid reflects what the plan grants.
+            const orgEnabledModules = modulesRes.data;
+            const effectiveEnabledModules =
+                orgEnabledModules.length > 0
+                    ? orgEnabledModules
+                    : planModuleList;
+            setEnabledModules(effectiveEnabledModules);
+            setInitialEnabledModules(effectiveEnabledModules);
             setSubForm({
-                plan: (sub?.plan ?? orgRes.data.plan) as SubscriptionPlan,
+                plan: (catalogPlan?.name ?? orgPlan) as SubscriptionPlan,
                 status: sub?.status ?? "TRIALING",
                 trialEndsAt: calendarDay(sub?.trialEndsAt),
                 renewsAt: calendarDay(sub?.renewsAt),
@@ -315,8 +167,8 @@ export default function PlatformOrganizationDetailPage() {
                 maxUsers: orgRes.data.maxUsers ?? 3,
                 maxProperties: orgRes.data.maxProperties ?? 10,
             });
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Failed to load tenant");
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Failed to load tenant");
         } finally {
             setLoading(false);
         }
@@ -343,8 +195,8 @@ export default function PlatformOrganizationDetailPage() {
             else await platformApi.activate(id, reason);
             setReason("");
             load();
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Action failed");
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Action failed");
         }
     };
 
@@ -363,8 +215,8 @@ export default function PlatformOrganizationDetailPage() {
             // Reload as the tenant user: the bearer token now scopes every call.
             router.push("/dashboard");
             router.refresh();
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Impersonation failed");
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Impersonation failed");
         }
     };
 
@@ -381,12 +233,44 @@ export default function PlatformOrganizationDetailPage() {
         setError("");
         try {
             await platformApi.setEnabledModules(id, enabledModules);
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Failed to save modules");
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Failed to save modules");
         } finally {
             setModulesSaving(false);
         }
     };
+
+    /** Reset the org's enabled modules back to what its plan grants. */
+    const resetModules = async () => {
+        if (planModules.length === 0) return;
+        setModulesSaving(true);
+        setError("");
+        try {
+            await platformApi.setEnabledModules(id, planModules);
+            setEnabledModules(planModules);
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Failed to reset modules");
+        } finally {
+            setModulesSaving(false);
+        }
+    };
+
+  console.log('Plan modules: ', planModules);
+  console.log('Enabled modules: ', enabledModules);
+    /** True when the org's enabled modules differ from what was loaded
+     *  initially — i.e. the admin has made a change worth persisting. */
+    const modulesDiffer =
+        enabledModules.length !== initialEnabledModules.length ||
+        enabledModules.some((m) => !initialEnabledModules.includes(m));
+
+    /** True when the org's enabled modules differ from the plan baseline —
+     *  i.e. a reset would change something. */
+    const modulesDifferFromPlan =
+        enabledModules.length !== planModules.length ||
+        enabledModules.some((m) => !planModules.includes(m));
+
+    /** A module key that comes from the plan baseline — checked and read-only. */
+    const isPlanModule = (key: string) => planModules.includes(key);
 
     /**
      * Save the subscription terms.
@@ -431,25 +315,27 @@ export default function PlatformOrganizationDetailPage() {
 
     return (
         <div className="p-6 space-y-6">
-            <div>
+            <div className="flex justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">{org.name}</h1>
+                  <p className="text-sm text-muted-foreground">
+                      {org.slug} · Plan · {org.subscription?.plan ?? org.plan} ·{" "}
+                      {org.subscription ? (
+                          <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${STATUS_STYLES[org.subscription.status]}`}
+                          >
+                              {org.subscription.status}
+                          </span>
+                      ) : (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                              NO SUBSCRIPTION
+                          </span>
+                      )}
+                  </p>
+                </div>
                 <button onClick={() => router.push("/platform/organizations")} className="text-sm text-blue-600 hover:underline mb-2">
                     ← All tenants
                 </button>
-                <h1 className="text-2xl font-bold">{org.name}</h1>
-                <p className="text-sm text-muted-foreground">
-                    {org.slug} · plan {org.subscription?.plan ?? org.plan} ·{" "}
-                    {org.subscription ? (
-                        <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${STATUS_STYLES[org.subscription.status]}`}
-                        >
-                            {org.subscription.status}
-                        </span>
-                    ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
-                            NO SUBSCRIPTION
-                        </span>
-                    )}
-                </p>
             </div>
 
             {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
@@ -532,9 +418,9 @@ export default function PlatformOrganizationDetailPage() {
                             }
                             className="w-full px-3 py-2 border rounded-lg bg-background"
                         >
-                            {PLANS.map((p) => (
-                                <option key={p} value={p}>
-                                    {p}
+                            {availablePlans.map((p) => (
+                                <option key={p.id} value={p.name}>
+                                    {p.name}
                                 </option>
                             ))}
                         </select>
@@ -648,7 +534,7 @@ export default function PlatformOrganizationDetailPage() {
                 <h2 className="text-lg font-semibold mb-4">Manage modules</h2>
                 <p className="text-sm text-muted-foreground mb-4">
                     Toggle which modules are enabled for {org.name}. Disabled modules are
-                    hidden from that organization's sidebar. Changes are saved immediately.
+                    hidden from that organization&apos;s sidebar. Changes are saved immediately.
                 </p>
                 {modulesSaving ? (
                     <div className="text-sm text-muted-foreground">Saving...</div>
@@ -659,22 +545,44 @@ export default function PlatformOrganizationDetailPage() {
                                 <div className="flex items-center gap-2 mb-3">
                                     <input
                                         type="checkbox"
-                                        checked={enabledModules.includes(group.key)}
+                                        checked={isPlanModule(group.key) || enabledModules.includes(group.key)}
+                                        disabled={isPlanModule(group.key)}
                                         onChange={() => toggleModule(group.key)}
                                         className="rounded bg:text-blue-600"
                                     />
                                     <span className="font-semibold">{group.label}</span>
-                                    {group.key && enabledModules.includes(group.key) && (
-                                        <span className="ml-auto text-xs text-green-600">enabled</span>
-                                    )}
+                                    {isPlanModule(group.key) ? (
+                                        <span className="ml-auto text-xs text-blue-600">
+                                            plan
+                                        </span>
+                                    ) : enabledModules.includes(group.key) ? (
+                                        <span className="ml-auto text-xs text-green-600">
+                                            enabled
+                                        </span>
+                                    ) : null}
                                 </div>
                                 <div className="space-y-1 ml-4">
                                     {group.children.map((child) => (
-                                        <label key={child.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                                        <label
+                                            key={child.key}
+                                            className={`flex items-center gap-2 text-sm ${
+                                                isPlanModule(child.key)
+                                                    ? 'text-slate-500 dark:text-slate-400'
+                                                    : 'cursor-pointer'
+                                            }`}
+                                        >
                                             <input
                                                 type="checkbox"
-                                                checked={enabledModules.includes(child.key)}
-                                                onChange={() => toggleModule(child.key)}
+                                                checked={
+                                                    isPlanModule(child.key) ||
+                                                        enabledModules.includes(
+                                                            child.key
+                                                        )
+                                                }
+                                                disabled={isPlanModule(child.key)}
+                                                onChange={() =>
+                                                    toggleModule(child.key)
+                                                }
                                                 className="rounded bg:text-blue-600"
                                             />
                                             <span>{child.label}</span>
@@ -685,13 +593,24 @@ export default function PlatformOrganizationDetailPage() {
                         ))}
                     </div>
                 )}
-                <button
-                    onClick={saveModules}
-                    disabled={modulesSaving}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                    Save module changes
-                </button>
+                <div className="mt-4 flex flex-row gap-2">
+                    <button
+                        onClick={saveModules}
+                        disabled={modulesSaving || !modulesDiffer}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        Save module changes
+                    </button>
+                    {modulesDifferFromPlan && (
+                        <button
+                            onClick={resetModules}
+                            disabled={modulesSaving}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                        >
+                            Reset to plan modules
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="p-6 bg-card rounded-lg shadow">

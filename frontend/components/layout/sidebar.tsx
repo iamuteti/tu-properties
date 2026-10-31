@@ -97,305 +97,974 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'] },
-// There is no `/organizations` entry here on purpose. That page is the
-// tenant-style CRUD list (name, slug, subdomain) and it is a near-duplicate of
-// the platform list under Platform → Organizations, which is the one that
-// carries the subscription state, the module toggles and the suspend action.
-// Two sidebar items both called "Organizations", one of which showed no
-// subscription and no modules, is how a Super Admin ends up believing there is
-// nowhere to manage a tenant's plan. The platform surface is the only one.
-// Module 9 — Maintenance. The queue is where the work is; the register and the
-    // service calendar are what the queue is judged against, so a technician gets
-    // all three but a leasing officer only needs to see that the queue exists.
-    {
-        label: 'Maintenance',
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT", "USER"],
+  },
+  // There is no `/organizations` entry here on purpose. That page is the
+  // tenant-style CRUD list (name, slug, subdomain) and it is a near-duplicate of
+  // the platform list under Platform → Organizations, which is the one that
+  // carries the subscription state, the module toggles and the suspend action.
+  // Two sidebar items both called "Organizations", one of which showed no
+  // subscription and no modules, is how a Super Admin ends up believing there is
+  // nowhere to manage a tenant's plan. The platform surface is the only one.
+  // Module 9 — Maintenance. The queue is where the work is; the register and the
+  // service calendar are what the queue is judged against, so a technician gets
+  // all three but a leasing officer only needs to see that the queue exists.
+  {
+    label: "Maintenance",
+    icon: Wrench,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+      "LEASING_OFFICER",
+      "ACCOUNTANT",
+    ],
+    module: "maintenance",
+    children: [
+      {
+        href: "/maintenance/work-orders",
+        label: "Work orders",
         icon: Wrench,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'],
-        module: 'maintenance',
-        children: [
-            { href: '/maintenance/work-orders', label: 'Work orders', icon: Wrench, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'], module: 'maintenance/work-orders' },
-            { href: '/maintenance/work-orders/board', label: 'Board', icon: KanbanSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'], module: 'maintenance/work-orders/board' },
-            { href: '/maintenance/assets', label: 'Plant register', icon: Settings2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'], module: 'maintenance/assets' },
-            { href: '/maintenance/schedules', label: 'Service schedule', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'], module: 'maintenance/schedules' },
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "ACCOUNTANT",
         ],
-    },
-{
-        // Module 10 — Procurement. The three documents in the order they happen:
-        // a department asks, suppliers quote, the company commits. The supplier
-        // list sits with the buyers, though the *bills* those suppliers send stay
-        // in Finance — that split is deliberate, and it is why a procurement
-        // officer has no `payables` permission.
-        label: 'Procurement',
-        icon: ShoppingCart,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'],
-        module: 'procurement',
-        children: [
-            { href: '/procurement/purchase-requests', label: 'Purchase requests', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'], module: 'procurement/purchase-requests' },
-            { href: '/procurement/rfqs', label: 'Quotations', icon: FileStack, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'procurement/rfqs' },
-            { href: '/procurement/purchase-orders', label: 'Purchase orders', icon: Truck, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'procurement/purchase-orders' },
-            { href: '/procurement/suppliers', label: 'Suppliers', icon: Award, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER'], module: 'procurement/suppliers' },
+        module: "maintenance/work-orders",
+      },
+      {
+        href: "/maintenance/work-orders/board",
+        label: "Board",
+        icon: KanbanSquare,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
         ],
-    },
-    {
-        // Module 11 — Inventory. Sits next to Procurement because the two are two
-        // halves of one loop: an order commits to buy, the store holds what
-        // arrived. The roles mirror the backend's split exactly — a technician and
-        // an accountant can read the shelf and the ledger but write neither, and
-        // that is not an accident of the nav, it is `inventory-roles.ts`.
-        label: 'Inventory',
+        module: "maintenance/work-orders/board",
+      },
+      {
+        href: "/maintenance/assets",
+        label: "Plant register",
+        icon: Settings2,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+        ],
+        module: "maintenance/assets",
+      },
+      {
+        href: "/maintenance/schedules",
+        label: "Service schedule",
+        icon: CalendarClock,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+        ],
+        module: "maintenance/schedules",
+      },
+    ],
+  },
+  {
+    // Module 10 — Procurement. The three documents in the order they happen:
+    // a department asks, suppliers quote, the company commits. The supplier
+    // list sits with the buyers, though the *bills* those suppliers send stay
+    // in Finance — that split is deliberate, and it is why a procurement
+    // officer has no `payables` permission.
+    label: "Procurement",
+    icon: ShoppingCart,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "PROCUREMENT_OFFICER",
+      "ACCOUNTANT",
+      "MAINTENANCE_MANAGER",
+    ],
+    module: "procurement",
+    children: [
+      {
+        href: "/procurement/purchase-requests",
+        label: "Purchase requests",
+        icon: ClipboardList,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+        ],
+        module: "procurement/purchase-requests",
+      },
+      {
+        href: "/procurement/rfqs",
+        label: "Quotations",
+        icon: FileStack,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
+        ],
+        module: "procurement/rfqs",
+      },
+      {
+        href: "/procurement/purchase-orders",
+        label: "Purchase orders",
+        icon: Truck,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
+        ],
+        module: "procurement/purchase-orders",
+      },
+      {
+        href: "/procurement/suppliers",
+        label: "Suppliers",
+        icon: Award,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+        ],
+        module: "procurement/suppliers",
+      },
+    ],
+  },
+  {
+    // Module 11 — Inventory. Sits next to Procurement because the two are two
+    // halves of one loop: an order commits to buy, the store holds what
+    // arrived. The roles mirror the backend's split exactly — a technician and
+    // an accountant can read the shelf and the ledger but write neither, and
+    // that is not an accident of the nav, it is `inventory-roles.ts`.
+    label: "Inventory",
+    icon: Package,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+      "PROCUREMENT_OFFICER",
+      "ACCOUNTANT",
+    ],
+    module: "inventory",
+    children: [
+      {
+        href: "/inventory/items",
+        label: "Items",
         icon: Package,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'],
-        module: 'inventory',
-        children: [
-            { href: '/inventory/items', label: 'Items', icon: Package, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'inventory/items' },
-            { href: '/inventory/warehouses', label: 'Stores', icon: Warehouse, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'inventory/warehouses' },
-            { href: '/inventory/stock-movements', label: 'Stock ledger', icon: ArrowLeftRight, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'ACCOUNTANT'], module: 'inventory/stock-movements' },
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
         ],
-    },
-    {
-        label: 'Landlords',
+        module: "inventory/items",
+      },
+      {
+        href: "/inventory/warehouses",
+        label: "Stores",
+        icon: Warehouse,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
+        ],
+        module: "inventory/warehouses",
+      },
+      {
+        href: "/inventory/stock-movements",
+        label: "Stock ledger",
+        icon: ArrowLeftRight,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "PROCUREMENT_OFFICER",
+          "ACCOUNTANT",
+        ],
+        module: "inventory/stock-movements",
+      },
+    ],
+  },
+  {
+    label: "Landlords",
+    icon: Landmark,
+    roles: ["ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+    module: "landlords",
+    children: [
+      {
+        href: "/landlords",
+        label: "Owners",
         icon: Landmark,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
-        module: 'landlords',
-        children: [
-            { href: "/landlords", label: "Owners", icon: Landmark, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'landlords' },
-            { href: "/landlords/statements", label: "Owner statements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'landlords/statements' },
-            { href: "/landlords/payouts", label: "Owner payouts", icon: Banknote, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'landlords/payouts' },
-        ]
-    },
-    {
-        label: "Properties",
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+        module: "landlords",
+      },
+      {
+        href: "/landlords/statements",
+        label: "Owner statements",
+        icon: FileText,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+        module: "landlords/statements",
+      },
+      {
+        href: "/landlords/payouts",
+        label: "Owner payouts",
+        icon: Banknote,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+        module: "landlords/payouts",
+      },
+    ],
+  },
+  {
+    label: "Properties",
+    icon: Building2,
+    roles: ["ADMIN", "PROPERTY_MANAGER"],
+    module: "properties",
+    children: [
+      {
+        href: "/properties",
+        label: "All Properties",
         icon: Building2,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
-        module: 'properties',
-        children: [
-            { href: "/properties", label: "All Properties", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'properties' },
-            { href: "/units", label: "All Units", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'properties/units' },
-        ]
-    },
-    {
-        label: "CRM",
-        icon: Handshake,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
-        module: 'crm',
-        children: [
-            { href: "/crm/leads", label: "Leads & pipeline", icon: Kanban, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'crm/leads' },
-            { href: "/crm/contacts", label: "Contacts", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'crm/contacts' },
-        ]
-    },
-    {
-        label: "Sales",
-        icon: Handshake,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
-        module: 'sales',
-        children: [
-            { href: "/sales", label: "Sales pipeline", icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'sales' },
-            { href: "/sales/commissions", label: "Commissions", icon: HandCoins, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'sales/commissions' },
-        ]
-    },
-    {
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "properties",
+      },
+      {
+        href: "/units",
+        label: "All Units",
+        icon: Building2,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "properties/units",
+      },
+    ],
+  },
+  {
+    label: "CRM",
+    icon: Handshake,
+    roles: ["ADMIN", "PROPERTY_MANAGER"],
+    module: "crm",
+    children: [
+      {
+        href: "/crm/leads",
+        label: "Leads & pipeline",
+        icon: Kanban,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "crm/leads",
+      },
+      {
+        href: "/crm/contacts",
+        label: "Contacts",
+        icon: UserRound,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "crm/contacts",
+      },
+    ],
+  },
+  {
+    label: "Sales",
+    icon: Handshake,
+    roles: ["ADMIN", "PROPERTY_MANAGER"],
+    module: "sales",
+    children: [
+      {
+        href: "/sales",
+        label: "Sales pipeline",
+        icon: Building2,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "sales",
+      },
+      {
+        href: "/sales/commissions",
+        label: "Commissions",
+        icon: HandCoins,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "sales/commissions",
+      },
+    ],
+  },
+  {
+    label: "Tenants",
+    icon: Users,
+    roles: ["ADMIN", "PROPERTY_MANAGER"],
+    module: "tenants",
+    children: [
+      {
+        href: "/tenants",
         label: "Tenants",
         icon: Users,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'],
-        module: 'tenants',
-        children: [
-            { href: "/tenants", label: "Tenants", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
-            { href: "/terminal-tenants", label: "Terminal Tenants", icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'tenants' },
-            { href: "/tenant-requests", label: "Tenant Requests", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'tenant-requests' },
-            { href: "/security-deposits", label: "Security Deposits", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'security-deposits' },
-            { href: "/moving-out", label: "Move Out Processings", icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'moving-out' }
-        ]
-    },
-    // Module 5. A leasing officer is in this list because the role matrix says
-    // they may write leases: `agreements` is `viewWrite()` for them (view,
-    // create, update — not delete), and `AGREEMENT_WRITE_ROLES` on the
-    // controller names them too. The nav list and the API are the same list,
-    // because a role shown a nav item it cannot use — or given an API it is
-    // not shown — is the inconsistency this file's role lists exist to avoid.
-    { href: "/agreements", label: "Agreements", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'agreements' },
-    {
-        label: "Billing & Finance",
-        icon: CreditCard,
-        // A property manager is on this list for one reason: they are the
-        // person at the estate who receives the money, so they may capture it.
-        // Their child items are filtered by their own role lists, so what they
-        // see here is the capture and nothing else — the register, the chart of
-        // accounts and the journal stay with finance.
-        roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER'],
-        module: 'billing',
-        children: [
-            { href: "/finance/invoices", label: "Invoices", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'invoices' },
-            { href: "/finance/payments", label: "Payments", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'payments' },
-            { href: "/finance/arrears", label: "Arrears", icon: TrendingDown, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'arrears' },
-            { href: "/finance/payables", label: "Payables", icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'payables' },
-            { href: "/finance/suppliers", label: "Suppliers", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'finance/suppliers' },
-            { href: "/finance/refunds", label: "Refunds", icon: Undo2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'refunds' },
-            { href: "/finance/credits", label: "Customer Credits", icon: PiggyBank, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'credits' },
-            { href: "/finance/receipts", label: "Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'receipts' },
-            { href: "/finance/rent-receipts", label: "Rent Receipts", icon: CreditCard, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'rent-receipts' },
-            // Module 5/8. Money that arrives outside the system — a tenant at
-            // the office with an envelope of cash, a tenant who paid the owner
-            // directly — is captured by hand. It sits beside the receipts
-            // because it writes one.
-            { href: "/finance/capture-manually", label: "Capture Manually", icon: Banknote, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER'], module: 'receipts' },
-            { href: "/finance/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'chart-of-accounts' },
-            { href: "/finance/journal-entries", label: "Journal Entries", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'journal-entries' },
-            { href: "/finance/trial-balance", label: "Trial Balance", icon: Scale, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'], module: 'trial-balance' }
-        ]
-    },
-
-    /**
-     * Module 12. Every role list here is the backend's, copied rather than guessed —
-     * `HR_VIEW_ROLES`, `HR_APPROVER_ROLES` and `HR_PAYROLL_ROLES` in
-     * `backend/src/modules/hr/hr-roles.ts` — and they are deliberately **not** the
-     * same list:
-     *
-     * - the directory and the leave queue are readable by nine roles;
-     * - payroll runs and statutory rules by four, because `HR_PAYROLL_ROLES`
-     *   excludes the property manager: in a company that runs payroll properly the
-     *   person who approves the figures and the person who releases the money are
-     *   two people, and a nav that offered it to everybody would be a promise the
-     *   API refuses;
-     * - `/hr/me` to every staff login, since self-service is the whole point of the
-     *   `self` permission and an employee has no directory access at all.
-     */
-    {
-        label: 'HR & Payroll',
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "tenants",
+      },
+      {
+        href: "/terminal-tenants",
+        label: "Terminal Tenants",
         icon: UserRound,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'],
-        module: 'hr',
-        children: [
-            { href: '/hr/employees', label: 'Employees', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'], module: 'hr/employees' },
-            { href: '/hr/leave', label: 'Leave', icon: Calendar, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER'], module: 'hr/leave' },
-            { href: '/hr/payroll', label: 'Payroll runs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'], module: 'hr/payroll' },
-            { href: '/hr/settings/payroll-rules', label: 'Statutory rules', icon: Calculator, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'HR_MANAGER'], module: 'hr/settings/payroll-rules' },
-            { href: '/hr/me', label: 'My account', icon: UserRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'HR_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'EMPLOYEE'], module: 'hr/me' },
-        ],
-    },
-    /**
-     * Module 13. The register and the diary are broad — "is the clubhouse free on
-     * Saturday" is a question a leasing officer, an accountant and a technician all
-     * need answered, and none of them should have to ask a colleague.
-     *
-     * The two gate screens are the opposite, and the split is the design rather than
-     * an accident of the copy-paste: `visitors` and `access-cards` are for the roles
-     * whose actual job is being at the door, because the people in the visitor log
-     * did not choose to be recorded and have no other relationship with the company.
-     * A leasing officer and an accountant are both excluded. Note that a technician
-     * gets the visitor log but **not** the card register — they need to know whether
-     * the person who called about the boiler is expected, and should not be able to
-     * answer "does the caretaker have a key?" by issuing one.
-     *
-     * Every list here mirrors `FACILITIES_VIEW_ROLES` and `FACILITIES_DOOR_ROLES` in
-     * `backend/src/modules/facilities/facilities-roles.ts`, copied rather than guessed.
-     */
-    {
-        label: 'Facilities',
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "tenants",
+      },
+      {
+        href: "/tenant-requests",
+        label: "Tenant Requests",
+        icon: MessageSquare,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "LEASING_OFFICER"],
+        module: "tenant-requests",
+      },
+      {
+        href: "/security-deposits",
+        label: "Security Deposits",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "security-deposits",
+      },
+      {
+        href: "/moving-out",
+        label: "Move Out Processings",
         icon: DoorOpen,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'],
-        module: 'facilities',
-        children: [
-            { href: '/facilities', label: 'Facility register', icon: DoorOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'ACCOUNTANT'], module: 'facilities' },
-            { href: '/facilities/bookings', label: 'Bookings', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'LEASING_OFFICER', 'ACCOUNTANT'], module: 'facilities/bookings' },
-            { href: '/facilities/visits', label: 'The gate book', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'], module: 'facilities/visits' },
-            { href: '/facilities/visitors', label: 'Visitors', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'], module: 'facilities/visitors' },
-            { href: '/facilities/access-cards', label: 'Access cards', icon: KeyRound, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'MAINTENANCE_MANAGER'], module: 'facilities/access-cards' },
-        ],
-    },
-    /**
-     * Module 14 — Utilities.
-     *
-     * Every role list here mirrors one in
-     * `backend/src/modules/utilities/utilities-roles.ts`, copied rather than guessed,
-     * and the differences between the four screens are the module's permission design
-     * rather than an accident of navigation:
-     *
-     * - the register and the ledger are broad, because "how much water did this flat
-     *   use in June" is a question a leasing officer, an accountant and a technician
-     *   all need answered;
-     * - **tariffs are the narrowest screen**, held by exactly the roles that may write
-     *   one. An accountant can bill *from* a tariff and must not be able to change
-     *   what every resident owes.
-     */
-    {
-        label: 'Utilities',
-        icon: Gauge,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'],
-        module: 'utilities',
-        children: [
-            { href: '/utilities', label: 'Meter register', icon: Gauge, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'], module: 'utilities' },
-            { href: '/utilities/readings', label: 'Readings', icon: ClipboardList, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'HR_MANAGER'], module: 'utilities/readings' },
-            { href: '/utilities/tariffs', label: 'Tariffs', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER'], module: 'utilities/tariffs' },
-            { href: '/utilities/billing', label: 'Billing', icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'], module: 'utilities/billing' },
-            { href: '/utilities/billing', label: 'Billing', icon: Receipt, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'] },
-        ],
-    },
-    {
-        // Module 15 - Documents & Legal. `FileSignature` for the register and
-        // `CalendarClock` for the expiry report, because the report is a *calendar*
-        // problem - what ends, and when somebody has to decide - rather than another
-        // table of the same rows.
-        //
-        // Roles mirror `legal-roles.ts` exactly, and the asymmetry is the design:
-        // a lease officer and an accountant can both **read** the register, but
-        // Tariffs-style restriction means neither can file or renew anything. The
-        // renewal screen is hidden from the accountant even though the API lets them
-        // renew, because renewing is done from the contract's own detail page rather
-        // than from this list.
-        href: '/contracts',
-        label: 'Contracts',
-        icon: FileSignature,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'],
-        children: [
-            { href: '/contracts', label: 'Contract register', icon: FileSignature, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
-            { href: '/contracts/expiry-report', label: 'Expiry report', icon: CalendarClock, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN'] },
-            // Filing is narrower than reading: an accountant may read every obligation
-            // but may not manufacture one, and the Form button is hidden to match.
-            { href: '/contracts/new', label: 'File a contract', icon: PlusCircle, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'PROCUREMENT_OFFICER', 'MAINTENANCE_MANAGER'] },
-        ],
-    },
-    {
-        // Module 16. The role list is copied from `REPORTS_VIEW_ROLES` in
-        // `backend/src/modules/reports/reports-roles.ts` and must stay identical to it -
-        // the sidebar is only the first of two gates, and a role shown a nav item it
-        // cannot use is the exact parent/child inconsistency the UX standards call out.
-        //
-        // The four roles that are *absent* are absent on purpose: a leasing officer, a
-        // maintenance manager, a technician and a procurement officer each hold no report
-        // permission, because a report carries money across the whole organization. Their
-        // own figures are on the screens they already work in.
-        href: '/reports',
-        label: 'Reports',
-        icon: BarChart,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT'],
-        module: 'reports',
-    },
-    { href: "/users", label: "Users", icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'], module: 'users' },
-    {
-        // Module 19 Phase C — the platform owner's surface. Structurally
-        // separate from the tenant `/organizations` screen (which is the
-        // self-service view): these routes call `/platform/...` and only a
-        // SUPER_ADMIN ever sees them.
-        label: 'Platform',
-        icon: Shield,
-        roles: ['SUPER_ADMIN'],
-        children: [
-            { href: '/platform/organizations', label: 'Organizations', icon: Building, roles: ['SUPER_ADMIN'] },
-            { href: '/platform/subscriptions', label: 'Subscriptions', icon: CreditCard, roles: ['SUPER_ADMIN'] },
-            { href: '/platform/support-tickets', label: 'Support tickets', icon: MessageSquare, roles: ['SUPER_ADMIN'] },
-        ],
-    },
-    { href: "/support", label: "Support", icon: MessageSquare, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'LEASING_OFFICER', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'PROCUREMENT_OFFICER', 'HR_MANAGER'] },
-    { href: "/branches", label: "Branches", icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'], module: 'branches' },
-    { href: "/documents", label: "Documents", icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'USER'], module: 'documents' },
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "moving-out",
+      },
+    ],
+  },
+  // Module 5. A leasing officer is in this list because the role matrix says
+  // they may write leases: `agreements` is `viewWrite()` for them (view,
+  // create, update — not delete), and `AGREEMENT_WRITE_ROLES` on the
+  // controller names them too. The nav list and the API are the same list,
+  // because a role shown a nav item it cannot use — or given an API it is
+  // not shown — is the inconsistency this file's role lists exist to avoid.
+  {
+    href: "/agreements",
+    label: "Agreements",
+    icon: FileText,
+    roles: ["ADMIN", "PROPERTY_MANAGER", "LEASING_OFFICER"],
+    module: "agreements",
+  },
+  {
+    label: "Billing & Finance",
+    icon: CreditCard,
+    // A property manager is on this list for one reason: they are the
+    // person at the estate who receives the money, so they may capture it.
+    // Their child items are filtered by their own role lists, so what they
+    // see here is the capture and nothing else — the register, the chart of
+    // accounts and the journal stay with finance.
+    roles: ["ADMIN", "ACCOUNTANT", "PROPERTY_MANAGER"],
+    module: "billing",
+    children: [
+      {
+        href: "/finance/invoices",
+        label: "Invoices",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "invoices",
+      },
+      {
+        href: "/finance/payments",
+        label: "Payments",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "payments",
+      },
+      {
+        href: "/finance/arrears",
+        label: "Arrears",
+        icon: TrendingDown,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "arrears",
+      },
+      {
+        href: "/finance/payables",
+        label: "Payables",
+        icon: Receipt,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "payables",
+      },
+      {
+        href: "/finance/suppliers",
+        label: "Suppliers",
+        icon: Users,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "finance/suppliers",
+      },
+      {
+        href: "/finance/refunds",
+        label: "Refunds",
+        icon: Undo2,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "refunds",
+      },
+      {
+        href: "/finance/credits",
+        label: "Customer Credits",
+        icon: PiggyBank,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "credits",
+      },
+      {
+        href: "/finance/receipts",
+        label: "Receipts",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "receipts",
+      },
+      {
+        href: "/finance/rent-receipts",
+        label: "Rent Receipts",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "rent-receipts",
+      },
+      // Module 5/8. Money that arrives outside the system — a tenant at
+      // the office with an envelope of cash, a tenant who paid the owner
+      // directly — is captured by hand. It sits beside the receipts
+      // because it writes one.
+      {
+        href: "/finance/capture-manually",
+        label: "Capture Manually",
+        icon: Banknote,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT", "PROPERTY_MANAGER"],
+        module: "receipts",
+      },
+      {
+        href: "/finance/chart-of-accounts",
+        label: "Chart of Accounts",
+        icon: BookOpen,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "chart-of-accounts",
+      },
+      {
+        href: "/finance/journal-entries",
+        label: "Journal Entries",
+        icon: Scale,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "journal-entries",
+      },
+      {
+        href: "/finance/trial-balance",
+        label: "Trial Balance",
+        icon: Scale,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
+        module: "trial-balance",
+      },
+    ],
+  },
 
-{ href: "/notifications", label: "Notifications", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'notifications' },
-    { href: "/approvals", label: "Approvals", icon: CheckSquare, badge: 'approvals', roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'PROPERTY_MANAGER', 'LEASING_OFFICER'], module: 'approvals' },
-    { href: "/settings", label: "Settings", icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
-    { href: "/settings/tax", label: "Tax Settings", icon: Globe2, roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'] },
-    { href: "/settings/notifications", label: "Notification Settings", icon: Bell, roles: ['SUPER_ADMIN', 'ADMIN'] },
-    { href: "/settings/workflows", label: "Approval Workflows", icon: GitBranch, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  /**
+   * Module 12. Every role list here is the backend's, copied rather than guessed —
+   * `HR_VIEW_ROLES`, `HR_APPROVER_ROLES` and `HR_PAYROLL_ROLES` in
+   * `backend/src/modules/hr/hr-roles.ts` — and they are deliberately **not** the
+   * same list:
+   *
+   * - the directory and the leave queue are readable by nine roles;
+   * - payroll runs and statutory rules by four, because `HR_PAYROLL_ROLES`
+   *   excludes the property manager: in a company that runs payroll properly the
+   *   person who approves the figures and the person who releases the money are
+   *   two people, and a nav that offered it to everybody would be a promise the
+   *   API refuses;
+   * - `/hr/me` to every staff login, since self-service is the whole point of the
+   *   `self` permission and an employee has no directory access at all.
+   */
+  {
+    label: "HR & Payroll",
+    icon: UserRound,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "HR_MANAGER",
+      "ACCOUNTANT",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+      "LEASING_OFFICER",
+      "PROCUREMENT_OFFICER",
+      "EMPLOYEE",
+    ],
+    module: "hr",
+    children: [
+      {
+        href: "/hr/employees",
+        label: "Employees",
+        icon: Users,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "HR_MANAGER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+        ],
+        module: "hr/employees",
+      },
+      {
+        href: "/hr/leave",
+        label: "Leave",
+        icon: Calendar,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "HR_MANAGER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+        ],
+        module: "hr/leave",
+      },
+      {
+        href: "/hr/payroll",
+        label: "Payroll runs",
+        icon: Wallet,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT", "HR_MANAGER"],
+        module: "hr/payroll",
+      },
+      {
+        href: "/hr/settings/payroll-rules",
+        label: "Statutory rules",
+        icon: Calculator,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT", "HR_MANAGER"],
+        module: "hr/settings/payroll-rules",
+      },
+      {
+        href: "/hr/me",
+        label: "My account",
+        icon: UserRound,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "HR_MANAGER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+          "EMPLOYEE",
+        ],
+        module: "hr/me",
+      },
+    ],
+  },
+  /**
+   * Module 13. The register and the diary are broad — "is the clubhouse free on
+   * Saturday" is a question a leasing officer, an accountant and a technician all
+   * need answered, and none of them should have to ask a colleague.
+   *
+   * The two gate screens are the opposite, and the split is the design rather than
+   * an accident of the copy-paste: `visitors` and `access-cards` are for the roles
+   * whose actual job is being at the door, because the people in the visitor log
+   * did not choose to be recorded and have no other relationship with the company.
+   * A leasing officer and an accountant are both excluded. Note that a technician
+   * gets the visitor log but **not** the card register — they need to know whether
+   * the person who called about the boiler is expected, and should not be able to
+   * answer "does the caretaker have a key?" by issuing one.
+   *
+   * Every list here mirrors `FACILITIES_VIEW_ROLES` and `FACILITIES_DOOR_ROLES` in
+   * `backend/src/modules/facilities/facilities-roles.ts`, copied rather than guessed.
+   */
+  {
+    label: "Facilities",
+    icon: DoorOpen,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+      "LEASING_OFFICER",
+      "ACCOUNTANT",
+    ],
+    module: "facilities",
+    children: [
+      {
+        href: "/facilities",
+        label: "Facility register",
+        icon: DoorOpen,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "ACCOUNTANT",
+        ],
+        module: "facilities",
+      },
+      {
+        href: "/facilities/bookings",
+        label: "Bookings",
+        icon: CalendarClock,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "LEASING_OFFICER",
+          "ACCOUNTANT",
+        ],
+        module: "facilities/bookings",
+      },
+      {
+        href: "/facilities/visits",
+        label: "The gate book",
+        icon: ClipboardList,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+        ],
+        module: "facilities/visits",
+      },
+      {
+        href: "/facilities/visitors",
+        label: "Visitors",
+        icon: Users,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+        ],
+        module: "facilities/visitors",
+      },
+      {
+        href: "/facilities/access-cards",
+        label: "Access cards",
+        icon: KeyRound,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "MAINTENANCE_MANAGER",
+        ],
+        module: "facilities/access-cards",
+      },
+    ],
+  },
+  /**
+   * Module 14 — Utilities.
+   *
+   * Every role list here mirrors one in
+   * `backend/src/modules/utilities/utilities-roles.ts`, copied rather than guessed,
+   * and the differences between the four screens are the module's permission design
+   * rather than an accident of navigation:
+   *
+   * - the register and the ledger are broad, because "how much water did this flat
+   *   use in June" is a question a leasing officer, an accountant and a technician
+   *   all need answered;
+   * - **tariffs are the narrowest screen**, held by exactly the roles that may write
+   *   one. An accountant can bill *from* a tariff and must not be able to change
+   *   what every resident owes.
+   */
+  {
+    label: "Utilities",
+    icon: Gauge,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "ACCOUNTANT",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+      "LEASING_OFFICER",
+      "PROCUREMENT_OFFICER",
+      "HR_MANAGER",
+    ],
+    module: "utilities",
+    children: [
+      {
+        href: "/utilities",
+        label: "Meter register",
+        icon: Gauge,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+          "HR_MANAGER",
+        ],
+        module: "utilities",
+      },
+      {
+        href: "/utilities/readings",
+        label: "Readings",
+        icon: ClipboardList,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "ACCOUNTANT",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+          "HR_MANAGER",
+        ],
+        module: "utilities/readings",
+      },
+      {
+        href: "/utilities/tariffs",
+        label: "Tariffs",
+        icon: Wallet,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER"],
+        module: "utilities/tariffs",
+      },
+      {
+        href: "/utilities/billing",
+        label: "Billing",
+        icon: Receipt,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+        module: "utilities/billing",
+      },
+      {
+        href: "/utilities/billing",
+        label: "Billing",
+        icon: Receipt,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+      },
+    ],
+  },
+  {
+    // Module 15 - Documents & Legal. `FileSignature` for the register and
+    // `CalendarClock` for the expiry report, because the report is a *calendar*
+    // problem - what ends, and when somebody has to decide - rather than another
+    // table of the same rows.
+    //
+    // Roles mirror `legal-roles.ts` exactly, and the asymmetry is the design:
+    // a lease officer and an accountant can both **read** the register, but
+    // Tariffs-style restriction means neither can file or renew anything. The
+    // renewal screen is hidden from the accountant even though the API lets them
+    // renew, because renewing is done from the contract's own detail page rather
+    // than from this list.
+    href: "/contracts",
+    label: "Contracts",
+    icon: FileSignature,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "ACCOUNTANT",
+      "LEASING_OFFICER",
+      "PROCUREMENT_OFFICER",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+    ],
+    children: [
+      {
+        href: "/contracts",
+        label: "Contract register",
+        icon: FileSignature,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "ACCOUNTANT",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+        ],
+      },
+      {
+        href: "/contracts/expiry-report",
+        label: "Expiry report",
+        icon: CalendarClock,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "ACCOUNTANT",
+          "LEASING_OFFICER",
+          "PROCUREMENT_OFFICER",
+          "MAINTENANCE_MANAGER",
+          "TECHNICIAN",
+        ],
+      },
+      // Filing is narrower than reading: an accountant may read every obligation
+      // but may not manufacture one, and the Form button is hidden to match.
+      {
+        href: "/contracts/new",
+        label: "File a contract",
+        icon: PlusCircle,
+        roles: [
+          "SUPER_ADMIN",
+          "ADMIN",
+          "PROPERTY_MANAGER",
+          "PROCUREMENT_OFFICER",
+          "MAINTENANCE_MANAGER",
+        ],
+      },
+    ],
+  },
+  {
+    // Module 16. The role list is copied from `REPORTS_VIEW_ROLES` in
+    // `backend/src/modules/reports/reports-roles.ts` and must stay identical to it -
+    // the sidebar is only the first of two gates, and a role shown a nav item it
+    // cannot use is the exact parent/child inconsistency the UX standards call out.
+    //
+    // The four roles that are *absent* are absent on purpose: a leasing officer, a
+    // maintenance manager, a technician and a procurement officer each hold no report
+    // permission, because a report carries money across the whole organization. Their
+    // own figures are on the screens they already work in.
+    href: "/reports",
+    label: "Reports",
+    icon: BarChart,
+    roles: ["ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT"],
+    module: "reports",
+  },
+  {
+    href: "/users",
+    label: "Users",
+    icon: Users,
+    roles: ["SUPER_ADMIN", "ADMIN"],
+    module: "users",
+  },
+  {
+    // Module 19 Phase C — the platform owner's surface. Structurally
+    // separate from the tenant `/organizations` screen (which is the
+    // self-service view): these routes call `/platform/...` and only a
+    // SUPER_ADMIN ever sees them.
+    label: "Platform",
+    icon: Shield,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        href: "/platform/organizations",
+        label: "Organizations",
+        icon: Building,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        href: "/platform/plans",
+        label: "Plans",
+        icon: Banknote,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        href: "/platform/subscriptions",
+        label: "Subscriptions",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        href: "/platform/support-tickets",
+        label: "Support tickets",
+        icon: MessageSquare,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+  {
+    href: "/support",
+    label: "Support",
+    icon: MessageSquare,
+    roles: [
+      "ADMIN",
+      "PROPERTY_MANAGER",
+      "ACCOUNTANT",
+      "LEASING_OFFICER",
+      "MAINTENANCE_MANAGER",
+      "TECHNICIAN",
+      "PROCUREMENT_OFFICER",
+      "HR_MANAGER",
+    ],
+  },
+  {
+    href: "/branches",
+    label: "Branches",
+    icon: Building,
+    roles: ["ADMIN"],
+    module: "branches",
+  },
+  {
+    href: "/documents",
+    label: "Documents",
+    icon: FileText,
+    roles: ["ADMIN", "PROPERTY_MANAGER", "ACCOUNTANT", "USER"],
+    module: "documents",
+  },
+
+  {
+    href: "/notifications",
+    label: "Notifications",
+    icon: Bell,
+    roles: ["ADMIN", "ACCOUNTANT", "PROPERTY_MANAGER", "LEASING_OFFICER"],
+    module: "notifications",
+  },
+  {
+    href: "/approvals",
+    label: "Approvals",
+    icon: CheckSquare,
+    badge: "approvals",
+    roles: [
+      "ADMIN",
+      "ACCOUNTANT",
+      "PROPERTY_MANAGER",
+      "LEASING_OFFICER",
+    ],
+    module: "approvals",
+  },
+  {
+    href: "/settings",
+    label: "Settings",
+    icon: Settings,
+    roles: ["SUPER_ADMIN", "ADMIN"],
+  },
+  {
+    href: "/settings/tax",
+    label: "Tax Settings",
+    icon: Globe2,
+    roles: ["ADMIN", "ACCOUNTANT"],
+  },
+  {
+    href: "/settings/notifications",
+    label: "Notification Settings",
+    icon: Bell,
+    roles: ["SUPER_ADMIN", "ADMIN"],
+  },
+  {
+    href: "/settings/workflows",
+    label: "Approval Workflows",
+    icon: GitBranch,
+    roles: ["ADMIN"],
+  },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -418,7 +1087,7 @@ const roleLabels: Record<UserRole, string> = {
 
 export function Sidebar() {
     const pathname = usePathname();
-    const { user, isLoading, logout } = useAuth();
+    const { user, logout } = useAuth();
     const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
     const [collapsed, setCollapsed] = React.useState(false);
     // How many approvals are waiting on this person. Polled rather than pushed
@@ -428,8 +1097,16 @@ export function Sidebar() {
 
     // Module keys enabled for this user's organization (from Subscription.enabledModules).
     // SUPER_ADMIN has no organization and sees everything, so this is [] for them.
-    const enabledModules: string[] =
+    // When the org has no explicit modules enabled, fall back to the plan baseline
+    // (SubscriptionPlan.enabledModules) so new orgs show the plan's modules.
+    const enabledModulesFromOrg: string[] =
         user?.organization?.subscription?.enabledModules ?? [];
+    const planModules: string[] =
+        user?.organization?.subscription?.planRecord?.enabledModules ?? [];
+    const enabledModules: string[] =
+        enabledModulesFromOrg.length > 0
+            ? enabledModulesFromOrg
+            : planModules;
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
     React.useEffect(() => {

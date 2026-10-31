@@ -55,6 +55,13 @@ export class OnboardOrganizationDto {
   @IsIn(['STARTER', 'PROFESSIONAL', 'ENTERPRISE'])
   plan?: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
+  /** The id of the plan row in `subscription_plans`, when the org started on a
+   * catalog plan. Null for orgs created before plans existed, or for the
+   * hardcoded STARTER/FREE tiers that have no catalog row. */
+  @IsOptional()
+  @IsString()
+  planId?: string;
+
   /** The company administrator's login, created with the same transaction. */
   @IsEmail()
   adminEmail!: string;

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SimpleTable, SimpleTableColumn } from "@/components/ui/simple-table";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 
 export default function PlatformOrganizationsPage() {
     const { user, isLoading } = useAuth();
@@ -45,8 +46,8 @@ export default function PlatformOrganizationsPage() {
         try {
             const response = await platformApi.list();
             setOrgs(response.data);
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Failed to load organizations");
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Failed to load organizations");
         } finally {
             setLoading(false);
         }
@@ -60,21 +61,20 @@ export default function PlatformOrganizationsPage() {
             setShowForm(false);
             setFormData({ name: "", slug: "", plan: "STARTER", organizationType: "AGENCY", adminEmail: "", adminFirstName: "", adminLastName: "", adminPassword: "" });
             load();
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || "Failed to onboard organization");
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } }; message?: string }; setError(e.response?.data?.message || e.message || "Failed to onboard organization");
         }
     };
 
     const handleDelete = async (orgId: string) => {
-        if (!window.confirm("Delete this organization? This cannot be undone.")) return;
         setDeletingOrgId(orgId);
         try {
             await platformApi.remove(orgId);
             toast.success("Organization deleted");
             setConfirmDeleteOrgId(null);
             load();
-        } catch (err: any) {
-            toast.error(err.message || "Failed to delete organization");
+        } catch (err: unknown) {
+            const e = err as { message?: string }; toast.error(e.message || "Failed to delete organization");
         } finally {
             setDeletingOrgId(null);
         }
@@ -151,24 +151,6 @@ export default function PlatformOrganizationsPage() {
                             <Trash2 className="h-4 w-4" />
                             Delete
                         </Button>
-                    )}
-                    {confirmDeleteOrgId === org.id && (
-                        <div className="mt-2 flex items-center gap-2">
-                            <Button
-                                onClick={() => handleDelete(org.id)}
-                                variant="destructive"
-                                size="sm"
-                            >
-                                Confirm delete
-                            </Button>
-                            <Button
-                                onClick={() => setConfirmDeleteOrgId(null)}
-                                variant="outline"
-                                size="sm"
-                            >
-                                Cancel
-                            </Button>
-                        </div>
                     )}
                 </div>
             ),
@@ -257,6 +239,18 @@ export default function PlatformOrganizationsPage() {
                     emptyMessage="No organizations yet."
                 />
             </div>
+
+            <ConfirmDialog
+                isOpen={!!confirmDeleteOrgId}
+                onClose={() => setConfirmDeleteOrgId(null)}
+                onConfirm={() => {
+                    if (confirmDeleteOrgId) handleDelete(confirmDeleteOrgId);
+                }}
+                title="Delete organization"
+                message="Delete this organization? This cannot be undone."
+                confirmText="Delete"
+                tone="danger"
+            />
         </div>
     );
 }

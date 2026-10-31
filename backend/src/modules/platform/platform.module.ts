@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PlatformOrganizationsController } from './platform-organizations.controller';
+import { PlatformPlansController } from './platform-plans.controller';
+import { PublicPlansController } from './public-plans.controller';
 import { PlatformSignupController } from './platform-signup.controller';
 import { PlatformContactController } from './platform-contact.controller';
 import { PlatformImpersonationController } from './platform-impersonation.controller';
@@ -43,6 +45,8 @@ import { StorageModule } from '../documents/storage.module';
   ],
   controllers: [
     PlatformOrganizationsController,
+    PlatformPlansController,
+    PublicPlansController,
     PlatformSignupController,
     PlatformContactController,
     PlatformImpersonationController,

@@ -93,7 +93,7 @@ Migration `20261003145000_module3_crm` (applied; `migrate status` clean).
   communication create/list/delete, CSV export. Linking a tenant releases any previous link first, so the
   one-to-one rule holds.
 - **DTOs** with `class-validator` for every body; the global `ValidationPipe` (Module 2) strips undeclared fields.
-- **RBAC** — two new permission modules `crm_leads` / `crm_contacts` in `roles-seed.ts`, granted to Super
+- **RBAC** — two new permission modules `crm_leads` / `crm_contacts` in `role-permissions.ts`, granted to Super
   Admin (all), Company Admin, Property Manager, Leasing Officer (both full) and Sales Agent (leads full,
   contacts read/write). Conversion requires `crm_leads.update` **and** `crm_contacts.create`.
 

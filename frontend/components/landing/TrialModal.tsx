@@ -5,6 +5,8 @@ import { platformApi, authApi } from '@/lib/api';
 interface TrialModalProps {
   isOpen: boolean;
   onClose: () => void;
+  selectedPlan?: string;
+  selectedCurrency?: string;
 }
 
 interface SignupSuccess {
@@ -32,7 +34,7 @@ const labelClass =
  * every error path here surfaces the server's answer — a taken email points at
  * sign-in, a rate limit says to wait, validation names the field.
  */
-export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
+export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose, selectedPlan, selectedCurrency }) => {
   const [orgName, setOrgName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -46,8 +48,28 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
-  const [resending, setResending] = useState(false);
-  const [resendError, setResendError] = useState<string | null>(null);
+    const [resending, setResending] = useState(false);
+    const [resendError, setResendError] = useState<string | null>(null);
+    const [availablePlans, setAvailablePlans] = useState<{ id: string; name: string; description?: string; prices?: Record<string, number> }[]>([]);
+    const [chosenPlan, setChosenPlan] = useState<string | undefined>(selectedPlan);
+    const [effectiveCurrency, setEffectiveCurrency] = useState(selectedCurrency || 'USD');
+
+    // When no explicit currency is passed (clicked outside the pricing section),
+    // fall back to IP-based currency so a Kenyan visitor still sees KES.
+    useEffect(() => {
+        if (selectedCurrency) return;
+        (async () => {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                if (!res.ok) return;
+                const data = await res.json();
+                const country = String(data?.country_code || data?.country || '').toUpperCase();
+                setEffectiveCurrency(country === 'KE' ? 'KES' : 'USD');
+            } catch {
+                setEffectiveCurrency('USD');
+            }
+        })();
+    }, [selectedCurrency]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -57,9 +79,27 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
     return () => clearTimeout(timer);
   }, [error]);
 
-  if (!isOpen) return null;
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003'}/plans`);
+                if (res.ok) {
+                    const data: { id: string; name: string; description?: string; prices?: Record<string, number> }[] = await res.json();
+                    setAvailablePlans(Array.isArray(data) ? data.map((p) => ({ id: p.id, name: p.name, description: p.description, prices: p.prices })) : []);
+                }
+            } catch {
+                // ignore
+            }
+        })();
+    }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    useEffect(() => {
+        setChosenPlan(selectedPlan);
+    }, [selectedPlan]);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -76,6 +116,7 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
         adminFirstName: firstName.trim(),
         adminLastName: lastName.trim(),
         adminPassword: password,
+        planId: chosenPlan ?? undefined,
       });
       const data = res.data as SignupSuccess;
       if (data.emailVerificationRequired) {
@@ -151,7 +192,7 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 dark:bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#0A1020] border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#0A1020] border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
@@ -178,6 +219,33 @@ export const TrialModal: React.FC<TrialModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {availablePlans.length > 0 && (
+                <div>
+                  <label className={labelClass}>Plan</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availablePlans.map((p) => {
+                      const cur = effectiveCurrency;
+                      const amt = p.prices?.[cur] ?? p.prices?.USD ?? p.prices?.KES;
+                      const symbol = cur === 'USD' ? '$' : (cur === 'KES' ? 'KES ' : `${cur} `);
+                      const priceText = amt != null ? `${symbol}${Number(amt).toLocaleString()}` : 'Free';
+                      return (
+                        <button
+                          type="button"
+                          key={p.id}
+                          onClick={() => setChosenPlan(p.id)}
+                          className={`flex-1 min-w-[140px] text-left px-4 py-3 rounded-lg border-2 transition-all ${chosenPlan === p.id ? 'border-amber-400' : 'border-slate-200 dark:border-slate-800'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-sm">{p.name}</span>
+                            <span className="text-sm font-bold">{priceText}</span>
+                          </div>
+                          {p.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{p.description}</p>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className={labelClass} htmlFor="trial-org">
                   Organization / Agency Name

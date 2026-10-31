@@ -4,7 +4,7 @@ import {
   LEGACY_ROLE_TO_SYSTEM_ROLE,
   ModulePermissions,
   PermissionSet,
-} from '@/prisma/roles-seed';
+} from '@/prisma/role-permissions';
 
 /**
  * Structured RBAC resolver (Module 1: Core Platform).
@@ -143,7 +143,7 @@ export class PermissionsService {
       this.logger.warn(
         `UserRole.${legacyRole} maps to the system role "${mapped}", which does not ` +
           `exist. User ${userId} has been denied everything — check ` +
-          `LEGACY_ROLE_TO_SYSTEM_ROLE in roles-seed.ts, or assign them a role directly.`,
+          `LEGACY_ROLE_TO_SYSTEM_ROLE in role-permissions.ts, or assign them a role directly.`,
       );
       return { all: false, modules: {} };
     }
@@ -171,9 +171,13 @@ export class PermissionsService {
     for (const set of sets) {
       for (const [module, actions] of Object.entries(set.modules ?? {})) {
         const target = (modules[module] ??= {});
-        for (const [action, granted] of Object.entries(actions)) {
-          if (granted) {
-            target[action as keyof ModulePermissions] = true;
+        if (actions && typeof actions === 'object') {
+          for (const [action, granted] of Object.entries(
+            actions as Record<string, unknown>,
+          )) {
+            if (granted) {
+              target[action as keyof ModulePermissions] = true;
+            }
           }
         }
       }

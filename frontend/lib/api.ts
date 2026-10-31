@@ -42,6 +42,7 @@ import { AuthResponse, User, Property, Unit, Tenant, Agreement, Invoice, Payment
     TicketStatus,
     SubscriptionPlan,
     SubscriptionStatus,
+    SubscriptionPlanRecord,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
@@ -347,6 +348,7 @@ export const platformApi = {
         adminFirstName: string;
         adminLastName: string;
         adminPassword: string;
+        planId?: string;
     }) => api.post('/platform/signup', data),
 
     list: () =>
@@ -391,6 +393,44 @@ export const platformApi = {
             `/platform/organizations/${id}/subscription`,
             payload,
         ),
+
+    /** Subscription plan catalog (Module 19 Phase D — SUPER_ADMIN only). */
+    plans: () =>
+        api.get<SubscriptionPlanRecord[]>('/platform/plans'),
+    plan: (id: string) =>
+        api.get<SubscriptionPlanRecord>(`/platform/plans/${id}`),
+    createPlan: (payload: {
+        name: string;
+        slug?: string;
+        description?: string | null;
+        prices?: Record<string, number>;
+        enabledModules?: string[];
+        interval?: string;
+        maxUsers?: number;
+        maxProperties?: number;
+        features?: string[];
+        isActive?: boolean;
+        isPopular?: boolean;
+        sortOrder?: number;
+    }) =>
+        api.post<SubscriptionPlanRecord>('/platform/plans', payload),
+    updatePlan: (id: string, payload: Partial<{
+        name: string;
+        slug: string;
+        description: string | null;
+        prices: Record<string, number>;
+        enabledModules: string[];
+        interval: string;
+        maxUsers: number;
+        maxProperties: number;
+        features: string[];
+        isActive: boolean;
+        isPopular: boolean;
+        sortOrder: number;
+    }>) =>
+        api.patch<SubscriptionPlanRecord>(`/platform/plans/${id}`, payload),
+    deletePlan: (id: string) =>
+        api.delete<{ deleted: boolean }>(`/platform/plans/${id}`),
 
     usage: (id: string) =>
         api.get<OrganizationUsage>(`/platform/organizations/${id}/usage`),

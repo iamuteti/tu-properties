@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
 import { seedDemoData } from './demo-data';
-import { seedRoles } from './roles-seed';
+import { seedRoles } from './role-permissions';
 
 dotenv.config();
 

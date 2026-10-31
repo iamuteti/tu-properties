@@ -88,7 +88,7 @@ import {
   SETTLED_PAYMENT_METHODS,
   UNIT_TYPES,
 } from '@/common/contants';
-import { seedRoles } from './roles-seed';
+import { seedRoles } from './role-permissions';
 import { seedPayrollRules } from './payroll-rules-seed';
 import {
   computePayslip,
@@ -4490,7 +4490,9 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
       },
     ];
     for (const staff of maintenanceStaff) {
-      await prisma.user.create({ data: { passwordHash, emailVerified: true, ...staff } });
+      await prisma.user.create({
+        data: { passwordHash, emailVerified: true, ...staff },
+      });
     }
 
     // Structured role assignments for every staff login, so the role matrix is
@@ -8662,12 +8664,12 @@ async function generateMarketOrgData(
       email: `tenant@${market.slug}.${market.emailDomain}`,
       firstName: (portalTenant.otherNames ?? '').trim() || 'Tenant',
       lastName: portalTenant.surname,
-          passwordHash,
-          emailVerified: true,
-          role: UserRole.USER,
-          organizationId: market.organizationId,
-          portalTenantId: portalTenant.id,
-        },
+      passwordHash,
+      emailVerified: true,
+      role: UserRole.USER,
+      organizationId: market.organizationId,
+      portalTenantId: portalTenant.id,
+    },
   });
 
   console.log(

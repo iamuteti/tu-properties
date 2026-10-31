@@ -22,6 +22,8 @@ import {
   SuspendOrganizationDto,
 } from './dto/onboarding.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
+import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
+import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
 import { ImpersonateDto } from './dto/impersonate.dto';
 
 /** An impersonation session lasts 15 minutes — long enough to reproduce a
@@ -139,6 +141,7 @@ export class PlatformService {
             subscription: {
               create: {
                 plan: dto.plan ?? 'STARTER',
+                ...(dto.planId !== undefined ? { planId: dto.planId } : {}),
                 status: SubscriptionStatus.TRIALING,
                 trialEndsAt,
                 enabledModules: dto.enabledModules ?? [],
@@ -218,7 +221,9 @@ export class PlatformService {
     const org = await this.prisma.organization.findUnique({
       where: { id },
       include: {
-        subscription: true,
+        subscription: {
+          include: { planRecord: true },
+        },
         _count: { select: { users: true, properties: true, tenants: true } },
       },
     });
@@ -631,6 +636,7 @@ export class PlatformService {
         create: {
           organizationId: id,
           plan: dto.plan ?? org.plan,
+          ...(dto.planId !== undefined ? { planId: dto.planId } : {}),
           status: nextStatus,
           trialEndsAt: trialEndsAt ?? null,
           renewsAt: renewsAt ?? null,
@@ -639,6 +645,7 @@ export class PlatformService {
         },
         update: {
           ...(dto.plan !== undefined ? { plan: dto.plan } : {}),
+          ...(dto.planId !== undefined ? { planId: dto.planId } : {}),
           status: nextStatus,
           ...(trialEndsAt !== undefined ? { trialEndsAt } : {}),
           ...(renewsAt !== undefined ? { renewsAt } : {}),
@@ -858,5 +865,161 @@ export class PlatformService {
       actorId,
     });
     return { ended: true };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Subscription plan catalog (Module 19 Phase D)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Every plan in the catalog, newest / sort-order first. */
+  async findAllPlans() {
+    return this.prisma.subscriptionPlan.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /** One plan by id. 404s when unknown. */
+  async findPlan(id: string) {
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id },
+    });
+    if (!plan) throw new NotFoundException('Subscription plan not found');
+    return plan;
+  }
+
+  /** Create a plan. Slug defaults to a kebab-case of the name. */
+  async createPlan(dto: CreateSubscriptionPlanDto, actorId?: string) {
+    const slug = dto.slug ?? this.slugify(dto.name);
+
+    const existing = await this.prisma.subscriptionPlan.findUnique({
+      where: { slug },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `A plan with the slug "${slug}" already exists.`,
+      );
+    }
+
+    const plan = await this.prisma.subscriptionPlan.create({
+      data: {
+        name: dto.name,
+        slug,
+        description: dto.description ?? null,
+        prices: dto.prices ?? {},
+        enabledModules: dto.enabledModules ?? [],
+        interval: dto.interval ?? 'month',
+        maxUsers: dto.maxUsers ?? 3,
+        maxProperties: dto.maxProperties ?? 10,
+        features: dto.features ?? [],
+        isActive: dto.isActive ?? true,
+        isPopular: dto.isPopular ?? false,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+
+    await this.safeAudit({
+      action: 'SUBSCRIPTION_PLAN_CREATED',
+      entity: 'SubscriptionPlan',
+      entityId: plan.id,
+      details: `Plan "${plan.name}" (${plan.slug}) created`,
+      actorId,
+    });
+
+    return plan;
+  }
+
+  /** Replace plan fields. A plan can be archived (isActive = false) but not
+   * hard deleted while subscriptions reference it. */
+  async updatePlan(
+    id: string,
+    dto: UpdateSubscriptionPlanDto,
+    actorId?: string,
+  ) {
+    const plan = await this.findPlan(id); // 404 if unknown
+
+    const data: Record<string, unknown> = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.prices !== undefined) data.prices = dto.prices;
+    if (dto.enabledModules !== undefined)
+      data.enabledModules = dto.enabledModules;
+    if (dto.interval !== undefined) data.interval = dto.interval;
+    if (dto.maxUsers !== undefined) data.maxUsers = dto.maxUsers;
+    if (dto.maxProperties !== undefined) data.maxProperties = dto.maxProperties;
+    if (dto.features !== undefined) data.features = dto.features;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.isPopular !== undefined) data.isPopular = dto.isPopular;
+    if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
+
+    // Renaming changes the slug unless the caller sends one explicitly.
+    if (dto.name !== undefined && !dto.slug) {
+      data.slug = this.slugify(dto.name);
+    } else if (dto.slug !== undefined) {
+      data.slug = dto.slug;
+    }
+
+    if (data.slug && data.slug !== plan.slug) {
+      const taken = await this.prisma.subscriptionPlan.findUnique({
+        where: { slug: data.slug as string },
+      });
+      if (taken && taken.id !== id) {
+        throw new ConflictException(
+          `A plan with the slug "${data.slug as string}" already exists.`,
+        );
+      }
+    }
+
+    const updated = await this.prisma.subscriptionPlan.update({
+      where: { id },
+      data: data as Parameters<
+        typeof this.prisma.subscriptionPlan.update
+      >[0]['data'],
+    });
+
+    await this.safeAudit({
+      action: 'SUBSCRIPTION_PLAN_UPDATED',
+      entity: 'SubscriptionPlan',
+      entityId: updated.id,
+      details: `Plan "${updated.name}" (${updated.slug}) updated`,
+      actorId,
+    });
+
+    return updated;
+  }
+
+  /** Archive a plan. Refused while any subscription still references it. */
+  async deletePlan(id: string, actorId?: string) {
+    const plan = await this.findPlan(id); // 404 if unknown
+
+    const count = await this.prisma.subscription.count({
+      where: { planId: id },
+    });
+    if (count > 0) {
+      throw new BadRequestException(
+        `Cannot delete "${plan.name}": ${count} subscription${
+          count === 1 ? '' : 's'
+        } still reference it. Archive it instead (set isActive to false).`,
+      );
+    }
+
+    await this.prisma.subscriptionPlan.delete({ where: { id } });
+
+    await this.safeAudit({
+      action: 'SUBSCRIPTION_PLAN_DELETED',
+      entity: 'SubscriptionPlan',
+      entityId: id,
+      details: `Plan "${plan.name}" (${plan.slug}) deleted`,
+      actorId,
+    });
+
+    return { deleted: true };
+  }
+
+  private slugify(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 }

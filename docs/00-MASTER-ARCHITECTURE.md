@@ -173,7 +173,7 @@ the user's role allows it **and** the module key is present in the organization'
 
 34. ✅ **Public lead capture is now authenticated, not open.** `POST /crm/public/leads` is `@Public()` by necessity (a website form cannot hold a JWT), so it is guarded by `CrmWebhookGuard`: constant-time comparison of an `x-webhook-secret` header, **fails closed** when `CRM_WEBHOOK_SECRET` is unset, and takes the organization from `CRM_WEBHOOK_ORGANIZATION_ID` so the payload cannot target another tenant. Per-tenant secrets (an `Organization.crmWebhookSecret` column) are the follow-up if a multi-tenant deployment needs public capture.
 35. ✅ **`Tenant` and `Contact` are linked, not merged.** `Tenant.contactId` is unique + nullable + `SetNull`. Merging would put lease identity fields (`accountNumber`, `taxPin`) on every buyer/investor/lawyer row and would force a migration of the invoice/receipt/move-out FKs that reference `Tenant` with `onDelete: Restrict`. Reasoning is written up in `04-MODULE-crm.md`.
-36. New RBAC modules `crm_leads` / `crm_contacts` were added to `roles-seed.ts`. **Anything you add later that needs a module-level permission must also be added to `PERMISSION_MODULES` and to the role matrix, then re-seeded**, or the `PermissionsGuard` denies it with "Insufficient permissions" even for admins. Re-seed roles with `seedRoles(prisma)` rather than the full `npm run seed`, which wipes the database.
+36. New RBAC modules `crm_leads` / `crm_contacts` were added to `role-permissions.ts`. **Anything you add later that needs a module-level permission must also be added to `PERMISSION_MODULES` and to the role matrix, then re-seeded**, or the `PermissionsGuard` denies it with "Insufficient permissions" even for admins. Re-seed roles with `seedRoles(prisma)` rather than the full `npm run seed`, which wipes the database.
 37. Open: **no lead deduplication.** The same person can arrive from the website and from Facebook as two separate leads. A unique constraint on `(organizationId, email)` plus a merge flow is the fix.
 38. Open: **`CommunicationLog` is a record, not delivery.** Nothing is actually sent to a lead or contact — that is Module 18 (Notifications) plus the WhatsApp/e-mail integrations. The timeline is the log those will write to, so do not build a second message history when they land.
 39. Open: **no bulk import for leads/contacts.** `common/csv.ts` already parses and reports per row (used by properties and units); a lead spreadsheet paste is the same shape.
@@ -264,7 +264,7 @@ the user's role allows it **and** the module key is present in the organization'
     reported through the maintenance portal are the same record. `PAYMENT_PLAN` (issue 57) and
     `LEASE_AMENDMENT` are still `RECORDED_ONLY`.
 69. ✅ **Role permissions are not applied to existing databases by changing `roles-seed.ts`.** Re-running the full
-    demo seed would have wiped the demo data to grant three permission modules. `backend/src/prisma/seed-roles.ts`
+    demo seed would have wiped the demo data to grant three permission modules. `backend/src/prisma/seed-system-roles.ts`
     now runs `seedRoles()` alone against the configured datasource (the same `PrismaPg` adapter pattern
     `demo-data.ts` uses) — this is the "permission added to the seed but not the database" case from issue 36, and
     it is worth remembering that a permissions change is not live until it is seeded.

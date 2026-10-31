@@ -240,10 +240,12 @@ enum OrganizationType {
   OWNER
 }
 
-model Subscription {
+  model Subscription {
   id             String             @id @default(cuid())
   organizationId String             @unique
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId         String?             @unique
+  planRecord     SubscriptionPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
 
   /**
    * The plan tier the org is on. Kept as a plain string rather than a foreign key
@@ -6734,4 +6736,39 @@ model ContactInquiry {
 
   @@index([status, createdAt])
   @@map("contact_inquiries")
+}
+
+// ---------------------------------------------------------------------------
+// Subscription plans (Module 19) — the catalog the platform sells. SUPER_ADMIN
+// creates, edits and archives plans here; each organization's subscription then
+// references one plan. Fields on `Organization`/`Subscription` (plan, maxUsers,
+// maxProperties) are the per-org override of what the plan defaults to.
+// ---------------------------------------------------------------------------
+
+model SubscriptionPlan {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g. "Starter", "Professional", "Enterprise"
+  slug        String   @unique // e.g. "starter", "professional"
+  description String?  @db.Text
+
+  prices      Json     @default("{}") // map of ISO-4217 currency code -> price
+  enabledModules String[] @default([]) // module keys this plan grants
+  interval    String   @default("month") // "month" | "year"
+
+  maxUsers    Int      @default(3)
+  maxProperties Int    @default(10)
+
+  features    Json     @default("[]") // list of feature strings shown on the pricing card
+
+  isActive    Boolean  @default(true) // archived plans can't be newly assigned
+  isPopular   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+
+  subscriptions Subscription[] // reverse relation
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("subscription_plans")
 }
