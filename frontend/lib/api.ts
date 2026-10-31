@@ -161,7 +161,8 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !url?.includes('/auth/logout') &&
-      !url?.endsWith('/auth/profile')
+      !url?.endsWith('/auth/profile') &&
+      !url?.includes('/auth/verify-email')
     ) {
       window.dispatchEvent(new CustomEvent('unauthorized'));
       if (process.env.NODE_ENV !== 'production') {
@@ -205,6 +206,12 @@ export const authApi = {
     // Login / security history (self-scoped; org-wide history is on /audit)
     loginHistory: () =>
         api.get<LoginEvent[]>('/auth/login-history'),
+
+    // Email verification (Module 19 public trial signup).
+    resendVerification: (email: string) =>
+        api.post<{ message: string }>('/auth/resend-verification', { email }),
+    verifyEmail: (token: string) =>
+        api.get<{ message: string }>(`/auth/verify-email?token=${token}`),
 };
 
 // Users API (user management, Module 1: Core Platform)
@@ -334,6 +341,14 @@ export function restoreImpersonation() {
 }
 
 export const platformApi = {
+    signup: (data: {
+        name: string;
+        adminEmail: string;
+        adminFirstName: string;
+        adminLastName: string;
+        adminPassword: string;
+    }) => api.post('/platform/signup', data),
+
     list: () =>
         api.get<PlatformOrganization[]>('/platform/organizations'),
 

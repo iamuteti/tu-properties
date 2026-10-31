@@ -4324,6 +4324,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         lastName: 'Admin',
         phone: '+254700000002',
         passwordHash,
+        emailVerified: true,
         role: UserRole.ADMIN,
         organizationId: defaultOrg.id,
       },
@@ -4337,6 +4338,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         lastName: 'Manager',
         phone: '+254700000003',
         passwordHash,
+        emailVerified: true,
         role: UserRole.PROPERTY_MANAGER,
         organizationId: defaultOrg.id,
       },
@@ -4350,6 +4352,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         lastName: 'Accountant',
         phone: '+254700000004',
         passwordHash,
+        emailVerified: true,
         role: UserRole.ACCOUNTANT,
         organizationId: defaultOrg.id,
       },
@@ -4363,6 +4366,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         lastName: 'Admin',
         phone: '+254700000005',
         passwordHash,
+        emailVerified: true,
         role: UserRole.ADMIN,
         organizationId: rohiOrg.id,
       },
@@ -4382,6 +4386,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         lastName: 'Finance',
         phone: '+254700000006',
         passwordHash,
+        emailVerified: true,
         role: UserRole.ACCOUNTANT,
         organizationId: rohiOrg.id,
       },
@@ -4394,6 +4399,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         lastName: 'Operations',
         phone: '+254700000007',
         passwordHash,
+        emailVerified: true,
         role: UserRole.PROPERTY_MANAGER,
         organizationId: rohiOrg.id,
       },
@@ -4484,7 +4490,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
       },
     ];
     for (const staff of maintenanceStaff) {
-      await prisma.user.create({ data: { passwordHash, ...staff } });
+      await prisma.user.create({ data: { passwordHash, emailVerified: true, ...staff } });
     }
 
     // Structured role assignments for every staff login, so the role matrix is
@@ -4560,6 +4566,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
           lastName: 'Admin',
           phone: profileRandomPhone(getProfile(market.code)),
           passwordHash,
+          emailVerified: true,
           role: UserRole.ADMIN,
           organizationId: market.organizationId,
         },
@@ -4663,6 +4670,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
           firstName: (tenant.otherNames ?? '').trim() || 'Tenant',
           lastName: tenant.surname,
           passwordHash,
+          emailVerified: true,
           // A portal login is a resident: never a staff role.
           role: UserRole.USER,
           organizationId: org.id,
@@ -8654,11 +8662,12 @@ async function generateMarketOrgData(
       email: `tenant@${market.slug}.${market.emailDomain}`,
       firstName: (portalTenant.otherNames ?? '').trim() || 'Tenant',
       lastName: portalTenant.surname,
-      passwordHash,
-      role: UserRole.USER,
-      organizationId: market.organizationId,
-      portalTenantId: portalTenant.id,
-    },
+          passwordHash,
+          emailVerified: true,
+          role: UserRole.USER,
+          organizationId: market.organizationId,
+          portalTenantId: portalTenant.id,
+        },
   });
 
   console.log(

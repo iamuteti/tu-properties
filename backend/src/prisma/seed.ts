@@ -108,6 +108,7 @@ async function main() {
       lastName: 'Admin',
       phone: '+254700000001',
       passwordHash,
+      emailVerified: true,
       role: UserRole.SUPER_ADMIN,
     },
   });

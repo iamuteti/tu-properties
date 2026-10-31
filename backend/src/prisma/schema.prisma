@@ -367,6 +367,11 @@ model User {
   isActive       Boolean @default(true)
   emailVerified  Boolean @default(false)
 
+  // Email verification flow (Module 19 public trial signup). A fresh account
+  // cannot log in until the token sent to its address is confirmed.
+  verifyEmailToken   String? // hashed token for email verification
+  verifyEmailExpires DateTime?
+
   // Audit fields
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

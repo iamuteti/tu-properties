@@ -86,6 +86,18 @@ export class AuthService {
           'This organization has been suspended. Contact your administrator.',
         );
       }
+      // An unverified address may not log in: the confirmation link must be
+      // clicked first. This is a distinct fact from a wrong password, so it
+      // gets its own message rather than being collapsed into "invalid
+      // credentials" (which would hide the real fix from the user).
+      if (!user.emailVerified) {
+        this.logger.warn(
+          `Login refused for ${email}: email address not verified`,
+        );
+        throw new UnauthorizedException(
+          'Your email address has not been verified yet. Check your inbox for the confirmation link, or request a new one.',
+        );
+      }
       const { passwordHash, mfaSecret, ...result } = user;
       return result;
     }

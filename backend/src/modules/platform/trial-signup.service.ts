@@ -4,8 +4,10 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import { PrismaService } from '@/prisma/prisma.service';
 import { PlatformService, type OnboardConflictCause } from './platform.service';
 import { TrialSignupDto } from './dto/trial-signup.dto';
+import { EmailVerificationService } from '@/modules/auth/email-verification.service';
 
 export interface TrialSignupResult {
   organizationId: string;
@@ -14,6 +16,8 @@ export interface TrialSignupResult {
   adminEmail: string;
   plan: string;
   trialEndsAt: Date | null;
+  /** True when the account must confirm its email before it can log in. */
+  emailVerificationRequired: boolean;
 }
 
 /**
@@ -21,17 +25,17 @@ export interface TrialSignupResult {
  * surface, and therefore kept in its own service rather than as a branch of the
  * SUPER_ADMIN-only `PlatformService.onboard`.
  *
- * Two decisions live here. First, the slug is derived from the organization name,
- * not chosen: a caller-supplied slug is taken verbatim by `onboard()` (whose other
- * caller is a Super Admin choosing deliberately), while a public form handing out
- * slugs is how `acme` gets squatted before Acme Ltd arrives. Second, a slug clash
- * retries with a random suffix instead of asking the visitor to invent another
- * name — but an *email* clash is rethrown untouched, because that address already
- * owns an account and saying "pick another slug" would be the wrong answer.
+ * signup now creates the account unverified (`emailVerified = false`), mints a
+ * confirmation token, mails it, and reports `emailVerificationRequired` so the
+ * caller shows "check your inbox" instead of logging the visitor straight in.
  */
 @Injectable()
 export class TrialSignupService {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+    private readonly prisma: PrismaService,
+    private readonly emailVerification: EmailVerificationService,
+  ) {}
 
   async signup(dto: TrialSignupDto): Promise<TrialSignupResult> {
     const base = slugify(dto.name);
@@ -63,6 +67,24 @@ export class TrialSignupService {
             'Trial organization was created but could not be read back',
           );
         }
+        // The admin user was created inside the same transaction; read it back to
+        // bind the verification token to its row.
+        const admin = await this.prisma.user.findUnique({
+          where: { email: dto.adminEmail },
+          select: { id: true, emailVerified: true },
+        });
+        if (!admin) {
+          throw new InternalServerErrorException(
+            'Trial organization was created but its admin user could not be read back',
+          );
+        }
+        if (!admin.emailVerified) {
+          await this.emailVerification.initiateVerification(
+            admin.id,
+            dto.adminEmail,
+          );
+        }
+
         return {
           organizationId: org.id,
           name: org.name,
@@ -70,6 +92,7 @@ export class TrialSignupService {
           adminEmail: dto.adminEmail,
           plan: org.plan,
           trialEndsAt: org.subscription?.trialEndsAt ?? null,
+          emailVerificationRequired: !admin.emailVerified,
         };
       } catch (err) {
         // A slug clash retries with a fresh suffix; everything else — including
