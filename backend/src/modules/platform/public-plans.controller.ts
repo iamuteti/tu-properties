@@ -10,7 +10,7 @@ export class PublicPlansController {
   @Get()
   async findAll() {
     return this.prisma.subscriptionPlan.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isPublic: true },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
     });
   }

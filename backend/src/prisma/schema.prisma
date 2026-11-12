@@ -210,6 +210,10 @@ visitorVisits              VisitorVisit[]
   // Module 19 — support tickets raised by this tenant.
   supportTickets            SupportTicket[]
 
+  // Stripe
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6762,6 +6766,7 @@ model SubscriptionPlan {
 
   isActive    Boolean  @default(true) // archived plans can't be newly assigned
   isPopular   Boolean  @default(false)
+  isPublic    Boolean  @default(true)  // shown on public pricing page; custom/enterprise plans set false
   sortOrder   Int      @default(0)
 
   subscriptions Subscription[] // reverse relation

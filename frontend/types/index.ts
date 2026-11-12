@@ -4594,6 +4594,7 @@ export interface SubscriptionPlanRecord {
     features: string[];
     isActive: boolean;
     isPopular: boolean;
+    isPublic: boolean;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;

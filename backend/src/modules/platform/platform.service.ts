@@ -913,6 +913,7 @@ export class PlatformService {
         features: dto.features ?? [],
         isActive: dto.isActive ?? true,
         isPopular: dto.isPopular ?? false,
+        isPublic: dto.isPublic ?? true,
         sortOrder: dto.sortOrder ?? 0,
       },
     });
@@ -949,6 +950,7 @@ export class PlatformService {
     if (dto.features !== undefined) data.features = dto.features;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.isPopular !== undefined) data.isPopular = dto.isPopular;
+    if (dto.isPublic !== undefined) data.isPublic = dto.isPublic;
     if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
 
     // Renaming changes the slug unless the caller sends one explicitly.

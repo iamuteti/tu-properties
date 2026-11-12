@@ -3,7 +3,8 @@ import { PRICING_PLANS } from '../data/landingData';
 import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface PricingSectionProps {
-  onStartTrial: () => void;
+  onStartTrial: (plan?: string) => void;
+  onContactSales?: () => void;
 }
 
 type Currency = 'USD' | 'KES' | 'NGN' | 'ZAR';
@@ -88,6 +89,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
         {/* Pricing Cards Grid */}
         <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
           {PRICING_PLANS.map((plan, idx) => {
+            const isEnterprise = plan.name.toLowerCase() === 'enterprise';
             const planPricing = plan.pricing[currency];
             const price = billingCycle === 'annual' ? planPricing.annual : planPricing.monthly;
 
@@ -120,17 +122,32 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
                     {plan.description}
                   </p>
 
-                  <div className="mt-6 pt-6 border-t border-slate-800/80">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl sm:text-4xl font-extrabold text-white font-['Space_Grotesk']">
-                        {CURRENCY_SYMBOLS[currency]}
-                        {price.toLocaleString()}
-                      </span>
-                      <span className="text-xs text-slate-400 font-mono">
-                        /month {billingCycle === 'annual' && '(billed annually)'}
-                      </span>
+                  {!isEnterprise && (
+                    <div className="mt-6 pt-6 border-t border-slate-800/80">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-white font-['Space_Grotesk']">
+                          {CURRENCY_SYMBOLS[currency]}
+                          {price.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          /month {billingCycle === 'annual' && '(billed annually)'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {isEnterprise && (
+                    <div className="mt-6 pt-6 border-t border-slate-800/80">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider mb-3">
+                        <span>Custom Pricing</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-white font-['Space_Grotesk']">
+                          Contact Sales
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Feature Checkmarks */}
                   <div className="mt-8 space-y-3">
@@ -152,17 +169,31 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
 
                 {/* Bottom CTA */}
                 <div className="mt-8 pt-6 border-t border-slate-800">
-                  <button
-                    onClick={onStartTrial}
-                    className={`w-full py-3.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      plan.highlighted
-                        ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-500/25'
-                        : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
-                    }`}
-                  >
-                    <span>{plan.cta}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  {isEnterprise ? (
+                    <button
+                      onClick={() => onContactSales?.()}
+                      className={`w-full py-3.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        plan.highlighted
+                          ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-500/25'
+                          : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                      }`}
+                    >
+                      <span>Contact Sales</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onStartTrial(plan.name)}
+                      className={`w-full py-3.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        plan.highlighted
+                          ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-500/25'
+                          : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                      }`}
+                    >
+                      <span>{plan.cta}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <p className="mt-2 text-center text-[10px] text-slate-400 font-mono">
                     14-day free trial, no card required
                   </p>

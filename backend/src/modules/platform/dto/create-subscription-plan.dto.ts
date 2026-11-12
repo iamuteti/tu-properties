@@ -2,7 +2,6 @@ import {
   IsEnum,
   IsIn,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -85,6 +84,12 @@ export class CreateSubscriptionPlanDto {
   @IsOptional()
   @IsEnum([true, false])
   isPopular?: boolean;
+
+  /** Whether this plan is shown on the public pricing page. Custom/enterprise
+   * plans set this to false so only admins can see and assign them. */
+  @IsOptional()
+  @IsEnum([true, false])
+  isPublic?: boolean;
 
   /** Lower sorts first. */
   @IsOptional()
