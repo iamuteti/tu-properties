@@ -2,208 +2,208 @@
 
 ## Overview
 
-Integrate Stripe for collecting subscription payments on the Tu Properties platform. Trial signups remain free (no card required); paid plans (STARTER/PROFESSIONAL/ENTERPRISE) are charged via Stripe Checkout in the organization's currency (KES or USD). Kenya market additionally supports M-Pesa as a payment method via Stripe.
+Stripe collects subscription payments for paid plans. Trial signups stay free (no card); paid plans are charged via **Stripe Checkout** (hosted redirect) in the organization's currency (USD or KES). Kenya also supports **M-Pesa** via Stripe.
 
 ## Architecture
 
 ```
-Frontend           Backend (NestJS)            Stripe
--------            ------------              ------
-Checkout button -> POST /payments/checkout   <-- Create Checkout Session
-                  <-- redirect URL          --> redirect user to Stripe Checkout
-                  <-- Webhook POST          <-- Stripe sends events
-                  UPDATE subscription/org
+Frontend                      Backend (NestJS)                 Stripe
+--------                      ----------------                 ------
+"Subscribe / Upgrade"  ──►  POST /payments/checkout     ──►  create Checkout Session
+   (org detail page)          (ADMIN or SUPER_ADMIN)           (subscription mode)
+        │                            │
+        │  ◄── { url, sessionId }    │
+        ▼                            ▼
+  window.location = url  ──►  Stripe hosted Checkout page
+        │                            │
+        └──── pay ──────────────────►│
+                                     │  webhook: checkout.session.completed
+                                     │  POST /payments/webhooks/stripe ◄──
+                                     ▼
+                          mark Subscription ACTIVE + apply purchased plan
 ```
 
-Data flow:
-1. Super admin (or tenant on pricing page) clicks "Start trial/Upgrade to paid" on a plan.
-2. Frontend calls `POST /payments/checkout` with `planId` and `currency` (from `plan.prices`).
-3. Backend creates (or reuses) a Stripe `Customer` for the org, creates a Stripe `Checkout Session` in `subscription` mode with the plan's price for the selected currency, returns the checkout URL.
-4. Frontend redirects the browser to Stripe Checkout.
-5. Customer pays. Stripe fires `checkout.session.completed` webhook to `POST /webhooks/stripe`.
-6. Backend verifies the webhook signature, finds the org by `stripeCustomerId` or `client_reference_id`, marks the organization's subscription `ACTIVE` and records the plan/price.
-7. Stripe handles recurring billing automatically; `invoice.payment_succeeded` / `invoice.payment_failed` webhooks keep the subscription state in sync.
+## How the Stripe catalog is used (important)
 
-## Files to Create / Modify
+**The backend does not store Stripe `price_...` IDs.** At checkout it:
 
-### Backend (`backend/`)
+1. Reads the plan's `prices` map (e.g. `{ "USD": 49, "KES": 6500 }`) and the org's currency.
+2. Calls `stripe.prices.list({ currency, active: true, limit: 100 })`.
+3. Picks the price whose **`unit_amount` equals the plan price converted to minor units** (`×100` for USD/KES; `×1` for zero-decimal currencies like JPY/KRW) **and** whose **`recurring.interval` matches the plan's `interval`** (`month`/`year`).
 
-New module directory: `backend/src/modules/payments/`
+So the prices you create in the Stripe Dashboard are matched **automatically by amount + currency + billing cycle**. You do **not** copy/paste `price_...` IDs anywhere.
 
+**Consequence — the numbers must line up exactly:**
+- Plan `Starter` USD price = `49` ↔ Stripe price `$49.00` recurring **monthly**.
+- Plan `Starter` KES price = `6500` ↔ Stripe price `KES 6,500.00` recurring **monthly**.
+- If the plan interval is `year`, the Stripe price must also be **yearly**, or no match is found.
+
+If they don't match, checkout fails with `No Stripe price found for <CUR> <amount>/<interval>`.
+
+> Note: `prices.list` returns at most 100 prices per call. Keep the number of active prices per currency modest (or paginate) so the match isn't missed.
+
+## Files
+
+### Backend — `backend/src/modules/payments/`
 | File | Purpose |
 |------|---------|
-| `payments.module.ts` | Module wiring (PaymentsController, PaymentsService, StripeService) |
-| `payments.controller.ts` | `POST /payments/checkout` (create session), `POST /webhooks/stripe` (Stripe events, no auth), `GET /payments/customer-portal` (optional) |
-| `payments.service.ts` | Business logic: create/retrieve Stripe customer, create checkout session, process webhook events, update org subscription |
-| `stripe.service.ts` | Thin wrapper around the Stripe SDK (initialize with secret key) |
-| `dto/create-checkout-session.dto.ts` | Request body: `{ planId: string; currency: string }` |
-| `dto/webhook-event.dto.ts` | Typed webhook payload (optional) |
+| `payments.module.ts` | Wires controller + services |
+| `payments.controller.ts` | `POST /payments/checkout` (ADMIN/SUPER_ADMIN), `POST /payments/webhooks/stripe` (public, signature verified) |
+| `payments.service.ts` | Resolve plan → match Stripe price → create customer + session; process webhook events; upgrade org |
+| `stripe.service.ts` | Stripe SDK wrapper (client init, customer create/find, checkout session, webhook signature) |
+| `dto/create-checkout-session.dto.ts` | `{ planId, currency, organizationId?, successUrl?, cancelUrl? }` |
 
-Modified files:
+### Backend — modified
 | File | Change |
 |------|--------|
-| `backend/src/modules/platform/dto/onboarding.dto.ts` | Add optional `stripeCustomerId?: string` (for linking org to Stripe customer) |
-| `backend/src/modules/platform/dto/update-subscription.dto.ts` | Already has plan; ensure it can also accept `stripeSubscriptionId` if you want to store Stripe's subscription ID |
-| `backend/src/modules/platform/platform.service.ts` | Add methods to update org subscription status/plan after payment |
-| `backend/src/prisma/schema.prisma` | Add `stripeCustomerId?: string` and `stripeSubscriptionId?: string` to `Organization` (or `Subscription`) model |
-| `backend/.env` | `STRIPE_SECRET_KEY=sk_test_...`, `STRIPE_WEBHOOK_SECRET=whsec_...` |
+| `backend/src/prisma/schema.prisma` | `Organization.stripeCustomerId`, `Organization.stripeSubscriptionId`; `Subscription.planId` (no longer `@unique`), `@@index([planId])` |
+| `backend/src/main.ts` | `NestFactory.create(AppModule, { rawBody: true })` so the webhook can verify the Stripe signature |
+| `backend/src/app.module.ts` | Registers `PaymentsModule` |
+| `backend/.env` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
 
-### Frontend (`frontend/`)
-
+### Frontend
 | File | Purpose |
 |------|---------|
-| `frontend/lib/stripe.ts` | Load Stripe.js with `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
-| `frontend/components/payments/checkout-button.tsx` | Button that calls `POST /payments/checkout` and redirects to Stripe |
-| `frontend/app/(dashboard)/platform/organizations/[id]/page.tsx` | Add "Upgrade to paid plan" button linking to checkout |
-| `frontend/app/(dashboard)/platform/payments/success/page.tsx` | Success page after payment |
-| `frontend/app/(dashboard)/platform/payments/cancel/page.tsx` | Cancel page |
-| `frontend/.env` | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...` |
+| `frontend/lib/api.ts` | `platformApi.checkout({ planId, currency, organizationId?, successUrl?, cancelUrl? })` |
+| `frontend/app/(dashboard)/platform/organizations/[id]/page.tsx` | **"Subscribe / Upgrade"** button → calls checkout → `window.location = url` |
+| `frontend/types/index.ts` | `PlatformOrganization.currency`, `subscription.planId` |
 
-### Environment Variables
+> **No frontend Stripe SDK is required.** Checkout is a hosted redirect — the browser goes to Stripe's URL, so no `stripe` npm package and no `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` are needed. (Those are only needed if you switch to Stripe.js/Elements.)
+
+## Environment Variables
 
 **Backend (`backend/.env`):**
 ```
-STRIPE_SECRET_KEY=your-stripe-test-secret-key
-STRIPE_WEBHOOK_SECRET=your-stripe-webhook-signing-secret
+STRIPE_SECRET_KEY=sk_test_...        # from Stripe Dashboard → Developers → API keys
+STRIPE_WEBHOOK_SECRET=whsec_...      # from the webhook endpoint's signing secret
 ```
 
-**Frontend (`frontend/.env`):**
-```
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_XXXXXXXXXXXXXXXXXXXXXXXX
-```
+**Frontend:** none required for the redirect flow.
 
 ## Stripe Dashboard Configuration
 
-Follow these steps in the Stripe Dashboard (`https://dashboard.stripe.com`):
+Steps in the Stripe Dashboard (`https://dashboard.stripe.com`):
 
 ### 1. Switch to Test Mode
-- Toggle **Test mode** at the top-left of the Dashboard (switch to **Live mode** for production).
-- All steps below should be done in Test mode first, then repeated in Live mode.
+- Toggle **Test mode** (top-left). Do everything in test mode first, then repeat in Live mode.
 
 ### 2. Create API Keys
-- Go to **Developers → API keys**.
-- Copy **Publishable key** → set as `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` in `frontend/.env`.
-- Copy **Secret key** → set as `STRIPE_SECRET_KEY` in `backend/.env`.
-- Keys are prefixed `sk_test_...` / `pk_test_...` in test mode; `sk_live_...` / `pk_live_...` in live mode.
+- **Developers → API keys**.
+- Copy **Secret key** → `STRIPE_SECRET_KEY` in `backend/.env`.
+- (Publishable key not needed for redirect Checkout.)
+- Test keys start `sk_test_...`; live keys `sk_live_...`.
 
 ### 3. Create Products (one per plan tier)
-- Go to **Products → Add product**.
-- Create one product per tier:
-  - **Starter** — for small firms / individual landlords
-  - **Professional** — for growing property management companies
-  - **Enterprise** — do NOT create a fixed-price Enterprise product in Stripe. Enterprise is custom-priced per client; create a custom plan in the admin panel instead, then create a matching Stripe Product/Price on demand.
-- For each product, set:
-  - **Name**: e.g. "Starter Plan"
-  - **Description**: short blurb matching the plan
-  - **Pricing model**: Recurring (subscription)
-  - **Currency**: USD (then repeat for KES)
+- **Products → Add product**.
+- **Starter** — small firms / individual landlords.
+- **Professional** — growing property management companies.
+- **Enterprise** — do **not** create a fixed-price product. Enterprise is custom-priced per client: create a custom plan in the admin panel, then create a matching Stripe Product/Price on demand (deferred).
 
 ### 4. Create Prices (one per currency per product)
-- On each product page, click **Add price**.
-- Create two prices per product (USD and KES):
-  - **Starter**: $49 / month (USD), KES 6,500 / month (KES)
-  - **Professional**: $129 / month (USD), KES 17,000 / month (KES)
-  - **Enterprise**: custom — create price on demand with the negotiated amount
-- Set **Billing cycle**: Monthly
-- Copy each Price ID (starts with `price_...`) — you'll need these when creating checkout sessions.
+- On each product, **Add price**.
+- **Starter**: `$49.00` USD monthly, `KES 6,500.00` monthly.
+- **Professional**: `$129.00` USD monthly, `KES 17,000.00` monthly.
+- Set **Billing cycle** to match the plan's `interval` in the admin panel (monthly ↔ `month`).
+- These amounts must equal the plan's `prices` map exactly (see "How the Stripe catalog is used").
+- You do **not** need to copy the `price_...` IDs — the backend matches by amount.
 
 ### 5. Register Webhook Endpoint
-- Go to **Developers → Webhooks → Add endpoint**.
-- **Endpoint URL**: `https://api-properties.tuhame.co.ke/webhooks/stripe`
-- **Events to send**:
+- **Developers → Webhooks → Add endpoint**.
+- **Endpoint URL**: `https://api-properties.tuhame.co.ke/payments/webhooks/stripe`
+  (local dev: `http://localhost:3003/payments/webhooks/stripe` via ngrok)
+- **Events**:
   - `checkout.session.completed`
   - `invoice.payment_succeeded`
   - `invoice.payment_failed`
   - `customer.subscription.updated`
   - `customer.subscription.deleted` (optional)
-- Click **Add endpoint**.
-- Copy the **Signing secret** (starts with `whsec_...`) → set as `STRIPE_WEBHOOK_SECRET` in `backend/.env`.
-- **Test the webhook**: click **Send test webhook** → select `checkout.session.completed` → verify your backend returns 200.
+- Copy the **Signing secret** (`whsec_...`) → `STRIPE_WEBHOOK_SECRET` in `backend/.env`.
+- **Test**: **Send test webhook** → `checkout.session.completed` → backend returns `200 { received: true }`.
 
 ### 6. Enable Payment Methods
-- Go to **Settings → Payment methods**.
-- **Card**: ensure it is enabled (default).
-- **M-Pesa** (Kenya only): enable under **Mobile money** → M-Pesa. Required for KES transactions in Kenya.
-- Other methods (Apple Pay, Google Pay, etc.) can be enabled optionally.
+- **Settings → Payment methods**.
+- **Card**: enabled (default).
+- **M-Pesa** (Kenya): enable under **Mobile money** → M-Pesa (required for KES).
 
 ### 7. Billing Settings
-- Go to **Settings → Billing**.
-- Enable **Automatic collection** for unpaid invoices.
-- Set **Smart retries** on for failed payments (helps recover failed card payments).
+- **Settings → Billing**: enable **Automatic collection**; turn on **Smart retries**.
 
 ### 8. Test Cards
-Use these Stripe test card numbers in test mode:
 - `4242 4242 4242 4242` — succeeds
-- `4000 0000 0000 9995` — declines with insufficient funds
-- `4000 0000 0000 9987` — declines with lost card
-- Any future expiry date, any CVC
+- `4000 0000 0000 9995` — insufficient funds
+- `4000 0000 0000 9987` — lost card
+- Any future expiry, any CVC
 
 ### 9. Go Live
-- Switch Stripe Dashboard to **Live mode**.
-- Repeat steps 2–8 with live keys.
-- Replace test keys in `backend/.env` and `frontend/.env` with live keys.
-- Update the webhook endpoint URL if using a different production domain.
+- Switch to **Live mode**, repeat steps 2–8 with live keys, replace `backend/.env` values.
 
-## Database Schema Changes
+## Database Schema
 
-Add to `backend/src/prisma/schema.prisma`:
-
+`backend/src/prisma/schema.prisma`:
 ```prisma
 model Organization {
-  // ... existing fields ...
-  stripeCustomerId    String?   @unique
+  // ...
+  stripeCustomerId     String?  @unique
   stripeSubscriptionId String?  @unique
-  // ... rest of model ...
+}
+
+model Subscription {
+  // ...
+  planId     String?
+  planRecord SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  @@index([planId])
 }
 ```
 
-Then run:
+Apply:
 ```bash
 cd backend
 npx prisma db push --accept-data-loss
-npx prisma db generate
+npx prisma generate
 ```
 
 ## Checklist
 
 ### Backend
-- [ ] Install `stripe` npm package in `backend/`
-- [ ] Add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to `backend/.env`
-- [ ] Add `stripeCustomerId` and `stripeSubscriptionId` to Prisma schema (`Organization` or `Subscription` model)
-- [ ] Run `npx prisma db push --accept-data-loss` and `npx prisma db generate`
-- [ ] Create `backend/src/modules/payments/` module with controller, service, DTOs
-- [ ] Implement `POST /payments/checkout` — create Stripe customer (if missing), create checkout session in `subscription` mode with plan's price for the selected currency
-- [ ] Implement `POST /webhooks/stripe` — verify signature, handle `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.updated`
-- [ ] Update org subscription status to `ACTIVE` on successful payment
-- [ ] Add `STRIPE_SECRET_KEY` to backend lockfile install flags (`--legacy-peer-deps` already used)
-- [ ] Typecheck (`npx tsc --noEmit`) and lint (`npm run lint`) pass
+- [x] Install `stripe` npm package in `backend/`
+- [x] Add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to `backend/.env`
+- [x] Add `stripeCustomerId` / `stripeSubscriptionId` to `Organization`; `Subscription.planId` + index
+- [x] Run `npx prisma db push --accept-data-loss` and `npx prisma generate`
+- [x] Create `backend/src/modules/payments/` module (controller, service, stripe service, DTO)
+- [x] `POST /payments/checkout` — resolve org, match Stripe price (amount+currency+interval), create customer + subscription session, return URL
+- [x] `POST /payments/webhooks/stripe` — verify signature; handle `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.updated`
+- [x] Apply purchased plan on `checkout.session.completed` (upgrade `Subscription.plan`/`planId` + `Organization.plan`), set status ACTIVE
+- [x] `NestFactory.create(..., { rawBody: true })` for webhook signature verification (`req.rawBody`, `req.body` still parsed)
+- [x] Register `PaymentsModule` in `AppModule`
+- [x] Typecheck (`npx tsc --noEmit`) and lint pass
+- [x] Live check: JSON login 201, signed webhook 200, forged signature 400, malformed body 400
 
 ### Frontend
-- [ ] Install `stripe` npm package in `frontend/`
-- [ ] Add `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to `frontend/.env`
-- [ ] Create `frontend/lib/stripe.ts` — Stripe.js loader
-- [ ] Create `frontend/components/payments/checkout-button.tsx`
-- [ ] Wire checkout button into plan selection (landing page PricingSection and/or org detail page)
-- [ ] Create success and cancel pages
-- [ ] Typecheck (`npx tsc --noEmit`) passes
+- [x] `platformApi.checkout()` in `lib/api.ts`
+- [x] "Subscribe / Upgrade" button on org detail page (calls checkout, redirects to Stripe)
+- [x] `PlatformOrganization.currency` + `subscription.planId` types
+- [x] Typecheck (`npx tsc --noEmit`) and lint pass
+- [ ] (Optional) Dedicated success/cancel pages — currently handled via `?checkout=success|cancelled` query params on the org page
+- [x] No Stripe SDK / publishable key required (hosted redirect)
 
-### Operations
-- [ ] Create Stripe Products for each plan (STARTER, PROFESSIONAL, ENTERPRISE) in Stripe Dashboard
-- [ ] Create Stripe Prices for each product in USD and KES
-- [ ] Register webhook endpoint: `https://api-properties.tuhame.co.ke/webhooks/stripe` (events: `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.updated`)
-- [ ] Enable M-Pesa payment method in Stripe Dashboard (for KES/Kenya)
-- [ ] Test with Stripe test cards (4242 4242 4242 4242 etc.) and test mode
-- [ ] Switch to live keys (`sk_live_`, `pk_live_`) for production
+### Operations (Stripe Dashboard)
+- [x] Products created: Starter, Professional
+- [x] Prices created: USD + KES for each (amounts must equal plan `prices`)
+- [ ] Register webhook endpoint: `https://api-properties.tuhame.co.ke/payments/webhooks/stripe` (events above)
+- [ ] Enable M-Pesa (Kenya, KES)
+- [ ] Test with Stripe test cards in test mode
+- [ ] Switch to live keys for production
 
 ### Verification
-- [ ] Guest can select a paid plan and is redirected to Stripe Checkout
-- [ ] Webhook receives `checkout.session.completed` and marks org subscription `ACTIVE`
-- [ ] Recurring invoice succeeds/fails and webhook updates subscription state
-- [ ] M-Pesa payment works for KES (Kenya test)
-- [ ] Frontend redirects to success page after payment
+- [ ] Org page "Subscribe / Upgrade" redirects to Stripe Checkout with the correct amount
+- [ ] `checkout.session.completed` webhook marks the org `ACTIVE` on the purchased plan
+- [ ] Recurring `invoice.payment_succeeded` / `invoice.payment_failed` update subscription state
+- [ ] M-Pesa works for KES (Kenya test)
+- [ ] Plan amount in admin == Stripe price amount (else checkout errors clearly)
 
 ## Notes
 
-- The existing `Organization.plan` field holds the tier string (`STARTER`, `PROFESSIONAL`, `ENTERPRISE`). Stripe's `Price` object is keyed by currency — lookup the plan's `prices[currency]` amount when creating the checkout session.
-- Stripe Checkout in `subscription` mode creates a Stripe Subscription automatically; store its ID in `stripeSubscriptionId` so you can cancel/update it later from your admin panel.
-- Do not log or expose Stripe secret keys in frontend code or logs.
+- `Organization.plan` holds the tier string; the plan's `prices` map + Stripe price must agree on amount and billing cycle.
+- `Subscription.planId` links to `SubscriptionPlan` (multiple orgs can share a plan; the FK is not unique).
+- Never log or expose Stripe secret keys.
+- Enterprise custom pricing (inline `price_data`) is deferred; when implemented it will bypass the amount-match lookup.

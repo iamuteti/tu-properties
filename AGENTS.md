@@ -36,6 +36,18 @@ npm run dev
 - Session lifetime is 1 hour in both modes (the `Session` row's `expiresAt` is what the JWT strategy checks), so
   either way the user signs in again hourly.
 
+## Request bodies (`rawBody`)
+- The Stripe webhook verifies its signature over the untouched request bytes, and those come from Nest's own
+  parser: `NestFactory.create(AppModule, { rawBody: true })` in `backend/src/main.ts`. `req.body` stays a parsed
+  object, and the raw payload is copied to `req.rawBody`.
+- **Do not add `app.use(express.raw({ type: 'application/json' }))` (or any other `bodyParser` middleware) in
+  `main.ts`.** `app.use` registers ahead of the parser middleware that `app.listen()` installs, so a global raw
+  parser consumes the stream first and leaves `req.body` as a `Buffer` for *every* JSON request: every `@Body()`
+  DTO then sees `undefined` fields, and `POST /auth/login` dies inside Prisma as `where: { email: undefined }`
+  (a 500 with a stack trace) — this is exactly what broke every write endpoint on 2026-11-12.
+- `backend/src/main.bootstrap.spec.ts` fails the build if a global raw parser returns or the `rawBody` option is
+  dropped, and the webhook itself answers 400 for a missing/forged signature and 500 if `req.rawBody` is absent.
+
 ## Database
 - Connection: `postgresql://postgres:admin@localhost:5432/tu-properies?schema=public` (see `backend/.env`).
 - **Prisma 7 does not generate the client on install** — `@prisma/client` has no `postinstall` hook and

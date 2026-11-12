@@ -2,6 +2,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -62,6 +63,10 @@ export class UpdateSubscriptionPlanDto {
   @IsOptional()
   @IsString({ each: true })
   features?: string[];
+
+  @IsOptional()
+  @IsObject()
+  stripePrices?: Record<string, string>;
 
   @IsOptional()
   @IsEnum([true, false])

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PERMISSION_MODULES } from '@/prisma/roles-seed';
+import { PERMISSION_MODULES } from '@/prisma/role-permissions';
 
 /**
  * The permission vocabulary, checked against the code that uses it.

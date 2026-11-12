@@ -4587,6 +4587,7 @@ export interface SubscriptionPlanRecord {
     slug: string;
     description: string | null;
     prices: Record<string, number>;
+    stripePrices: Record<string, string>;
     enabledModules: string[];
     interval: string;
     maxUsers: number;
@@ -4614,6 +4615,7 @@ export interface PlatformOrganization {
     subdomain?: string | null;
     isActive: boolean;
     plan: string;
+    currency: string;
     maxUsers: number;
     maxProperties: number;
     contactEmail?: string | null;
@@ -4622,6 +4624,7 @@ export interface PlatformOrganization {
     subscription?: {
         id: string;
         plan: string;
+        planId?: string | null;
         planRecord?: { id: string; name: string; enabledModules: string[] } | null;
         status: SubscriptionStatus;
         trialEndsAt?: string | null;

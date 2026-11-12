@@ -906,6 +906,7 @@ export class PlatformService {
         slug,
         description: dto.description ?? null,
         prices: dto.prices ?? {},
+        stripePrices: dto.stripePrices ?? {},
         enabledModules: dto.enabledModules ?? [],
         interval: dto.interval ?? 'month',
         maxUsers: dto.maxUsers ?? 3,
@@ -942,6 +943,7 @@ export class PlatformService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.prices !== undefined) data.prices = dto.prices;
+    if (dto.stripePrices !== undefined) data.stripePrices = dto.stripePrices;
     if (dto.enabledModules !== undefined)
       data.enabledModules = dto.enabledModules;
     if (dto.interval !== undefined) data.interval = dto.interval;

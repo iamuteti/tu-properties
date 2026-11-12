@@ -5,7 +5,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import * as express from 'express';
 import { CorsAllowlistService } from './security/cors.service';
 
 dotenv.config();
@@ -27,12 +26,16 @@ async function bootstrap() {
     console.error('Failed to create uploads directory:', err);
   }
 
-  const app = await NestFactory.create(AppModule);
-
-  // Raw-body middleware for Stripe webhook signature verification.
-  // Must run before NestJS's JSON body parser so the raw body is available
-  // as req.rawBody for signature verification.
-  app.use(express.raw({ type: 'application/json' }));
+  // `rawBody: true` asks Nest's own JSON/urlencoded parsers to keep the
+  // untouched bytes on `req.rawBody`, which the Stripe webhook needs for
+  // signature verification (`POST /payments/webhooks/stripe`).
+  //
+  // Do NOT replace this with `app.use(express.raw({ type: 'application/json' }))`:
+  // `app.use` registers ahead of the parser middleware that `app.listen()`
+  // installs, so a global raw parser reads the stream first and leaves
+  // `req.body` as a Buffer for every JSON request — every `@Body()` DTO then
+  // sees `undefined` fields (this is what broke `POST /auth/login`).
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Parse request cookies so the JWT strategy can read the httpOnly auth cookie.
   app.use(cookieParser());

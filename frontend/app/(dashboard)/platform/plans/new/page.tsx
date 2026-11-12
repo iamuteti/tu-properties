@@ -12,6 +12,7 @@ export default function NewPlanPage() {
     const router = useRouter();
     const [form, setForm] = useState({
         name: "", slug: "", description: "", priceUsd: "", priceKes: "",
+        stripePriceUsd: "", stripePriceKes: "",
         enabledModules: [] as string[], interval: "month", maxUsers: "3",
         maxProperties: "10", features: "", isActive: true, isPopular: false, sortOrder: "0",
     });
@@ -43,6 +44,10 @@ export default function NewPlanPage() {
                 prices: {
                     ...(form.priceUsd.trim() !== "" ? { USD: Number(form.priceUsd) } : {}),
                     ...(form.priceKes.trim() !== "" ? { KES: Number(form.priceKes) } : {}),
+                },
+                stripePrices: {
+                    ...(form.stripePriceUsd.trim() !== "" ? { USD: form.stripePriceUsd.trim() } : {}),
+                    ...(form.stripePriceKes.trim() !== "" ? { KES: form.stripePriceKes.trim() } : {}),
                 },
                 enabledModules: form.enabledModules,
                 interval: form.interval,
@@ -97,6 +102,14 @@ export default function NewPlanPage() {
                     <div>
                         <label className="block text-sm font-medium mb-1">Price (KES)</label>
                         <input type="number" step="0.01" min="0" value={form.priceKes} onChange={(e) => setForm({ ...form, priceKes: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="0" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Stripe Price ID (USD)</label>
+                        <input type="text" value={form.stripePriceUsd} onChange={(e) => setForm({ ...form, stripePriceUsd: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="price_..." />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Stripe Price ID (KES)</label>
+                        <input type="text" value={form.stripePriceKes} onChange={(e) => setForm({ ...form, stripePriceKes: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="price_..." />
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Interval</label>

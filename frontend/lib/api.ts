@@ -404,6 +404,7 @@ export const platformApi = {
         slug?: string;
         description?: string | null;
         prices?: Record<string, number>;
+        stripePrices?: Record<string, string>;
         enabledModules?: string[];
         interval?: string;
         maxUsers?: number;
@@ -419,6 +420,7 @@ export const platformApi = {
         slug: string;
         description: string | null;
         prices: Record<string, number>;
+        stripePrices: Record<string, string>;
         enabledModules: string[];
         interval: string;
         maxUsers: number;
@@ -431,6 +433,19 @@ export const platformApi = {
         api.patch<SubscriptionPlanRecord>(`/platform/plans/${id}`, payload),
     deletePlan: (id: string) =>
         api.delete<{ deleted: boolean }>(`/platform/plans/${id}`),
+
+    /** Start a Stripe Checkout session to subscribe an org to a paid plan. */
+    checkout: (payload: {
+        planId: string;
+        currency: string;
+        organizationId?: string;
+        successUrl?: string;
+        cancelUrl?: string;
+    }) =>
+        api.post<{ url: string | null; sessionId: string }>(
+            '/payments/checkout',
+            payload,
+        ),
 
     usage: (id: string) =>
         api.get<OrganizationUsage>(`/platform/organizations/${id}/usage`),

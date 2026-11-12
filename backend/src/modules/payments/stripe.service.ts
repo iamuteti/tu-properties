@@ -77,12 +77,16 @@ export class StripeService implements OnModuleInit {
     currency,
     successUrl,
     cancelUrl,
+    metadata,
+    clientReferenceId,
   }: {
     customerId: string;
     priceId: string;
     currency: string;
     successUrl?: string;
     cancelUrl?: string;
+    metadata?: Record<string, string>;
+    clientReferenceId?: string;
   }) {
     const stripe = this.assertInitialized();
 
@@ -98,7 +102,8 @@ export class StripeService implements OnModuleInit {
       currency,
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: {},
+      client_reference_id: clientReferenceId,
+      metadata: metadata ?? {},
     });
   }
 

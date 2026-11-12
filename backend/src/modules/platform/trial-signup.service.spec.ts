@@ -3,6 +3,8 @@ import { ConflictException } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { TrialSignupService, slugify } from './trial-signup.service';
 import type { OnboardConflictCause } from './platform.service';
+import { PrismaService } from '@/prisma/prisma.service';
+import { EmailVerificationService } from '@/modules/auth/email-verification.service';
 
 /**
  * Module 19 — public trial signup.
@@ -16,6 +18,7 @@ import type { OnboardConflictCause } from './platform.service';
 describe('TrialSignupService', () => {
   let service: TrialSignupService;
   let onboard: jest.Mock;
+  let initiateVerification: jest.Mock;
 
   const dto = {
     name: 'Rohi Estate Management',
@@ -40,10 +43,28 @@ describe('TrialSignupService', () => {
         Promise.resolve(createdOrg(body.slug)),
       );
 
+    // signup reads the admin row back to bind the verification token to it, so
+    // the prisma and verification collaborators have to be in the module or the
+    // service cannot be constructed at all.
+    initiateVerification = jest.fn().mockResolvedValue(undefined);
+    const prisma = {
+      subscriptionPlan: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'user-new', emailVerified: false }),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrialSignupService,
         { provide: PlatformService, useValue: { onboard } },
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: EmailVerificationService,
+          useValue: { initiateVerification },
+        },
       ],
     }).compile();
 
@@ -92,7 +113,14 @@ describe('TrialSignupService', () => {
       adminEmail: dto.adminEmail,
       plan: 'STARTER',
       trialEndsAt: new Date('2026-10-25T00:00:00.000Z'),
+      // The admin is created unverified, so the caller must show "check your
+      // inbox" instead of logging the visitor straight in.
+      emailVerificationRequired: true,
     });
+    expect(initiateVerification).toHaveBeenCalledWith(
+      'user-new',
+      dto.adminEmail,
+    );
   });
 
   it('retries a taken slug with a suffix instead of failing', async () => {

@@ -6,6 +6,7 @@ import {
   Get,
   Request,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Prisma } from '@prisma/client';
@@ -34,9 +35,22 @@ export class AuthController {
     ttl: 5 * 60 * 1000,
     message: 'Too many login attempts. Try again in a few minutes.',
   })
-  async login(@Body() req, @Request() request) {
+  async login(
+    @Body() req: { email?: unknown; password?: unknown },
+    @Request() request,
+  ) {
+    // Validate the shape before it reaches Prisma: a body without an `email`
+    // (field renamed, no body at all) used to be passed through as
+    // `where: { email: undefined }`, which is a Prisma validation error and
+    // therefore a 500, not the 400 that a malformed request deserves.
+    if (!req || typeof req.email !== 'string' || !req.email.trim()) {
+      throw new BadRequestException('Email is required');
+    }
+    if (typeof req.password !== 'string' || !req.password) {
+      throw new BadRequestException('Password is required');
+    }
     const validUser = await this.authService.validateUser(
-      req.email,
+      req.email.trim(),
       req.password,
     );
     if (!validUser) {
@@ -66,8 +80,13 @@ export class AuthController {
     ttl: 15 * 60 * 1000,
     message: 'Too many password reset requests. Try again later.',
   })
-  async forgotPassword(@Body() body: { email: string }) {
-    return this.authService.forgotPassword(body.email);
+  async forgotPassword(@Body() body: { email?: unknown }) {
+    // Same malformed-body guard as login: `findOneByEmail(undefined)` is a
+    // Prisma validation error, not a "user not found".
+    if (!body || typeof body.email !== 'string' || !body.email.trim()) {
+      throw new BadRequestException('Email is required');
+    }
+    return this.authService.forgotPassword(body.email.trim());
   }
 
   @Post('reset-password')
@@ -77,7 +96,23 @@ export class AuthController {
     ttl: 15 * 60 * 1000,
     message: 'Too many password reset attempts. Try again later.',
   })
-  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+  async resetPassword(
+    @Body() body: { token?: unknown; newPassword?: unknown },
+  ) {
+    // Same rule as login/forgot-password: a missing field is a bad request.
+    // Without this, an absent token reached `crypto.update(undefined)` and came
+    // back as a TypeError.
+    if (
+      !body ||
+      typeof body.token !== 'string' ||
+      !body.token ||
+      typeof body.newPassword !== 'string' ||
+      !body.newPassword
+    ) {
+      throw new BadRequestException(
+        'Reset token and new password are required',
+      );
+    }
     return this.authService.resetPassword(body.token, body.newPassword);
   }
 

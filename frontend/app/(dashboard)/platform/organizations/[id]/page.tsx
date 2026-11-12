@@ -255,8 +255,6 @@ export default function PlatformOrganizationDetailPage() {
         }
     };
 
-  console.log('Plan modules: ', planModules);
-  console.log('Enabled modules: ', enabledModules);
     /** True when the org's enabled modules differ from what was loaded
      *  initially — i.e. the admin has made a change worth persisting. */
     const modulesDiffer =
@@ -296,6 +294,43 @@ export default function PlatformOrganizationDetailPage() {
             await load();
         } catch (err) {
             setError(errorMessage(err, "Failed to update the subscription"));
+        } finally {
+            setSubSaving(false);
+        }
+    };
+
+    /**
+     * Start a Stripe Checkout for the selected plan, then redirect the browser
+     * to Stripe. On success Stripe returns here and the webhook marks the
+     * subscription ACTIVE on the purchased plan.
+     */
+    const startCheckout = async () => {
+        setError("");
+        const plan =
+            availablePlans.find((p) => p.name === subForm.plan) ||
+            (org?.subscription?.planId
+                ? availablePlans.find((p) => p.id === org.subscription!.planId)
+                : undefined);
+        if (!plan) {
+            setError("No matching catalog plan. Create the plan in Plans first.");
+            return;
+        }
+        setSubSaving(true);
+        try {
+            const res = await platformApi.checkout({
+                planId: plan.id,
+                currency: org?.currency || "USD",
+                organizationId: id,
+                successUrl: `${window.location.origin}/platform/organizations/${id}?checkout=success`,
+                cancelUrl: `${window.location.origin}/platform/organizations/${id}?checkout=cancelled`,
+            });
+            if (res.data?.url) {
+                window.location.href = res.data.url;
+            } else {
+                setError("Stripe did not return a checkout URL.");
+            }
+        } catch (err) {
+            setError(errorMessage(err, "Failed to start checkout"));
         } finally {
             setSubSaving(false);
         }
@@ -521,6 +556,13 @@ export default function PlatformOrganizationDetailPage() {
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                     >
                         {subSaving ? "Saving..." : "Save subscription"}
+                    </button>
+                    <button
+                        onClick={startCheckout}
+                        disabled={subSaving}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                        Subscribe / Upgrade
                     </button>
                     <span className="text-xs text-muted-foreground">
                         Trial ends {displayDate(org.subscription?.trialEndsAt)} · renews{" "}

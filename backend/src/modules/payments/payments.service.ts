@@ -80,29 +80,70 @@ export class PaymentsService {
       });
     }
 
-    // Look up the Stripe Price by unit_amount + currency.
-    const priceList = await this.stripeService.client.prices.list({
-      currency: dto.currency,
-      active: true,
-      limit: 100,
-    });
-    const stripePrice = priceList.data.find(
-      (p) => p.unit_amount === unitAmount && p.currency === dto.currency,
-    );
-    if (!stripePrice) {
+    // Resolve the Stripe Price ID:
+    // 1. Prefer the ID stored on the plan (option A) — keyed by currency code.
+    // 2. Fall back to matching by amount + interval for plans not yet configured.
+    const stripePrices = (plan.stripePrices ?? {}) as Record<string, string>;
+    let priceId: string | undefined = stripePrices[dto.currency];
+
+    if (!priceId) {
+      // The plan stores prices in MAJOR units (e.g. 49 USD); Stripe's
+      // `unit_amount` is in MINOR units (4900 cents). Convert before matching.
+      const zeroDecimal = new Set([
+        'BIF',
+        'CLP',
+        'DJF',
+        'GNF',
+        'JPY',
+        'KMF',
+        'KRW',
+        'MGA',
+        'PYG',
+        'RWF',
+        'UGX',
+        'VND',
+        'VUV',
+        'XAF',
+        'XOF',
+        'XPF',
+      ]);
+      const factor = zeroDecimal.has(dto.currency.toUpperCase()) ? 1 : 100;
+      const expectedMinor = Math.round(unitAmount * factor);
+
+      const priceList = await this.stripeService.client.prices.list({
+        currency: dto.currency.toLowerCase(),
+        active: true,
+        limit: 100,
+      });
+      const match = priceList.data.find(
+        (p) =>
+          p.unit_amount === expectedMinor &&
+          p.currency === dto.currency.toLowerCase() &&
+          (!plan.interval || p.recurring?.interval === plan.interval),
+      );
+      priceId = match?.id;
+    }
+
+    if (!priceId) {
       throw new BadRequestException(
-        `No Stripe price found for currency "${dto.currency}" at amount ${unitAmount}. ` +
-          'Create the price in Stripe Dashboard first.',
+        `No Stripe price configured for plan "${plan.name}" in ${dto.currency}. ` +
+          'Set the Stripe Price ID on the plan (Plans → edit) or create a matching price in Stripe.',
       );
     }
 
-    // Create the Stripe Checkout Session.
+    // Create the Stripe Checkout Session, tagging it with the org + plan so the
+    // webhook can upgrade the right subscription to the right plan.
     const session = await this.stripeService.createCheckoutSession({
       customerId: customer.id,
-      priceId: stripePrice.id,
+      priceId,
       currency: dto.currency,
       successUrl: dto.successUrl,
       cancelUrl: dto.cancelUrl,
+      clientReferenceId: org.id,
+      metadata: {
+        organizationId: org.id,
+        planId: plan.id,
+      },
     });
 
     return { url: session.url, sessionId: session.id };
@@ -120,22 +161,50 @@ export class PaymentsService {
           typeof session.subscription === 'string'
             ? session.subscription
             : null;
+        const metaOrgId = session.metadata?.organizationId ?? null;
+        const metaPlanId = session.metadata?.planId ?? null;
+        const clientRefOrgId =
+          typeof session.client_reference_id === 'string'
+            ? session.client_reference_id
+            : null;
 
-        if (!customerId) {
-          this.logger.warn('checkout.session.completed without customerId');
-          return;
+        // Find the org by stripeCustomerId first, then by the metadata /
+        // client_reference_id we attached when creating the session.
+        let org = customerId
+          ? await this.prisma.organization.findUnique({
+              where: { stripeCustomerId: customerId },
+            })
+          : null;
+        if (!org && metaOrgId) {
+          org = await this.prisma.organization.findUnique({
+            where: { id: metaOrgId },
+          });
         }
-
-        // Find the org by stripeCustomerId.
-        const org = await this.prisma.organization.findUnique({
-          where: { stripeCustomerId: customerId },
-        });
+        if (!org && clientRefOrgId) {
+          org = await this.prisma.organization.findUnique({
+            where: { id: clientRefOrgId },
+          });
+        }
         if (!org) {
-          this.logger.warn(`No org found for stripe customer ${customerId}`);
+          this.logger.warn(
+            `checkout.session.completed: no org for customer ${customerId}, metaOrg ${metaOrgId}, clientRef ${clientRefOrgId}`,
+          );
           return;
         }
 
-        // Mark the org's subscription ACTIVE and store stripe ids.
+        // Resolve the purchased plan (if the session carried one) so the org's
+        // plan is upgraded, not just marked ACTIVE.
+        let planName: string | null = null;
+        if (metaPlanId) {
+          const plan = await this.prisma.subscriptionPlan.findUnique({
+            where: { id: metaPlanId },
+            select: { name: true },
+          });
+          planName = plan?.name ?? null;
+        }
+
+        // Mark the org's subscription ACTIVE, store stripe ids, and apply the
+        // purchased plan.
         await this.prisma.$transaction([
           this.prisma.subscription.updateMany({
             where: { organizationId: org.id },
@@ -145,18 +214,21 @@ export class PaymentsService {
               ...(subscriptionId
                 ? { stripeSubscriptionId: subscriptionId }
                 : {}),
+              ...(planName ? { plan: planName } : {}),
+              ...(metaPlanId ? { planId: metaPlanId } : {}),
             },
           }),
           this.prisma.organization.update({
             where: { id: org.id },
             data: {
               stripeSubscriptionId: subscriptionId ?? org.stripeSubscriptionId,
+              ...(planName ? { plan: planName } : {}),
             },
           }),
         ]);
 
         this.logger.log(
-          `Organization ${org.id} activated subscription (stripe subscription ${subscriptionId})`,
+          `Organization ${org.id} activated subscription (stripe subscription ${subscriptionId}, plan ${planName ?? 'unchanged'})`,
         );
         break;
       }

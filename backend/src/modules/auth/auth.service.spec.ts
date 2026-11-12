@@ -57,6 +57,10 @@ describe('AuthService', () => {
     mfaSecret: 'ABCDEFGHIJKLMNOPQRSTUVWX',
     mfaEnabled: true,
     isActive: true,
+    // A login requires a confirmed address (AuthService.validateUser), so the
+    // fixture has to carry the flag or every "lets the user in" case fails on
+    // the verification branch instead of the behaviour it names.
+    emailVerified: true,
   };
 
   const plainUser: any = { ...mfaUser, mfaSecret: null, mfaEnabled: false };
@@ -158,6 +162,27 @@ describe('AuthService', () => {
     });
   });
 
+  describe('validateUser — malformed body', () => {
+    // A login posted without an `email` used to reach Prisma as
+    // `where: { email: undefined }` and come back as a Prisma validation
+    // error: a 500 with a stack trace for what is a bad request. The same
+    // shape hits `forgotPassword`, which shares `findOneByEmail`.
+    it.each([
+      ['missing email', undefined, 'pw'],
+      ['blank email', '   ', 'pw'],
+      ['missing password', 'admin@rohi.co.ke', undefined],
+      ['blank password', 'admin@rohi.co.ke', ''],
+    ])('treats a %s as a failed sign-in, not a server error', async (_label, email, pass) => {
+      const result = await service.validateUser(
+        email as unknown as string,
+        pass as unknown as string,
+      );
+
+      expect(result).toBeNull();
+      expect(usersService.findOneByEmail).not.toHaveBeenCalled();
+    });
+  });
+
   describe('login (MFA disabled)', () => {
     it('issues a session row, sets the cookie, and sanitizes the user', async () => {
       const res = mockRes();
@@ -242,7 +267,9 @@ describe('AuthService', () => {
         'auth_token',
         expect.objectContaining({ httpOnly: true }),
       );
-      expect(result.accessToken).toBe('signed-jwt');
+      // `login` returns a union (MFA challenge / bearer / cookie), so narrow
+      // the bearer member rather than reading `accessToken` off the union.
+      expect((result as { accessToken?: string }).accessToken).toBe('signed-jwt');
 
       // The session row is still the one the token points at — revoking it
       // still kills the bearer token.

@@ -2,6 +2,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -74,6 +75,11 @@ export class CreateSubscriptionPlanDto {
   @IsOptional()
   @IsString({ each: true })
   features?: string[];
+
+  /** Stripe Price IDs keyed by currency code (e.g. { "USD": "price_...", "KES": "price_..." }). */
+  @IsOptional()
+  @IsObject()
+  stripePrices?: Record<string, string>;
 
   /** Whether this plan can be newly assigned to an organization. */
   @IsOptional()

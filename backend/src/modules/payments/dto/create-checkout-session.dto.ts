@@ -1,7 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 /**
- * Create a Stripe Checkout session for upgrading an organization to a paid plan.
+ * Create a Stripe Checkout session for subscribing an organization to a paid plan.
  */
 export class CreateCheckoutSessionDto {
   /** The id of the subscription plan to subscribe to. */
@@ -13,6 +13,14 @@ export class CreateCheckoutSessionDto {
   @IsString()
   @IsNotEmpty()
   currency!: string;
+
+  /**
+   * The organization to subscribe. A tenant admin omits this (their own org is
+   * used); a SUPER_ADMIN must supply it, since they belong to no organization.
+   */
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
 
   /** Optional: the URL Stripe should redirect to after successful payment. */
   @IsOptional()

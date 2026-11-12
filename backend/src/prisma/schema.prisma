@@ -248,7 +248,7 @@ enum OrganizationType {
   id             String             @id @default(cuid())
   organizationId String             @unique
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  planId         String?             @unique
+  planId         String?
   planRecord     SubscriptionPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
 
   /**
@@ -284,6 +284,7 @@ enum OrganizationType {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+  @@index([planId])
   @@map("subscriptions")
 }
 
@@ -6756,6 +6757,7 @@ model SubscriptionPlan {
   description String?  @db.Text
 
   prices      Json     @default("{}") // map of ISO-4217 currency code -> price
+  stripePrices Json    @default("{}") // map of ISO-4217 currency code -> Stripe Price ID (price_...)
   enabledModules String[] @default([]) // module keys this plan grants
   interval    String   @default("month") // "month" | "year"
 

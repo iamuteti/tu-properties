@@ -178,6 +178,14 @@ export class UsersService {
   }
 
   async findOneByEmail(email: string) {
+    // Prisma rejects a unique lookup with an undefined/empty key
+    // (`where: { email: undefined }`), and that validation error surfaced as a
+    // 500 with a stack trace on any login whose body had no `email` field.
+    // Callers (AuthService.validateUser, AuthService.forgotPassword) treat a
+    // missing user as "no such account", which is what an unusable key is.
+    if (typeof email !== 'string' || !email.trim()) {
+      return null;
+    }
     return this.prisma.user.findUnique({
       where: { email },
       // Include the organization's Subscription so callers that build a client-visible

@@ -32,6 +32,15 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
+    // Guard before the lookup and the compare: an absent email reaches
+    // `findOneByEmail` as `undefined` and an absent password makes
+    // `bcrypt.compare` throw. Both are a failed sign-in, not a server error.
+    if (typeof email !== 'string' || !email.trim()) {
+      return null;
+    }
+    if (typeof pass !== 'string' || !pass) {
+      return null;
+    }
     const user = await this.usersService.findOneByEmail(email);
     if (
       user &&
