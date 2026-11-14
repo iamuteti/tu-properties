@@ -153,19 +153,19 @@ export default function ApprovalsPage() {
                                             </div>
                                             <div className="flex flex-wrap gap-2">
                                                 {task.status === "ESCALATED" && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
                                                         <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                                                         Escalated to you
                                                     </span>
                                                 )}
                                                 {task.overdue && task.status !== "ESCALATED" && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-medium text-danger">
                                                         <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                                                         Past its deadline
                                                     </span>
                                                 )}
                                                 {task.viaDelegation && (
-                                                    <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                                                    <span className="rounded-full bg-stage-violet-soft px-2.5 py-0.5 text-xs font-medium text-stage-violet">
                                                         On somebody&apos;s behalf
                                                     </span>
                                                 )}

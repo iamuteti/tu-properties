@@ -232,7 +232,7 @@ export function ReceiptDetailModal({
                         <span className="tabular-nums">{fmt.money(appliedTotal, currency)}</span>
                     </div>
                     {onAccount > 0 && (
-                        <div className="flex justify-between text-amber-700">
+                        <div className="flex justify-between text-warning">
                             <span>On account</span>
                             <span className="tabular-nums">{fmt.money(onAccount, currency)}</span>
                         </div>

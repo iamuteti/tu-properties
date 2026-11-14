@@ -248,7 +248,7 @@ export function WorkOrderMaterialsPanel({ workOrderId }: { workOrderId: string }
                                     {movements.map((movement) => (
                                         <TableRow
                                             key={movement.id}
-                                            className={movement.isNew ? 'bg-emerald-50' : undefined}
+                                            className={movement.isNew ? 'bg-success-soft' : undefined}
                                         >
                                             <TableCell className="text-sm">
                                                 {new Date(

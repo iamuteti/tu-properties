@@ -205,7 +205,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
                                             {installment.invoice ? (
                                                 <a
                                                     href={`/finance/invoices/${installment.invoice.id}`}
-                                                    className="text-xs text-sky-700 hover:underline"
+                                                    className="text-xs text-stage-sky hover:underline"
                                                 >
                                                     {installment.invoice.invoiceNumber}
                                                 </a>
@@ -282,7 +282,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
                             </div>
                             <button
                                 type="button"
-                                className="mb-1 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                className="mb-1 rounded p-1.5 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                 aria-label="Remove split"
                                 onClick={() =>
                                     setSplits((current) => current.filter((_, i) => i !== index))
@@ -323,7 +323,7 @@ export function SaleMoneyPanel({ sale, onChanged }: { sale: Sale; onChanged: () 
 
                     <span
                         className={`text-sm font-medium ${
-                            Math.abs(splitTotal - 100) > 0.01 ? 'text-red-600' : 'text-green-700'
+                            Math.abs(splitTotal - 100) > 0.01 ? 'text-danger' : 'text-success'
                         }`}
                     >
                         Splits total {splitTotal}%
@@ -403,10 +403,10 @@ function Field({ label, id, children }: { label: string; id: string; children: R
 function InstalmentBadge({ status }: { status: string }) {
     const styles: Record<string, string> = {
         SCHEDULED: 'bg-muted text-foreground',
-        INVOICED: 'bg-amber-100 text-amber-800',
-        PAID: 'bg-green-100 text-green-800',
-        OVERDUE: 'bg-red-100 text-red-800',
-        WAIVED: 'bg-gray-200 text-foreground',
+        INVOICED: 'bg-warning-soft text-warning',
+        PAID: 'bg-success-soft text-success',
+        OVERDUE: 'bg-danger-soft text-danger',
+        WAIVED: 'bg-muted text-foreground',
     };
     return (
         <span

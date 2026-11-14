@@ -60,7 +60,7 @@ export function QuoteComparisonTable({
             <SummaryStrip comparison={comparison} />
 
             {comparison.singleSource && (
-                <p className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
                         Only one supplier was invited to this round, so nothing here has been
@@ -98,7 +98,7 @@ export function QuoteComparisonTable({
                                     return (
                                         <TableRow
                                             key={row.quoteId}
-                                            className={isAwarded ? "bg-emerald-50" : undefined}
+                                            className={isAwarded ? "bg-success-soft" : undefined}
                                         >
                                             <TableCell className="text-muted-foreground">
                                                 {row.rank}
@@ -147,8 +147,8 @@ export function QuoteComparisonTable({
                                                     <span
                                                         className={
                                                             row.variance > 0
-                                                                ? "text-amber-700"
-                                                                : "text-emerald-700"
+                                                                ? "text-warning"
+                                                                : "text-success"
                                                         }
                                                     >
                                                         {row.variance > 0 ? "+" : ""}
@@ -172,11 +172,11 @@ export function QuoteComparisonTable({
                                             </TableCell>
                                             <TableCell>
                                                 {row.coversAllLines ? (
-                                                    <span className="text-emerald-700">
+                                                    <span className="text-success">
                                                         all {row.linesTotal}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-amber-700">
+                                                    <span className="text-warning">
                                                         {row.linesCovered} of {row.linesTotal}
                                                     </span>
                                                 )}
@@ -272,10 +272,10 @@ function Flag({
     icon?: React.ComponentType<{ className?: string }>;
 }) {
     const tones: Record<string, string> = {
-        green: "bg-emerald-100 text-emerald-700",
-        blue: "bg-blue-100 text-blue-700",
-        violet: "bg-violet-100 text-violet-700",
-        emerald: "bg-emerald-600 text-white",
+        green: "bg-success-soft text-success",
+        blue: "bg-info-soft text-info",
+        violet: "bg-stage-violet-soft text-stage-violet",
+        emerald: "bg-success text-success-fg",
         slate: "bg-muted text-muted-foreground",
     };
     return (
@@ -313,7 +313,7 @@ export function ReceiptProgress({
             >
                 <div
                     className={`h-full rounded-full ${
-                        pct >= 100 ? "bg-emerald-500" : "bg-amber-400"
+                        pct >= 100 ? "bg-success" : "bg-warning"
                     }`}
                     style={{ width: `${pct}%` }}
                 />

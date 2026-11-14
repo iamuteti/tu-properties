@@ -230,7 +230,7 @@ export default function PurchaseRequestsPage() {
                                                 {request.reference}
                                             </Link>
                                             {request.priority === 'URGENT' && (
-                                                <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                                                <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">
                                                     Urgent
                                                 </span>
                                             )}
@@ -298,7 +298,7 @@ function Stat({
                 <p className="text-sm text-muted-foreground">{label}</p>
                 <p
                     className={`text-2xl font-semibold ${
-                        tone === 'amber' && Number(value) > 0 ? 'text-amber-700' : ''
+                        tone === 'amber' && Number(value) > 0 ? 'text-warning' : ''
                     }`}
                 >
                     {value}

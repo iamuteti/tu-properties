@@ -61,10 +61,10 @@ export function OwnerStatementTable({
                             <td className="py-2 pr-3 text-right tabular-nums">
                                 {money(statement.grossIncome)}
                             </td>
-                            <td className="py-2 pr-3 text-right tabular-nums text-red-600">
+                            <td className="py-2 pr-3 text-right tabular-nums text-danger">
                                 {money(statement.expenses)}
                             </td>
-                            <td className="py-2 pr-3 text-right tabular-nums text-red-600">
+                            <td className="py-2 pr-3 text-right tabular-nums text-danger">
                                 {money(statement.managementFee)}
                             </td>
                             <td className="py-2 text-right font-semibold tabular-nums">

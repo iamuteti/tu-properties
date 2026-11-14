@@ -247,7 +247,7 @@ export default function NewInvoicePage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="landlordId" className="text-sm font-medium leading-none">
-                Landlord <span className="text-red-500">*</span>
+                Landlord <span className="text-danger">*</span>
               </label>
               <Select
                 id="landlordId"
@@ -298,7 +298,7 @@ export default function NewInvoicePage() {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <label htmlFor="invoiceDate" className="text-sm font-medium leading-none">
-                Invoice Date <span className="text-red-500">*</span>
+                Invoice Date <span className="text-danger">*</span>
               </label>
               <Input
                 id="invoiceDate"
@@ -312,7 +312,7 @@ export default function NewInvoicePage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="dueDate" className="text-sm font-medium leading-none">
-                Due Date <span className="text-red-500">*</span>
+                Due Date <span className="text-danger">*</span>
               </label>
               <Input
                 id="dueDate"
@@ -384,7 +384,7 @@ export default function NewInvoicePage() {
           {/* Row 5: Sign On eFims */}
           <div className="space-y-2">
             <label className="text-sm font-medium leading-none">
-              Sign On eFims <span className="text-red-500">*</span>
+              Sign On eFims <span className="text-danger">*</span>
             </label>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">

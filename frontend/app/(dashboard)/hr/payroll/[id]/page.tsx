@@ -197,7 +197,7 @@ export default function PayrollRunDetailPage() {
 
             {run.voidReason && (
                 <div
-                    className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
+                    className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger"
                     role="alert"
                 >
                     <p className="font-medium">This run was voided</p>
@@ -207,7 +207,7 @@ export default function PayrollRunDetailPage() {
 
             {run.coverage?.warning && (
                 <div
-                    className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning"
                     role="alert"
                 >
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -234,7 +234,7 @@ export default function PayrollRunDetailPage() {
                             {lastWarnings.map((warning) => (
                                 <li key={warning.code} className="flex items-start gap-2">
                                     <AlertTriangle
-                                        className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                                        className="mt-0.5 h-4 w-4 shrink-0 text-warning"
                                         aria-hidden="true"
                                     />
                                     <span>

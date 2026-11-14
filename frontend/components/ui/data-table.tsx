@@ -386,7 +386,7 @@ export function DataTable<T extends Record<string, any>>({
                     <th className="px-6 py-3 text-left text-xs font-light text-muted-foreground uppercase tracking-wider">
                       <input
                         type="checkbox"
-                        className="rounded border-border text-cyan-600 focus:ring-cyan-500"
+                        className="rounded border-border text-stage-cyan focus:ring-stage-cyan"
                         checked={table.getIsAllPageRowsSelected()}
                         onChange={table.getToggleAllPageRowsSelectedHandler()}
                       />

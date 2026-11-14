@@ -249,11 +249,11 @@ export default function PurchaseRequestDetailPage() {
             )}
 
             {request.rejectionReason && (
-                <Card className="border-red-200 bg-red-50">
+                <Card className="border-danger/30 bg-danger-soft">
                     <CardContent className="pt-6">
-                        <p className="text-sm font-medium text-red-800">Why this was rejected</p>
-                        <p className="mt-1 text-sm text-red-900">{request.rejectionReason}</p>
-                        <p className="mt-1 text-xs text-red-700">
+                        <p className="text-sm font-medium text-danger">Why this was rejected</p>
+                        <p className="mt-1 text-sm text-danger">{request.rejectionReason}</p>
+                        <p className="mt-1 text-xs text-danger">
                             Kept on the record when the request is reopened, so the same request
                             cannot come back with the same problem.
                         </p>

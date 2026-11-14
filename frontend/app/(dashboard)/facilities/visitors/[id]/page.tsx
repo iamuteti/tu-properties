@@ -96,11 +96,11 @@ export default function VisitorDetailPage() {
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             {visitor.company && <span>{visitor.company}</span>}
                             {visitor.isBlacklisted ? (
-                                <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                <span className="inline-flex items-center rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-medium text-danger">
                                     Barred from the site
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                <span className="inline-flex items-center rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-medium text-success">
                                     May be admitted
                                 </span>
                             )}
@@ -146,13 +146,13 @@ export default function VisitorDetailPage() {
                 fact a guard is looking for, and burying it under a phone number is
                 how somebody waves through the person they were told not to admit. */}
             {visitor.isBlacklisted && (
-                <Card className="border-red-300 bg-red-50/50">
+                <Card className="border-danger/30 bg-danger-soft">
                     <CardHeader>
-                        <CardTitle className="text-red-800">Barred from the site</CardTitle>
+                        <CardTitle className="text-danger">Barred from the site</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-1 text-sm">
-                        <p className="text-red-900">{visitor.blacklistReason}</p>
-                        <p className="text-xs text-red-700">
+                        <p className="text-danger">{visitor.blacklistReason}</p>
+                        <p className="text-xs text-danger">
                             Barred{' '}
                             {visitor.blacklistedAt
                                 ? new Date(visitor.blacklistedAt).toLocaleDateString()
@@ -271,7 +271,7 @@ export default function VisitorDetailPage() {
                                     <span
                                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                             VISIT_STATE_STYLES[visit.state] ??
-                                            'bg-gray-100 text-foreground'
+                                            'bg-muted text-foreground'
                                         }`}
                                     >
                                         {visit.stateLabel}
@@ -302,7 +302,7 @@ export default function VisitorDetailPage() {
                                     <span
                                         className={`ml-auto inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                             ACCESS_CARD_STATUS_STYLES[card.status] ??
-                                            'bg-gray-100 text-foreground'
+                                            'bg-muted text-foreground'
                                         }`}
                                     >
                                         {card.status.toLowerCase()}

@@ -140,7 +140,7 @@ export default function SalesPage() {
                             {`${row.original.agent.firstName} ${row.original.agent.lastName}`.trim()}
                         </span>
                     ) : (
-                        <span className="text-sm text-amber-600">Unassigned</span>
+                        <span className="text-sm text-warning">Unassigned</span>
                     ),
             },
             {
@@ -241,7 +241,7 @@ export default function SalesPage() {
                             type="button"
                             onClick={() => setView('list')}
                             className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium ${
-                                view === 'list' ? 'bg-slate-900 text-white' : 'text-muted-foreground'
+                                view === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
                             }`}
                         >
                             <KanbanSquare className="h-4 w-4" aria-hidden="true" />
@@ -251,7 +251,7 @@ export default function SalesPage() {
                             type="button"
                             onClick={() => setView('board')}
                             className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium ${
-                                view === 'board' ? 'bg-slate-900 text-white' : 'text-muted-foreground'
+                                view === 'board' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
                             }`}
                         >
                             <Columns3 className="h-4 w-4" aria-hidden="true" />
@@ -345,7 +345,7 @@ export default function SalesPage() {
                     columns={columns}
                     searchPlaceholder="Search by sale code, property or buyer…"
                     emptyMessage="No sales yet. Open one from a property that is up for sale."
-                    emptyIcon={<Building2 className="h-12 w-12 text-slate-400" aria-hidden="true" />}
+                    emptyIcon={<Building2 className="h-12 w-12 text-muted-foreground" aria-hidden="true" />}
                     serverSidePagination
                     paginationMeta={meta}
                     onPaginationChange={(p) => {

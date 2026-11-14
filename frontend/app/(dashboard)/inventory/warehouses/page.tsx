@@ -196,7 +196,7 @@ function StoreStatus({ store }: { store: WarehouseRow }) {
         <span className="flex flex-wrap items-center gap-1.5">
             {store.isDefault && (
                 <span
-                    className="inline-flex items-center rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-medium text-cyan-800"
+                    className="inline-flex items-center rounded-full bg-stage-cyan-soft px-2.5 py-0.5 text-xs font-medium text-stage-cyan"
                     title="Goods are booked in here when nobody says where — it is the answer the API uses when the store is left out"
                 >
                     Default

@@ -118,7 +118,7 @@ export default function RfqDetailPage() {
                             <h1 className="text-3xl font-bold tracking-tight">{rfq.title}</h1>
                             <StatusBadge status={rfq.status} />
                             {rfq.overdue && (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                                <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
                                     {rfq.daysOverdue} days past the quote deadline
                                 </span>
                             )}
@@ -303,8 +303,8 @@ export default function RfqDetailPage() {
                         )}
 
                         {rfq.awardedQuote && (
-                            <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2">
-                                <p className="text-sm font-medium text-emerald-800">
+                            <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2">
+                                <p className="text-sm font-medium text-success">
                                     Awarded —{' '}
                                     {
                                         rfq.quotes.find(

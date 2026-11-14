@@ -101,13 +101,13 @@ function TimelineRow({
                         {meta.label}
                     </span>
                     {overdue && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger">
                             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                             Past its deadline
                         </span>
                     )}
                     {step.actedViaDelegationId && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-stage-violet-soft px-2 py-0.5 text-xs font-medium text-stage-violet">
                             <ShieldAlert className="h-3 w-3" aria-hidden="true" />
                             Acted under a delegation
                         </span>
@@ -135,41 +135,41 @@ function Marker({ status }: { status: WorkflowStep["status"] }) {
         "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2";
     if (status === "APPROVED") {
         return (
-            <span className={cn(base, "border-emerald-200 bg-emerald-100 text-emerald-700")}>
+            <span className={cn(base, "border-success/30 bg-success-soft text-success")}>
                 <Check className="h-4 w-4" aria-hidden="true" />
             </span>
         );
     }
     if (status === "REJECTED") {
         return (
-            <span className={cn(base, "border-red-200 bg-red-100 text-red-700")}>
+            <span className={cn(base, "border-danger/30 bg-danger-soft text-danger")}>
                 <X className="h-4 w-4" aria-hidden="true" />
             </span>
         );
     }
     if (status === "SKIPPED") {
         return (
-            <span className={cn(base, "border-border bg-muted text-slate-400")}>
+            <span className={cn(base, "border-border bg-muted text-muted-foreground")}>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </span>
         );
     }
     if (status === "ESCALATED") {
         return (
-            <span className={cn(base, "border-orange-200 bg-orange-100 text-orange-700")}>
+            <span className={cn(base, "border-warning/30 bg-warning-soft text-warning")}>
                 <AlertTriangle className="h-4 w-4" aria-hidden="true" />
             </span>
         );
     }
     if (status === "ACTIVE") {
         return (
-            <span className={cn(base, "border-amber-300 bg-amber-100 text-amber-700")}>
+            <span className={cn(base, "border-warning/30 bg-warning-soft text-warning")}>
                 <Clock className="h-4 w-4" aria-hidden="true" />
             </span>
         );
     }
     return (
-        <span className={cn(base, "border-border bg-card text-slate-300")}>
+        <span className={cn(base, "border-border bg-card text-muted-foreground")}>
             <Clock className="h-4 w-4" aria-hidden="true" />
         </span>
     );

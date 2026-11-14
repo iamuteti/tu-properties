@@ -50,11 +50,11 @@ const statusOptions = [
 // Bar track is the unpaid part of the period, tinted by how bad it is.
 // The fill is always the settled part.
 const rentStatusTones: Record<RentTone, { track: string; fill: string; label: string; text: string }> = {
-    paid: { track: 'bg-gray-200', fill: 'bg-green-500', label: '', text: '' },
-    overdue: { track: 'bg-red-200', fill: 'bg-green-500', label: 'text-red-600', text: 'Overdue' },
-    partial: { track: 'bg-amber-200', fill: 'bg-green-500', label: 'text-amber-700', text: 'Part paid' },
-    due: { track: 'bg-blue-200', fill: 'bg-green-500', label: 'text-blue-700', text: 'Payment due' },
-    none: { track: 'bg-gray-200', fill: 'bg-gray-300', label: 'text-muted-foreground', text: '' },
+    paid: { track: 'bg-muted', fill: 'bg-success', label: '', text: '' },
+    overdue: { track: 'bg-danger/25', fill: 'bg-success', label: 'text-danger', text: 'Overdue' },
+    partial: { track: 'bg-warning/25', fill: 'bg-success', label: 'text-warning', text: 'Part paid' },
+    due: { track: 'bg-info/25', fill: 'bg-success', label: 'text-info', text: 'Payment due' },
+    none: { track: 'bg-muted', fill: 'bg-muted', label: 'text-muted-foreground', text: '' },
 };
 
 export default function TenantsPage() {
@@ -185,12 +185,12 @@ export default function TenantsPage() {
             cell: ({ row }) => {
                 const status = row.original.status;
                 const colorMap = {
-                    active: 'bg-green-100 text-green-800',
-                    inactive: 'bg-gray-100 text-foreground',
-                    archived: 'bg-blue-100 text-blue-800',
+                    active: 'bg-success-soft text-success',
+                    inactive: 'bg-muted text-foreground',
+                    archived: 'bg-info-soft text-info',
                 };
                 return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-foreground'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-muted text-foreground'}`}>
                         {status.charAt(0).toUpperCase() + status.slice(1)}
                     </span>
                 );
@@ -209,7 +209,7 @@ export default function TenantsPage() {
                             router.push(`/tenants/${tenant.id}`);
                         }}
                         title={`View ${tenant.tenantName}`}
-                        className="flex flex-col gap-0.5 w-full items-start cursor-pointer text-cyan-600 hover:bg-cyan-50 hover:underline hover:text-cyan-700 transition-all duration-200"
+                        className="flex flex-col gap-0.5 w-full items-start cursor-pointer text-stage-cyan hover:bg-stage-cyan-soft hover:underline hover:text-stage-cyan transition-all duration-200"
                     >
                         <span className="font-medium">{tenant.tenantName}</span>
                         {tenant.phone && (
@@ -307,7 +307,7 @@ export default function TenantsPage() {
             : 0;
 
         return (
-            <div className="bg-muted p-4 border-l-4 border-cyan-500 ml-4 rounded-lg">
+            <div className="bg-muted p-4 border-l-4 border-stage-cyan/50 ml-4 rounded-lg">
                 <div className="flex flex-col md:flex-row gap-6 items-start">
                     {/* Photo */}
                     <div className="flex flex-col items-center shrink-0">
@@ -315,11 +315,11 @@ export default function TenantsPage() {
                             <img
                                 src={row.photoUrl}
                                 alt="Tenant"
-                                className="w-28 h-28 rounded-full object-cover border-2 border-cyan-500 shadow-md"
+                                className="w-28 h-28 rounded-full object-cover border-2 border-stage-cyan/50 shadow-md"
                             />
                         ) : (
-                            <div className="w-28 h-28 rounded-full bg-gray-300 flex items-center justify-center shadow-md">
-                                <User className="h-14 w-14 text-gray-500" />
+                            <div className="w-28 h-28 rounded-full bg-muted flex items-center justify-center shadow-md">
+                                <User className="h-14 w-14 text-muted-foreground" />
                             </div>
                         )}
                     </div>
@@ -362,9 +362,9 @@ export default function TenantsPage() {
                 </div>
 
                 {row.agreementType === 'LEASE' && (
-                    <div className="mt-5 bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+                    <div className="mt-5 bg-stage-cyan-soft border border-stage-cyan/30 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
-                            <span className="text-xs font-semibold text-cyan-700 bg-cyan-100 px-2 py-1 rounded">Lease Dates & Term</span>
+                            <span className="text-xs font-semibold text-stage-cyan bg-stage-cyan-soft px-2 py-1 rounded">Lease Dates & Term</span>
                             <span className="text-sm text-foreground">
                                 {row.agreementStartDate ? new Date(row.agreementStartDate).toLocaleDateString('en-GB') : '-'} - {row.agreementEndDate ? new Date(row.agreementEndDate).toLocaleDateString('en-GB') : '-'}
                             </span>

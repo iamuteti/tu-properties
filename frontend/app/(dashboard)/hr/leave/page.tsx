@@ -282,7 +282,7 @@ export default function LeaveListPage() {
                                                 {request.employeeName ?? '—'}
                                             </Link>
                                             {request.clashesWith && request.clashesWith.length > 0 && (
-                                                <p className="text-xs text-amber-700">
+                                                <p className="text-xs text-warning">
                                                     overlaps {request.clashesWith.length} other
                                                     request(s)
                                                 </p>

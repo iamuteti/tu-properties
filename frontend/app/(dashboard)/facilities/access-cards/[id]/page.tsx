@@ -109,7 +109,7 @@ export default function AccessCardDetailPage() {
     }
 
     const statusStyle =
-        ACCESS_CARD_STATUS_STYLES[card.effectiveStatus] ?? 'bg-gray-100 text-foreground';
+        ACCESS_CARD_STATUS_STYLES[card.effectiveStatus] ?? 'bg-muted text-foreground';
     const derived = card.effectiveStatus !== card.status;
     const isHeld = card.holder !== 'NONE';
 
@@ -190,12 +190,12 @@ export default function AccessCardDetailPage() {
 
             {/* The lost case, explained rather than just refused. */}
             {card.status === 'LOST' && (
-                <Card className="border-orange-300 bg-orange-50/50">
+                <Card className="border-warning/30 bg-warning-soft">
                     <CardHeader>
-                        <CardTitle className="text-orange-900">Reported lost</CardTitle>
+                        <CardTitle className="text-warning">Reported lost</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
-                        <p className="text-orange-900">
+                        <p className="text-warning">
                             A lost card has been in somebody else&rsquo;s pocket, so its
                             number is treated as compromised. It is deliberately{' '}
                             <strong>not reactivatable</strong> — bringing it back would mean
@@ -215,7 +215,7 @@ export default function AccessCardDetailPage() {
                             </p>
                         )}
                         {!card.replacementCardId && isHeld && (
-                            <p className="text-xs text-orange-800">
+                            <p className="text-xs text-warning">
                                 No replacement has been recorded yet. Issue a new card and
                                 record it here.
                             </p>
@@ -252,7 +252,7 @@ export default function AccessCardDetailPage() {
                                     ? new Date(card.expiresAt).toLocaleDateString()
                                     : 'never'}
                                 {card.expiringSoon && (
-                                    <span className="ml-1 text-xs text-amber-700">
+                                    <span className="ml-1 text-xs text-warning">
                                         {card.daysUntilExpiry} days
                                     </span>
                                 )}
@@ -285,10 +285,10 @@ export default function AccessCardDetailPage() {
                     </dl>
 
                     {card.revokedReason && (
-                        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm">
+                        <div className="mt-4 rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm">
                             <p className="text-muted-foreground">Revoked</p>
-                            <p className="text-red-900">{card.revokedReason}</p>
-                            <p className="mt-1 text-xs text-red-700">
+                            <p className="text-danger">{card.revokedReason}</p>
+                            <p className="mt-1 text-xs text-danger">
                                 {card.revokedAt
                                     ? new Date(card.revokedAt).toLocaleString()
                                     : ''}

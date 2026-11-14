@@ -8,10 +8,10 @@ import { platformApi } from "@/lib/api";
 import { PlatformOrganization, SubscriptionStatus } from "@/types";
 
 const STATUS_STYLES: Record<SubscriptionStatus, string> = {
-    TRIALING: "bg-blue-100 text-blue-800",
-    ACTIVE: "bg-green-100 text-green-800",
-    SUSPENDED: "bg-red-100 text-red-800",
-    CANCELLED: "bg-gray-200 text-gray-700",
+    TRIALING: "bg-info-soft text-info",
+    ACTIVE: "bg-success-soft text-success",
+    SUSPENDED: "bg-danger-soft text-danger",
+    CANCELLED: "bg-muted text-foreground",
 };
 
 /**
@@ -95,7 +95,7 @@ export default function PlatformSubscriptionsPage() {
                 </p>
             </div>
 
-            {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+            {error && <div className="p-4 bg-danger-soft text-danger rounded-lg">{error}</div>}
 
             <div className="flex flex-wrap items-end gap-3">
                 <div>
@@ -139,7 +139,7 @@ export default function PlatformSubscriptionsPage() {
             </div>
 
             <div className="bg-card rounded-lg shadow overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted">
                         <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Tenant</th>
@@ -152,7 +152,7 @@ export default function PlatformSubscriptionsPage() {
                             <th className="px-4 py-2" />
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                         {rows.map((org) => {
                             const sub = org.subscription;
                             return (
@@ -160,7 +160,7 @@ export default function PlatformSubscriptionsPage() {
                                     <td className="px-4 py-2 text-sm">
                                         <Link
                                             href={`/platform/organizations/${org.id}`}
-                                            className="text-blue-600 hover:underline font-medium"
+                                            className="text-info hover:underline font-medium"
                                         >
                                             {org.name}
                                         </Link>
@@ -175,7 +175,7 @@ export default function PlatformSubscriptionsPage() {
                                                 {sub.status}
                                             </span>
                                         ) : (
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-warning-soft text-warning">
                                                 NONE
                                             </span>
                                         )}
@@ -195,7 +195,7 @@ export default function PlatformSubscriptionsPage() {
                                     <td className="px-4 py-2 text-right">
                                         <Link
                                             href={`/platform/organizations/${org.id}`}
-                                            className="text-sm text-blue-600 hover:underline"
+                                            className="text-sm text-info hover:underline"
                                         >
                                             Manage
                                         </Link>

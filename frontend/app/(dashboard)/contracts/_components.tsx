@@ -70,14 +70,14 @@ export function ContractStatusPill({
  * than a coupling to introduce. If a status is added here it needs a colour there too.
  */
 const STATUS_CLASS: Record<string, string> = {
-    NOTICE_DUE: 'bg-red-100 text-red-700',
-    EXPIRED: 'bg-red-50 text-red-600',
-    EXPIRING_SOON: 'bg-amber-100 text-amber-800',
-    PENDING: 'bg-amber-100 text-amber-800',
+    NOTICE_DUE: 'bg-danger-soft text-danger',
+    EXPIRED: 'bg-danger-soft text-danger',
+    EXPIRING_SOON: 'bg-warning-soft text-warning',
+    PENDING: 'bg-warning-soft text-warning',
     OPEN_ENDED: 'bg-muted text-muted-foreground',
     SUPERSEDED: 'bg-muted text-muted-foreground',
-    UNDATED: 'bg-yellow-50 text-yellow-700',
-    ACTIVE: 'bg-green-100 text-green-800',
+    UNDATED: 'bg-warning-soft text-warning',
+    ACTIVE: 'bg-success-soft text-success',
 };
 
 /**
@@ -122,11 +122,11 @@ export function ExpiryCell({
             <span
                 className={
                     pastNotice
-                        ? 'font-medium text-red-700'
+                        ? 'font-medium text-danger'
                         : ended
                             ? 'text-muted-foreground'
                             : soon
-                                ? 'font-medium text-amber-700'
+                                ? 'font-medium text-warning'
                                 : ''
                 }
             >

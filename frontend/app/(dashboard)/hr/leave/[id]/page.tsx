@@ -272,7 +272,7 @@ export default function LeaveDetailPage() {
 
             {request.clashesWith && request.clashesWith.length > 0 && (
                 <div
-                    className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    className="rounded-md border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning"
                     role="alert"
                 >
                     <p className="font-medium">This overlaps approved leave</p>

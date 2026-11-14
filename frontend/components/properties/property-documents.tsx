@@ -139,7 +139,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                                     <button
                                         type="button"
                                         onClick={() => handleDelete(image)}
-                                        className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                                        className="rounded p-1 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                         aria-label={`Delete ${image.fileName}`}
                                     >
                                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -156,7 +156,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                     {files.map((file) => (
                         <li key={file.id} className="flex items-center justify-between gap-3 px-3 py-2">
                             <span className="flex min-w-0 items-center gap-2">
-                                <FileText className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                                 <span className="truncate text-sm">{file.fileName}</span>
                                 <span className="shrink-0 text-xs text-muted-foreground">
                                     v{file.version} · {Math.round(file.sizeBytes / 1024)} KB
@@ -173,7 +173,7 @@ export function PropertyDocuments({ propertyId }: { propertyId: string }) {
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(file)}
-                                    className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                                    className="rounded p-1.5 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                     aria-label={`Delete ${file.fileName}`}
                                 >
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />

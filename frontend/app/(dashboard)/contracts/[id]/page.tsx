@@ -309,7 +309,7 @@ export default function ContractDetailPage() {
                             </span>
                         </div>
                     ) : (
-                        <p className="text-sm text-amber-700">
+                        <p className="text-sm text-warning">
                             No signed copy on file. The register has the row; the paper is
                             somewhere else. Attach it from the Documents screen against
                             this contract.

@@ -130,7 +130,7 @@ export default function ExpiryReportPage() {
                 <Card>
                     <CardHeader className="pb-2">
                         <CardDescription>Notice period passed</CardDescription>
-                        <CardTitle className="text-3xl text-red-700">{noticeDue}</CardTitle>
+                        <CardTitle className="text-3xl text-danger">{noticeDue}</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0 text-xs text-muted-foreground">
                         Cannot be ended or extended. The decision was due before the term
@@ -140,7 +140,7 @@ export default function ExpiryReportPage() {
                 <Card>
                     <CardHeader className="pb-2">
                         <CardDescription>Ends within 30 days</CardDescription>
-                        <CardTitle className="text-3xl text-amber-700">{expiringSoon}</CardTitle>
+                        <CardTitle className="text-3xl text-warning">{expiringSoon}</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0 text-xs text-muted-foreground">
                         Notice can still be served.

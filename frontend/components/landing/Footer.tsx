@@ -1,180 +1,119 @@
 import React from 'react';
-import { Building2, Globe2, ShieldCheck, Lock, Mail, ArrowUp } from 'lucide-react';
+import Link from 'next/link';
+import { Building2, ShieldCheck, ArrowUp } from 'lucide-react';
 import { MARKETS } from './data/landingData';
 
-export const Footer: React.FC = () => {
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+/** Footer links are routes, not anchors: deep material lives on its own pages. */
+const MODULE_LINKS = ['Property & Units (100+)', 'Leasing & Tenant Portal', 'Derived Owner Statements', 'General Ledger & Jurisdiction Tax', 'Payment Recording & FIFO Allocation', 'Maintenance & Response Tracking'];
 
+const TRUST_LINKS = ['Derived Accounting Guarantee', '13 System Roles & Boundary Control', 'Append-Only Audit Logs', 'Multi-Tenant DB Isolation', 'Lease Expiry Schedules (60/30/14/7d)', 'CSV Dry-Run Validation'];
+
+const linkClass = 'hover:text-brand-700 dark:hover:text-brand-300 transition-colors';
+
+export const Footer: React.FC = () => {
   return (
-    <footer className="bg-slate-100 dark:bg-[#050811] border-t border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 text-xs">
+    <footer className="bg-canvas border-t border-line text-ink-muted text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
-          
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 shadow-md">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-brand-700 dark:bg-brand-500 flex items-center justify-center text-white">
                 <Building2 className="w-5 h-5 stroke-[2.5]" />
               </div>
-              <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white font-display">
-                TU Properties
-              </span>
-            </div>
+              <span className="font-semibold text-xl tracking-tight text-ink font-display">TU Properties</span>
+            </Link>
 
-            <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              The modern multi-market SaaS platform for property management companies, landlords, and institutional trusts worldwide. One organization per market, with its own currency, locale and tax rules. Run your properties, tenants, money, and staff from one audited system.
-            </p>
+            <p className="text-ink-muted text-xs sm:text-sm leading-relaxed max-w-sm">Property management software for owners, agencies and institutional trusts in Kenya and the United States. Each organization keeps its own currency, locale and tax rules. Run your properties, tenants, money, and staff from one audited system.</p>
 
-            <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+            <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-ink-subtle">
               {MARKETS.map((market) => (
-                <a
-                  key={market.code}
-                  href="#markets"
-                  title={`${market.country} — ${market.currency}`}
-                  className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-500/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                >
+                <Link key={market.code} href="/demo" title={`${market.country} — ${market.currency}`} className="px-2.5 py-1 rounded-md bg-surface border border-line text-ink-muted hover:border-brand-500/40 hover:text-brand-700 dark:hover:text-brand-300 transition-colors">
                   {market.code}
-                </a>
+                </Link>
               ))}
             </div>
           </div>
 
           {/* Col 1: Platform Modules */}
           <div>
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono mb-3">
-              Core Modules
-            </h4>
+            <h4 className="text-xs font-bold text-ink uppercase tracking-wider font-mono mb-3">Core Modules</h4>
             <ul className="space-y-2">
-              <li>
-                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Property & Units (100+)
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Leasing & Tenant Portal
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Derived Owner Statements
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  General Ledger & Jurisdiction Tax
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Payment Recording & FIFO Allocation
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Maintenance & Response Tracking
-                </a>
-              </li>
+              {MODULE_LINKS.map((label) => (
+                <li key={label}>
+                  <Link href="/features" className={linkClass}>
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Col 2: Architecture & Security */}
           <div>
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono mb-3">
-              Architecture & Trust
-            </h4>
+            <h4 className="text-xs font-bold text-ink uppercase tracking-wider font-mono mb-3">Architecture &amp; Trust</h4>
             <ul className="space-y-2">
+              {TRUST_LINKS.map((label) => (
+                <li key={label}>
+                  <Link href="/security" className={linkClass}>
+                    {label}
+                  </Link>
+                </li>
+              ))}
               <li>
-                <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Derived Accounting Guarantee
-                </a>
-              </li>
-              <li>
-                <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  13 System Roles &amp; Boundary Control
-                </a>
-              </li>
-              <li>
-                <a href="#trust" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Append-Only Audit Logs
-                </a>
-              </li>
-              <li>
-                <a href="#saas" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Multi-Tenant DB Isolation
-                </a>
-              </li>
-              <li>
-                <a href="#contact" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                <Link href="/contact" className={linkClass}>
                   Contact Us
-                </a>
-              </li>
-              <li>
-                <a href="#saas" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  Lease Expiry Schedules (60/30/14/7d)
-                </a>
-              </li>
-              <li>
-                <a href="#faq" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  CSV Dry-Run Validation
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
 
           {/* Col 3: Company & Contact */}
           <div>
-            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono mb-3">
-              Get Started
-            </h4>
+            <h4 className="text-xs font-bold text-ink uppercase tracking-wider font-mono mb-3">Get Started</h4>
             <ul className="space-y-2">
               <li>
-                <a href="#pricing" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                <Link href="/#pricing" className={linkClass}>
                   Pricing (14-Day Free Trial)
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#demo-accounts" className="text-amber-600 dark:text-amber-400 hover:text-amber-500 font-semibold transition-colors flex items-center gap-1.5">
+                <Link href="/demo" className="text-brand-700 dark:text-brand-300 hover:text-brand-7000 font-semibold transition-colors flex items-center gap-1.5">
                   <span>Demo / Test Accounts</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                </a>
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+                </Link>
               </li>
               <li>
-                <a href="#how-it-works" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                <Link href="/#how-it-works" className={linkClass}>
                   Interactive Simulator
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#faq" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                <Link href="/#faq" className={linkClass}>
                   Technical FAQ
-                </a>
+                </Link>
               </li>
-              <li className="pt-2 text-[11px] text-slate-500 font-mono">
-                Inquiries: support@tuhame.co.ke
+              <li>
+                <Link href="/contact" className={linkClass}>
+                  Contact
+                </Link>
               </li>
+              <li className="pt-2 text-[11px] text-ink-subtle font-mono">Inquiries: support@tuhame.co.ke</li>
             </ul>
           </div>
-
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-          <div>
-            © {new Date().getFullYear()} TU Properties. All rights reserved. Numbers derived from transactional records.
-          </div>
+        <div className="mt-12 pt-8 border-t border-line dark:border-line flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-ink-subtle">
+          <div>© {new Date().getFullYear()} TU Properties. All rights reserved. Numbers derived from transactional records.</div>
 
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
               <ShieldCheck className="w-3.5 h-3.5" />
               Isolated Tenant DB
             </span>
-            <span className="text-slate-500">•</span>
-            <button
-              onClick={scrollToTop}
-              className="hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
-            >
+            <span className="text-ink-subtle">•</span>
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1 cursor-pointer transition-colors">
               <span>Back to top</span>
               <ArrowUp className="w-3.5 h-3.5" />
             </button>

@@ -381,7 +381,7 @@ export default function PropertiesPage() {
                     columns={columns}
                     searchPlaceholder="Search properties…"
                     emptyMessage="No properties found. Add one to get started."
-                    emptyIcon={<Building2 className="h-12 w-12 text-slate-400" aria-hidden="true" />}
+                    emptyIcon={<Building2 className="h-12 w-12 text-muted-foreground" aria-hidden="true" />}
                     serverSidePagination
                     paginationMeta={meta}
                     onPaginationChange={handlePaginationChange}

@@ -185,7 +185,7 @@ export function RentReceiptFilters({
             type="checkbox"
             checked={filters.reversedOnly}
             onChange={(e) => handleFilterChange('reversedOnly', e.target.checked)}
-            className="ml-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="ml-2 h-4 w-4 rounded border-input text-info focus:ring-info"
           />
         </div>
 
@@ -198,7 +198,7 @@ export function RentReceiptFilters({
             type="checkbox"
             checked={filters.excludeReversed}
             onChange={(e) => handleFilterChange('excludeReversed', e.target.checked)}
-            className="ml-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="ml-2 h-4 w-4 rounded border-input text-info focus:ring-info"
           />
         </div>
 
@@ -211,7 +211,7 @@ export function RentReceiptFilters({
             type="checkbox"
             checked={filters.nonCurrentPeriodReversalOnly}
             onChange={(e) => handleFilterChange('nonCurrentPeriodReversalOnly', e.target.checked)}
-            className="ml-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="ml-2 h-4 w-4 rounded border-input text-info focus:ring-info"
           />
         </div>
 

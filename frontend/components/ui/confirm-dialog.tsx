@@ -51,15 +51,17 @@ export default function ConfirmDialog({
           <div className="mt-6 flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-gray-100"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               {cancelText}
             </button>
             <button
                 onClick={() => { onConfirm(); onClose(); }}
                 disabled={confirmDisabled}
-                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${
-                    tone === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'
+                className={`rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                    tone === 'danger'
+                        ? 'bg-danger text-danger-fg hover:bg-danger/90'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
             >
               {confirmText}

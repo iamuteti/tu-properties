@@ -305,7 +305,7 @@ export default function ContractsPage() {
                                                     On file
                                                 </span>
                                             ) : (
-                                                <span className="font-medium text-amber-700">
+                                                <span className="font-medium text-warning">
                                                     Missing
                                                 </span>
                                             )}

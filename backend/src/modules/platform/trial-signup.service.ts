@@ -83,6 +83,7 @@ export class TrialSignupService {
             adminPassword: dto.adminPassword,
             trialDays: 14,
             contactEmail: dto.contactEmail,
+            currency: dto.currency,
           },
           undefined,
         );

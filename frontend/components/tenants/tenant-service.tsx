@@ -285,7 +285,7 @@ export function TenantServiceSection({
             </div>
 
             {pendingRequests.length > 0 && (
-                <p className="text-sm text-amber-700">
+                <p className="text-sm text-warning">
                     {pendingRequests.length} request(s) are still waiting for a decision.
                 </p>
             )}

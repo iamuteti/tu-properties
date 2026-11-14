@@ -69,7 +69,7 @@ export function StatementSummary({
                 <dd
                     className={cn(
                         'text-base font-bold tabular-nums',
-                        owed ? 'text-red-600' : 'text-emerald-700',
+                        owed ? 'text-danger' : 'text-success',
                     )}
                 >
                     {money(values.netPayout, currency)}
@@ -109,7 +109,7 @@ function Row({
             <dd
                 className={cn(
                     'tabular-nums',
-                    tone === 'deduct' ? 'text-red-600' : undefined,
+                    tone === 'deduct' ? 'text-danger' : undefined,
                 )}
             >
                 {value}

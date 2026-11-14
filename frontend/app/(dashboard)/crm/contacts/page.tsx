@@ -250,7 +250,7 @@ export default function ContactsPage() {
                     columns={columns}
                     searchPlaceholder="Search contacts by name, email, phone or company…"
                     emptyMessage="No contacts yet. Convert a lead, or add one directly."
-                    emptyIcon={<UserRound className="h-12 w-12 text-slate-400" aria-hidden="true" />}
+                    emptyIcon={<UserRound className="h-12 w-12 text-muted-foreground" aria-hidden="true" />}
                     serverSidePagination
                     paginationMeta={meta}
                     onPaginationChange={(p) => {

@@ -138,7 +138,7 @@ export default function SaleDetailPage() {
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Outstanding</p>
                         <p
                             className={`mt-1 text-2xl font-bold ${
-                                money.outstanding > 0 ? 'text-red-600' : 'text-green-700'
+                                money.outstanding > 0 ? 'text-danger' : 'text-success'
                             }`}
                         >
                             {currency} {Number(money.outstanding).toLocaleString()}
@@ -181,14 +181,14 @@ export default function SaleDetailPage() {
                                     <span
                                         className={`rounded-full px-2.5 py-1 font-medium ${
                                             reached
-                                                ? 'bg-slate-900 text-white'
+                                                ? 'bg-primary text-primary-foreground'
                                                 : 'bg-muted text-muted-foreground'
                                         }`}
                                     >
                                         {stage.label}
                                     </span>
                                     {index < SALE_STAGES.filter((s) => s.value !== 'CANCELLED').length - 1 && (
-                                        <span className="text-slate-300">→</span>
+                                        <span className="text-muted-foreground">→</span>
                                     )}
                                 </li>
                             );
@@ -198,7 +198,7 @@ export default function SaleDetailPage() {
                     <SaleStageActions sale={sale} onChanged={loadSale} />
 
                     {sale.cancellationReason && (
-                        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                        <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
                             Cancelled: {sale.cancellationReason}
                         </p>
                     )}

@@ -122,7 +122,7 @@ export default function WarehouseDetailPage({
                     </h1>
                     <p className="text-muted-foreground">
                         {store.isDefault && (
-                            <span className="mr-2 inline-flex items-center rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-medium text-cyan-800">
+                            <span className="mr-2 inline-flex items-center rounded-full bg-stage-cyan-soft px-2.5 py-0.5 text-xs font-medium text-stage-cyan">
                                 Default store
                             </span>
                         )}

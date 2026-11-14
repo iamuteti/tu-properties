@@ -168,7 +168,7 @@ export default function BillDetailPage() {
                 )}
             </div>
 
-            {notice && <div className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">{notice}</div>}
+            {notice && <div className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">{notice}</div>}
             {error && <div className="text-destructive text-sm">{error}</div>}
 
             <div className="grid gap-4 md:grid-cols-4">

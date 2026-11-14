@@ -18,7 +18,7 @@ const columns: ColumnDef<Invoice>[] = [
     accessorKey: "invoiceNumber",
     header: "Invoice #",
     cell: ({ row }) => (
-      <Link href={`/finance/invoices/${row.original.id}`} className="font-medium text-blue-600 hover:text-blue-800">
+      <Link href={`/finance/invoices/${row.original.id}`} className="font-medium text-info hover:text-info">
         {row.original.invoiceNumber}
       </Link>
     ),
@@ -69,7 +69,7 @@ const columns: ColumnDef<Invoice>[] = [
     accessorKey: "balanceAmount",
     header: "Amount Due",
     cell: ({ row }) => (
-      <div className="text-right font-medium text-red-600">
+      <div className="text-right font-medium text-danger">
         {row.original.currency} {row.original.balanceAmount}
       </div>
     ),
@@ -83,22 +83,22 @@ const columns: ColumnDef<Invoice>[] = [
       
       switch (status) {
         case "PAID":
-          statusColor = "bg-green-100 text-green-800";
+          statusColor = "bg-success-soft text-success";
           break;
         case "OVERDUE":
-          statusColor = "bg-red-100 text-red-800";
+          statusColor = "bg-danger-soft text-danger";
           break;
         case "PARTIALLY_PAID":
-          statusColor = "bg-yellow-100 text-yellow-800";
+          statusColor = "bg-warning-soft text-warning";
           break;
         case "PENDING":
-          statusColor = "bg-blue-100 text-blue-800";
+          statusColor = "bg-info-soft text-info";
           break;
         case "DRAFT":
-          statusColor = "bg-gray-100 text-foreground";
+          statusColor = "bg-muted text-foreground";
           break;
         case "CANCELLED":
-          statusColor = "bg-gray-100 text-foreground";
+          statusColor = "bg-muted text-foreground";
           break;
       }
       
@@ -271,7 +271,7 @@ export default function InvoicesPage() {
           { id: "status", label: "Status" },
         ]}
         emptyMessage="No invoices found. Create your first invoice to get started."
-        emptyIcon={<Search className="mx-auto h-12 w-12 text-slate-400" />}
+        emptyIcon={<Search className="mx-auto h-12 w-12 text-muted-foreground" />}
         defaultPageSize={10}
         pageSizeOptions={[10, 20, 30, 40, 50]}
         enableRowSelection

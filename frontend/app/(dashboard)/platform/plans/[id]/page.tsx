@@ -110,9 +110,9 @@ export default function EditPlanPage() {
         <div className="p-6 space-y-6 mx-auto">
             <div className="flex justify-between">
                 <h1 className="text-2xl font-bold">Edit plan</h1>
-                <button onClick={() => router.push("/platform/plans")} className="text-sm text-blue-600 hover:underline mb-2">← Back to plans</button>
+                <button onClick={() => router.push("/platform/plans")} className="text-sm text-info hover:underline mb-2">← Back to plans</button>
             </div>
-            {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+            {error && <div className="p-4 bg-danger-soft text-danger rounded-lg">{error}</div>}
             <div className="p-6 bg-card rounded-lg shadow space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -197,7 +197,7 @@ export default function EditPlanPage() {
                     </div>
                 </div>
                 <div className="mt-4">
-                    <button onClick={save} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    <button onClick={save} disabled={saving} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50">
                         {saving ? "Saving…" : "Save changes"}
                     </button>
                 </div>

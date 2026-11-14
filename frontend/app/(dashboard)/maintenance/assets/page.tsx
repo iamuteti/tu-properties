@@ -109,7 +109,7 @@ export default function AssetsPage() {
                     const date = new Date(next);
                     const overdue = date < new Date();
                     return (
-                        <span className={overdue ? 'font-medium text-amber-700' : ''}>
+                        <span className={overdue ? 'font-medium text-warning' : ''}>
                             {date.toLocaleDateString(undefined, {
                                 day: 'numeric',
                                 month: 'short',
@@ -350,9 +350,9 @@ function Counter({
 }) {
     const toneClass =
         tone === 'danger'
-            ? 'text-red-600'
+            ? 'text-danger'
             : tone === 'warn'
-              ? 'text-amber-600'
+              ? 'text-warning'
               : 'text-foreground';
     return (
         <div className="rounded-lg border border-border px-4 py-3">

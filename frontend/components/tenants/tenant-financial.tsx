@@ -97,7 +97,7 @@ export function TenantFinancialSection({
                     <CardContent>
                         <p
                             className={`text-2xl font-semibold ${
-                                totalOutstanding > 0 ? 'text-amber-700' : ''
+                                totalOutstanding > 0 ? 'text-warning' : ''
                             }`}
                         >
                             {fmt.money(totalOutstanding, currency)}

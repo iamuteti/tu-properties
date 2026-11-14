@@ -242,7 +242,7 @@ export default function NotificationSettingsPage() {
             </div>
 
             {notice && (
-                <div className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                <div className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
                     {notice}
                 </div>
             )}
@@ -262,12 +262,12 @@ export default function NotificationSettingsPage() {
                                         <span>
                                             {CHANNEL_TITLES[channel.channel] ?? channel.channel}
                                             {channel.active && (
-                                                <span className="ml-3 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                                                <span className="ml-3 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">
                                                     active
                                                 </span>
                                             )}
                                             {!channel.active && channel.configured && (
-                                                <span className="ml-3 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-foreground">
+                                                <span className="ml-3 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                                                     configured, not active
                                                 </span>
                                             )}
@@ -300,7 +300,7 @@ export default function NotificationSettingsPage() {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {channel.error && (
-                                        <p className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                        <p className="flex items-center gap-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">
                                             <AlertTriangle className="h-4 w-4" />
                                             {channel.error}
                                         </p>

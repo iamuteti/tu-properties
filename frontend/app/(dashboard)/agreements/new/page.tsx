@@ -306,7 +306,7 @@ export default function NewAgreementPage() {
                                         else — the agreement keeps both numbers.
                                     </p>
                                 ) : (
-                                    <p className="text-xs text-amber-700">
+                                    <p className="text-xs text-warning">
                                         This kind of unit has no deposit rule yet, so
                                         say what the deposit is.
                                     </p>

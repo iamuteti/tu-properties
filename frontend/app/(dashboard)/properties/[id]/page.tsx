@@ -155,12 +155,12 @@ export default function PropertyDetailPage() {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard label="Units" value={occupancy.total ?? 0} />
-                <SummaryCard label="Vacant" value={occupancy.VACANT ?? 0} tone="text-green-700" />
-                <SummaryCard label="Occupied" value={occupancy.OCCUPIED ?? 0} tone="text-blue-700" />
+                <SummaryCard label="Vacant" value={occupancy.VACANT ?? 0} tone="text-success" />
+                <SummaryCard label="Occupied" value={occupancy.OCCUPIED ?? 0} tone="text-info" />
                 <SummaryCard
                     label="Other"
                     value={(occupancy.RESERVED ?? 0) + (occupancy.MAINTENANCE ?? 0)}
-                    tone="text-amber-700"
+                    tone="text-warning"
                 />
             </div>
 
@@ -181,7 +181,7 @@ export default function PropertyDetailPage() {
                         onClick={() => setTab(item.id)}
                         className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                             tab === item.id
-                                ? "bg-slate-900 text-white"
+                                ? "bg-primary text-primary-foreground"
                                 : "text-muted-foreground hover:bg-muted"
                         }`}
                     >

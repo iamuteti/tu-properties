@@ -146,7 +146,7 @@ export default function PayrollRulesPage() {
             {coverage && (
                 <Card
                     className={
-                        coverage.warning ? 'border-amber-400' : undefined
+                        coverage.warning ? 'border-warning/50' : undefined
                     }
                 >
                     <CardHeader>
@@ -162,27 +162,27 @@ export default function PayrollRulesPage() {
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                         {coverage.warning ? (
-                            <p className="text-amber-900">{coverage.warning}</p>
+                            <p className="text-warning">{coverage.warning}</p>
                         ) : (
-                            <p className="text-emerald-800">
+                            <p className="text-success">
                                 {coverage.ruleCount} rules in force
                                 {coverage.codes.length > 0 && `: ${coverage.codes.join(', ')}`}
                             </p>
                         )}
                         {coverage.missingAccounts.length > 0 && (
-                            <p className="text-amber-900">
+                            <p className="text-warning">
                                 No ledger account is mapped for: {coverage.missingAccounts.join(', ')}.
                                 The figures will calculate but cannot post.
                             </p>
                         )}
                         {coverage.unknownAccounts.length > 0 && (
-                            <p className="text-amber-900">
+                            <p className="text-warning">
                                 These ledger accounts are not in the chart of accounts:{' '}
                                 {coverage.unknownAccounts.join(', ')}.
                             </p>
                         )}
                         {coverage.sharedAccounts && coverage.sharedAccounts.length > 0 && (
-                            <p className="text-amber-900">
+                            <p className="text-warning">
                                 More than one rule posts to the same account:{' '}
                                 {coverage.sharedAccounts.join(', ')}, so a trial balance will
                                 merge them.
@@ -958,7 +958,7 @@ function PreviewModal({ onClose }: { onClose: () => void }) {
                             <span className="font-medium">{preview.jurisdiction.label}</span>.
                         </p>
                         {preview.lines.length === 0 ? (
-                            <p className="text-sm text-amber-800">
+                            <p className="text-sm text-warning">
                                 Nothing was calculated — no rules resolve for this jurisdiction.
                             </p>
                         ) : (

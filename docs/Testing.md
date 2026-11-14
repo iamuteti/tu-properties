@@ -31,10 +31,13 @@ npx prisma db seed
 
 ### Choosing the markets the demo covers
 
-The seed covers fifteen markets by default — the big rental markets (US, UK,
-Canada, Australia, Germany, France), the fast-growing ones (India, China,
-Japan, South Korea, Brazil, Mexico), the GCC (United Arab Emirates) and, in
-Africa, **Kenya and South Africa only**.
+The seed covers the **two markets this deployment sells into** — Kenya and the
+United States — because those are the only ones the public site offers and the
+plan catalogue can price (`backend/src/common/supported-markets.ts`). The other
+thirteen profiles in `jurisdictions.ts` are complete and still seedable, but
+they are dormant configuration rather than an offer: they exist so a third
+market can be switched on without re-deriving its tax, telephone, tariff and
+rent data.
 
 Two environment variables control it:
 
@@ -44,10 +47,16 @@ Two environment variables control it:
 # gets a market organization with its own currency, locale and tax rules.
 DEMO_COUNTRY=KE npm run db:seed:demo
 
-# A subset of markets, by ISO-3166-1 alpha-2 code. An unknown code fails
-# the seed loudly rather than silently skipping a market.
+# A subset of markets, by ISO-3166-1 alpha-2 code. Unset, it defaults to the
+# supported markets (KE,US). An unknown code fails the seed loudly rather
+# than silently skipping a market.
 DEMO_COUNTRIES=KE,ZA,IN,BR npm run db:seed:demo
 ```
+
+With no variables set, the seed therefore produces Rohi and Westhill (Kenya)
+plus the United States market organization. To reproduce the pre-narrowing
+fifteen-market demo, name the markets explicitly — nothing was deleted from the
+seeder, only from the default.
 
 Each market is seeded from its own jurisdiction profile
 (`backend/src/prisma/jurisdictions.ts`): currency, locale, timezone,
@@ -228,7 +237,10 @@ Capture Manually), and the utility meter register and billing.
 | Dubai Properties Group | dubai-properties-group-ae | mae | PROFESSIONAL |
 
 Only the markets listed in `DEMO_COUNTRIES` (and not the primary one) get a
-row here; the table is the full set.
+row here; the table is the full set. With the default configuration only
+**Liberty Property Group (US)** is seeded alongside Rohi and Westhill; the rest
+appear when their code is passed explicitly, e.g.
+`DEMO_COUNTRIES=KE,US,ZA,GB npm run db:seed:demo`.
 
 ### Business Data
 - **Westhill Properties:** 1 property, 2 units, 2 tenants, 1 agreement, 2 invoices.

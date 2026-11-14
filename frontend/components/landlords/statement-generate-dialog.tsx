@@ -189,7 +189,7 @@ export function StatementGenerateDialog({
 
                 <div className="rounded-lg border bg-muted p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                        <Sparkles className="h-4 w-4 text-cyan-600" aria-hidden="true" />
+                        <Sparkles className="h-4 w-4 text-stage-cyan" aria-hidden="true" />
                         What this period will produce
                     </div>
 
@@ -238,7 +238,7 @@ export function StatementGenerateDialog({
                             {preview.priorStatements.some(
                                 (statement) => statement.status !== 'VOID',
                             ) && (
-                                <p className="text-xs text-amber-700">
+                                <p className="text-xs text-warning">
                                     A statement already covers part of this period — generating
                                     this one will be refused until it is voided.
                                 </p>

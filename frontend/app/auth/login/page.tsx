@@ -182,7 +182,7 @@ function LoginForm() {
                     aria-label="TU Properties - back to home"
                     className="group flex items-center gap-2.5 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/25 transition-transform duration-200 group-hover:scale-105">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-700 dark:bg-brand-500 text-white">
                         <Building2 className="h-5 w-5 stroke-[2.3]" />
                     </span>
                     <span className="text-lg font-extrabold tracking-tight text-foreground">
@@ -263,7 +263,7 @@ function LoginForm() {
             {/* Quick Demo Fill Buttons */}
             {/* <div className="pt-4 border-t border-border space-y-2">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                    <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                    <KeyRound className="w-3.5 h-3.5 text-brand-600 dark:text-brand-300" />
                     <span>Quick Fill Demo Personas (Password123!):</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -281,7 +281,7 @@ function LoginForm() {
                                 setValue('email', demo.email);
                                 setValue('password', 'Password123!');
                             }}
-                            className="px-2.5 py-1 text-xs rounded-md bg-secondary hover:bg-amber-500/10 hover:text-amber-500 hover:border-amber-500/30 border border-border text-secondary-foreground font-mono transition-colors"
+                            className="px-2.5 py-1 text-xs rounded-md bg-secondary hover:bg-brand-50 dark:hover:bg-brand-100 hover:text-brand-700 dark:hover:text-brand-300 hover:border-brand-500/40 border border-border text-secondary-foreground font-mono transition-colors"
                         >
                             {demo.label}
                         </button>

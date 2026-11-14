@@ -64,11 +64,11 @@ export default function PlatformPlansPage() {
                     <h1 className="text-2xl font-bold">Plans</h1>
                     <p className="text-sm text-muted-foreground">The catalog the platform sells. Edit a plan to manage its modules.</p>
                 </div>
-                <Link href="/platform/plans/new" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                <Link href="/platform/plans/new" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2">
                     <Plus className="w-4 h-4" /> New plan
                 </Link>
             </div>
-            {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+            {error && <div className="p-4 bg-danger-soft text-danger rounded-lg">{error}</div>}
             <div className="bg-card rounded-lg shadow overflow-x-auto">
                 <SimpleTable
                     data={plans}
@@ -79,7 +79,7 @@ export default function PlatformPlansPage() {
                             <div>
                                 <div className="font-medium">{plan.name}</div>
                                 <div className="text-xs text-muted-foreground">{plan.slug} · {plan.interval}</div>
-                                {plan.isPopular && <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800">Popular</span>}
+                                {plan.isPopular && <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-brand-100 text-brand-700 dark:text-brand-300">Popular</span>}
                             </div>
                         )},
                         { key: "price", header: "Price", cell: (plan: SubscriptionPlanRecord) => {
@@ -90,14 +90,14 @@ export default function PlatformPlansPage() {
                         { key: "limits", header: "Limits", cell: (plan: SubscriptionPlanRecord) => `${plan.maxUsers} seats · ${plan.maxProperties} properties` },
                         { key: "modules", header: "Modules", cell: (plan: SubscriptionPlanRecord) => plan.enabledModules?.length ?? 0 },
                         { key: "status", header: "Status", cell: (plan: SubscriptionPlanRecord) => plan.isActive
-                            ? <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-                            : <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700">Archived</span> },
+                            ? <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-success-soft text-success">Active</span>
+                            : <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-muted text-foreground">Archived</span> },
                         { key: "actions", header: "", headerClassName: "text-right", className: "text-right", cell: (plan: SubscriptionPlanRecord) => (
                             <div className="flex items-center justify-end gap-2">
-                                <Link href={`/platform/plans/${plan.id}`} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit">
+                                <Link href={`/platform/plans/${plan.id}`} className="p-1.5 text-info hover:bg-info-soft rounded" title="Edit">
                                     <Pencil className="w-4 h-4" />
                                 </Link>
-                                <button onClick={() => setConfirmDelete(plan)} disabled={deletingId === plan.id} className={`p-1.5 rounded ${plan.isActive ? "text-red-600 hover:bg-red-50" : "text-gray-400"} disabled:opacity-50`} title={plan.isActive ? "Archive" : "Restore"}>
+                                <button onClick={() => setConfirmDelete(plan)} disabled={deletingId === plan.id} className={`p-1.5 rounded ${plan.isActive ? "text-danger hover:bg-danger-soft" : "text-muted-foreground"} disabled:opacity-50`} title={plan.isActive ? "Archive" : "Restore"}>
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                             </div>

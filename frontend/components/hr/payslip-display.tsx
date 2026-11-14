@@ -60,8 +60,8 @@ const DIRECTION_HEADING: Record<PayrollLineDirection, string> = {
 
 const DIRECTION_ROW: Record<PayrollLineDirection, string> = {
     EARNING: 'text-foreground',
-    EMPLOYEE_DEDUCTION: 'text-amber-800',
-    EMPLOYER_CONTRIBUTION: 'text-sky-800',
+    EMPLOYEE_DEDUCTION: 'text-warning',
+    EMPLOYER_CONTRIBUTION: 'text-stage-sky',
 };
 
 export interface PayslipDisplayProps {
@@ -150,7 +150,7 @@ export function PayslipDisplay({
                     </dl>
 
                     {payslip.paymentState === 'approved-not-released' && (
-                        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        <p className="rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
                             This period has been approved and posted to the ledger, but the
                             money has not been released yet.
                         </p>
@@ -218,7 +218,7 @@ export function PayslipDisplay({
                         </div>
                         <div>
                             <dt className="text-sm text-muted-foreground">Deductions</dt>
-                            <dd className="text-lg font-semibold text-amber-800">
+                            <dd className="text-lg font-semibold text-warning">
                                 {money(totals.employeeDeductions, payslip.currency)}
                             </dd>
                         </div>
@@ -226,7 +226,7 @@ export function PayslipDisplay({
                             <dt className="text-sm text-muted-foreground">
                                 Employer contributions
                             </dt>
-                            <dd className="text-lg font-semibold text-sky-800">
+                            <dd className="text-lg font-semibold text-stage-sky">
                                 {money(totals.employerContributions, payslip.currency)}
                             </dd>
                         </div>

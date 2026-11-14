@@ -603,7 +603,7 @@ export default function SettingsPage() {
                         )}
 
                         {mfaMsg && (
-                            <p className={`text-sm ${mfaMsg.kind === "error" ? "text-destructive" : "text-green-700"}`}>
+                            <p className={`text-sm ${mfaMsg.kind === "error" ? "text-destructive" : "text-success"}`}>
                                 {mfaMsg.text}
                             </p>
                         )}
@@ -656,7 +656,7 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-end gap-3">
                 {saveMsg && (
-                    <p className={`text-sm ${saveMsg.kind === "error" ? "text-destructive" : "text-green-700"}`}>
+                    <p className={`text-sm ${saveMsg.kind === "error" ? "text-destructive" : "text-success"}`}>
                         {saveMsg.text}
                     </p>
                 )}

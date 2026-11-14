@@ -23,22 +23,22 @@ const columns: ColumnDef<Payment>[] = [
       
       switch (method) {
         case "CASH":
-          methodColor = "bg-green-100 text-green-800";
+          methodColor = "bg-success-soft text-success";
           break;
         case "BANK_TRANSFER":
-          methodColor = "bg-blue-100 text-blue-800";
+          methodColor = "bg-info-soft text-info";
           break;
         case "CHEQUE":
-          methodColor = "bg-yellow-100 text-yellow-800";
+          methodColor = "bg-warning-soft text-warning";
           break;
         case "MPESA":
-          methodColor = "bg-purple-100 text-purple-800";
+          methodColor = "bg-stage-violet-soft text-stage-violet";
           break;
         case "CARD":
-          methodColor = "bg-indigo-100 text-indigo-800";
+          methodColor = "bg-stage-indigo-soft text-stage-indigo";
           break;
         default:
-          methodColor = "bg-gray-100 text-foreground";
+          methodColor = "bg-muted text-foreground";
       }
       
       return (
@@ -70,7 +70,7 @@ const columns: ColumnDef<Payment>[] = [
       // Try to get meaningful particulars from invoice or rental agreement
       if (payment.invoice) {
         return (
-          <Link href={`/finance/invoices/${payment.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800">
+          <Link href={`/finance/invoices/${payment.invoice.id}`} className="font-medium text-info hover:text-info">
             {payment.invoice.invoiceNumber}
           </Link>
         );
@@ -353,7 +353,7 @@ export default function PaymentsPage() {
           { id: "paymentReference", label: "Reference" },
         ]}
         emptyMessage="No payments found. Record your first payment to get started."
-        emptyIcon={<Search className="mx-auto h-12 w-12 text-slate-400" />}
+        emptyIcon={<Search className="mx-auto h-12 w-12 text-muted-foreground" />}
         defaultPageSize={10}
         pageSizeOptions={[10, 20, 30, 40, 50]}
         enableRowSelection

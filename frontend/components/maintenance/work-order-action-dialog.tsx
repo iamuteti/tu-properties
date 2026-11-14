@@ -195,7 +195,7 @@ export function WorkOrderActionDialog({
                 {action === 'COMPLETE' && (
                     <>
                         {openTasks > 0 && (
-                            <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+                            <div className="flex items-start gap-2 rounded-md bg-warning-soft p-3 text-sm text-warning">
                                 <AlertTriangle
                                     className="mt-0.5 h-4 w-4 shrink-0"
                                     aria-hidden="true"
@@ -256,7 +256,7 @@ export function WorkOrderActionDialog({
                 )}
 
                 {error && (
-                    <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
+                    <div className="flex items-start gap-2 rounded-md bg-danger-soft p-3 text-sm text-danger">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                         <span>{error}</span>
                     </div>

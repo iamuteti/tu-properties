@@ -162,7 +162,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
               placeholder="Enter landlord name"
             />
             {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              <p className="mt-1 text-sm text-danger">{errors.name.message}</p>
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -176,7 +176,7 @@ export function AddLandlordModal({ isOpen, onClose, onSuccess, landlord }: AddLa
                 placeholder="Enter email address"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                <p className="mt-1 text-sm text-danger">{errors.email.message}</p>
               )}
             </div>
             <div>

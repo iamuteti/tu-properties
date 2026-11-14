@@ -88,7 +88,7 @@ export default function FacilityBookingsPage() {
                     <p className="text-muted-foreground">
                         Every slot that has been held, asked for, given up or missed.
                         {pendingCount > 0 && (
-                            <span className="ml-1 font-medium text-amber-700">
+                            <span className="ml-1 font-medium text-warning">
                                 {pendingCount} waiting for approval.
                             </span>
                         )}
@@ -216,7 +216,7 @@ export default function FacilityBookingsPage() {
                                             <p className="font-mono text-muted-foreground">
                                                 {booking.slotLabel}
                                                 {booking.timing.phase === 'NOW' && (
-                                                    <span className="ml-1 font-sans text-emerald-700">
+                                                    <span className="ml-1 font-sans text-success">
                                                         now
                                                     </span>
                                                 )}
@@ -256,12 +256,12 @@ export default function FacilityBookingsPage() {
 function StatusPill({ status }: { status: FacilityBookingStatus }) {
     const style =
         {
-            PENDING: 'bg-amber-100 text-amber-800',
-            CONFIRMED: 'bg-emerald-100 text-emerald-700',
+            PENDING: 'bg-warning-soft text-warning',
+            CONFIRMED: 'bg-success-soft text-success',
             CANCELLED: 'bg-muted text-muted-foreground',
-            REJECTED: 'bg-red-100 text-red-700',
-            NO_SHOW: 'bg-orange-100 text-orange-800',
-        }[status] ?? 'bg-gray-100 text-foreground';
+            REJECTED: 'bg-danger-soft text-danger',
+            NO_SHOW: 'bg-warning-soft text-warning',
+        }[status] ?? 'bg-muted text-foreground';
     const label = status.charAt(0) + status.slice(1).toLowerCase();
     return (
         <span

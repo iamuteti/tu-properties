@@ -225,16 +225,16 @@ export default function AgreementsPage() {
             </div>
 
             {expiring.agreements.length > 0 && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+                <div className="rounded-lg border border-warning/30 bg-warning-soft p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                            <h2 className="flex items-center gap-2 text-sm font-semibold text-warning">
                                 <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                                 {expiring.agreements.length} agreement
                                 {expiring.agreements.length === 1 ? '' : 's'} ending within 60
                                 days
                             </h2>
-                            <p className="mt-0.5 text-xs text-amber-800">
+                            <p className="mt-0.5 text-xs text-warning">
                                 Renewal is open for these — reminders become scheduled sends in
                                 Module 18.
                             </p>
@@ -244,7 +244,7 @@ export default function AgreementsPage() {
                                 <Link
                                     key={lease.id}
                                     href={`/agreements/${lease.id}`}
-                                    className="rounded-md bg-card px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm hover:bg-amber-100"
+                                    className="rounded-md bg-card px-3 py-1.5 text-xs font-medium text-warning shadow-sm hover:bg-warning-soft"
                                 >
                                     {lease.tenant
                                         ? `${lease.tenant.surname} ${lease.tenant.otherNames ?? ""}`.trim()
@@ -326,7 +326,7 @@ export default function AgreementsPage() {
                     columns={columns}
                     searchPlaceholder="Search by lease code, tenant or unit…"
                     emptyMessage="No agreements yet. Draft one against a vacant unit."
-                    emptyIcon={<FileText className="h-12 w-12 text-slate-400" aria-hidden="true" />}
+                    emptyIcon={<FileText className="h-12 w-12 text-muted-foreground" aria-hidden="true" />}
                     serverSidePagination
                     paginationMeta={meta}
                     onPaginationChange={(p) => {

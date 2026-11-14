@@ -192,7 +192,7 @@ export default function NewRfqPage() {
                     <CardTitle className="text-lg">
                         Who to ask
                         {selected.length < 2 && (
-                            <span className="ml-2 text-sm font-normal text-amber-700">
+                            <span className="ml-2 text-sm font-normal text-warning">
                                 {selected.length === 0
                                     ? 'Nobody yet'
                                     : 'One supplier — this will be flagged single-source'}

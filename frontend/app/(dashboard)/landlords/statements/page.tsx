@@ -93,14 +93,14 @@ export default function OwnerStatementsPage() {
             accessorKey: 'expenses',
             header: 'Expenses',
             cell: ({ row }) => (
-                <span className="tabular-nums text-red-600">{money(row.original.expenses)}</span>
+                <span className="tabular-nums text-danger">{money(row.original.expenses)}</span>
             ),
         },
         {
             accessorKey: 'managementFee',
             header: 'Fee',
             cell: ({ row }) => (
-                <span className="tabular-nums text-red-600">{money(row.original.managementFee)}</span>
+                <span className="tabular-nums text-danger">{money(row.original.managementFee)}</span>
             ),
         },
         {

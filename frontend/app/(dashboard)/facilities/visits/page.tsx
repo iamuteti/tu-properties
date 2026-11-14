@@ -103,10 +103,10 @@ export default function VisitorVisitsPage() {
                         computed from two timestamps and the clock, so nothing here can be
                         stale.
                         {onSite > 0 && (
-                            <span className="ml-1 font-medium text-emerald-700">
+                            <span className="ml-1 font-medium text-success">
                                 {onSite} on site
                                 {overdue > 0 && (
-                                    <span className="text-red-700">, {overdue} overstayed</span>
+                                    <span className="text-danger">, {overdue} overstayed</span>
                                 )}
                                 .
                             </span>
@@ -235,7 +235,7 @@ export default function VisitorVisitsPage() {
                                             <span
                                                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                                     VISIT_STATE_STYLES[visit.state] ??
-                                                    'bg-gray-100 text-foreground'
+                                                    'bg-muted text-foreground'
                                                 }`}
                                             >
                                                 {visit.stateLabel}
@@ -246,7 +246,7 @@ export default function VisitorVisitsPage() {
                                                 </p>
                                             )}
                                             {visit.isOverdue && visit.minutesOverdue != null && (
-                                                <p className="mt-1 text-xs text-red-700">
+                                                <p className="mt-1 text-xs text-danger">
                                                     {visit.minutesOverdue} min over
                                                 </p>
                                             )}

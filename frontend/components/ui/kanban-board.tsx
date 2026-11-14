@@ -120,7 +120,7 @@ export function KanbanBoard<T>({
                                 <div>
                                     <h2 className="text-sm font-semibold">
                                         {column.label}{' '}
-                                        <span className="text-slate-400">({cards.length})</span>
+                                        <span className="text-muted-foreground">({cards.length})</span>
                                     </h2>
                                     {column.description && (
                                         <p className="text-xs text-muted-foreground">
@@ -135,8 +135,8 @@ export function KanbanBoard<T>({
                                     <p
                                         className={`rounded-md border border-dashed px-3 py-6 text-center text-xs ${
                                             isTarget
-                                                ? 'border-slate-400 bg-card text-muted-foreground'
-                                                : 'border-border text-slate-400'
+                                                ? 'border-border bg-card text-muted-foreground'
+                                                : 'border-border text-muted-foreground'
                                         }`}
                                     >
                                         {droppable ? (isTarget ? 'Drop here' : 'No items') : 'Closed'}

@@ -378,7 +378,7 @@ export default function UnitDetailPage() {
                         Billing
                     </CardTitle>
                     {outstanding > 0 && (
-                        <span className="text-sm font-medium text-red-600">
+                        <span className="text-sm font-medium text-danger">
                             Outstanding {unit.currency ?? "KES"} {outstanding.toLocaleString()}
                         </span>
                     )}

@@ -44,20 +44,20 @@ export const ImagePicker: React.FC<ImagePickerProps> = ({
             <img
               src={preview}
               alt="Preview"
-              className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+              className="w-24 h-24 object-cover rounded-lg border border-border"
             />
             <button
               type="button"
               onClick={handleRemove}
               disabled={disabled}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 disabled:opacity-50"
+              className="absolute -top-2 -right-2 bg-danger text-danger-fg rounded-full p-1 hover:bg-danger/90 disabled:opacity-50"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-muted">
-            <Upload className="w-8 h-8 text-gray-400" />
+          <div className="w-24 h-24 border-2 border-dashed border-input rounded-lg flex items-center justify-center bg-muted">
+            <Upload className="w-8 h-8 text-muted-foreground" />
           </div>
         )}
         <div>
@@ -71,7 +71,7 @@ export const ImagePicker: React.FC<ImagePickerProps> = ({
           />
           <label
             htmlFor="image-input"
-            className="inline-flex items-center px-4 py-2 bg-card border border-gray-300 rounded-md shadow-sm text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center px-4 py-2 bg-card border border-input rounded-md shadow-sm text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 cursor-pointer"
           >
             {preview ? 'Change Photo' : 'Upload Photo'}
           </label>

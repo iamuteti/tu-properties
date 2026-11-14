@@ -275,7 +275,7 @@ export default function SecurityDepositsPage() {
                                   locale,
                               )}
                         {row.original.carriedForward > 0 && (
-                            <p className="text-xs text-amber-700">
+                            <p className="text-xs text-warning">
                                 {formatMoney(
                                     row.original.carriedForward,
                                     row.original.currency,

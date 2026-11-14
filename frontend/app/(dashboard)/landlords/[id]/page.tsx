@@ -33,7 +33,7 @@ const categoryLabel = (value: string) =>
 
 const statementTone = (status: string) =>
     OWNER_STATEMENT_STATUSES.find((option) => option.value === status)?.className ??
-    'bg-gray-100 text-foreground';
+    'bg-muted text-foreground';
 
 /**
  * Landlord detail (Module 6).
@@ -168,7 +168,7 @@ export default function LandlordDetailPage() {
                     <CardContent>
                         <p
                             className={`text-2xl font-semibold ${
-                                landlord.totals.outstanding > 0 ? 'text-amber-700' : ''
+                                landlord.totals.outstanding > 0 ? 'text-warning' : ''
                             }`}
                         >
                             {money(landlord.totals.outstanding)}

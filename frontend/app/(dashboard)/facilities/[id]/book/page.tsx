@@ -258,7 +258,7 @@ export default function BookFacilityPage() {
                                     aria-pressed={isSelected}
                                     className={`min-w-[5.5rem] shrink-0 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
                                         isSelected
-                                            ? 'border-cyan-600 bg-cyan-50'
+                                            ? 'border-stage-cyan/60 bg-stage-cyan-soft'
                                             : 'border-border hover:bg-muted'
                                     }`}
                                 >
@@ -272,7 +272,7 @@ export default function BookFacilityPage() {
                                         className={
                                             entry.isOpen
                                                 ? free > 0
-                                                    ? 'text-emerald-700'
+                                                    ? 'text-success'
                                                     : 'text-muted-foreground'
                                                 : 'text-muted-foreground'
                                         }
@@ -345,11 +345,11 @@ export default function BookFacilityPage() {
                                             aria-pressed={isSelected}
                                             className={`w-full rounded-lg border px-2 py-2 text-xs transition-colors ${
                                                 isSelected
-                                                    ? 'border-cyan-600 bg-cyan-50 font-medium'
+                                                    ? 'border-stage-cyan/60 bg-stage-cyan-soft font-medium'
                                                     : canPick
                                                       ? covered
-                                                        ? 'border-cyan-300 bg-cyan-50/60 hover:border-cyan-500'
-                                                        : 'border-emerald-200 bg-emerald-50 hover:border-emerald-400'
+                                                        ? 'border-stage-cyan/40 bg-stage-cyan-soft hover:border-stage-cyan/50'
+                                                        : 'border-success/30 bg-success-soft hover:border-success/60'
                                                       : 'cursor-not-allowed border-border bg-muted text-muted-foreground'
                                             }`}
                                             title={
@@ -379,7 +379,7 @@ export default function BookFacilityPage() {
                         </p>
                     )}
                     {preview?.ok && (
-                        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        <p className="rounded-md border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">
                             That slot is free. It will be confirmed immediately, or held
                             for approval if the facility needs it.
                         </p>

@@ -1225,7 +1225,7 @@ export function Sidebar() {
                             "rounded-full px-2 py-0.5 text-xs font-semibold",
                             isActive
                                 ? "bg-primary-foreground/20 text-primary-foreground"
-                                : "bg-amber-100 text-amber-800"
+                                : "bg-warning-soft text-warning"
                         )}
                     >
                         {badgeCount}

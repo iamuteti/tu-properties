@@ -216,7 +216,7 @@ export default function TenantDetailPage() {
                     <CardContent>
                         <p
                             className={`text-2xl font-semibold ${
-                                data.outstanding > 0 ? 'text-amber-700' : ''
+                                data.outstanding > 0 ? 'text-warning' : ''
                             }`}
                         >
                             {fmt.money(data.outstanding, data.currency)}

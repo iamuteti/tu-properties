@@ -165,7 +165,7 @@ export default function WorkflowSettingsPage() {
                                                         {definition.entityType}
                                                     </span>
                                                     {isPlatform && (
-                                                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                                                        <span className="rounded-full bg-stage-violet-soft px-2 py-0.5 text-xs font-medium text-stage-violet">
                                                             Platform default
                                                         </span>
                                                     )}
@@ -387,7 +387,7 @@ function DefinitionEditor({
                 />
 
                 {mode === "copy" && (
-                    <p className="rounded-md bg-violet-50 px-3 py-2 text-sm text-violet-900">
+                    <p className="rounded-md bg-stage-violet-soft px-3 py-2 text-sm text-stage-violet">
                         Saving creates your organization&apos;s own copy. The platform
                         default is left untouched for everyone else.
                     </p>

@@ -151,7 +151,7 @@ export default function CommissionReportPage() {
                         <Card>
                             <CardContent className="py-4">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending</p>
-                                <p className="mt-1 text-2xl font-bold text-amber-700">
+                                <p className="mt-1 text-2xl font-bold text-warning">
                                     {totals.pending.toLocaleString()}
                                 </p>
                             </CardContent>
@@ -159,7 +159,7 @@ export default function CommissionReportPage() {
                         <Card>
                             <CardContent className="py-4">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Approved</p>
-                                <p className="mt-1 text-2xl font-bold text-sky-700">
+                                <p className="mt-1 text-2xl font-bold text-stage-sky">
                                     {totals.approved.toLocaleString()}
                                 </p>
                             </CardContent>
@@ -167,7 +167,7 @@ export default function CommissionReportPage() {
                         <Card>
                             <CardContent className="py-4">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Paid</p>
-                                <p className="mt-1 text-2xl font-bold text-green-700">
+                                <p className="mt-1 text-2xl font-bold text-success">
                                     {totals.paid.toLocaleString()}
                                 </p>
                             </CardContent>
@@ -212,13 +212,13 @@ export default function CommissionReportPage() {
                                                 <TableCell className="text-right font-medium">
                                                     {row.total.toLocaleString()}
                                                 </TableCell>
-                                                <TableCell className="text-right text-amber-700">
+                                                <TableCell className="text-right text-warning">
                                                     {row.pending.toLocaleString()}
                                                 </TableCell>
-                                                <TableCell className="text-right text-sky-700">
+                                                <TableCell className="text-right text-stage-sky">
                                                     {row.approved.toLocaleString()}
                                                 </TableCell>
-                                                <TableCell className="text-right text-green-700">
+                                                <TableCell className="text-right text-success">
                                                     {row.paid.toLocaleString()}
                                                 </TableCell>
                                             </TableRow>

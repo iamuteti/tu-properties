@@ -248,7 +248,7 @@ export default function FacilitiesPage() {
                                                             {facility.opensAtLabel}–{facility.closesAtLabel}
                                                         </span>
                                                         {facility.isOpenNow && (
-                                                            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                                            <span className="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">
                                                                 open now
                                                             </span>
                                                         )}
@@ -262,7 +262,7 @@ export default function FacilitiesPage() {
                                                     <TableCell className="text-xs">
                                                         {facility.isBookable ? (
                                                             facility.requiresApproval ? (
-                                                                <span className="text-amber-700">
+                                                                <span className="text-warning">
                                                                     needs approval
                                                                 </span>
                                                             ) : (

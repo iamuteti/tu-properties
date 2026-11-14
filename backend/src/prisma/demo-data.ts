@@ -107,7 +107,6 @@ import {
   getActiveProfile,
   getProfile,
   PROFILES,
-  demoMarkets,
   orgEmailDomain,
   rentInRange,
   randomFrom,
@@ -124,6 +123,7 @@ import {
   randomPostalCode as profileRandomPostalCode,
   utilityRate,
 } from './jurisdictions';
+import { SUPPORTED_MARKET_CODES } from '../common/supported-markets';
 
 dotenv.config();
 
@@ -3896,9 +3896,12 @@ export interface SeedDemoDataOptions {
  * The markets the demo covers, minus the primary one.
  *
  * An unknown code is an error rather than a skipped market: a typo in
- * `DEMO_COUNTRIES` that quietly seeds fourteen countries instead of fifteen is
- * the kind of mistake nobody notices until a demo fails to show a country it
- * promised.
+ * `DEMO_COUNTRIES` that quietly seeds one country instead of two is the kind of
+ * mistake nobody notices until a demo fails to show a country it promised.
+ *
+ * Defaults to the two markets the product sells into. The other jurisdiction
+ * profiles still exist and a code outside this list still seeds correctly when
+ * asked for explicitly — this is the default, not a hard restriction.
  */
 function resolveMarketCodes(
   options: SeedDemoDataOptions,
@@ -3915,7 +3918,7 @@ function resolveMarketCodes(
   const codes = (
     requested
       ? requested.map((code) => code.toUpperCase())
-      : demoMarkets(primary)
+      : [...SUPPORTED_MARKET_CODES]
   ).filter((code, index, all) => all.indexOf(code) === index);
 
   const unknown = codes.filter((code) => !PROFILES[code]);
@@ -4198,23 +4201,28 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
       },
     });
 
-    // Multi-branch international enterprise organization (optional).
+    // Multi-branch enterprise organization (optional).
+    //
+    // Two branches, one per market the product sells into. The organization
+    // itself takes the primary market's currency, locale, time zone and tax
+    // country rather than a hardcoded one, so `DEMO_COUNTRY=US` produces a US
+    // parent with a Nairobi branch, not a British company with a Dubai office.
     if (multiBranch) {
-      console.log('Creating international enterprise organization...');
+      console.log('Creating multi-branch enterprise organization...');
       const intlOrg = await prisma.organization.create({
         data: {
-          name: 'Global Properties International',
-          slug: 'global-properties-international',
-          subdomain: 'global',
+          name: 'Transatlantic Property Group',
+          slug: 'transatlantic-property-group',
+          subdomain: 'transatlantic',
           plan: 'ENTERPRISE',
           maxUsers: 200,
           maxProperties: 5000,
           isActive: true,
-          taxCountryCode: 'GB',
-          defaultLocale: 'en-GB',
-          currency: 'GBP',
-          timezone: 'Europe/London',
-          weekendDays: [6, 7],
+          taxCountryCode: activeProfile.code,
+          defaultLocale: activeProfile.locale,
+          currency: activeProfile.currency,
+          timezone: activeProfile.timezone,
+          weekendDays: activeProfile.weekendDays,
         },
       });
 
@@ -4226,15 +4234,11 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         },
       });
 
+      // The two markets the product offers. `code` is set explicitly because a
+      // three-letter slice of "New York" is "NEW", which reads like a mistake.
       const branches = [
-        { name: 'London Branch', city: 'London', currency: 'GBP' },
-        { name: 'New York Branch', city: 'New York', currency: 'USD' },
-        {
-          name: 'Nairobi Branch',
-          city: 'Nairobi',
-          currency: activeProfile.currency,
-        },
-        { name: 'Dubai Branch', city: 'Dubai', currency: 'AED' },
+        { name: 'Nairobi Branch', city: 'Nairobi', code: 'NBO' },
+        { name: 'New York Branch', city: 'New York', code: 'NYC' },
       ];
       for (const b of branches) {
         await prisma.branch.create({
@@ -4242,13 +4246,13 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
             organizationId: intlOrg.id,
             name: b.name,
             city: b.city,
-            code: b.city.substring(0, 3).toUpperCase(),
+            code: b.code,
             isActive: true,
           },
         });
       }
       console.log(
-        `Created international organization with ${branches.length} branches.`,
+        `Created multi-branch organization with ${branches.length} branches.`,
       );
     }
 
@@ -4256,12 +4260,15 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     //
     // Rohi and Westhill carry the whole dataset — payroll, utilities,
     // contracts, workflows — and that is where the detail belongs. What the
-    // market organizations add is *coverage*: the demo of a multi-country
-    // product has to show that a Kenyan organization and an Indian one are not
-    // the same rows with a different label on them, and the cheapest honest
-    // way to show that is to seed both with their own currency, locale,
+    // market organizations add is *coverage*: that a Kenyan organization and a
+    // US one are not the same rows with a different label on them. The cheapest
+    // honest way to show that is to seed each with its own currency, locale,
     // timezone, tax jurisdiction, rent band, names, addresses, phone formats,
     // banks and utility tariffs.
+    //
+    // Default is the two markets the product sells into; naming another code in
+    // `DEMO_COUNTRIES` still seeds it, which is what keeps the dormant
+    // jurisdiction profiles honest.
     console.log('Creating market organizations...');
     const marketOrgs: MarketOrg[] = [];
     for (const code of resolveMarketCodes(options, country)) {

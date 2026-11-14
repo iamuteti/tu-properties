@@ -291,7 +291,7 @@ export default function JournalEntriesPage() {
                             <div className="flex flex-wrap items-center justify-between gap-4">
                                 <div className="text-sm text-muted-foreground">
                                     Debits {money(draftTotals.debit)} · Credits {money(draftTotals.credit)} ·{" "}
-                                    <span className={draftTotals.difference === 0 ? "text-green-700" : "text-destructive"}>
+                                    <span className={draftTotals.difference === 0 ? "text-success" : "text-destructive"}>
                                         {draftTotals.difference === 0
                                             ? "Balanced"
                                             : `Out by ${money(Math.abs(draftTotals.difference))}`}
@@ -369,11 +369,11 @@ export default function JournalEntriesPage() {
                                                 <TableCell className="text-right">{money(total)}</TableCell>
                                                 <TableCell>
                                                     {entry.status === "REVERSED" ? (
-                                                        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-foreground">
+                                                        <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
                                                             Reversed
                                                         </span>
                                                     ) : (
-                                                        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                                                        <span className="rounded-full bg-success-soft px-2 py-1 text-xs font-medium text-success">
                                                             Posted
                                                         </span>
                                                     )}

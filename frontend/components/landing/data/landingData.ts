@@ -483,20 +483,30 @@ export const ALL_MARKETS: MarketProfile[] = [
 ];
 
 /**
+ * The markets this deployment sells into.
+ *
+ * Two, deliberately: Kenya and the United States. The other profiles in
+ * `ALL_MARKETS` are kept as dormant config so a market can be switched on
+ * without re-deriving its tax, telephone, tariff and rent data — but nothing
+ * offers them while they are not in this list.
+ */
+export const SUPPORTED_MARKET_CODES = ['KE', 'US'];
+
+/**
  * Which markets the public landing page shows.
  *
  * Driven by `NEXT_PUBLIC_LANDING_MARKETS` in `frontend/.env` — a
  * comma-separated list of ISO-3166-1 alpha-2 codes, in the order they should
- * appear. Leave it unset and every market shows. The env var decides what the
- * page talks about; the profile itself is still the copy above.
+ * appear. Leave it unset and `SUPPORTED_MARKET_CODES` is used. The env var
+ * decides what the page talks about; the profile itself is still the copy above.
  */
 function parseMarketCodes(value: string | undefined): string[] {
-  if (value === undefined) return ALL_MARKETS.map((market) => market.code);
+  if (value === undefined) return SUPPORTED_MARKET_CODES;
   const codes = value
     .split(',')
     .map((code) => code.trim().toUpperCase())
     .filter(Boolean);
-  if (codes.length === 0) return ALL_MARKETS.map((market) => market.code);
+  if (codes.length === 0) return SUPPORTED_MARKET_CODES;
   return codes;
 }
 
@@ -520,10 +530,12 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * The markets on the page, in the order `NEXT_PUBLIC_LANDING_MARKETS` gave.
- * Never empty — a list of only unknown codes falls back to every market.
+ * Never empty — a list of only unknown codes falls back to the supported pair.
  */
 export const MARKETS: MarketProfile[] =
-  REQUESTED_MARKETS.length > 0 ? REQUESTED_MARKETS : ALL_MARKETS;
+  REQUESTED_MARKETS.length > 0
+    ? REQUESTED_MARKETS
+    : ALL_MARKETS.filter((market) => SUPPORTED_MARKET_CODES.includes(market.code));
 
 export const MARKET_CODES = MARKETS.map((market) => market.code);
 
@@ -1071,21 +1083,19 @@ export const TESTIMONIALS = [
   }
 ];
 
-export type PricingCurrency =
-  | 'USD'
-  | 'KES'
-  | 'ZAR'
-  | 'GBP'
-  | 'CAD'
-  | 'AUD'
-  | 'EUR'
-  | 'INR'
-  | 'JPY'
-  | 'CNY'
-  | 'KRW'
-  | 'BRL'
-  | 'MXN'
-  | 'AED';
+/**
+ * Which currencies the product bills in.
+ *
+ * Two markets are offered — Kenya and the United States — so there are two
+ * currencies. The other jurisdiction profiles still exist in
+ * `backend/src/prisma/jurisdictions.ts` and in this file's `ALL_MARKETS`, but
+ * they are dormant config: no page offers them and no organization can be
+ * created in one. Adding a market back means adding its currency here and a
+ * price for every tier in `PRICING_PLANS` (the `Record` type makes a missing
+ * tier a compile error).
+ */
+export type PricingCurrency = 'KES' | 'USD';
+
 
 /**
  * Every currency the pricing table can be shown in.
@@ -1093,22 +1103,7 @@ export type PricingCurrency =
  * One per currency the shipped markets bill in — Germany and France share the
  * euro, so fourteen currencies cover fifteen markets.
  */
-export const ALL_PRICING_CURRENCIES: PricingCurrency[] = [
-  'USD',
-  'KES',
-  'ZAR',
-  'GBP',
-  'CAD',
-  'AUD',
-  'EUR',
-  'INR',
-  'JPY',
-  'CNY',
-  'KRW',
-  'BRL',
-  'MXN',
-  'AED'
-];
+export const ALL_PRICING_CURRENCIES: PricingCurrency[] = ['KES', 'USD'];
 
 /**
  * Which currencies the pricing switcher offers.
@@ -1116,7 +1111,8 @@ export const ALL_PRICING_CURRENCIES: PricingCurrency[] = [
  * Driven by `NEXT_PUBLIC_LANDING_CURRENCIES` in `frontend/.env` — a
  * comma-separated list of ISO-4217 codes, in the order they should appear.
  * Leave it unset and the currencies the enabled markets bill in are used, so
- * the two lists cannot drift apart.
+ * the two lists cannot drift apart. Kenya bills in KES, the United States in
+ * USD, so the default pair is both.
  */
 function parseCurrencies(value: string | undefined): PricingCurrency[] {
   if (value === undefined) {
@@ -1172,20 +1168,8 @@ export const PRICING_PLANS: {
     badge: 'Boutique Apartments & Private Landlords',
     description: 'Perfect for boutique 12-unit walk-ups, residential apartments, or emerging portfolios up to 50 active units.',
     pricing: {
-      USD: { monthly: 49, annual: 39 },
       KES: { monthly: 6500, annual: 5200 },
-      ZAR: { monthly: 900, annual: 720 },
-      GBP: { monthly: 39, annual: 31 },
-      CAD: { monthly: 67, annual: 52 },
-      AUD: { monthly: 74, annual: 59 },
-      EUR: { monthly: 45, annual: 36 },
-      INR: { monthly: 4050, annual: 3250 },
-      JPY: { monthly: 7600, annual: 6000 },
-      CNY: { monthly: 350, annual: 280 },
-      KRW: { monthly: 66000, annual: 53000 },
-      BRL: { monthly: 250, annual: 200 },
-      MXN: { monthly: 830, annual: 660 },
-      AED: { monthly: 180, annual: 144 }
+      USD: { monthly: 49, annual: 39 }
     },
     features: [
       'Ideal for 12 to 50 active rental units',
@@ -1204,20 +1188,8 @@ export const PRICING_PLANS: {
     badge: 'Growing Property Management Companies',
     description: 'Complete operations for established agencies running multiple buildings and dedicated staff.',
     pricing: {
-      USD: { monthly: 129, annual: 99 },
       KES: { monthly: 17000, annual: 13000 },
-      ZAR: { monthly: 2400, annual: 1850 },
-      GBP: { monthly: 99, annual: 76 },
-      CAD: { monthly: 177, annual: 136 },
-      AUD: { monthly: 197, annual: 151 },
-      EUR: { monthly: 119, annual: 91 },
-      INR: { monthly: 10700, annual: 8200 },
-      JPY: { monthly: 20000, annual: 15300 },
-      CNY: { monthly: 930, annual: 710 },
-      KRW: { monthly: 174000, annual: 133000 },
-      BRL: { monthly: 660, annual: 505 },
-      MXN: { monthly: 2190, annual: 1680 },
-      AED: { monthly: 473, annual: 363 }
+      USD: { monthly: 129, annual: 99 }
     },
     features: [
       'Up to 300 active units across up to 5 branches',
@@ -1235,23 +1207,11 @@ export const PRICING_PLANS: {
   },
   {
     name: 'Enterprise',
-    badge: 'Institutional Portfolios & Multi-Country Firms',
-    description: 'Bespoke infrastructure for property management groups operating across several jurisdictions.',
+    badge: 'Institutional Portfolios & Multi-Entity Firms',
+    description: 'Bespoke infrastructure for property groups running several organizations across Kenya and the United States.',
     pricing: {
-      USD: { monthly: 299, annual: 249 },
       KES: { monthly: 39000, annual: 32000 },
-      ZAR: { monthly: 5500, annual: 4600 },
-      GBP: { monthly: 235, annual: 196 },
-      CAD: { monthly: 410, annual: 341 },
-      AUD: { monthly: 457, annual: 380 },
-      EUR: { monthly: 275, annual: 229 },
-      INR: { monthly: 24800, annual: 20600 },
-      JPY: { monthly: 46400, annual: 38600 },
-      CNY: { monthly: 2150, annual: 1790 },
-      KRW: { monthly: 403000, annual: 336000 },
-      BRL: { monthly: 1520, annual: 1270 },
-      MXN: { monthly: 5080, annual: 4230 },
-      AED: { monthly: 1097, annual: 914 }
+      USD: { monthly: 299, annual: 249 }
     },
     features: [
       'High unit and property ceilings, set per organization',
@@ -1279,7 +1239,7 @@ export const FAQS = [
   },
   {
     question: 'Does it handle my country\'s taxes?',
-    answer: 'It does, because jurisdiction is configuration rather than code. Fifteen market profiles ship with the platform, each carrying its own currency, locale, timezone, consumption-tax rate, telephone format, tax-ID shape, utility tariffs and residential rent band, so a Kenyan organization and an Indian one are not the same rows with a different label on them. Statutory rates are configuration rows on top of that: worked tax rules ship for Kenya, Germany, the United Kingdom and United States (by state), worked payroll rules for Kenya, Germany and the United Kingdom, and any other regime is added as a dated rule rather than as code.'
+    answer: 'It does, because jurisdiction is configuration rather than code. Two market profiles are offered today — Kenya and the United States — and each carries its own currency, locale, timezone, consumption-tax rate, telephone format, tax-ID shape, utility tariffs and rent band, so a Kenyan organization and a Californian one are not the same rows with a different label on them. Statutory rates are configuration rows on top of that: worked tax rules ship for Kenya and for the United States by state, and worked payroll rules for Kenya. Another market is added as a profile row plus dated rules, not as code.'
   },
   {
     question: 'What property and portfolio sizes does TU Properties support?',

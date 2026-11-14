@@ -26,13 +26,22 @@ under the `tuhame.co.ke` domain (sub-domain per project).
   `secure` in production). The API origin must be **same-site** with the frontend
   — it is, both sit under `tuhame.co.ke`. Move the API to another registrable
   domain and the browser stops sending the cookie.
-- Payments: **no payment gateway is integrated** — rent and invoices are
-  *recorded*, not processed. `mpesaPropertyPayNumber` and the STK-push switches
-  are per-property fields in the UI, and there are no gateway credentials to
-  set at deploy time (no `MPESA_*` variable is read by the code).
-- Email and SMS: configured **in the admin panel** — SMTP and SMS provider
-  credentials live encrypted in the database. There are no `SMTP_*` env vars;
-  `NOTIFICATION_CREDENTIALS_KEY` is the only secret to set at deploy time.
+- Payments: **Stripe Checkout** bills subscriptions for paid plans. The client
+  calls `POST /payments/checkout` (ADMIN/SUPER_ADMIN), the API creates a hosted
+  Checkout Session, and Stripe calls back to `POST /payments/webhooks/stripe`.
+  Set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` at deploy time (section 3).
+  Rent and invoice collection is still *recorded*, not processed —
+  `mpesaPropertyPayNumber` and the STK-push switches are per-property fields in
+  the UI, and no `MPESA_*` env var is read. The webhook verifies its signature
+  against the raw request bytes, which Nest exposes via `rawBody: true` in
+  `main.ts`; never add a global `express.raw` parser (it leaves `req.body` a
+  `Buffer` and breaks every `@Body()` DTO).
+- Email: **two independent paths.** System `SMTP_*` env vars send the
+  trial-signup verification link, before any organization has configured a
+  channel; per-organization SMTP/SMS credentials are configured **in the admin
+  panel** and stored encrypted under `NOTIFICATION_CREDENTIALS_KEY`. Set
+  `SMTP_*` and `FRONTEND_URL` at deploy time — the verification link is
+  `${FRONTEND_URL}/auth/verify-email?token=...`.
 - There is **no Redis/Bull, no Socket.IO and no Swagger** in this project.
   Recurring billing and other scheduled work run inside the API
   (`@nestjs/schedule`), so there is nothing extra to install or harden.
@@ -89,8 +98,8 @@ only `npm run db:seed:roles` (roles + permissions) and create the first
 organization through the UI.
 
 > Do NOT run `npm run db:seed:demo` against a live database — it deletes every
-> organization and re-seeds all 15 markets with the public `Password123!`
-> password. Use it only on a staging copy.
+> organization and re-seeds the demo markets (Kenya and the United States by
+> default) with the public `Password123!` password. Use it only on a staging copy.
 
 ## 3. Production Environment Variables
 
@@ -146,6 +155,36 @@ JWT_SECRET="<strong-random-value>"
 # admin panel lets a key be re-entered.
 NOTIFICATION_CREDENTIALS_KEY="<64-hex-chars>"
 
+# Public site origin — used only to build the email-verification link a public
+# trial signup receives: ${FRONTEND_URL}/auth/verify-email?token=...
+# This does NOT drive CORS (that is CORS_ORIGINS). Default: http://localhost:3007.
+FRONTEND_URL="https://properties.tuhame.co.ke"
+
+# System SMTP — sends the trial-signup verification email before any
+# organization has configured its own notification channel. Separate from the
+# per-organization SMTP/SMS credentials stored in the admin panel. If unset the
+# API attempts 127.0.0.1:2525; a failed send is logged and the account simply
+# stays unverified (the user can request a resend).
+SMTP_HOST=""
+SMTP_PORT=2525
+SMTP_USER=""
+SMTP_PASS=""
+SMTP_FROM="TU Properties <noreply@example.invalid>"
+SMTP_SECURE=false
+
+# How long an email-verification token stays valid, in milliseconds.
+# Default: 86400000 (24 hours).
+EMAIL_VERIFICATION_EXPIRES_MS=86400000
+
+# Stripe — subscription billing only (not rent collection).
+# Secret key: Stripe Dashboard → Developers → API keys.
+# Webhook signing secret: the endpoint's signing secret.
+# Endpoint: https://api-properties.tuhame.co.ke/payments/webhooks/stripe
+# Without these the API still boots; checkout throws and the webhook rejects
+# events. No publishable key is needed (hosted-redirect Checkout).
+STRIPE_SECRET_KEY="sk_live_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
 # Uploads — MUST be an absolute path outside the git checkout so `git pull`
 # never wipes stored files, and the PM2 user must own it (section 4.4).
 STORAGE_DRIVER=local
@@ -168,11 +207,12 @@ STORAGE_DIR=/var/lib/tu-properties/uploads
 # S3_FORCE_PATH_STYLE=true
 ```
 
-> **Variables the code does NOT read** — do not rely on them: `FRONTEND_URL`
-> (CORS is driven by `CORS_ORIGINS` alone), `JWT_EXPIRES_IN` (the session TTL is
-> hardcoded to 60 minutes), `SMTP_*` and `MPESA_*` (email, SMS and payments are
-> configured in the admin panel or not integrated at all), and `S3_BUCKET_NAME`
-> (the variable is `S3_BUCKET`).
+> **Variables the code does NOT read** — do not rely on them: `JWT_EXPIRES_IN`
+> (the session TTL is hardcoded to 60 minutes), `MPESA_*` (there is no M-Pesa
+> gateway; M-Pesa payments are recorded, and M-Pesa inside Stripe Checkout is
+> enabled in the Stripe Dashboard), and `S3_BUCKET_NAME` (the variable is
+> `S3_BUCKET`). `FRONTEND_URL` **is** read now, but only for the email-verification
+> link — CORS is still driven by `CORS_ORIGINS` alone.
 
 ### Frontend `frontend/.env`
 
@@ -191,9 +231,18 @@ NEXT_PUBLIC_BACKEND_URL=https://api-properties.tuhame.co.ke
 PORT=3002
 
 # Public landing page — comma-separated, in display order.
-# 14 currencies cover the 15 markets (Germany and France share the euro).
-# NEXT_PUBLIC_LANDING_MARKETS=KE,ZA,US,GB,CA,AU,DE,FR,IN,CN,JP,KR,BR,MX,AE
-# NEXT_PUBLIC_LANDING_CURRENCIES=USD,KES,ZAR,GBP,CAD,AUD,EUR,INR,CNY,JPY,KRW,BRL,MXN,AED
+# The product is offered in two markets: Kenya (KES) and the United States
+# (USD). Both values default to exactly this, so setting them is optional —
+# set them only when you want a different order or a narrower surface.
+# Two currencies cover two markets; every market's currency must have a price
+# for every tier in PRICING_PLANS, which is where /features pricing reads from.
+# NEXT_PUBLIC_LANDING_MARKETS=KE,US
+# NEXT_PUBLIC_LANDING_CURRENCIES=KES,USD
+
+# Stripe — NOT required. Checkout is a hosted redirect, so the browser never
+# loads Stripe.js and no publishable key is read by the code. The variable in
+# frontend/.env.example is reserved for a future Stripe.js/Elements flow.
+# NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 ```
 
 PM2 does **not** set ports in `ecosystem.config.js` — `PORT` comes from this
@@ -529,6 +578,11 @@ PostgreSQL (5432) stays bound to localhost.
 - [ ] Upload a document — confirms the storage driver (a file in
       `/var/lib/tu-properties/uploads`, or an object in the S3 bucket) and the
       25 MB nginx cap
+- [ ] A public trial signup sends a verification email — confirms `SMTP_*` and
+      `FRONTEND_URL`; the link lands on `/auth/verify-email` and verifies the user
+- [ ] `POST /payments/webhooks/stripe` with a Stripe test event returns
+      `200 { received: true }` — confirms `STRIPE_WEBHOOK_SECRET` and
+      `rawBody: true`; a forged signature returns 400
 - [ ] Configure SMTP in the admin panel and send a test notification — without
       an active provider the email channel is suppressed, not delivered
 - [ ] Tenant isolation: log in as an org admin and confirm only that
@@ -650,12 +704,15 @@ The seeders are development tools. On production, use them deliberately:
 |---------|--------------|---------------------|
 | `npm run db:seed` | Super Admin + 13 roles + demo organizations (Rohi, Westhill) | Yes, on a **fresh** database — then change the admin password |
 | `npm run db:seed:roles` | Roles + permission matrix only | Yes — the right choice for an empty production database |
-| `npm run db:seed:demo` | **Deletes every organization** and re-seeds all 15 markets with `Password123!` | No |
+| `npm run db:seed:demo` | **Deletes every organization** and re-seeds the demo markets (`KE,US` by default) with `Password123!` | No |
 | `npm run db:seed:jedan` | The Jedan Apartments dataset (1 estate, 44 units, 53 tenants) | Only as a demo dataset — run it *after* `db:seed:demo`, because the demo seed wipes organizations |
 | `npm run db:backfill:unit-types` | Gives existing units a unit type and a deposit rule | Yes — safe to run twice, leaves units that already have a type alone |
 
-The demo market is chosen with `DEMO_COUNTRY` / `DEMO_COUNTRIES`
-(ISO-3166-1 alpha-2; Africa is Kenya and South Africa only). An unknown code
+The demo markets are chosen with `DEMO_COUNTRY` / `DEMO_COUNTRIES` (ISO-3166-1
+alpha-2). Unset, `DEMO_COUNTRIES` defaults to the supported markets, `KE,US`:
+Rohi Estate Management and Westhill Properties (Kenya) plus the United States
+market organization. The other jurisdiction profiles are dormant config and
+seed only when named explicitly (`DEMO_COUNTRIES=KE,ZA,IN`). An unknown code
 fails the seed loudly on purpose — a skipped market is worse than a stopped
 seed. Full account list: `Testing.md`.
 
@@ -720,7 +777,8 @@ carries one and clears it when it does not.
 | ecosystem.config.js | Relative `cwd` paths | Always `pm2 start ecosystem.config.js` from the repo root (step 4.3) |
 | `STORAGE_DIR` | Relative default (`./uploads`) | Absolute path + chown (steps 3, 4.4) |
 | Super Admin password | Public default (`Password123!`) | Change on first login (steps 2, 7.11) |
-| Email / SMS | Not configured | Configure SMTP + SMS in the admin panel (steps 3, 7.12) |
-| M-Pesa | Pay numbers recorded per property, no gateway integrated | Set the per-property pay number; live STK push needs a gateway integration |
+| Email / SMS | System SMTP + per-org credentials not configured | Set `SMTP_*` + `FRONTEND_URL` for trial-signup verification; configure per-org SMTP + SMS in the admin panel (steps 3, 7.12) |
+| Stripe billing | Keys not set | Set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; create Products/Prices and register the webhook (`PAYMENT_INTEGRATION.md`) |
+| M-Pesa | Pay numbers recorded per property, no gateway integrated | Set the per-property pay number; enable M-Pesa inside Stripe Checkout; live STK push would need a gateway integration |
 | SSL + DNS | No records/certs | A records + certbot for both subdomains (step 5) |
 | Backups | None | `pg_dump` + uploads `tar` on a cron (step 10.2) |

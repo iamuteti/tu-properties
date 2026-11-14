@@ -61,15 +61,15 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                 <button
                     type="button"
                     className={cn(
-                        "flex h-10 w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
+                        "flex h-10 w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm ring-offset-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-stage-cyan/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
                         className,
-                        error && "border-red-500 focus:ring-red-500",
+                        error && "border-danger/50 focus:ring-danger",
                         disabled && "cursor-not-allowed opacity-50"
                     )}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     disabled={disabled}
                 >
-                    <span className={cn("truncate", !selectedLabels && "text-slate-400")}>
+                    <span className={cn("truncate", !selectedLabels && "text-muted-foreground")}>
                         {selectedLabels || placeholder}
                     </span>
                     <svg
@@ -83,19 +83,19 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                 </button>
 
                 {isOpen && (
-                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-border bg-card text-slate-950 shadow-lg">
+                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-border bg-card text-foreground shadow-lg">
                         {search && (
-                            <div className="relative p-2 border-b border-slate-100">
+                            <div className="relative p-2 border-b border-border">
                                 <input
                                     type="text"
                                     placeholder="Search..."
-                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-slate-400 border border-border rounded-md"
+                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-muted-foreground border border-border rounded-md"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     autoFocus
                                 />
                                 <svg
-                                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -114,7 +114,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                                     >
                                         <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
                                             {value.includes(option.value) && (
-                                                <Check className="h-4 w-4 text-cyan-600" />
+                                                <Check className="h-4 w-4 text-stage-cyan" />
                                             )}
                                         </span>
                                         <span className="pl-6">{option.label}</span>
@@ -137,10 +137,10 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
             <div className="grid w-full items-center gap-1.5">
                 <label className="text-sm font-medium leading-none text-foreground">
                     {label}
-                    {required && <span className="text-red-500"> *</span>}
+                    {required && <span className="text-danger"> *</span>}
                 </label>
                 {content}
-                {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+                {error && <p className="text-sm font-medium text-danger">{error}</p>}
             </div>
         )
     }

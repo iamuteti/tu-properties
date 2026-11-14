@@ -341,7 +341,7 @@ export function CaptureManuallyForm({ tenantId: lockedTenantId, tenantName: lock
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-                <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+                <div className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4 text-danger">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
                     <p className="text-sm">{error}</p>
                 </div>
@@ -445,7 +445,7 @@ export function CaptureManuallyForm({ tenantId: lockedTenantId, tenantName: lock
                     </div>
 
                     {methodIsDirectRemit && (
-                        <p className="self-end rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 md:col-span-2">
+                        <p className="self-end rounded-lg border border-warning/30 bg-warning-soft p-3 text-xs text-warning md:col-span-2">
                             <strong className="font-semibold">This money did not reach the estate.</strong>{' '}
                             It was remitted straight to the party it was due to, so it is booked as money
                             the owner owes the estate — not as cash the estate is holding.
@@ -579,7 +579,7 @@ export function CaptureManuallyForm({ tenantId: lockedTenantId, tenantName: lock
                 </Button>
                 {amountReceived > 0 && (
                     <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Check className="h-4 w-4 text-green-600" aria-hidden="true" />
+                        <Check className="h-4 w-4 text-success" aria-hidden="true" />
                         {fmt.money(amountReceived, currency)} will be captured for{' '}
                         {tenantDisplayName || 'the selected tenant'}.
                     </p>

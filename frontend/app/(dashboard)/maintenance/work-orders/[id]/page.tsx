@@ -185,7 +185,7 @@ export default function WorkOrderDetailPage({
             </div>
 
             {workOrder.overdue && (
-                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
                         This has missed its {priorityMeta?.window ?? '7 day'} response
@@ -236,12 +236,12 @@ export default function WorkOrderDetailPage({
                             </dl>
 
                             {workOrder.accessInstructions && (
-                                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
-                                    <p className="flex items-center gap-2 font-medium text-amber-900">
+                                <div className="rounded-md border border-warning/30 bg-warning-soft p-3 text-sm">
+                                    <p className="flex items-center gap-2 font-medium text-warning">
                                         <DoorOpen className="h-4 w-4" aria-hidden="true" />
                                         Access
                                     </p>
-                                    <p className="mt-1 text-amber-800">{workOrder.accessInstructions}</p>
+                                    <p className="mt-1 text-warning">{workOrder.accessInstructions}</p>
                                 </div>
                             )}
                         </CardContent>
@@ -301,7 +301,7 @@ export default function WorkOrderDetailPage({
                             )}
 
                             {openTasks > 0 && (
-                                <p className="text-xs text-amber-700">
+                                <p className="text-xs text-warning">
                                     {openTasks} item{openTasks === 1 ? '' : 's'} still open —
                                     completion is refused until they are finished or removed.
                                 </p>
@@ -359,7 +359,7 @@ export default function WorkOrderDetailPage({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                                    <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
                                     What was done
                                 </CardTitle>
                             </CardHeader>
@@ -409,7 +409,7 @@ export default function WorkOrderDetailPage({
                                 </ul>
                                 <Link
                                     href="/approvals"
-                                    className="inline-block text-sm text-cyan-700 hover:underline"
+                                    className="inline-block text-sm text-stage-cyan hover:underline"
                                 >
                                     See it in the approval inbox
                                 </Link>
@@ -497,7 +497,7 @@ export default function WorkOrderDetailPage({
                                 <Field label="Closed" value={formatDate(workOrder.closedAt)} />
                             )}
                             {workOrder.overdue ? (
-                                <p className="flex items-center gap-2 font-medium text-red-600">
+                                <p className="flex items-center gap-2 font-medium text-danger">
                                     <Clock className="h-4 w-4" aria-hidden="true" />
                                     Response window missed
                                 </p>

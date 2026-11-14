@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
 import { authApi } from "@/lib/api";
 
-export default function VerifyEmailPage() {
+/**
+ * `useSearchParams()` opts a page out of static prerendering, so the component
+ * that reads it has to sit inside a `Suspense` boundary or `next build` fails
+ * with "missing-suspense-with-csr-bailout".
+ */
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"idle" | "success" | "error">(() =>
@@ -82,5 +87,15 @@ export default function VerifyEmailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense
+      fallback={<div className="flex min-h-[400px] items-center justify-center bg-muted p-4 sm:p-6" />}
+    >
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

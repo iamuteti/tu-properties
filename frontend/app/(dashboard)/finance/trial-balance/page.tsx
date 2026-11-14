@@ -109,12 +109,12 @@ export default function TrialBalancePage() {
                         </div>
                         <div className="md:col-span-2">
                             {balanced ? (
-                                <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                                <p className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">
                                     Debits {money(totals.totalDebit)} = credits {money(totals.totalCredit)} — the
                                     ledger balances.
                                 </p>
                             ) : (
-                                <p className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+                                <p className="flex items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
                                     <AlertTriangle className="h-4 w-4" /> Debits {money(totals.totalDebit)} do not
                                     equal credits {money(totals.totalCredit)} — investigate before filing.
                                 </p>

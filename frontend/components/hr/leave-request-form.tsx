@@ -251,7 +251,7 @@ export function LeaveRequestForm({
                             className={`rounded-md border px-3 py-2 text-sm ${
                                 preview.allowed
                                     ? 'border-border bg-muted text-foreground'
-                                    : 'border-amber-300 bg-amber-50 text-amber-900'
+                                    : 'border-warning/30 bg-warning-soft text-warning'
                             }`}
                             role="status"
                         >

@@ -116,7 +116,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                                                 <p className="font-medium">{schedule.title}</p>
                                                 <p
                                                     className={`text-sm ${
-                                                        overdue ? 'font-medium text-amber-700' : 'text-muted-foreground'
+                                                        overdue ? 'font-medium text-warning' : 'text-muted-foreground'
                                                     }`}
                                                 >
                                                     Next due{' '}
@@ -161,7 +161,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                                     {asset.serviceHistory.map((service) => (
                                         <li
                                             key={service.id}
-                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0"
+                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
                                         >
                                             <span>
                                                 <Link
@@ -204,7 +204,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                                     {asset.workOrders.map((workOrder) => (
                                         <li
                                             key={workOrder.id}
-                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0"
+                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
                                         >
                                             <span>
                                                 <Link

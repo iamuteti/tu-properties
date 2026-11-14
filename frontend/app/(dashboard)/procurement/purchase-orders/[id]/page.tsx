@@ -129,7 +129,7 @@ export default function PurchaseOrderDetailPage() {
                             </h1>
                             <StatusBadge status={order.status} />
                             {order.overdue && (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                                <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
                                     {order.daysOverdue} days late
                                 </span>
                             )}
@@ -348,9 +348,9 @@ export default function PurchaseOrderDetailPage() {
                                                     className={
                                                         Number(line.receivedQuantity) >
                                                         Number(line.quantity) - 0.001
-                                                            ? 'text-emerald-700'
+                                                            ? 'text-success'
                                                             : Number(line.receivedQuantity) > 0
-                                                              ? 'text-amber-700'
+                                                              ? 'text-warning'
                                                               : 'text-muted-foreground'
                                                     }
                                                 >
@@ -522,10 +522,10 @@ export default function PurchaseOrderDetailPage() {
                     </Card>
 
                     {order.cancellationReason && (
-                        <Card className="border-red-200 bg-red-50">
+                        <Card className="border-danger/30 bg-danger-soft">
                             <CardContent className="pt-6 text-sm">
-                                <p className="font-medium text-red-800">Why it was cancelled</p>
-                                <p className="mt-1 text-red-900">{order.cancellationReason}</p>
+                                <p className="font-medium text-danger">Why it was cancelled</p>
+                                <p className="mt-1 text-danger">{order.cancellationReason}</p>
                             </CardContent>
                         </Card>
                     )}

@@ -87,7 +87,7 @@ export default function WorkOrderBoardPage() {
                     <p className="text-sm font-medium leading-tight">{workOrder.title}</p>
                     {workOrder.overdue && (
                         <AlertTriangle
-                            className="h-4 w-4 shrink-0 text-red-600"
+                            className="h-4 w-4 shrink-0 text-danger"
                             aria-label="Overdue"
                         />
                     )}
@@ -103,13 +103,13 @@ export default function WorkOrderBoardPage() {
                         ? `${workOrder.assignedTechnician.firstName} ${workOrder.assignedTechnician.lastName}`
                         : 'Unassigned'}
                     {workOrder.priority === 'EMERGENCY' && (
-                        <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 font-medium text-red-700">
+                        <span className="ml-1 rounded-full bg-danger-soft px-1.5 py-0.5 font-medium text-danger">
                             Emergency
                         </span>
                     )}
                 </p>
                 {openTasks > 0 && (
-                    <p className="text-xs text-amber-700">
+                    <p className="text-xs text-warning">
                         {openTasks} checklist item{openTasks === 1 ? '' : 's'} open
                     </p>
                 )}

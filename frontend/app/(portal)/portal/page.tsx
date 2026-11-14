@@ -53,7 +53,7 @@ export default function PortalOverviewPage() {
             </div>
 
             {overdue && (
-                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
                     <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                     <span>
                         {summary.nextDue?.invoiceNumber} is overdue — it was due on{" "}
@@ -76,12 +76,12 @@ export default function PortalOverviewPage() {
                 <Card
                     label="Outstanding"
                     value={`${currency} ${summary.money.outstanding.toLocaleString()}`}
-                    tone={summary.money.outstanding > 0 ? "text-red-600" : "text-green-700"}
+                    tone={summary.money.outstanding > 0 ? "text-danger" : "text-success"}
                 />
                 <Card
                     label="Arrears"
                     value={`${currency} ${summary.money.arrears.toLocaleString()}`}
-                    tone={summary.money.arrears > 0 ? "text-amber-700" : "text-green-700"}
+                    tone={summary.money.arrears > 0 ? "text-warning" : "text-success"}
                     hint="Overdue only"
                 />
                 <Card
@@ -126,7 +126,7 @@ export default function PortalOverviewPage() {
                     href="/portal/invoices"
                     className="flex items-center gap-3 rounded-lg border bg-card p-5 transition-colors hover:bg-muted"
                 >
-                    <FileText className="h-5 w-5 text-slate-400" aria-hidden="true" />
+                    <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                     <div>
                         <p className="text-sm font-medium">Invoices</p>
                         <p className="text-xs text-muted-foreground">
@@ -138,7 +138,7 @@ export default function PortalOverviewPage() {
                     href="/portal/receipts"
                     className="flex items-center gap-3 rounded-lg border bg-card p-5 transition-colors hover:bg-muted"
                 >
-                    <Wallet className="h-5 w-5 text-slate-400" aria-hidden="true" />
+                    <Wallet className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                     <div>
                         <p className="text-sm font-medium">Receipts</p>
                         <p className="text-xs text-muted-foreground">

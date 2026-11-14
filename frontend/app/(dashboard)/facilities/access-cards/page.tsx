@@ -105,12 +105,12 @@ export default function AccessCardsPage() {
                     <p className="text-muted-foreground">
                         Who holds a fob, what it opens and when it stops working.
                         {usable > 0 && (
-                            <span className="ml-1 font-medium text-emerald-700">
+                            <span className="ml-1 font-medium text-success">
                                 {usable} in use.
                             </span>
                         )}
                         {expiringSoon > 0 && (
-                            <span className="ml-1 font-medium text-amber-700">
+                            <span className="ml-1 font-medium text-warning">
                                 {expiringSoon} expiring within 30 days.
                             </span>
                         )}
@@ -250,7 +250,7 @@ export default function AccessCardsPage() {
                                                         card.expiresAt,
                                                     ).toLocaleDateString()}
                                                     {card.expiringSoon && (
-                                                        <span className="ml-1 text-amber-700">
+                                                        <span className="ml-1 text-warning">
                                                             soon
                                                         </span>
                                                     )}
@@ -297,7 +297,7 @@ function StatusPill({
     effective: AccessCardStatus;
     raw: AccessCardStatus;
 }) {
-    const style = ACCESS_CARD_STATUS_STYLES[effective] ?? 'bg-gray-100 text-foreground';
+    const style = ACCESS_CARD_STATUS_STYLES[effective] ?? 'bg-muted text-foreground';
     const label = effective.charAt(0) + effective.slice(1).toLowerCase();
     const derived = effective !== raw;
 

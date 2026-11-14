@@ -137,6 +137,7 @@ export class PlatformService {
             plan: dto.plan ?? 'STARTER',
             organizationType: dto.organizationType ?? 'AGENCY',
             contactEmail: dto.contactEmail,
+            ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
             isActive: true,
             subscription: {
               create: {

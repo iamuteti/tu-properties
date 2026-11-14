@@ -447,7 +447,7 @@ function ReorderHint({ item }: { item: InventoryItemRow }) {
     }
 
     return (
-        <span className="text-sm text-amber-800">
+        <span className="text-sm text-warning">
             order {units(item.reorder.suggestedQuantity)}{' '}
             {item.reorder.unitOfMeasure}
             {item.reorder.estimatedCost == null
@@ -543,7 +543,7 @@ function Stat({
                 <p className="text-sm text-muted-foreground">{label}</p>
                 <p
                     className={`text-2xl font-semibold ${
-                        tone === 'amber' && Number(value) > 0 ? 'text-amber-700' : ''
+                        tone === 'amber' && Number(value) > 0 ? 'text-warning' : ''
                     }`}
                 >
                     {value}

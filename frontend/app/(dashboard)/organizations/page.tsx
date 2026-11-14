@@ -66,14 +66,14 @@ export default function OrganizationsPage() {
                 <h1 className="text-2xl font-bold">Organizations</h1>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                 >
                     {showForm ? "Cancel" : "Add Organization"}
                 </button>
             </div>
 
             {error && (
-                <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                <div className="mb-4 p-4 bg-danger-soft text-danger rounded-lg">
                     {error}
                 </div>
             )}
@@ -126,7 +126,7 @@ export default function OrganizationsPage() {
                         </div>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                         >
                             Create Organization
                         </button>
@@ -135,7 +135,7 @@ export default function OrganizationsPage() {
             )}
 
             <div className="bg-card rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
@@ -155,7 +155,7 @@ export default function OrganizationsPage() {
                             </th>
                         </tr>
                     </thead>
-                    <tbody className="bg-card divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-border">
                         {organizations.map((org) => (
                             <tr key={org.id}>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -171,8 +171,8 @@ export default function OrganizationsPage() {
                                     <span
                                         className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                             org.isActive
-                                                ? "bg-green-100 text-green-800"
-                                                : "bg-red-100 text-red-800"
+                                                ? "bg-success-soft text-success"
+                                                : "bg-danger-soft text-danger"
                                         }`}
                                     >
                                         {org.isActive ? "Active" : "Inactive"}

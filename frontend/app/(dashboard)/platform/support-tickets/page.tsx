@@ -85,14 +85,14 @@ export default function PlatformSupportTicketsPage() {
             <h1 className="text-2xl font-bold mb-1">Support tickets</h1>
             <p className="text-sm text-muted-foreground mb-6">Every tenant&apos;s requests. Your answer is the resolution note on RESOLVED.</p>
 
-            {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+            {error && <div className="mb-4 p-4 bg-danger-soft text-danger rounded-lg">{error}</div>}
 
             <div className="flex gap-2 mb-4">
                 {STATUSES.map((s) => (
                     <button
                         key={s}
                         onClick={() => { setFilter(s); setLoading(true); }}
-                        className={`px-3 py-1 rounded-full text-sm ${filter === s ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
+                        className={`px-3 py-1 rounded-full text-sm ${filter === s ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted"}`}
                     >
                         {s}
                     </button>
@@ -100,7 +100,7 @@ export default function PlatformSupportTicketsPage() {
             </div>
 
             <div className="bg-card rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted">
                         <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Subject</th>
@@ -109,7 +109,7 @@ export default function PlatformSupportTicketsPage() {
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Raised</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                         {tickets.map((t) => (
                             <tr key={t.id} className="hover:bg-muted cursor-pointer" onClick={() => openTicket(t.id)}>
                                 <td className="px-4 py-2 text-sm font-medium">{t.subject}</td>
@@ -144,7 +144,7 @@ export default function PlatformSupportTicketsPage() {
                         {targetStatus === "RESOLVED" && (
                             <input type="text" value={resolution} onChange={(e) => setResolution(e.target.value)} placeholder="What was done (the tenant reads this)" className="flex-1 px-3 py-2 border rounded-lg" />
                         )}
-                        <button onClick={setStatus} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Apply</button>
+                        <button onClick={setStatus} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">Apply</button>
                         <button onClick={() => setSelected(null)} className="px-4 py-2 border rounded-lg">Close</button>
                     </div>
                 </div>

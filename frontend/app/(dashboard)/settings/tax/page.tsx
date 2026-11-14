@@ -236,7 +236,7 @@ export default function TaxSettingsPage() {
                         </div>
                     </form>
                     {!jurisdiction?.countryCode && (
-                        <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        <p className="mt-4 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">
                             No country is set, so no tax is applied to invoices. That is
                             deliberate — this system does not assume a jurisdiction.
                         </p>

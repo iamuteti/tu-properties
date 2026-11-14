@@ -102,7 +102,7 @@ export function ConvertLeadDialog({
                             type="button"
                             onClick={() => setMode('create')}
                             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                                mode === 'create' ? 'bg-slate-900 text-white' : 'bg-muted text-muted-foreground'
+                                mode === 'create' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                             }`}
                         >
                             New contact
@@ -111,7 +111,7 @@ export function ConvertLeadDialog({
                             type="button"
                             onClick={() => setMode('link')}
                             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                                mode === 'link' ? 'bg-slate-900 text-white' : 'bg-muted text-muted-foreground'
+                                mode === 'link' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                             }`}
                         >
                             Link existing contact

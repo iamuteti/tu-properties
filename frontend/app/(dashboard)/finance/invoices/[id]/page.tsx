@@ -11,17 +11,17 @@ import { financeApi } from "@/lib/api";
 import { Invoice } from "@/types";
 
 const STATUS_STYLES: Record<Invoice["status"], string> = {
-    DRAFT: "bg-gray-100 text-foreground",
-    PENDING: "bg-blue-100 text-blue-800",
-    PARTIALLY_PAID: "bg-yellow-100 text-yellow-800",
-    PAID: "bg-green-100 text-green-800",
-    OVERDUE: "bg-red-100 text-red-800",
-    CANCELLED: "bg-gray-100 text-foreground",
+    DRAFT: "bg-muted text-foreground",
+    PENDING: "bg-info-soft text-info",
+    PARTIALLY_PAID: "bg-warning-soft text-warning",
+    PAID: "bg-success-soft text-success",
+    OVERDUE: "bg-danger-soft text-danger",
+    CANCELLED: "bg-muted text-foreground",
 };
 
 function StatusBadge({ status }: { status: Invoice["status"] }) {
     return (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[status] || "bg-gray-100 text-foreground"}`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[status] || "bg-muted text-foreground"}`}>
             {status}
         </span>
     );
@@ -206,7 +206,7 @@ export default function InvoiceDetailPage() {
                         <CardTitle className="text-sm font-medium text-muted-foreground">Paid</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-700">{currency} {fmt(invoice.paidAmount)}</div>
+                        <div className="text-2xl font-bold text-success">{currency} {fmt(invoice.paidAmount)}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -214,7 +214,7 @@ export default function InvoiceDetailPage() {
                         <CardTitle className="text-sm font-medium text-muted-foreground">Balance Due</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-red-600">{currency} {fmt(invoice.balanceAmount)}</div>
+                        <div className="text-2xl font-bold text-danger">{currency} {fmt(invoice.balanceAmount)}</div>
                     </CardContent>
                 </Card>
             </div>

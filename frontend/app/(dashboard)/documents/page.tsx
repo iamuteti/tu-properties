@@ -241,7 +241,7 @@ export default function DocumentsPage() {
                                     </span>
                                 </TableCell>
                                 <TableCell>
-                                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+                                    <span className="rounded bg-info-soft px-1.5 py-0.5 text-xs font-medium text-info">
                                         v{doc.version}
                                     </span>
                                 </TableCell>

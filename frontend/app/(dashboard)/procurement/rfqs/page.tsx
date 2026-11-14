@@ -199,12 +199,12 @@ function RoundCard({ rfq }: { rfq: Rfq }) {
                             </Link>
                             <StatusBadge status={rfq.status} />
                             {rfq.overdue && (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                                <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
                                     {rfq.daysOverdue} days past the deadline
                                 </span>
                             )}
                             {rfq.singleSource && (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                                <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
                                     Single source
                                 </span>
                             )}
@@ -265,7 +265,7 @@ function Stat({
                 <p className="text-sm text-muted-foreground">{label}</p>
                 <p
                     className={`text-2xl font-semibold ${
-                        tone === "amber" && value > 0 ? "text-amber-700" : ""
+                        tone === "amber" && value > 0 ? "text-warning" : ""
                     }`}
                 >
                     {value}

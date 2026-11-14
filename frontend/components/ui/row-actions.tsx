@@ -35,7 +35,7 @@ export function RowActionsMenu<T>({
     return (
         <Menu as="div" className="relative inline-block text-left">
             <MenuButton
-                className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+                className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-stage-cyan"
                 aria-label={label}
                 onClick={(event) => event.stopPropagation()}
             >
@@ -52,9 +52,9 @@ export function RowActionsMenu<T>({
                             title={action.disabled ? action.disabledReason : undefined}
                             className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
                                     action.disabled
-                                        ? 'cursor-not-allowed text-slate-400'
+                                        ? 'cursor-not-allowed text-muted-foreground'
                                         : action.variant === 'danger'
-                                          ? 'text-red-600 hover:bg-red-50'
+                                          ? 'text-danger hover:bg-danger-soft'
                                           : 'text-foreground hover:bg-muted'
                                 }`}
                                 onClick={(event) => {

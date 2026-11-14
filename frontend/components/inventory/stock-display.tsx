@@ -13,9 +13,9 @@ import type { ReorderSuggestion, StockStatus, StockValuation } from '@/types';
  */
 
 const STATUS_STYLE: Record<StockStatus, string> = {
-    OUT_OF_STOCK: 'bg-red-100 text-red-700',
-    REORDER: 'bg-amber-100 text-amber-800',
-    OK: 'bg-emerald-100 text-emerald-700',
+    OUT_OF_STOCK: 'bg-danger-soft text-danger',
+    REORDER: 'bg-warning-soft text-warning',
+    OK: 'bg-success-soft text-success',
 };
 
 /**
@@ -72,7 +72,7 @@ export function StockLevel({
     return (
         <span className={className}>
             <span
-                className={`font-medium tabular-nums ${negative ? 'text-red-700' : ''}`}
+                className={`font-medium tabular-nums ${negative ? 'text-danger' : ''}`}
             >
                 {negative ? '−' : ''}
                 {Math.abs(quantity).toLocaleString('en-KE', { maximumFractionDigits: 2 })}
@@ -106,7 +106,7 @@ export function MovementAmount({
     return (
         <span
             className={`inline-flex items-center gap-0.5 font-medium tabular-nums ${
-                incoming ? 'text-emerald-700' : 'text-foreground'
+                incoming ? 'text-success' : 'text-foreground'
             }`}
         >
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -179,7 +179,7 @@ export function StockValuationPanel({ valuation }: { valuation: StockValuation }
                 everything on the shelf.
             </p>
             {valuation.movementsWithoutCost > 0 && (
-                <p className="flex items-start gap-1.5 text-xs text-amber-700">
+                <p className="flex items-start gap-1.5 text-xs text-warning">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {valuation.movementsWithoutCost} movement
                     {valuation.movementsWithoutCost === 1 ? '' : 's'} carried no price, so
@@ -203,8 +203,8 @@ export function ReorderCallout({ reorder }: { reorder: ReorderSuggestion }) {
     if (!reorder.needsReorder) return null;
 
     return (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
-            <p className="font-medium text-amber-900">
+        <div className="rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm">
+            <p className="font-medium text-warning">
                 Order {reorder.suggestedQuantity.toLocaleString('en-KE', {
                     maximumFractionDigits: 2,
                 })}{' '}
@@ -212,9 +212,9 @@ export function ReorderCallout({ reorder }: { reorder: ReorderSuggestion }) {
                 {reorder.status === 'OUT_OF_STOCK' ? ' — nothing left' : ''}
             </p>
             {reorder.reason && (
-                <p className="mt-1 text-amber-800">{reorder.reason}</p>
+                <p className="mt-1 text-warning">{reorder.reason}</p>
             )}
-            <p className="mt-1 text-xs text-amber-800">
+            <p className="mt-1 text-xs text-warning">
                 {reorder.estimatedCost == null
                     ? 'No price on file, so the cost is unknown.'
                     : `Estimated cost ${money(reorder.estimatedCost)}.`}

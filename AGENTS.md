@@ -81,7 +81,7 @@ npm run dev
 - Give existing units a kind of unit and a deposit rule → `npm run db:backfill:unit-types`. Safe to run twice; a
   property that already has unit types is left alone. This is the path for an estate that was created before
   `PropertyUnitType` existed.
-- The demo seed covers 15 markets (KE, ZA, US, GB, CA, AU, DE, FR, IN, CN, JP, KR, BR, MX, AE) — Africa is Kenya and South Africa only. `DEMO_COUNTRY=XX` makes XX the primary market (Rohi + Westhill); `DEMO_COUNTRIES=KE,ZA,IN` seeds a subset. Both take ISO-3166-1 alpha-2 codes and an unknown code fails the seed loudly. Market data comes from `backend/src/prisma/jurisdictions.ts` — add a country there, not as a constant in the seeder.
+- The demo seed's default markets are **Kenya and the United States** (`DEMO_COUNTRIES` defaults to `KE,US`). The other jurisdiction profiles still seed when asked for by code — `DEMO_COUNTRY=XX` makes XX the primary market (Rohi + Westhill); `DEMO_COUNTRIES=KE,ZA,IN` seeds a subset. Both take ISO-3166-1 alpha-2 codes and an unknown code fails the seed loudly. Market data comes from `backend/src/prisma/jurisdictions.ts` — add a country there, not as a constant in the seeder.
 - **Hand-maintained indexes are invisible to Prisma and `migrate dev` will try to DROP them.** `notifications_landlordId_readAt_idx` and `utility_charges_no_double_bill_bulk` (partial unique) exist only as raw SQL in their own migrations — the schema cannot express the partial predicate, so every generated migration proposes both DROPs. 2026-10-11: a generated migration was applied with the DROPs in it and both guards silently vanished (restored same day, no violating rows). Always delete those two DROP statements from a generated migration before applying, and verify with `SELECT indexname FROM pg_indexes WHERE indexname IN (...)` afterwards.
 
 ## Public landing page
@@ -89,16 +89,30 @@ npm run dev
   **Every string on it must be traceable to code, seed data or a module document.** It records payments rather than
   processing them, sends in-app/email/SMS rather than WhatsApp or push, and ships 13 seeded system roles — say what
   the code does, not what it might do.
+- **The landing page is five blocks: hero, interactive engine, pricing, FAQ, final CTA.** Reference material lives on
+  its own routes — `/features` (the 20 modules), `/demo` (seeded logins, deliberately `noindex`), `/security` (derived
+  accounting + role matrix) and `/contact`. Pages are server components that export their own metadata;
+  `components/landing/LandingLayout.tsx` supplies the navbar, footer and trial modal, and `trial-context.tsx` lets any
+  section open that modal without a callback prop. Do not put a second promotional section back on the landing page —
+  the previous version stacked fifteen of them and repeated three arguments five times each.
+- **The product is offered in two markets: Kenya (KES) and the United States (USD).** `backend/src/common/supported-markets.ts`
+  is the single source of truth — the landing page, the demo seed default, the trial signup and the organization
+  profile all read the same list. The other thirteen profiles in `backend/src/prisma/jurisdictions.ts` are **dormant
+  config**: complete and still used by the seeder when asked for by code, but offered nowhere. Adding a market back
+  means adding it to `supported-markets.ts` plus the frontend pieces below — not re-deriving its tax, telephone,
+  tariff and rent data.
 - **Which markets and currencies the page shows is deployment configuration, not page copy:**
   `NEXT_PUBLIC_LANDING_MARKETS` (ISO-3166-1 alpha-2) and `NEXT_PUBLIC_LANDING_CURRENCIES` (ISO-4217) in
   `frontend/.env`. Both are comma-separated and **order-significant** — the order in the env file is the order on the
-  page. They drive the hero badge, the hero market switcher, the footer chips, the jurisdiction configurator, the
-  market proof strip and the pricing currency switcher, and the counts in the copy are derived from them.
-  **Fourteen currencies cover fifteen markets** — Germany and France share the euro — and every market's currency must
-  be priceable. A new currency therefore needs three things: the code in the `PricingCurrency` union, an amount for
-  every tier in `PRICING_PLANS` (the `Record` type makes a missing tier a compile error), and a symbol in
-  `PricingSection.tsx`'s `CURRENCY_SYMBOLS`. `NEXT_PUBLIC_*` values are inlined at build time: change them and
-  rebuild.
+  page. They drive the hero market switcher, the footer chips and the demo market tabs (the jurisdiction configurator
+  and market proof strip no longer exist). Unset, they default to `KE,US` and `KES,USD`.
+  **Two currencies cover two markets**, and every market's currency must be priceable. A new currency therefore needs
+  three things: the code in the `PricingCurrency` union, an amount for every tier in `PRICING_PLANS` (the `Record` type
+  makes a missing tier a compile error), and a symbol in `PricingSection.tsx`'s `CURRENCY_SYMBOLS`. `NEXT_PUBLIC_*`
+  values are inlined at build time: change them and rebuild.
+- The pricing section no longer calls `ipapi.co` and the trial modal no longer does either — with two currencies the
+  visitor's IP had nothing to decide, and the call sent every visitor's address to a third party. The modal falls back
+  to the browser's own time zone (`Africa/Nairobi` → KES, otherwise USD) when it is opened outside the pricing section.
 - The market *profiles* (currency, locale, timezone, tax rate, telephone format, tax-ID shape, utility tariffs, rent band)
   are a hand-copy of `backend/src/prisma/jurisdictions.ts` in `frontend/components/landing/data/landingData.ts` —
   the frontend must not import backend source. Add a country there and in the frontend copy, not in a component.

@@ -129,13 +129,13 @@ export default function MovingOutPage() {
             cell: ({ row }) => {
                 const status = row.original.status;
                 const colorMap = {
-                    PENDING: 'bg-yellow-100 text-yellow-800',
-                    APPROVED: 'bg-green-100 text-green-800',
-                    COMPLETED: 'bg-blue-100 text-blue-800',
-                    REJECTED: 'bg-red-100 text-red-800',
+                    PENDING: 'bg-warning-soft text-warning',
+                    APPROVED: 'bg-success-soft text-success',
+                    COMPLETED: 'bg-info-soft text-info',
+                    REJECTED: 'bg-danger-soft text-danger',
                 };
                 return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-foreground'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[status] || 'bg-muted text-foreground'}`}>
                         {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
                     </span>
                 );
@@ -288,7 +288,7 @@ export default function MovingOutPage() {
                     { id: 'tenantName', label: 'Tenant name' },
                 ]}
                 emptyMessage="No move-out requests found. Create one to get started."
-                emptyIcon={<DoorOpen className="h-12 w-12 text-slate-400" />}
+                emptyIcon={<DoorOpen className="h-12 w-12 text-muted-foreground" />}
                 serverSidePagination
                 paginationMeta={meta}
                 onPaginationChange={handlePaginationChange}

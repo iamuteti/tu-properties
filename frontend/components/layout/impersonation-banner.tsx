@@ -44,11 +44,11 @@ export function ImpersonationBanner() {
     };
 
     return (
-        <div className="bg-amber-500 text-white px-6 py-2 flex items-center justify-between text-sm">
+        <div className="bg-warning text-warning-fg px-6 py-2 flex items-center justify-between text-sm">
             <span>
                 Impersonating <strong>{imp.user.email}</strong> ({imp.user.role}) — actions are audited against you.
             </span>
-            <button onClick={end} className="underline font-medium hover:text-amber-100">
+            <button onClick={end} className="underline font-medium hover:opacity-80">
                 End impersonation
             </button>
         </div>

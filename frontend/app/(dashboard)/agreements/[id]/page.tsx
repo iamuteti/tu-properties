@@ -150,7 +150,7 @@ export default function LeaseDetailPage() {
             </div>
 
             {(lease.timeline?.notices ?? []).length > 0 && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div className="rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
                     {(lease.timeline?.notices ?? []).map((notice) => (
                         <p key={notice}>{notice}</p>
                     ))}
@@ -175,7 +175,7 @@ export default function LeaseDetailPage() {
                         </p>
                         <p
                             className={`mt-1 text-2xl font-bold ${
-                                money.outstanding > 0 ? "text-red-600" : "text-green-700"
+                                money.outstanding > 0 ? "text-danger" : "text-success"
                             }`}
                         >
                             {currency} {money.outstanding.toLocaleString()}
@@ -187,7 +187,7 @@ export default function LeaseDetailPage() {
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Arrears</p>
                         <p
                             className={`mt-1 text-2xl font-bold ${
-                                money.arrears > 0 ? "text-amber-700" : "text-green-700"
+                                money.arrears > 0 ? "text-warning" : "text-success"
                             }`}
                         >
                             {currency} {money.arrears.toLocaleString()}
@@ -283,7 +283,7 @@ export default function LeaseDetailPage() {
                         />
                         <Detail label="Deposit refunded" value={lease.depositRefunded ? "Yes" : "No"} />
                         {lease.terminatedReason && (
-                            <div className="col-span-2 rounded-md bg-red-50 px-3 py-2 text-red-700">
+                            <div className="col-span-2 rounded-md bg-danger-soft px-3 py-2 text-danger">
                                 <p className="text-xs font-medium">Terminated</p>
                                 <p className="text-sm">{lease.terminatedReason}</p>
                             </div>

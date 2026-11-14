@@ -158,7 +158,7 @@ export default function LeadDetailPage() {
                             )}
                         </div>
                         {lead.lostReason && (
-                            <div className="col-span-2 rounded-md bg-red-50 px-3 py-2 text-red-700">
+                            <div className="col-span-2 rounded-md bg-danger-soft px-3 py-2 text-danger">
                                 <p className="text-xs font-medium">Lost because</p>
                                 <p className="text-sm">{lead.lostReason}</p>
                             </div>
@@ -189,7 +189,7 @@ export default function LeadDetailPage() {
                     </p>
                     <LeadStageActions lead={lead} onChanged={loadLead} />
                     {lead.contact && (
-                        <div className="mt-4 rounded-md border bg-green-50 px-3 py-2 text-sm">
+                        <div className="mt-4 rounded-md border bg-success-soft px-3 py-2 text-sm">
                             Converted to contact{' '}
                             <Link href={`/crm/contacts/${lead.contact.id}`} className="font-medium underline">
                                 {lead.contact.firstName} {lead.contact.lastName}

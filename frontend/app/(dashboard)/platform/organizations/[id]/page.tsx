@@ -23,10 +23,10 @@ function UsageBar({ used, max }: { used: number; max: number }) {
         <div>
             <div className="flex justify-between text-sm mb-1">
                 <span>{used} / {max}</span>
-                {over && <span className="text-red-600 font-medium">over limit</span>}
+                {over && <span className="text-danger font-medium">over limit</span>}
             </div>
-            <div className="h-2 bg-gray-200 rounded">
-                <div className={`h-2 rounded ${over ? "bg-red-500" : "bg-blue-600"}`} style={{ width: `${pct}%` }} />
+            <div className="h-2 bg-muted rounded">
+                <div className={`h-2 rounded ${over ? "bg-danger" : "bg-primary"}`} style={{ width: `${pct}%` }} />
             </div>
         </div>
     );
@@ -41,10 +41,10 @@ const SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
 ];
 
 const STATUS_STYLES: Record<SubscriptionStatus, string> = {
-    TRIALING: 'bg-blue-100 text-blue-800',
-    ACTIVE: 'bg-green-100 text-green-800',
-    SUSPENDED: 'bg-red-100 text-red-800',
-    CANCELLED: 'bg-gray-200 text-gray-700',
+    TRIALING: 'bg-info-soft text-info',
+    ACTIVE: 'bg-success-soft text-success',
+    SUSPENDED: 'bg-danger-soft text-danger',
+    CANCELLED: 'bg-muted text-foreground',
 };
 
 /**
@@ -345,7 +345,7 @@ export default function PlatformOrganizationDetailPage() {
     }
 
     if (!org) {
-        return <div className="p-6 text-red-600">{error || "Tenant not found."}</div>;
+        return <div className="p-6 text-danger">{error || "Tenant not found."}</div>;
     }
 
     return (
@@ -362,20 +362,20 @@ export default function PlatformOrganizationDetailPage() {
                               {org.subscription.status}
                           </span>
                       ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-warning-soft text-warning">
                               NO SUBSCRIPTION
                           </span>
                       )}
                   </p>
                 </div>
-                <button onClick={() => router.push("/platform/organizations")} className="text-sm text-blue-600 hover:underline mb-2">
+                <button onClick={() => router.push("/platform/organizations")} className="text-sm text-info hover:underline mb-2">
                     ← All tenants
                 </button>
             </div>
 
-            {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+            {error && <div className="p-4 bg-danger-soft text-danger rounded-lg">{error}</div>}
             {impersonating && (
-                <div className="p-4 bg-amber-100 text-amber-800 rounded-lg">
+                <div className="p-4 bg-warning-soft text-warning rounded-lg">
                     Impersonating {impersonating} — every request now runs as that user for 15 minutes. The banner at the top ends it.
                 </div>
             )}
@@ -419,11 +419,11 @@ export default function PlatformOrganizationDetailPage() {
                         className="w-full px-3 py-2 border rounded-lg mb-3"
                     />
                     {org.isActive ? (
-                        <button onClick={() => act("suspend")} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        <button onClick={() => act("suspend")} className="px-4 py-2 bg-danger text-danger-fg rounded-lg hover:bg-danger/90">
                             Suspend
                         </button>
                     ) : (
-                        <button onClick={() => act("activate")} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <button onClick={() => act("activate")} className="px-4 py-2 bg-success text-success-fg rounded-lg hover:bg-success/90">
                             Reactivate
                         </button>
                     )}
@@ -553,14 +553,14 @@ export default function PlatformOrganizationDetailPage() {
                     <button
                         onClick={saveSubscription}
                         disabled={subSaving}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                     >
                         {subSaving ? "Saving..." : "Save subscription"}
                     </button>
                     <button
                         onClick={startCheckout}
                         disabled={subSaving}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-success text-success-fg rounded-lg hover:bg-success/90 disabled:opacity-50"
                     >
                         Subscribe / Upgrade
                     </button>
@@ -590,15 +590,15 @@ export default function PlatformOrganizationDetailPage() {
                                         checked={isPlanModule(group.key) || enabledModules.includes(group.key)}
                                         disabled={isPlanModule(group.key)}
                                         onChange={() => toggleModule(group.key)}
-                                        className="rounded bg:text-blue-600"
+                                        className="rounded hover:text-info"
                                     />
                                     <span className="font-semibold">{group.label}</span>
                                     {isPlanModule(group.key) ? (
-                                        <span className="ml-auto text-xs text-blue-600">
+                                        <span className="ml-auto text-xs text-info">
                                             plan
                                         </span>
                                     ) : enabledModules.includes(group.key) ? (
-                                        <span className="ml-auto text-xs text-green-600">
+                                        <span className="ml-auto text-xs text-success">
                                             enabled
                                         </span>
                                     ) : null}
@@ -609,7 +609,7 @@ export default function PlatformOrganizationDetailPage() {
                                             key={child.key}
                                             className={`flex items-center gap-2 text-sm ${
                                                 isPlanModule(child.key)
-                                                    ? 'text-slate-500 dark:text-slate-400'
+                                                    ? 'text-muted-foreground dark:text-muted-foreground'
                                                     : 'cursor-pointer'
                                             }`}
                                         >
@@ -625,7 +625,7 @@ export default function PlatformOrganizationDetailPage() {
                                                 onChange={() =>
                                                     toggleModule(child.key)
                                                 }
-                                                className="rounded bg:text-blue-600"
+                                                className="rounded hover:text-info"
                                             />
                                             <span>{child.label}</span>
                                         </label>
@@ -639,7 +639,7 @@ export default function PlatformOrganizationDetailPage() {
                     <button
                         onClick={saveModules}
                         disabled={modulesSaving || !modulesDiffer}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                     >
                         Save module changes
                     </button>
@@ -647,7 +647,7 @@ export default function PlatformOrganizationDetailPage() {
                         <button
                             onClick={resetModules}
                             disabled={modulesSaving}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                            className="px-4 py-2 bg-danger text-danger-fg rounded-lg hover:bg-danger/90 disabled:opacity-50"
                         >
                             Reset to plan modules
                         </button>
@@ -660,7 +660,7 @@ export default function PlatformOrganizationDetailPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                     Impersonate to see the product exactly as this tenant sees it. The token lasts 15 minutes, carries the user&apos;s own role, and the start is audited with your reason.
                 </p>
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted">
                         <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">User</th>
@@ -669,7 +669,7 @@ export default function PlatformOrganizationDetailPage() {
                             <th className="px-4 py-2" />
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                         {users.map((u) => (
                             <tr key={u.id}>
                                 <td className="px-4 py-2 text-sm">{u.firstName} {u.lastName} <span className="text-muted-foreground">({u.email})</span></td>
@@ -677,7 +677,7 @@ export default function PlatformOrganizationDetailPage() {
                                 <td className="px-4 py-2 text-sm">{u.isActive ? "Active" : "Inactive"}</td>
                                 <td className="px-4 py-2 text-right">
                                     {u.isActive && (
-                                        <button onClick={() => setShowImpDialog(u.id)} className="text-sm text-blue-600 hover:underline">
+                                        <button onClick={() => setShowImpDialog(u.id)} className="text-sm text-info hover:underline">
                                             Impersonate
                                         </button>
                                     )}
@@ -699,7 +699,7 @@ export default function PlatformOrganizationDetailPage() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => { const t = users.find((x) => x.id === showImpDialog); if (t) startImpersonation(t); }}
-                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                                className="px-4 py-2 bg-warning text-warning-fg rounded-lg hover:bg-warning/90"
                             >
                                 Start impersonation
                             </button>

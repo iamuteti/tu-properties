@@ -121,9 +121,9 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                 <button
                     type="button"
                     className={cn(
-                        "flex h-10 w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
+                        "flex h-10 w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm ring-offset-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-stage-cyan/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
                         className,
-                        error && "border-red-500 focus:ring-red-500"
+                        error && "border-danger/50 focus:ring-danger"
                     )}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     disabled={disabled}
@@ -131,7 +131,7 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                     aria-expanded={isOpen}
                     {...controlProps}
                 >
-                    <span className={cn("truncate", !value && "text-slate-400")}>
+                    <span className={cn("truncate", !value && "text-muted-foreground")}>
                         {selectedLabel}
                     </span>
                     <svg
@@ -145,19 +145,19 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                 </button>
 
                 {isOpen && displayOptions.length > 0 && (
-                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-border bg-card text-slate-950 shadow-lg">
+                    <div className="absolute z-[9999] mt-1 w-full rounded-lg border border-border bg-card text-foreground shadow-lg">
                         {search && (
-                            <div className="relative p-2 border-b border-slate-100">
+                            <div className="relative p-2 border-b border-border">
                                 <input
                                     type="text"
                                     placeholder="Search..."
-                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-slate-400 border border-border rounded-md"
+                                    className="w-full bg-transparent pl-8 pr-4 py-1.5 text-sm outline-none placeholder:text-muted-foreground border border-border rounded-md"
                                     value={searchQuery}
                                     onChange={handleSearchChange}
                                     autoFocus
                                 />
                                 <svg
-                                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -201,10 +201,10 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                     className="text-sm font-medium leading-none text-foreground"
                 >
                     {label}
-                    {required && <span className="text-red-500"> *</span>}
+                    {required && <span className="text-danger"> *</span>}
                 </label>
                 {selectContent}
-                {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+                {error && <p className="text-sm font-medium text-danger">{error}</p>}
             </div>
         )
     }

@@ -196,7 +196,7 @@ export default function NewRentReceiptPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="receiptNumber" className="text-sm font-medium leading-none">
-                Receipt Number <span className="text-red-500">*</span>
+                Receipt Number <span className="text-danger">*</span>
               </label>
               <Input
                 id="receiptNumber"
@@ -209,7 +209,7 @@ export default function NewRentReceiptPage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="paymentDate" className="text-sm font-medium leading-none">
-                Payment Date <span className="text-red-500">*</span>
+                Payment Date <span className="text-danger">*</span>
               </label>
               <Input
                 id="paymentDate"
@@ -227,7 +227,7 @@ export default function NewRentReceiptPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="tenantId" className="text-sm font-medium leading-none">
-                Tenant <span className="text-red-500">*</span>
+                Tenant <span className="text-danger">*</span>
               </label>
               <Select
                 id="tenantId"
@@ -246,7 +246,7 @@ export default function NewRentReceiptPage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="AgreementId" className="text-sm font-medium leading-none">
-                Rental Agreement <span className="text-red-500">*</span>
+                Rental Agreement <span className="text-danger">*</span>
               </label>
               <Select
                 id="AgreementId"
@@ -268,7 +268,7 @@ export default function NewRentReceiptPage() {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <label htmlFor="paymentMethod" className="text-sm font-medium leading-none">
-                Payment Method <span className="text-red-500">*</span>
+                Payment Method <span className="text-danger">*</span>
               </label>
               <Select
                 id="paymentMethod"
@@ -294,7 +294,7 @@ export default function NewRentReceiptPage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="currency" className="text-sm font-medium leading-none">
-                Currency <span className="text-red-500">*</span>
+                Currency <span className="text-danger">*</span>
               </label>
               <Select
                 id="currency"
@@ -311,7 +311,7 @@ export default function NewRentReceiptPage() {
 
           <div className="space-y-2">
             <label htmlFor="amount" className="text-sm font-medium leading-none">
-              Amount <span className="text-red-500">*</span>
+              Amount <span className="text-danger">*</span>
             </label>
             <Input
               id="amount"
@@ -349,7 +349,7 @@ export default function NewRentReceiptPage() {
                     {associatedInvoices.map((invoice: any) => (
                       <TableRow
                         key={invoice.id}
-                        className={appliedInvoices.includes(invoice.id) ? "bg-green-50" : ""}
+                        className={appliedInvoices.includes(invoice.id) ? "bg-success-soft" : ""}
                       >
                         <TableCell className="text-center">
                           <input
@@ -357,7 +357,7 @@ export default function NewRentReceiptPage() {
                             checked={appliedInvoices.includes(invoice.id)}
                             onChange={() => toggleInvoice(invoice.id)}
                             disabled={isSubmitting}
-                            className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                            className="rounded border-input text-stage-cyan focus:ring-stage-cyan"
                           />
                         </TableCell>
                         <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>

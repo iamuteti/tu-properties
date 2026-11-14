@@ -204,7 +204,7 @@ export default function PayrollRunsPage() {
                                                 {run.reference}
                                             </Link>
                                             {run.summary.mixedCurrency && (
-                                                <p className="text-xs text-amber-700">
+                                                <p className="text-xs text-warning">
                                                     Mixed currencies
                                                 </p>
                                             )}

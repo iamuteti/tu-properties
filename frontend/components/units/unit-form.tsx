@@ -273,9 +273,9 @@ export function UnitForm({
                                 aria-current={index === stepIndex ? 'step' : undefined}
                                 className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                                     index === stepIndex
-                                        ? 'bg-slate-900 text-white'
+                                        ? 'bg-primary text-primary-foreground'
                                         : index < stepIndex
-                                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                          ? 'bg-success-soft text-success hover:bg-success/20'
                                           : 'bg-muted text-muted-foreground hover:bg-muted'
                                 }`}
                             >
@@ -290,7 +290,7 @@ export function UnitForm({
             </div>
 
             {draftRestored && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">
                     <span>An unfinished draft from earlier was restored.</span>
                     <Button type="button" variant="ghost" size="sm" onClick={discardDraft}>
                         Start fresh
@@ -482,7 +482,7 @@ export function UnitForm({
                                         )}
                                         <button
                                             type="button"
-                                            className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                            className="rounded p-1 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                             aria-label={`Remove ${feature.name}`}
                                             onClick={() => setFeatures((current) => current.filter((_, i) => i !== index))}
                                         >

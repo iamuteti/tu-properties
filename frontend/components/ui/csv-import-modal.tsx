@@ -100,7 +100,7 @@ export function CsvImportModal({
                     <button
                         type="button"
                         onClick={close}
-                        className="rounded p-1 text-slate-400 hover:bg-muted"
+                        className="rounded p-1 text-muted-foreground hover:bg-muted"
                         aria-label="Close"
                     >
                         ✕
@@ -145,26 +145,26 @@ export function CsvImportModal({
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <Stat label="Rows" value={report.total} />
-                                <Stat label="Created" value={report.created} tone="text-green-700" />
-                                <Stat label="Skipped" value={report.skipped} tone="text-amber-700" />
-                                <Stat label="Failed" value={report.failed} tone="text-red-600" />
+                                <Stat label="Created" value={report.created} tone="text-success" />
+                                <Stat label="Skipped" value={report.skipped} tone="text-warning" />
+                                <Stat label="Failed" value={report.failed} tone="text-danger" />
                             </div>
 
                             {report.dryRun && (
-                                <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
                                     Dry run — nothing was written. Import to apply these changes.
                                 </p>
                             )}
 
                             {failedRows.length > 0 && (
                                 <div className="space-y-2">
-                                    <h3 className="text-sm font-semibold text-red-700">Rows that need fixing</h3>
+                                    <h3 className="text-sm font-semibold text-danger">Rows that need fixing</h3>
                                     <ul className="max-h-40 divide-y overflow-y-auto rounded-md border text-sm">
                                         {failedRows.map((row) => (
                                             <li key={row.row} className="px-3 py-2">
                                                 <span className="font-medium">Row {row.row}</span>
                                                 {row.code && <span className="ml-2 font-mono text-xs">{row.code}</span>}
-                                                <span className="block text-xs text-red-600">{row.message}</span>
+                                                <span className="block text-xs text-danger">{row.message}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -173,7 +173,7 @@ export function CsvImportModal({
 
                             {skippedRows.length > 0 && (
                                 <details className="text-sm">
-                                    <summary className="cursor-pointer text-amber-700">
+                                    <summary className="cursor-pointer text-warning">
                                         {skippedRows.length} row(s) skipped
                                     </summary>
                                     <ul className="mt-2 max-h-32 divide-y overflow-y-auto rounded-md border">

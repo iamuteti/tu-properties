@@ -126,7 +126,7 @@ export default function LeaveBalancesPage() {
                                                     ? days(row.balance.carriedIn)
                                                     : '—'}
                                                 {row.balance.expired > 0 && (
-                                                    <p className="text-xs text-amber-700">
+                                                    <p className="text-xs text-warning">
                                                         {days(row.balance.expired)} expired
                                                     </p>
                                                 )}

@@ -61,7 +61,7 @@ export default function PortalDocumentsPage() {
                         >
                             <div className="flex min-w-0 items-center gap-3">
                                 <FileText
-                                    className="h-4 w-4 shrink-0 text-slate-400"
+                                    className="h-4 w-4 shrink-0 text-muted-foreground"
                                     aria-hidden="true"
                                 />
                                 <div className="min-w-0">

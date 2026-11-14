@@ -324,7 +324,7 @@ export default function UnitsPage() {
                     columns={columns}
                     searchPlaceholder="Search units…"
                     emptyMessage="No units found. Add one to get started."
-                    emptyIcon={<DoorOpen className="h-12 w-12 text-slate-400" aria-hidden="true" />}
+                    emptyIcon={<DoorOpen className="h-12 w-12 text-muted-foreground" aria-hidden="true" />}
                     serverSidePagination
                     paginationMeta={meta}
                     onPaginationChange={handlePaginationChange}

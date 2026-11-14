@@ -137,10 +137,10 @@ export default function ApprovalDetailPage() {
             </div>
 
             {instance.autoApproved && (
-                <Card className="border-amber-200 bg-amber-50">
+                <Card className="border-warning/30 bg-warning-soft">
                     <CardContent className="p-4 text-sm">
                         <p className="font-medium">Processed without approval</p>
-                        <p className="text-amber-900">
+                        <p className="text-warning">
                             {instance.note ??
                                 "No policy applied when this was raised, so it went straight through."}
                         </p>

@@ -67,7 +67,7 @@ export default function PortalInvoicesPage() {
                                     <p className="text-xs text-muted-foreground">
                                         Due {new Date(invoice.dueDate).toLocaleDateString()}
                                         {overdue && (
-                                            <span className="ml-2 font-medium text-red-600">
+                                            <span className="ml-2 font-medium text-danger">
                                                 overdue
                                             </span>
                                         )}
@@ -81,8 +81,8 @@ export default function PortalInvoicesPage() {
                                     <p
                                         className={`text-xs ${
                                             balance > 0
-                                                ? "text-red-600"
-                                                : "text-green-700"
+                                                ? "text-danger"
+                                                : "text-success"
                                         }`}
                                     >
                                         {balance > 0

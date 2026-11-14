@@ -95,7 +95,7 @@ export default function PlatformOrganizationsPage() {
             className: 'whitespace-nowrap',
             cell: (org) => (
                 <div>
-                    <Link href={`/platform/organizations/${org.id}`} className="text-blue-600 hover:underline font-medium">
+                    <Link href={`/platform/organizations/${org.id}`} className="text-info hover:underline font-medium">
                         {org.name}
                     </Link>
                     <div className="text-xs text-muted-foreground">{org.slug} · {org.plan}</div>
@@ -124,7 +124,7 @@ export default function PlatformOrganizationsPage() {
             header: 'Status',
             className: 'whitespace-nowrap',
             cell: (org) => (
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${org.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${org.isActive ? "bg-success-soft text-success" : "bg-danger-soft text-danger"}`}>
                     {org.isActive ? "Active" : "Suspended"}
                 </span>
             ),
@@ -166,14 +166,14 @@ export default function PlatformOrganizationsPage() {
                 </div>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                 >
                     {showForm ? "Cancel" : "Onboard organization"}
                 </button>
             </div>
 
             {error && (
-                <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>
+                <div className="mb-4 p-4 bg-danger-soft text-danger rounded-lg">{error}</div>
             )}
 
             {showForm && (
@@ -223,7 +223,7 @@ export default function PlatformOrganizationsPage() {
                             <input type="password" value={formData.adminPassword} onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required minLength={10} />
                         </div>
                         <div className="md:col-span-2">
-                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
                                     Onboard organization
                                 </button>
                         </div>

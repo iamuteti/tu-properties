@@ -225,7 +225,7 @@ export default function SuppliersPage() {
                                                     ).map((_, index) => (
                                                         <Star
                                                             key={index}
-                                                            className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+                                                            className="h-3.5 w-3.5 fill-primary text-warning"
                                                             aria-hidden="true"
                                                         />
                                                     ))}
@@ -252,10 +252,10 @@ export default function SuppliersPage() {
                                                 <span
                                                     className={
                                                         supplier.performance.onTimeRate >= 80
-                                                            ? 'text-emerald-700'
+                                                            ? 'text-success'
                                                             : supplier.performance.onTimeRate >= 50
-                                                              ? 'text-amber-700'
-                                                              : 'text-red-700'
+                                                              ? 'text-warning'
+                                                              : 'text-danger'
                                                     }
                                                 >
                                                     {supplier.performance.onTimeRate}%
@@ -276,9 +276,9 @@ export default function SuppliersPage() {
                                                 <span
                                                     className={
                                                         supplier.contractExpired
-                                                            ? 'text-red-700'
+                                                            ? 'text-danger'
                                                             : supplier.contractExpiringSoon
-                                                              ? 'text-amber-700'
+                                                              ? 'text-warning'
                                                               : ''
                                                     }
                                                 >

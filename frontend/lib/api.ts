@@ -349,6 +349,8 @@ export const platformApi = {
         adminLastName: string;
         adminPassword: string;
         planId?: string;
+        /** KES or USD — the currency the visitor picked on the pricing page. */
+        currency?: 'KES' | 'USD';
     }) => api.post('/platform/signup', data),
 
     list: () =>

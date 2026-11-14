@@ -153,7 +153,7 @@ export default function TenantRequestsPage() {
                                                         request.status.slice(1).toLowerCase()}
                                                 </span>
                                                 {request.earlyNotice && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
                                                         <AlertTriangle
                                                             className="h-3 w-3"
                                                             aria-hidden="true"

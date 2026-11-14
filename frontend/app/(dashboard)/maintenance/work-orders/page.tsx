@@ -154,7 +154,7 @@ export default function WorkOrdersPage() {
                 cell: ({ row }) => {
                     if (row.original.overdue) {
                         return (
-                            <span className="inline-flex items-center gap-1 text-sm font-medium text-red-600">
+                            <span className="inline-flex items-center gap-1 text-sm font-medium text-danger">
                                 <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                                 Overdue
                             </span>
@@ -449,7 +449,7 @@ export default function WorkOrdersPage() {
             </div>
 
             {selected.length > 0 && (
-                <div className="flex items-center justify-between rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3">
+                <div className="flex items-center justify-between rounded-lg border border-stage-cyan/30 bg-stage-cyan-soft px-4 py-3">
                     <p className="text-sm">
                         {selected.length} selected
                         {assignable.length < selected.length && (
@@ -489,7 +489,7 @@ export default function WorkOrdersPage() {
                     defaultPageSize={25}
                     pageSizeOptions={[25, 50, 100]}
                     emptyMessage="No work orders match these filters."
-                    emptyIcon={<Wrench className="mx-auto h-12 w-12 text-slate-400" />}
+                    emptyIcon={<Wrench className="mx-auto h-12 w-12 text-muted-foreground" />}
                 />
             )}
 
@@ -544,9 +544,9 @@ function Counter({
 }) {
     const toneClass =
         tone === 'danger'
-            ? 'text-red-600'
+            ? 'text-danger'
             : tone === 'warn'
-              ? 'text-amber-600'
+              ? 'text-warning'
               : 'text-foreground';
 
     return (

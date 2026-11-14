@@ -111,7 +111,7 @@ export default function PaymentDetailPage() {
             </div>
 
             {notice && (
-                <div className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                <div className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">
                     {notice}
                 </div>
             )}

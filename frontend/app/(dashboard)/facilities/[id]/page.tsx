@@ -143,13 +143,13 @@ export default function FacilityDetailPage() {
                             {!detail.isBookable && (
                                 <>
                                     <span>·</span>
-                                    <span className="text-amber-700">not bookable</span>
+                                    <span className="text-warning">not bookable</span>
                                 </>
                             )}
                             {detail.requiresApproval && detail.isBookable && (
                                 <>
                                     <span>·</span>
-                                    <span className="text-amber-700">needs approval</span>
+                                    <span className="text-warning">needs approval</span>
                                 </>
                             )}
                         </div>
@@ -265,7 +265,7 @@ export default function FacilityDetailPage() {
                                             aria-pressed={isSelected}
                                             className={`min-w-[5.5rem] shrink-0 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
                                                 isSelected
-                                                    ? 'border-cyan-600 bg-cyan-50'
+                                                    ? 'border-stage-cyan/60 bg-stage-cyan-soft'
                                                     : 'border-border hover:bg-muted'
                                             }`}
                                         >
@@ -279,7 +279,7 @@ export default function FacilityDetailPage() {
                                                 className={
                                                     entry.isOpen
                                                         ? free > 0
-                                                            ? 'text-emerald-700'
+                                                            ? 'text-success'
                                                             : 'text-muted-foreground'
                                                         : 'text-muted-foreground'
                                                 }
@@ -321,7 +321,7 @@ export default function FacilityDetailPage() {
                                                     key={slot.minutes}
                                                     className={`rounded-lg border px-3 py-2 text-xs ${
                                                         slot.available
-                                                            ? 'border-emerald-200 bg-emerald-50'
+                                                            ? 'border-success/30 bg-success-soft'
                                                             : 'border-border bg-muted'
                                                     }`}
                                                 >
@@ -331,7 +331,7 @@ export default function FacilityDetailPage() {
                                                     <p
                                                         className={
                                                             slot.available
-                                                                ? 'text-emerald-700'
+                                                                ? 'text-success'
                                                                 : 'text-muted-foreground'
                                                         }
                                                     >
@@ -482,7 +482,7 @@ export default function FacilityDetailPage() {
  * table invites. Each module maps its own.
  */
 function StatusPill({ status }: { status: FacilityBookingStatus }) {
-    const style = FACILITY_BOOKING_STATUS_STYLES[status] ?? 'bg-gray-100 text-foreground';
+    const style = FACILITY_BOOKING_STATUS_STYLES[status] ?? 'bg-muted text-foreground';
     const label = status.charAt(0) + status.slice(1).toLowerCase();
     return (
         <span

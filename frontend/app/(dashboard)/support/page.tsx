@@ -69,7 +69,7 @@ export default function SupportPage() {
             <h1 className="text-2xl font-bold mb-1">Support</h1>
             <p className="text-sm text-muted-foreground mb-6">Ask the platform team. They answer as a resolution note on the ticket.</p>
 
-            {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+            {error && <div className="mb-4 p-4 bg-danger-soft text-danger rounded-lg">{error}</div>}
 
             <div className="mb-6 p-6 bg-card rounded-lg shadow">
                 <h2 className="text-lg font-semibold mb-4">Raise a ticket</h2>
@@ -82,14 +82,14 @@ export default function SupportPage() {
                         <label className="block text-sm font-medium mb-1">What happened (min 10 characters)</label>
                         <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 border rounded-lg" rows={4} required minLength={10} />
                     </div>
-                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
                         Raise ticket
                     </button>
                 </form>
             </div>
 
             <div className="bg-card rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted">
                         <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Subject</th>
@@ -98,7 +98,7 @@ export default function SupportPage() {
                             <th className="px-4 py-2" />
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                         {tickets.map((t) => (
                             <tr key={t.id}>
                                 <td className="px-4 py-2 text-sm">
@@ -109,7 +109,7 @@ export default function SupportPage() {
                                 <td className="px-4 py-2 text-sm">{t.resolution ?? "—"}</td>
                                 <td className="px-4 py-2 text-right">
                                     {(t.status === "OPEN" || t.status === "IN_PROGRESS") && (
-                                        <button onClick={() => close(t.id)} className="text-sm text-blue-600 hover:underline">
+                                        <button onClick={() => close(t.id)} className="text-sm text-info hover:underline">
                                             Close
                                         </button>
                                     )}

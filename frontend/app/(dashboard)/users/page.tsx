@@ -212,7 +212,7 @@ export default function UsersPage() {
                                 <TableCell>
                                     <button
                                         onClick={() => openRoles(user)}
-                                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-info-soft px-2.5 py-0.5 text-xs font-medium text-info hover:bg-info-soft"
                                         title="Manage roles"
                                     >
                                         <Shield className="h-3 w-3" />
@@ -224,8 +224,8 @@ export default function UsersPage() {
                                         <span
                                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                                 user.isActive
-                                                    ? "bg-green-100 text-green-800"
-                                                    : "bg-gray-100 text-muted-foreground"
+                                                    ? "bg-success-soft text-success"
+                                                    : "bg-muted text-muted-foreground"
                                             }`}
                                         >
                                             {user.isActive ? "Active" : "Inactive"}
@@ -368,13 +368,13 @@ export default function UsersPage() {
                                             type="checkbox"
                                             checked={assigned}
                                             onChange={() => toggleRole(role)}
-                                            className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                                            className="mt-0.5 h-4 w-4 rounded border-input"
                                         />
                                         <span>
                                             <span className="block text-sm font-medium">
                                                 {role.name}
                                                 {role.isSystem ? null : (
-                                                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                                    <span className="ml-2 rounded bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning">
                                                         Org role
                                                     </span>
                                                 )}

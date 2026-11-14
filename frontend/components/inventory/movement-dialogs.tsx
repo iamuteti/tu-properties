@@ -988,7 +988,7 @@ export function StockTakeDialog({
 
                                         {difference !== null && difference !== 0 && (
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-xs font-medium text-amber-700">
+                                                <p className="text-xs font-medium text-warning">
                                                     {difference > 0
                                                         ? `${difference} ${item?.unitOfMeasure} more than the books say`
                                                         : `${Math.abs(difference)} ${item?.unitOfMeasure} missing`}

@@ -177,7 +177,7 @@ export default function NewReceiptPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
+        <div className="bg-danger-soft border border-danger/30 text-danger px-4 py-3 rounded-lg flex items-start gap-3">
           <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
           <div className="flex-1">{error}</div>
         </div>
@@ -191,7 +191,7 @@ export default function NewReceiptPage() {
             {/* Received From */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Received From: <span className="text-red-500">*</span>
+                Received From: <span className="text-danger">*</span>
               </label>
               <div className="flex gap-2">
                 <Input
@@ -217,7 +217,7 @@ export default function NewReceiptPage() {
             {/* Payment Method */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Payment Method: <span className="text-red-500">*</span>
+                Payment Method: <span className="text-danger">*</span>
               </label>
               <Select
                 name="paymentMethod"
@@ -248,7 +248,7 @@ export default function NewReceiptPage() {
                     value="ApplyToInvoice"
                     checked={formData.receiptType === "ApplyToInvoice"}
                     onChange={() => handleReceiptTypeChange("ApplyToInvoice")}
-                    className="text-blue-600 focus:ring-blue-500"
+                    className="text-info focus:ring-info"
                   />
                   <span>Apply to invoice</span>
                 </label>
@@ -259,7 +259,7 @@ export default function NewReceiptPage() {
                     value="CashReceipt"
                     checked={formData.receiptType === "CashReceipt"}
                     onChange={() => handleReceiptTypeChange("CashReceipt")}
-                    className="text-blue-600 focus:ring-blue-500"
+                    className="text-info focus:ring-info"
                   />
                   <span>Cash Receipt</span>
                 </label>
@@ -269,7 +269,7 @@ export default function NewReceiptPage() {
             {/* Deposit Into Account */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Deposit Into A/c: <span className="text-red-500">*</span>
+                Deposit Into A/c: <span className="text-danger">*</span>
               </label>
               <Select
                 name="depositIntoAc"
@@ -291,7 +291,7 @@ export default function NewReceiptPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Ref No.: <span className="text-red-500">*</span>
+                  Ref No.: <span className="text-danger">*</span>
                 </label>
                 <Input
                   type="text"
@@ -306,7 +306,7 @@ export default function NewReceiptPage() {
               {formData.paymentMethod === "CHEQUE" && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    Cheque Date: <span className="text-red-500">*</span>
+                    Cheque Date: <span className="text-danger">*</span>
                   </label>
                   <Input
                     type="date"
@@ -322,10 +322,10 @@ export default function NewReceiptPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Recording Date: <span className="text-red-500">*</span>
+                  Recording Date: <span className="text-danger">*</span>
                 </label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="date"
                     name="recordingDate"
@@ -339,7 +339,7 @@ export default function NewReceiptPage() {
               {/* Amount Received */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Amount Received: <span className="text-red-500">*</span>
+                  Amount Received: <span className="text-danger">*</span>
                 </label>
                 <Input
                   type="number"
@@ -461,7 +461,7 @@ export default function NewReceiptPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleRemoveLine(line.id || '')}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-danger hover:text-danger hover:bg-danger-soft"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

@@ -232,7 +232,7 @@ export default function MoveOutDetailPage() {
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
                             Deductions
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-red-600">
+                        <p className="mt-1 text-2xl font-bold text-danger">
                             −{currency} {deposit.deductionsTotal.toLocaleString()}
                         </p>
                     </CardContent>
@@ -244,13 +244,13 @@ export default function MoveOutDetailPage() {
                         </p>
                         <p
                             className={`mt-1 text-2xl font-bold ${
-                                deposit.refund > 0 ? "text-green-700" : "text-foreground"
+                                deposit.refund > 0 ? "text-success" : "text-foreground"
                             }`}
                         >
                             {currency} {deposit.refund.toLocaleString()}
                         </p>
                         {deposit.carriedForward > 0 && (
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-danger">
                                 {currency} {deposit.carriedForward.toLocaleString()} carried
                                 forward as a debt
                             </p>
@@ -297,7 +297,7 @@ export default function MoveOutDetailPage() {
                                             {!deposit.refundPaid && (
                                                 <button
                                                     type="button"
-                                                    className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                                    className="rounded p-1 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                                     aria-label="Remove deduction"
                                                     onClick={() =>
                                                         removeDeduction(record?.id ?? "")

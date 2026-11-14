@@ -169,7 +169,7 @@ export function TenantUtilitiesSection({ agreements, currency }: UtilitiesProps)
                                             <td className="py-2 pr-3">
                                                 <Pill status={charge.status} />
                                                 {charge.pricingError && (
-                                                    <p className="mt-1 max-w-xs text-xs text-amber-700">
+                                                    <p className="mt-1 max-w-xs text-xs text-warning">
                                                         {charge.pricingError}
                                                     </p>
                                                 )}

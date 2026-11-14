@@ -460,7 +460,7 @@ function OccupancyView({
                     {metrics.disagreements > 0 && (
                         <div
                             role="status"
-                            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                            className="rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning"
                         >
                             <strong>{metrics.disagreements}</strong> unit
                             {metrics.disagreements === 1 ? '' : 's'} carry a status that

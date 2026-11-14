@@ -179,7 +179,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
             onChange={(e) => setValue("propertyId", e.target.value)}
           />
           {errors.propertyId && (
-            <p className="mt-1 text-sm text-red-600">{errors.propertyId.message}</p>
+            <p className="mt-1 text-sm text-danger">{errors.propertyId.message}</p>
           )}
         </div>
 
@@ -198,7 +198,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
             onChange={(e) => setValue("tenantId", e.target.value)}
           />
           {errors.tenantId && (
-            <p className="mt-1 text-sm text-red-600">{errors.tenantId.message}</p>
+            <p className="mt-1 text-sm text-danger">{errors.tenantId.message}</p>
           )}
         </div>
 
@@ -216,7 +216,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
             onChange={(e) => setValue("AgreementId", e.target.value)}
           />
           {errors.AgreementId && (
-            <p className="mt-1 text-sm text-red-600">{errors.AgreementId.message}</p>
+            <p className="mt-1 text-sm text-danger">{errors.AgreementId.message}</p>
           )}
         </div>
 
@@ -231,7 +231,7 @@ export function MoveOutRequestModal({ isOpen, onClose, onSuccess }: MoveOutReque
             className="w-full"
           />
           {errors.moveoutDate && (
-            <p className="mt-1 text-sm text-red-600">{errors.moveoutDate.message}</p>
+            <p className="mt-1 text-sm text-danger">{errors.moveoutDate.message}</p>
           )}
         </div>
 

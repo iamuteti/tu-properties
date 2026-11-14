@@ -183,7 +183,7 @@ Weekend:{' '}
                                             day.isWorkingDay
                                                 ? 'border-border bg-card'
                                                 : day.holiday
-                                                  ? 'border-red-200 bg-red-50 text-red-900'
+                                                  ? 'border-danger/30 bg-danger-soft text-danger'
                                                   : 'border-border bg-muted text-muted-foreground'
                                         }`}
                                     >

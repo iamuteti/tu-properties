@@ -126,7 +126,7 @@ export default function ArrearsPage() {
                     </div>
 
                     {data.buckets.over90 > 0 && (
-                        <div className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+                        <div className="flex items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
                             <AlertTriangle className="h-4 w-4" />
                             {money(data.buckets.over90)} is more than 90 days past due.
                         </div>

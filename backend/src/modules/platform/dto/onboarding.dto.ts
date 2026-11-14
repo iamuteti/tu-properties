@@ -12,6 +12,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { SUPPORTED_CURRENCIES } from '@/common/supported-markets';
 
 /**
  * SaaS administration (Module 19) - onboarding a tenant.
@@ -98,6 +99,16 @@ export class OnboardOrganizationDto {
   @IsOptional()
   @IsEmail()
   contactEmail?: string;
+
+  /**
+   * Billing currency. Two are offered — KES for Kenya, USD for the United
+   * States — and the column defaults to KES when a caller omits it, which is
+   * what every pre-existing caller does.
+   */
+  @IsOptional()
+  @IsString()
+  @IsIn(SUPPORTED_CURRENCIES as unknown as string[])
+  currency?: string;
 }
 
 export class SuspendOrganizationDto {

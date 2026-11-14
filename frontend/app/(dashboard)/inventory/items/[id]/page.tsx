@@ -391,7 +391,7 @@ export default function InventoryItemDetailPage() {
                                     {item.consumedBy.map((entry) => (
                                         <li
                                             key={entry.movementId}
-                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0"
+                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
                                         >
                                             <span>
                                                 <Link
@@ -477,7 +477,7 @@ export default function InventoryItemDetailPage() {
                                         <span
                                             className={`font-medium tabular-nums ${
                                                 store.balance < 0
-                                                    ? 'text-red-700'
+                                                    ? 'text-danger'
                                                     : ''
                                             }`}
                                         >

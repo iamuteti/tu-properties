@@ -1,23 +1,6 @@
-'use client';
-
-import React, { useState } from 'react';
-import { Navbar } from '@/components/landing/Navbar';
-import { Hero } from '@/components/landing/Hero';
-import { MetricsStrip } from '@/components/landing/MetricsStrip';
-import { FeaturesList } from '@/components/landing/FeaturesList';
-import { InteractiveShowcase } from '@/components/landing/InteractiveShowcase';
-import { TrustSection } from '@/components/landing/TrustSection';
-import { SaaSSection } from '@/components/landing/SaaSSection';
-import { MarketProofStrip } from '@/components/landing/MarketProofStrip';
-import { JurisdictionConfigurator } from '@/components/landing/JurisdictionConfigurator';
-import { DemoAccountsSection } from '@/components/landing/DemoAccountsSection';
-import { Testimonials } from '@/components/landing/Testimonials';
-import { PricingSection } from '@/components/landing/PricingSection';
-import { FAQSection } from '@/components/landing/FAQSection';
-import { ContactSection } from '@/components/landing/ContactSection';
-import { FinalCTA } from '@/components/landing/FinalCTA';
-import { Footer } from '@/components/landing/Footer';
-import { TrialModal } from '@/components/landing/TrialModal';
+import React from 'react';
+import { LandingLayout } from '@/components/landing/LandingLayout';
+import { HomeContent } from '@/components/landing/HomeContent';
 
 /**
  * Public marketing site — the only route in the app that must never require a
@@ -25,85 +8,14 @@ import { TrialModal } from '@/components/landing/TrialModal';
  * unauthenticated visitors to `/auth/login`, so touching it here would bounce
  * every prospect off the landing page. "Sign in" is a plain link; "Start trial"
  * opens the real signup form, which POSTs to the public `/platform/signup`.
+ *
+ * Deep material lives on its own routes (`/features`, `/demo`, `/security`,
+ * `/contact`) — the landing page keeps only what persuades.
  */
 export default function LandingPage() {
-  const [trialModalOpen, setTrialModalOpen] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(undefined);
-  const [selectedCurrency, setSelectedCurrency] = useState<string | undefined>(undefined);
-
-  const handleOpenTrial = (planId?: string, currency?: string) => {
-    setSelectedPlanId(planId);
-    setSelectedCurrency(currency);
-    setTrialModalOpen(true);
-  };
-
-  const handleCloseTrial = () => {
-    setTrialModalOpen(false);
-  };
-
-  const handleScrollToHowItWorks = () => {
-    const el = document.getElementById('how-it-works');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const handleExploreModule = () => {
-    const el = document.getElementById('how-it-works');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   return (
-    <div className="landing min-h-screen bg-slate-50 dark:bg-[#070B14] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-amber-500/30 selection:text-amber-200">
-      <Navbar
-        onOpenTrialModal={handleOpenTrial}
-        onOpenDemoModal={handleScrollToHowItWorks}
-      />
-
-      <main className="flex-grow">
-        <Hero
-          onStartTrial={handleOpenTrial}
-          onSeeHowItWorks={handleScrollToHowItWorks}
-        />
-
-        <MetricsStrip />
-
-        <FeaturesList
-          onOpenTrialModal={handleOpenTrial}
-          onExploreModule={handleExploreModule}
-        />
-
-        <InteractiveShowcase onStartTrial={handleOpenTrial} />
-
-        <TrustSection />
-
-        <SaaSSection onStartTrial={handleOpenTrial} />
-
-        <MarketProofStrip />
-
-        <JurisdictionConfigurator />
-
-        <DemoAccountsSection />
-
-        <Testimonials />
-
-        <PricingSection onStartTrial={handleOpenTrial} />
-
-        <FAQSection />
-
-        <ContactSection />
-
-        <FinalCTA
-          onStartTrial={handleOpenTrial}
-          onSeeHowItWorks={handleScrollToHowItWorks}
-        />
-      </main>
-
-      <Footer />
-
-      <TrialModal isOpen={trialModalOpen} onClose={handleCloseTrial} selectedPlan={selectedPlanId} selectedCurrency={selectedCurrency} />
-    </div>
+    <LandingLayout>
+      <HomeContent />
+    </LandingLayout>
   );
 }

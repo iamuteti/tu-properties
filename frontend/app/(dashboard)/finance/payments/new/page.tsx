@@ -186,7 +186,7 @@ export default function NewPaymentPage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="paymentDate" className="text-sm font-medium leading-none">
-                Payment Date <span className="text-red-500">*</span>
+                Payment Date <span className="text-danger">*</span>
               </label>
               <Input
                 id="paymentDate"
@@ -204,7 +204,7 @@ export default function NewPaymentPage() {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <label htmlFor="amount" className="text-sm font-medium leading-none">
-                Amount <span className="text-red-500">*</span>
+                Amount <span className="text-danger">*</span>
               </label>
               <Input
                 id="amount"
@@ -255,7 +255,7 @@ export default function NewPaymentPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="paymentMethod" className="text-sm font-medium leading-none">
-                Payment Method <span className="text-red-500">*</span>
+                Payment Method <span className="text-danger">*</span>
               </label>
               <Select
                 id="paymentMethod"

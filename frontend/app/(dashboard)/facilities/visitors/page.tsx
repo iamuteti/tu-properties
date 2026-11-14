@@ -97,12 +97,12 @@ export default function VisitorsPage() {
                         The people who come to this site, with what a gate needs to know
                         about them.
                         {onSiteCount > 0 && (
-                            <span className="ml-1 font-medium text-emerald-700">
+                            <span className="ml-1 font-medium text-success">
                                 {onSiteCount} on site now.
                             </span>
                         )}
                         {barredCount > 0 && (
-                            <span className="ml-1 font-medium text-red-700">
+                            <span className="ml-1 font-medium text-danger">
                                 {barredCount} barred.
                             </span>
                         )}
@@ -237,7 +237,7 @@ export default function VisitorsPage() {
                                         </TableCell>
                                         <TableCell className="text-right text-xs">
                                             {(visitor.onSiteNow ?? 0) > 0 ? (
-                                                <span className="font-medium text-emerald-700">
+                                                <span className="font-medium text-success">
                                                     {visitor.onSiteNow}
                                                 </span>
                                             ) : (
@@ -246,7 +246,7 @@ export default function VisitorsPage() {
                                         </TableCell>
                                         <TableCell>
                                             {visitor.isBlacklisted ? (
-                                                <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                                <span className="inline-flex items-center rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-medium text-danger">
                                                     Barred
                                                 </span>
                                             ) : (

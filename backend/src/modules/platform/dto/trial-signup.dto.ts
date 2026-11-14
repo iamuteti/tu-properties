@@ -1,11 +1,13 @@
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { SUPPORTED_CURRENCIES } from '@/common/supported-markets';
 
 /**
  * Public trial signup (Module 19) — what the marketing site's form may hand in.
@@ -54,4 +56,16 @@ export class TrialSignupDto {
   @IsOptional()
   @IsString()
   planId?: string;
+
+  /**
+   * Billing currency the visitor picked on the pricing page: KES or USD.
+   *
+   * Optional because the pricing page is not the only way in, and the column
+   * defaults to KES. Rejecting anything else here is what keeps a trial
+   * organization from being created in a currency no plan row prices.
+   */
+  @IsOptional()
+  @IsString()
+  @IsIn(SUPPORTED_CURRENCIES as unknown as string[])
+  currency?: string;
 }

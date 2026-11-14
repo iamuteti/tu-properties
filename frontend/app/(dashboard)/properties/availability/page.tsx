@@ -109,7 +109,7 @@ export default function PropertyAvailabilityPage() {
                 <Card>
                     <CardContent className="py-4">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Available now</p>
-                        <p className="mt-1 text-2xl font-bold text-green-700">
+                        <p className="mt-1 text-2xl font-bold text-success">
                             {units.filter((unit) => unit.status === "VACANT").length}
                         </p>
                     </CardContent>
@@ -119,7 +119,7 @@ export default function PropertyAvailabilityPage() {
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
                             Leases ending in window
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-amber-700">{endingSoon}</p>
+                        <p className="mt-1 text-2xl font-bold text-warning">{endingSoon}</p>
                     </CardContent>
                 </Card>
             </div>
@@ -172,7 +172,7 @@ export default function PropertyAvailabilityPage() {
                                                         : ""}
                                                 </p>
                                                 {ending?.endDate && (
-                                                    <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                                                    <p className="mt-2 rounded bg-warning-soft px-2 py-1 text-xs text-warning">
                                                         Free from{" "}
                                                         {new Date(ending.endDate).toLocaleDateString()}
                                                         {ending.tenant

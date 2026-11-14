@@ -21,9 +21,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TU Properties — Multi-Market Property Management Platform",
+  title: "TU Properties — Property Management Platform for Kenya and the United States",
   description:
-    "Multi-market SaaS platform for property management companies, landlords, and institutional owners across fifteen jurisdictions. One organization per market, with its own currency, locale, and tax rules. Run properties, tenants, money, and staff from one system.",
+    "Property management SaaS for companies, landlords, and institutional owners in Kenya and the United States. Each organization keeps its own currency, locale, and tax rules. Run properties, tenants, money, and staff from one system.",
 };
 
 export default function RootLayout({

@@ -9,8 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { notificationsApi, AppNotification } from "@/lib/api";
 
 const PRIORITY_STYLES: Record<string, string> = {
-    CRITICAL: "bg-red-100 text-red-800",
-    HIGH: "bg-amber-100 text-amber-800",
+    CRITICAL: "bg-danger-soft text-danger",
+    HIGH: "bg-warning-soft text-warning",
     NORMAL: "bg-muted text-muted-foreground",
     LOW: "bg-muted text-muted-foreground",
 };
@@ -131,7 +131,7 @@ export default function NotificationsPage() {
             </div>
 
             {notice && (
-                <div className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                <div className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">
                     {notice}
                 </div>
             )}
@@ -160,7 +160,7 @@ export default function NotificationsPage() {
                                     onClick={() => handleOpen(item)}
                                 >
                                     {!item.readAt && (
-                                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+                                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
                                     )}
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -178,7 +178,7 @@ export default function NotificationsPage() {
                                             </span>
                                             {item.status === "SUPPRESSED" && (
                                                 <span
-                                                    className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-foreground"
+                                                    className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
                                                     title="No provider is configured for this channel, so it was not sent"
                                                 >
                                                     not sent

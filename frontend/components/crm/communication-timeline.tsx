@@ -32,12 +32,12 @@ const CHANNEL_ICONS: Record<string, React.ComponentType<{ className?: string }>>
 };
 
 const CHANNEL_STYLES: Record<string, string> = {
-    EMAIL: 'bg-sky-100 text-sky-700',
-    SMS: 'bg-emerald-100 text-emerald-700',
-    WHATSAPP: 'bg-green-100 text-green-700',
-    CALL: 'bg-violet-100 text-violet-700',
-    NOTE: 'bg-amber-100 text-amber-700',
-    MEETING: 'bg-indigo-100 text-indigo-700',
+    EMAIL: 'bg-stage-sky-soft text-stage-sky',
+    SMS: 'bg-success-soft text-success',
+    WHATSAPP: 'bg-success-soft text-success',
+    CALL: 'bg-stage-violet-soft text-stage-violet',
+    NOTE: 'bg-warning-soft text-warning',
+    MEETING: 'bg-stage-indigo-soft text-stage-indigo',
 };
 
 /**
@@ -245,7 +245,7 @@ export function CommunicationTimeline({
                                         <button
                                             type="button"
                                             onClick={() => remove(entry)}
-                                            className="ml-auto rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                            className="ml-auto rounded p-1 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                             aria-label="Delete log entry"
                                         >
                                             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />

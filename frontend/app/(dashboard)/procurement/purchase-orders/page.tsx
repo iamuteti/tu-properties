@@ -248,7 +248,7 @@ export default function PurchaseOrdersPage() {
                                                   ).toLocaleDateString()
                                                 : '—'}
                                             {order.overdue && (
-                                                <p className="text-xs text-amber-700">
+                                                <p className="text-xs text-warning">
                                                     {order.daysOverdue} days late
                                                 </p>
                                             )}
@@ -258,11 +258,11 @@ export default function PurchaseOrdersPage() {
                                         </TableCell>
                                         <TableCell className="text-sm">
                                             {order.supplierBill ? (
-                                                <span className="text-emerald-700">
+                                                <span className="text-success">
                                                     {order.supplierBill.billNumber}
                                                 </span>
                                             ) : order.status === 'RECEIVED' ? (
-                                                <span className="text-amber-700">
+                                                <span className="text-warning">
                                                     awaiting bill
                                                 </span>
                                             ) : (
@@ -297,7 +297,7 @@ function Stat({
                 <p className="text-sm text-muted-foreground">{label}</p>
                 <p
                     className={`text-2xl font-semibold ${
-                        tone === 'amber' && Number(value) > 0 ? 'text-amber-700' : ''
+                        tone === 'amber' && Number(value) > 0 ? 'text-warning' : ''
                     }`}
                 >
                     {value}

@@ -207,7 +207,7 @@ export function StockInPanel({ purchaseOrderId }: { purchaseOrderId: string }) {
                 )}
 
                 {pending.length === 0 ? (
-                    <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    <p className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">
                         Nothing is waiting. Every delivery on this order has been dealt
                         with — either it is on a shelf, or somebody recorded that it
                         never will be.

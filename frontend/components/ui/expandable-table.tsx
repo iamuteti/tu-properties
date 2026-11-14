@@ -241,7 +241,7 @@ export function ExpandableTable<TData extends TableData>({
       </div>
 
       {/* Table */}
-      <div className="bg-card/50 backdrop-blur-sm shadow-lg shadow-slate-900/10 rounded-xl border border-border overflow-hidden">
+      <div className="bg-card/50 backdrop-blur-sm shadow-lg shadow-sm rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
@@ -264,10 +264,10 @@ export function ExpandableTable<TData extends TableData>({
                         </span>
                         {header.column.getCanSort() && (
                           <div className="flex flex-col">
-                            <span className={`text-xs ${header.column.getIsSorted() === 'asc' ? 'text-cyan-600' : 'text-slate-300'}`}>
+                            <span className={`text-xs ${header.column.getIsSorted() === 'asc' ? 'text-stage-cyan' : 'text-muted-foreground'}`}>
                               ▲
                             </span>
-                            <span className={`text-xs -mt-0.5 ${header.column.getIsSorted() === 'desc' ? 'text-cyan-600' : 'text-slate-300'}`}>
+                            <span className={`text-xs -mt-0.5 ${header.column.getIsSorted() === 'desc' ? 'text-stage-cyan' : 'text-muted-foreground'}`}>
                               ▼
                             </span>
                           </div>
@@ -318,7 +318,7 @@ export function ExpandableTable<TData extends TableData>({
                 <tr>
                   <td colSpan={columns.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
-                      <Info className="h-12 w-12 text-slate-400" />
+                      <Info className="h-12 w-12 text-muted-foreground" />
                       <h3 className="mt-2 text-sm font-light text-foreground">No data found</h3>
                       <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
                     </div>
