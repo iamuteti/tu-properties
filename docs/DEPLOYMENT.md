@@ -9,7 +9,8 @@ under the `tuhame.co.ke` domain (sub-domain per project).
 > exit with `Ctrl+X`.
 
 > Local development commands (install, typecheck, lint, tests, demo seeds) live in
-> `AGENTS.md`. This file covers production deployment only.
+> `AGENTS.md`. This file covers production deployment only. Architecture lives in `GUIDE.md`; progress and
+> open work in `ROADMAP.md`; seed data and test scenarios in `Testing.md`.
 
 ## Stack Overview
 
@@ -231,11 +232,12 @@ NEXT_PUBLIC_BACKEND_URL=https://api-properties.tuhame.co.ke
 PORT=3002
 
 # Public landing page — comma-separated, in display order.
-# The product is offered in two markets: Kenya (KES) and the United States
+# The product is priced in two currencies: Kenya (KES) and the United States
 # (USD). Both values default to exactly this, so setting them is optional —
 # set them only when you want a different order or a narrower surface.
-# Two currencies cover two markets; every market's currency must have a price
-# for every tier in PRICING_PLANS, which is where /features pricing reads from.
+# A market shown here must be priceable: every currency it bills in needs a
+# price for every tier in PRICING_PLANS, which is where /features pricing reads
+# from. This narrows what the page advertises, not what the platform supports.
 # NEXT_PUBLIC_LANDING_MARKETS=KE,US
 # NEXT_PUBLIC_LANDING_CURRENCIES=KES,USD
 
@@ -709,12 +711,13 @@ The seeders are development tools. On production, use them deliberately:
 | `npm run db:backfill:unit-types` | Gives existing units a unit type and a deposit rule | Yes — safe to run twice, leaves units that already have a type alone |
 
 The demo markets are chosen with `DEMO_COUNTRY` / `DEMO_COUNTRIES` (ISO-3166-1
-alpha-2). Unset, `DEMO_COUNTRIES` defaults to the supported markets, `KE,US`:
-Rohi Estate Management and Westhill Properties (Kenya) plus the United States
-market organization. The other jurisdiction profiles are dormant config and
-seed only when named explicitly (`DEMO_COUNTRIES=KE,ZA,IN`). An unknown code
-fails the seed loudly on purpose — a skipped market is worse than a stopped
-seed. Full account list: `Testing.md`.
+alpha-2). Unset, `DEMO_COUNTRIES` defaults to the markets the page shows,
+`KE,US`: Rohi Estate Management and Westhill Properties (Kenya) plus the United
+States market organization. The other jurisdiction profiles seed only when named
+explicitly (`DEMO_COUNTRIES=KE,ZA,IN`) — this is a seeding default, not a
+restriction, and an organization can be onboarded in any ISO-4217 currency. An
+unknown code fails the seed loudly on purpose — a skipped market is worse than a
+stopped seed. Full account list: `Testing.md`.
 
 > Never point the demo seed at a production database: every seeded account
 > shares the password `Password123!`.
@@ -765,6 +768,84 @@ Switching back to cookies once the frontend has its own domain on
 frontend needs no change and no rebuild; it stores the token when the response
 carries one and clears it when it does not.
 
+## 13. Stripe Subscription Billing
+
+Stripe collects **plan subscription** payments. It does not collect rent. The implementation lives in
+`backend/src/modules/payments/`; the settlement/allocation design is in `GUIDE.md` §6 (Module 8) and §9.
+
+### Flow
+
+```
+Subscribe/Upgrade  ->  POST /payments/checkout      ->  Stripe Checkout Session (hosted redirect)
+(org detail page)      (ADMIN / SUPER_ADMIN)            subscription mode, org currency
+                              |
+                              +--> browser redirects to Stripe, pays
+                              |
+POST /payments/webhooks/stripe <-- checkout.session.completed
+                              |
+                              +--> Subscription ACTIVE, purchased plan applied to org
+```
+
+No Stripe SDK exists in the frontend: the API returns `{ url, sessionId }` and the browser is redirected.
+No `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is required.
+
+### How prices are matched (important)
+
+The backend stores **no `price_...` IDs**. At checkout it:
+
+1. Reads the plan's `prices` map (e.g. `{ "USD": 49, "KES": 6500 }`) and the organization's currency.
+2. Calls `stripe.prices.list({ currency, active: true, limit: 100 })`.
+3. Picks the price whose `unit_amount` equals the plan amount in minor units (`×100` for USD/KES; `×1` for
+   zero-decimal currencies) **and** whose `recurring.interval` equals the plan interval (`month`/`year`).
+
+So the Stripe Dashboard prices must equal the admin plan amounts exactly. A mismatch fails checkout with
+`No Stripe price found for <CUR> <amount>/<interval>`. Keep active prices per currency modest — `prices.list`
+returns at most 100.
+
+### Environment (`backend/.env`)
+
+```
+STRIPE_SECRET_KEY=sk_live_...        # Developers -> API keys
+STRIPE_WEBHOOK_SECRET=whsec_...      # webhook endpoint signing secret
+```
+
+Frontend needs nothing.
+
+### Stripe Dashboard setup
+
+1. **Test mode first** (top-left toggle), repeat in live mode at the end.
+2. **Developers → API keys** → copy the secret key to `STRIPE_SECRET_KEY`.
+3. **Products** — Starter, Professional. Do **not** create a fixed-price Enterprise product: Enterprise is
+   custom priced per client, with a matching Stripe price created on demand (deferred).
+4. **Prices** — one per currency per product, billing cycle matching the plan interval:
+   - Starter: `$49.00` USD monthly, `KES 6,500.00` monthly
+   - Professional: `$129.00` USD monthly, `KES 17,000.00` monthly
+   The amounts must equal the admin plan `prices` map (§ "How prices are matched").
+5. **Webhook** — `https://api-properties.tuhame.co.ke/payments/webhooks/stripe`
+   (local: `http://localhost:3003/payments/webhooks/stripe` via ngrok). Events:
+   `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`,
+   `customer.subscription.updated`, optionally `customer.subscription.deleted`. Copy the signing secret to
+   `STRIPE_WEBHOOK_SECRET`.
+6. **Payment methods** — Card on; for KES enable **Mobile money → M-Pesa**.
+7. **Billing settings** — automatic collection and smart retries on.
+8. **Test cards** — `4242 4242 4242 4242` succeeds; `4000 0000 0000 9995` insufficient funds; any future
+   expiry and any CVC.
+
+### Verification checklist
+
+- [x] `stripe` package installed in `backend/`; module, controller, service and DTO created
+- [x] `POST /payments/checkout` resolves org, matches price, creates customer + session, returns URL
+- [x] `POST /payments/webhooks/stripe` verifies the signature over `rawBody`; forged signature returns 400
+- [x] `checkout.session.completed` applies the plan and sets the subscription ACTIVE
+- [x] `NestFactory.create(..., { rawBody: true })` in place; no global raw parser (see `AGENTS.md`)
+- [x] "Subscribe / Upgrade" button redirects from the platform organization page
+- [ ] Webhook endpoint registered in the live Stripe account
+- [ ] M-Pesa enabled for KES and exercised with a Kenyan test payment
+- [ ] Live keys configured and one real subscription taken end to end
+
+> `rawBody` is the load-bearing detail: the webhook verifies the untouched request bytes. Adding
+> `express.raw()` in `main.ts` breaks every JSON endpoint in the app. Do not.
+
 ## Known Blockers / Pre-Launch Summary
 
 | Item | Status | Action |
@@ -778,7 +859,7 @@ carries one and clears it when it does not.
 | `STORAGE_DIR` | Relative default (`./uploads`) | Absolute path + chown (steps 3, 4.4) |
 | Super Admin password | Public default (`Password123!`) | Change on first login (steps 2, 7.11) |
 | Email / SMS | System SMTP + per-org credentials not configured | Set `SMTP_*` + `FRONTEND_URL` for trial-signup verification; configure per-org SMTP + SMS in the admin panel (steps 3, 7.12) |
-| Stripe billing | Keys not set | Set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; create Products/Prices and register the webhook (`PAYMENT_INTEGRATION.md`) |
+| Stripe billing | Keys not set | Set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; create Products/Prices and register the webhook (step 13) |
 | M-Pesa | Pay numbers recorded per property, no gateway integrated | Set the per-property pay number; enable M-Pesa inside Stripe Checkout; live STK push would need a gateway integration |
 | SSL + DNS | No records/certs | A records + certbot for both subdomains (step 5) |
 | Backups | None | `pg_dump` + uploads `tar` on a cron (step 10.2) |

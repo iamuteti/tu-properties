@@ -1204,7 +1204,7 @@ function round2(value: number): number {
  *    columns would leave every sale permanently "outstanding" and handover
  *    unreachable. The payments actually recorded against each invoice are
  *    summed here instead. Reconciling the invoice columns themselves is Finance
- *    module work and is listed as a follow-up in `05-MODULE-sales.md`.
+ *    module work and is tracked in `ROADMAP.md` §4, Phase 1.
  * 2. **A scheduled-but-unbilled instalment still counts as owed**, which is
  *    what stops a sale being handed over before the schedule has been billed.
  */

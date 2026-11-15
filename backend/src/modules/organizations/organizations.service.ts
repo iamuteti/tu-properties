@@ -1,14 +1,6 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma, UtilityBillingMode, VacancyPolicy } from '@prisma/client';
-import {
-  SUPPORTED_CURRENCIES,
-  isSupportedCurrency,
-} from '@/common/supported-markets';
 
 @Injectable()
 export class OrganizationsService {
@@ -103,14 +95,9 @@ export class OrganizationsService {
     },
   ) {
     await this.findOne(id); // Verify exists
-    // Two currencies are offered, so a currency outside them is a typo or an
-    // attempt to bill in something no price exists for. Reject it here rather
-    // than storing a currency the pricing catalogue has no row for.
-    if (data.currency !== undefined && !isSupportedCurrency(data.currency)) {
-      throw new BadRequestException(
-        `Unsupported currency "${data.currency}". This deployment bills in ${SUPPORTED_CURRENCIES.join(', ')}.`,
-      );
-    }
+    // The currency column is ISO-4217, not a membership test: an organization
+    // may bill in a currency the public plan catalogue does not price. Shape is
+    // validated at the DTO boundary; only trial signup restricts the value.
     const clean: Prisma.OrganizationUpdateInput = {};
     if (data.name !== undefined) clean.name = data.name;
     if (data.contactEmail !== undefined) clean.contactEmail = data.contactEmail;

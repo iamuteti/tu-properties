@@ -27,7 +27,11 @@ interface PricingSectionProps {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3003';
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
+/**
+ * Every priced currency needs a symbol here, and the `Record` makes a missing
+ * one a compile error — the same guard `PRICING_PLANS` uses for tier amounts.
+ */
+const CURRENCY_SYMBOLS: Record<PricingCurrency, string> = {
   KES: 'KES ',
   USD: '$',
 };
@@ -38,8 +42,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
   const [plans, setPlans] = useState<DisplayPlan[]>([]);
 
   /**
-   * The product bills in two currencies, so both are always offered. The
-   * visitor's IP used to be sent to `ipapi.co` to decide this; with two
+   * The plan catalogue is priced in two currencies, so both are always offered.
+   * The visitor's IP used to be sent to `ipapi.co` to decide this; with two
    * currencies there is nothing to decide, and the call only leaked their
    * address to a third party.
    */
@@ -146,7 +150,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
                   <div className="mt-6 pt-6 border-t border-line">
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl sm:text-4xl font-extrabold text-ink font-display">
-                        {CURRENCY_SYMBOLS[activeCurrency] ?? ''}
+                        {CURRENCY_SYMBOLS[activeCurrency]}
                         {(price ?? 0).toLocaleString()}
                       </span>
                       <span className="text-xs text-ink-subtle font-mono">/month {billingCycle === 'annual' && '(billed annually)'}</span>

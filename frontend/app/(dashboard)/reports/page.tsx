@@ -44,7 +44,7 @@ import {
  * Module 16 — reports.
  *
  * Six read endpoints behind five tabs, plus a landlord lookup. There is nothing to
- * create, edit or delete here, so the CRUD half of `00-UX-CROSS-CUTTING-STANDARDS.md`
+ * create, edit or delete here, so the CRUD half of `GUIDE.md` §8
  * does not apply; what does apply is the other half — real loading/empty/error
  * states, exports on every report, a date control that is honest about what it did,
  * and a layout that survives a phone.

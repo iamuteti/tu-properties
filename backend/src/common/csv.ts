@@ -1,8 +1,8 @@
 /**
  * Minimal RFC 4180 CSV helpers.
  *
- * Properties and units are high-volume import entities (`00-UX-CROSS-CUTTING-
- * STANDARDS.md` requires bulk import for them), so the parsing/serialisation
+ * Properties and units are high-volume import entities (`GUIDE.md` §7 requires
+ * bulk import for them), so the parsing/serialisation
  * lives on the server: one implementation, one set of rules, and the browser
  * just uploads a file and downloads a report.
  */

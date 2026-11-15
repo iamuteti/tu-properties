@@ -123,7 +123,7 @@ import {
   randomPostalCode as profileRandomPostalCode,
   utilityRate,
 } from './jurisdictions';
-import { SUPPORTED_MARKET_CODES } from '../common/supported-markets';
+import { DEFAULT_DEMO_MARKETS } from '../common/pricing-currencies';
 
 dotenv.config();
 
@@ -3899,9 +3899,10 @@ export interface SeedDemoDataOptions {
  * `DEMO_COUNTRIES` that quietly seeds one country instead of two is the kind of
  * mistake nobody notices until a demo fails to show a country it promised.
  *
- * Defaults to the two markets the product sells into. The other jurisdiction
- * profiles still exist and a code outside this list still seeds correctly when
- * asked for explicitly — this is the default, not a hard restriction.
+ * Defaults to the markets the landing page shows (Kenya and the United States).
+ * The other jurisdiction profiles still exist and a code outside this list still
+ * seeds correctly when asked for explicitly — this is the default, not a hard
+ * restriction.
  */
 function resolveMarketCodes(
   options: SeedDemoDataOptions,
@@ -3918,7 +3919,7 @@ function resolveMarketCodes(
   const codes = (
     requested
       ? requested.map((code) => code.toUpperCase())
-      : [...SUPPORTED_MARKET_CODES]
+      : [...DEFAULT_DEMO_MARKETS]
   ).filter((code, index, all) => all.indexOf(code) === index);
 
   const unknown = codes.filter((code) => !PROFILES[code]);
@@ -4203,7 +4204,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
 
     // Multi-branch enterprise organization (optional).
     //
-    // Two branches, one per market the product sells into. The organization
+    // Two branches, one per market the landing page shows. The organization
     // itself takes the primary market's currency, locale, time zone and tax
     // country rather than a hardcoded one, so `DEMO_COUNTRY=US` produces a US
     // parent with a Nairobi branch, not a British company with a Dubai office.
@@ -4234,7 +4235,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         },
       });
 
-      // The two markets the product offers. `code` is set explicitly because a
+      // The two default demo markets. `code` is set explicitly because a
       // three-letter slice of "New York" is "NEW", which reads like a mistake.
       const branches = [
         { name: 'Nairobi Branch', city: 'Nairobi', code: 'NBO' },
@@ -4266,8 +4267,8 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     // timezone, tax jurisdiction, rent band, names, addresses, phone formats,
     // banks and utility tariffs.
     //
-    // Default is the two markets the product sells into; naming another code in
-    // `DEMO_COUNTRIES` still seeds it, which is what keeps the dormant
+    // Default is the two markets the landing page shows; naming another code in
+    // `DEMO_COUNTRIES` still seeds it, which is what keeps the other
     // jurisdiction profiles honest.
     console.log('Creating market organizations...');
     const marketOrgs: MarketOrg[] = [];

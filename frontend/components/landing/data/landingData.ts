@@ -483,30 +483,31 @@ export const ALL_MARKETS: MarketProfile[] = [
 ];
 
 /**
- * The markets this deployment sells into.
+ * The markets the landing page shows when `NEXT_PUBLIC_LANDING_MARKETS` is unset.
  *
- * Two, deliberately: Kenya and the United States. The other profiles in
- * `ALL_MARKETS` are kept as dormant config so a market can be switched on
- * without re-deriving its tax, telephone, tariff and rent data — but nothing
- * offers them while they are not in this list.
+ * Two, because those are the markets the demo seed covers and the plan
+ * catalogue is priced for. This is a *display default*, not a capability limit:
+ * the platform models fifteen complete jurisdiction profiles and an
+ * organization can be onboarded into any of them — `OnboardOrganizationDto`
+ * accepts any ISO-4217 currency.
  */
-export const SUPPORTED_MARKET_CODES = ['KE', 'US'];
+export const DEFAULT_MARKET_CODES = ['KE', 'US'];
 
 /**
  * Which markets the public landing page shows.
  *
  * Driven by `NEXT_PUBLIC_LANDING_MARKETS` in `frontend/.env` — a
  * comma-separated list of ISO-3166-1 alpha-2 codes, in the order they should
- * appear. Leave it unset and `SUPPORTED_MARKET_CODES` is used. The env var
+ * appear. Leave it unset and `DEFAULT_MARKET_CODES` is used. The env var
  * decides what the page talks about; the profile itself is still the copy above.
  */
 function parseMarketCodes(value: string | undefined): string[] {
-  if (value === undefined) return SUPPORTED_MARKET_CODES;
+  if (value === undefined) return DEFAULT_MARKET_CODES;
   const codes = value
     .split(',')
     .map((code) => code.trim().toUpperCase())
     .filter(Boolean);
-  if (codes.length === 0) return SUPPORTED_MARKET_CODES;
+  if (codes.length === 0) return DEFAULT_MARKET_CODES;
   return codes;
 }
 
@@ -535,7 +536,7 @@ if (process.env.NODE_ENV !== 'production') {
 export const MARKETS: MarketProfile[] =
   REQUESTED_MARKETS.length > 0
     ? REQUESTED_MARKETS
-    : ALL_MARKETS.filter((market) => SUPPORTED_MARKET_CODES.includes(market.code));
+    : ALL_MARKETS.filter((market) => DEFAULT_MARKET_CODES.includes(market.code));
 
 export const MARKET_CODES = MARKETS.map((market) => market.code);
 
@@ -1084,15 +1085,15 @@ export const TESTIMONIALS = [
 ];
 
 /**
- * Which currencies the product bills in.
+ * The currencies the plan catalogue is priced in — not the currencies the
+ * platform can bill in.
  *
- * Two markets are offered — Kenya and the United States — so there are two
- * currencies. The other jurisdiction profiles still exist in
- * `backend/src/prisma/jurisdictions.ts` and in this file's `ALL_MARKETS`, but
- * they are dormant config: no page offers them and no organization can be
- * created in one. Adding a market back means adding its currency here and a
- * price for every tier in `PRICING_PLANS` (the `Record` type makes a missing
- * tier a compile error).
+ * `Organization.currency` is a free ISO-4217 column and the product models
+ * fifteen jurisdictions, so an organization may operate in any currency. These
+ * two are the ones the public price list quotes, because every tier in
+ * `PRICING_PLANS` carries an amount for them. Adding a priced currency means
+ * adding it here, an amount for every tier (the `Record` type makes a missing
+ * tier a compile error) and a symbol in `PricingSection.tsx`.
  */
 export type PricingCurrency = 'KES' | 'USD';
 
@@ -1100,8 +1101,8 @@ export type PricingCurrency = 'KES' | 'USD';
 /**
  * Every currency the pricing table can be shown in.
  *
- * One per currency the shipped markets bill in — Germany and France share the
- * euro, so fourteen currencies cover fifteen markets.
+ * One per currency the plan catalogue is priced in. A market that bills in
+ * something else can still be onboarded; it simply is not bought here.
  */
 export const ALL_PRICING_CURRENCIES: PricingCurrency[] = ['KES', 'USD'];
 

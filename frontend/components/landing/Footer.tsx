@@ -24,7 +24,7 @@ export const Footer: React.FC = () => {
               <span className="font-semibold text-xl tracking-tight text-ink font-display">TU Properties</span>
             </Link>
 
-            <p className="text-ink-muted text-xs sm:text-sm leading-relaxed max-w-sm">Property management software for owners, agencies and institutional trusts in Kenya and the United States. Each organization keeps its own currency, locale and tax rules. Run your properties, tenants, money, and staff from one audited system.</p>
+            <p className="text-ink-muted text-xs sm:text-sm leading-relaxed max-w-sm">Property management software for owners, agencies and institutional trusts. Plans are priced in KES and USD; each organization keeps its own currency, locale, tax rules and telephone formats. Run your properties, tenants, money, and staff from one audited system.</p>
 
             <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-mono text-ink-subtle">
               {MARKETS.map((market) => (

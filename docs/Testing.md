@@ -1,5 +1,8 @@
 # Testing Guide - TU Properties (Multi-Tenant SaaS)
 
+> Seed data, demo accounts and manual test scenarios. Architecture is in `GUIDE.md`; progress and open tasks are
+> in `ROADMAP.md`; production setup is in `docs/DEPLOYMENT.md`.
+
 This guide outlines how to test the multi-tenant functionality using the provided seed data.
 
 ## 1. Setup
@@ -31,13 +34,12 @@ npx prisma db seed
 
 ### Choosing the markets the demo covers
 
-The seed covers the **two markets this deployment sells into** — Kenya and the
-United States — because those are the only ones the public site offers and the
-plan catalogue can price (`backend/src/common/supported-markets.ts`). The other
-thirteen profiles in `jurisdictions.ts` are complete and still seedable, but
-they are dormant configuration rather than an offer: they exist so a third
-market can be switched on without re-deriving its tax, telephone, tariff and
-rent data.
+The seed covers Kenya and the United States by default — the two markets the
+public site shows and the plan catalogue prices (`DEFAULT_DEMO_MARKETS` in
+`backend/src/common/pricing-currencies.ts`). The other thirteen profiles in
+`jurisdictions.ts` are complete and still seedable; they simply are not the
+default. This is a seeding choice, not a restriction on the platform: an
+organization can be onboarded in any ISO-4217 currency.
 
 Two environment variables control it:
 
@@ -47,9 +49,9 @@ Two environment variables control it:
 # gets a market organization with its own currency, locale and tax rules.
 DEMO_COUNTRY=KE npm run db:seed:demo
 
-# A subset of markets, by ISO-3166-1 alpha-2 code. Unset, it defaults to the
-# supported markets (KE,US). An unknown code fails the seed loudly rather
-# than silently skipping a market.
+# A subset of markets, by ISO-3166-1 alpha-2 code. Unset, it defaults to
+# Kenya and the United States (KE,US). An unknown code fails the seed loudly
+# rather than silently skipping a market.
 DEMO_COUNTRIES=KE,ZA,IN,BR npm run db:seed:demo
 ```
 

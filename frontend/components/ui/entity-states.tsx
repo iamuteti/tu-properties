@@ -6,7 +6,7 @@ import { Button } from './button';
 /**
  * Shared loading / empty / error states.
  *
- * `00-UX-CROSS-CUTTING-STANDARDS.md` requires every list and detail page to
+ * `GUIDE.md` §8 (Frontend standards) requires every list and detail page to
  * have a real empty state, a loading indicator and a real error state instead
  * of a blank table or a silent failure. These three components are that
  * pattern so pages stop re-inventing it (or forgetting it).

@@ -6,7 +6,8 @@ Project-specific commands and conventions for working in this repository.
 - `backend/` — NestJS + Prisma/PostgreSQL API (port 3003).
 - `frontend/` — Next.js frontend (port 3002).
 - `backend/src/prisma/schema.prisma` — Prisma schema (source of truth).
-- `docs/` — module specs and database schema.
+- `docs/` — deployment and testing guides. Product/architecture reference is `GUIDE.md`; progress and open
+  tasks are `ROADMAP.md` (the single source of truth during development).
 
 ## Quick start
 
@@ -95,21 +96,22 @@ npm run dev
   `components/landing/LandingLayout.tsx` supplies the navbar, footer and trial modal, and `trial-context.tsx` lets any
   section open that modal without a callback prop. Do not put a second promotional section back on the landing page —
   the previous version stacked fifteen of them and repeated three arguments five times each.
-- **The product is offered in two markets: Kenya (KES) and the United States (USD).** `backend/src/common/supported-markets.ts`
-  is the single source of truth — the landing page, the demo seed default, the trial signup and the organization
-  profile all read the same list. The other thirteen profiles in `backend/src/prisma/jurisdictions.ts` are **dormant
-  config**: complete and still used by the seeder when asked for by code, but offered nowhere. Adding a market back
-  means adding it to `supported-markets.ts` plus the frontend pieces below — not re-deriving its tax, telephone,
-  tariff and rent data.
+- **The platform is priced in two currencies — Kenya (KES) and the United States (USD) — but is not limited to two
+  countries.** `backend/src/common/pricing-currencies.ts` holds `PRICED_CURRENCIES` (the currencies the plan catalogue
+  quotes) and `DEFAULT_DEMO_MARKETS` (what the demo seed covers). It governs the priced surfaces only: the landing
+  pricing table, the trial modal and `TrialSignupDto`'s currency check. Onboarding is broader — `OnboardOrganizationDto`
+  accepts any ISO-4217 currency and `Organization.currency` is a free column — so an operator can run an organization
+  in any of the fifteen jurisdiction profiles in `backend/src/prisma/jurisdictions.ts`. Do not turn "we price two
+  currencies" into a country allow-list on onboarding.
 - **Which markets and currencies the page shows is deployment configuration, not page copy:**
   `NEXT_PUBLIC_LANDING_MARKETS` (ISO-3166-1 alpha-2) and `NEXT_PUBLIC_LANDING_CURRENCIES` (ISO-4217) in
   `frontend/.env`. Both are comma-separated and **order-significant** — the order in the env file is the order on the
   page. They drive the hero market switcher, the footer chips and the demo market tabs (the jurisdiction configurator
   and market proof strip no longer exist). Unset, they default to `KE,US` and `KES,USD`.
-  **Two currencies cover two markets**, and every market's currency must be priceable. A new currency therefore needs
-  three things: the code in the `PricingCurrency` union, an amount for every tier in `PRICING_PLANS` (the `Record` type
-  makes a missing tier a compile error), and a symbol in `PricingSection.tsx`'s `CURRENCY_SYMBOLS`. `NEXT_PUBLIC_*`
-  values are inlined at build time: change them and rebuild.
+  **A market shown on the page must be priceable.** A new priced currency needs three things: the code in the
+  `PricingCurrency` union, an amount for every tier in `PRICING_PLANS` (the `Record` type makes a missing tier a compile
+  error), and a symbol in `PricingSection.tsx`'s `CURRENCY_SYMBOLS` (also a `Record`, so a missing symbol is a compile
+  error). `NEXT_PUBLIC_*` values are inlined at build time: change them and rebuild.
 - The pricing section no longer calls `ipapi.co` and the trial modal no longer does either — with two currencies the
   visitor's IP had nothing to decide, and the call sent every visitor's address to a third party. The modal falls back
   to the browser's own time zone (`Africa/Nairobi` → KES, otherwise USD) when it is opened outside the pricing section.
@@ -117,7 +119,7 @@ npm run dev
   are a hand-copy of `backend/src/prisma/jurisdictions.ts` in `frontend/components/landing/data/landingData.ts` —
   the frontend must not import backend source. Add a country there and in the frontend copy, not in a component.
 - Production origin is `properties.tuhame.co.ke` (backend `api-properties.tuhame.co.ke`) — see the nginx block in
-  `DEPLOYMENT.md`. CORS compares origins exactly, so `backend/.env`'s `CORS_ORIGINS` must list that exact origin.
+  `docs/DEPLOYMENT.md`. CORS compares origins exactly, so `backend/.env`'s `CORS_ORIGINS` must list that exact origin.
 
 ## Testing / verification
 - Typecheck: `npx tsc --noEmit` (from `backend/`).

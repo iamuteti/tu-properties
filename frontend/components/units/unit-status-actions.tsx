@@ -10,7 +10,7 @@ import type { Unit, UnitStatus } from '@/types';
 /**
  * Explicit occupancy actions for a unit.
  *
- * `00-UX-CROSS-CUTTING-STANDARDS.md` requires status changes to be presented as
+ * `GUIDE.md` §8 (Frontend standards) requires status changes to be presented as
  * named next-state actions rather than a dropdown that accepts invalid
  * transitions. The server is still the authority — it refuses a transition that
  * contradicts the unit's rental agreements — and the refusal reason is shown to

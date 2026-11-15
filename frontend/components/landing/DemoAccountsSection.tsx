@@ -192,12 +192,13 @@ const ALL_DEMO_MARKETS: DemoMarket[] = [
 ];
 
 /**
- * The demo market tabs, limited to the markets this deployment offers.
+ * The demo market tabs, limited to the markets the landing page shows.
  *
- * Kenya and the United States are what the seeder creates (`DEMO_COUNTRIES`
- * defaults to `KE,US`), so those are the only tabs whose logins actually work.
- * The other entries stay in the list as dormant data: switching a market on
- * needs no rewrite here, only that market in `SUPPORTED_MARKET_CODES`.
+ * Kenya and the United States are what the seeder creates by default
+ * (`DEMO_COUNTRIES` defaults to `KE,US`), so those are the tabs whose logins
+ * actually work. The other entries stay in the list as dormant data: the tabs
+ * follow `MARKET_CODES`, so switching one on is a deployment setting here, not
+ * a rewrite.
  */
 const OFFERED_DEMO_MARKETS = ALL_DEMO_MARKETS.filter((market) => MARKET_CODES.includes(market.code));
 

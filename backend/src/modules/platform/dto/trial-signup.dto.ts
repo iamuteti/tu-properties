@@ -7,7 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { SUPPORTED_CURRENCIES } from '@/common/supported-markets';
+import { PRICED_CURRENCIES } from '@/common/pricing-currencies';
 
 /**
  * Public trial signup (Module 19) — what the marketing site's form may hand in.
@@ -62,10 +62,11 @@ export class TrialSignupDto {
    *
    * Optional because the pricing page is not the only way in, and the column
    * defaults to KES. Rejecting anything else here is what keeps a trial
-   * organization from being created in a currency no plan row prices.
+   * organization from being created in a currency no plan row prices — this is
+   * a pricing constraint, not a limit on the countries the platform supports.
    */
   @IsOptional()
   @IsString()
-  @IsIn(SUPPORTED_CURRENCIES as unknown as string[])
+  @IsIn(PRICED_CURRENCIES as unknown as string[])
   currency?: string;
 }

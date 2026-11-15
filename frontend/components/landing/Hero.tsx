@@ -7,7 +7,7 @@ interface HeroProps {
   onSeeHowItWorks: () => void;
 }
 
-/** The public deployment origin (`DEPLOYMENT.md` → nginx `server_name`). */
+/** The public deployment origin (`docs/DEPLOYMENT.md` → nginx `server_name`). */
 const APP_ORIGIN = 'properties.tuhame.co.ke';
 
 function slugify(value: string): string {

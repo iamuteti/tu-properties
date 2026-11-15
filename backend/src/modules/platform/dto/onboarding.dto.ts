@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsIn,
   IsInt,
+  IsISO4217CurrencyCode,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -12,7 +13,6 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { SUPPORTED_CURRENCIES } from '@/common/supported-markets';
 
 /**
  * SaaS administration (Module 19) - onboarding a tenant.
@@ -101,13 +101,13 @@ export class OnboardOrganizationDto {
   contactEmail?: string;
 
   /**
-   * Billing currency. Two are offered — KES for Kenya, USD for the United
-   * States — and the column defaults to KES when a caller omits it, which is
-   * what every pre-existing caller does.
+   * Billing currency. Any ISO-4217 code is accepted — an operator may onboard an
+   * organization in a jurisdiction the public site does not price — and the
+   * column defaults to KES when a caller omits it, which is what every
+   * pre-existing caller does.
    */
   @IsOptional()
-  @IsString()
-  @IsIn(SUPPORTED_CURRENCIES as unknown as string[])
+  @IsISO4217CurrencyCode()
   currency?: string;
 }
 
