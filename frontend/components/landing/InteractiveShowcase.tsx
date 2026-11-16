@@ -150,13 +150,13 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
               <div className="border-b border-line pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-bold text-ink flex items-center gap-2">
-                    <Smartphone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <Smartphone className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
                     Payment Recording & Waterfall Settlement
                   </h3>
                   <p className="text-xs sm:text-sm text-ink-subtle mt-1">Rule: Oldest invoice settled first. Overpayments automatically become spendable credit. Amounts shown in {paySymbol}.</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-mono bg-emerald-950/60 text-emerald-600 dark:text-emerald-300 border border-emerald-800 px-3 py-1.5 rounded-lg">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex items-center gap-2 text-xs font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                   Payment Row Recorded
                 </div>
               </div>
@@ -229,20 +229,20 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                   <div className="bg-surface border border-line rounded-2xl p-5 space-y-4">
                     <div className="flex items-center justify-between border-b border-line pb-3">
                       <span className="text-xs font-mono text-ink-subtle">Allocation Engine Result:</span>
-                      <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">FIFO Waterfall Reconciled</span>
+                      <span className="text-xs font-mono text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60">FIFO Waterfall Reconciled</span>
                     </div>
 
                     {/* Step 1 Waterfall */}
                     <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-line">
                       <div>
                         <div className="text-xs font-bold text-ink flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                           Oldest Invoice (#INV-001)
                         </div>
                         <div className="text-[11px] text-ink-subtle font-mono mt-0.5">Original Balance: {payMoney(oldestInvoice)}</div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">-{payMoney(oldestSettled)} Settled</span>
+                        <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 block">-{payMoney(oldestSettled)} Settled</span>
                         <span className="text-[10px] text-ink-subtle font-mono">Remaining: {payMoney(oldestInvoice - oldestSettled)}</span>
                       </div>
                     </div>
@@ -251,13 +251,13 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                     <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-line">
                       <div>
                         <div className="text-xs font-bold text-ink flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                           Current Month Invoice (#INV-002)
                         </div>
                         <div className="text-[11px] text-ink-subtle font-mono mt-0.5">Original Balance: {payMoney(currentInvoice)}</div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">-{payMoney(currentSettled)} Settled</span>
+                        <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 block">-{payMoney(currentSettled)} Settled</span>
                         <span className="text-[10px] text-ink-subtle font-mono">Remaining: {payMoney(currentInvoice - currentSettled)}</span>
                       </div>
                     </div>
@@ -277,7 +277,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                     {/* Receipt Output */}
                     <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-ink-subtle font-mono">
                       <span>Receipt: REC-2026-88421.pdf</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">Ledger Entry #TX-9902 Posted</span>
+                      <span className="text-emerald-700 dark:text-emerald-400">Ledger Entry #TX-9902 Posted</span>
                     </div>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-line text-ink-muted">
                     <span>Derived WHT Deduction:</span>
-                    <span className="font-bold text-rose-400">
+                    <span className="font-bold text-rose-600 dark:text-rose-400">
                       - {currentTax.currency} {calculatedWHT.toLocaleString()}
                     </span>
                   </div>
@@ -341,7 +341,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       + {currentTax.currency} {calculatedVAT.toLocaleString()}
                     </span>
                   </div>
-                  <div className="pt-2 flex justify-between font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                  <div className="pt-2 flex justify-between font-bold text-sm text-emerald-700 dark:text-emerald-400">
                     <span>Net to Landlord:</span>
                     <span>
                       {currentTax.currency} {netAfterWHT.toLocaleString()}
@@ -355,7 +355,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                   <ul className="space-y-2 mt-2">
                     {currentTax.statutoryStaff.map((staffItem, idx) => (
                       <li key={idx} className="text-xs text-ink-muted flex items-center gap-2 p-2 rounded-lg bg-surface border border-line">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
                         <span>{staffItem}</span>
                       </li>
                     ))}
@@ -395,7 +395,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line text-ink-muted">
-                    <tr className="bg-emerald-950/20">
+                    <tr className="bg-emerald-50/70 dark:bg-emerald-950/20">
                       <td className="py-3 px-3 text-ink-subtle">Row 02</td>
                       <td className="py-3 px-3 font-sans text-ink font-medium">Westlands Ridge</td>
                       <td className="py-3 px-3 font-bold text-ink">4B</td>
@@ -403,24 +403,24 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       <td className="py-3 px-3">KES 85,000</td>
                       <td className="py-3 px-3">2026-01-01 → 2026-12-31</td>
                       <td className="py-3 px-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">VALID (Ready to commit)</span>
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">VALID (Ready to commit)</span>
                       </td>
                     </tr>
-                    <tr className="bg-rose-950/30">
+                    <tr className="bg-rose-50 dark:bg-rose-950/30">
                       <td className="py-3 px-3 text-ink-subtle">Row 03</td>
                       <td className="py-3 px-3 font-sans text-ink font-medium">Westlands Ridge</td>
                       <td className="py-3 px-3 font-bold text-ink">4B</td>
                       <td className="py-3 px-3 font-sans">J. Omondi</td>
                       <td className="py-3 px-3">KES 85,000</td>
-                      <td className="py-3 px-3 text-rose-300">2026-06-01 → 2027-05-31</td>
+                      <td className="py-3 px-3 text-rose-600 dark:text-rose-300">2026-06-01 → 2027-05-31</td>
                       <td className="py-3 px-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-sans font-bold flex items-center justify-end gap-1">
-                          <AlertTriangle className="w-3 h-3 text-rose-400" />
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40 font-sans font-bold flex items-center justify-end gap-1">
+                          <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
                           ERROR: Overlapping Lease on Unit 4B
                         </span>
                       </td>
                     </tr>
-                    <tr className="bg-emerald-950/20">
+                    <tr className="bg-emerald-50/70 dark:bg-emerald-950/20">
                       <td className="py-3 px-3 text-ink-subtle">Row 04</td>
                       <td className="py-3 px-3 font-sans text-ink font-medium">Lakeview Court</td>
                       <td className="py-3 px-3 font-bold text-ink">PH-01</td>
@@ -428,10 +428,10 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       <td className="py-3 px-3">INR 26,500</td>
                       <td className="py-3 px-3">2026-02-01 → 2027-01-31</td>
                       <td className="py-3 px-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">VALID (Ready to commit)</span>
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">VALID (Ready to commit)</span>
                       </td>
                     </tr>
-                    <tr className="bg-emerald-950/20">
+                    <tr className="bg-emerald-50/70 dark:bg-emerald-950/20">
                       <td className="py-3 px-3 text-ink-subtle">Row 05</td>
                       <td className="py-3 px-3 font-sans text-ink font-medium">Sandton View</td>
                       <td className="py-3 px-3 font-bold text-ink">Unit 14</td>
@@ -439,7 +439,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       <td className="py-3 px-3">ZAR 18,500</td>
                       <td className="py-3 px-3">2026-03-01 → 2027-02-28</td>
                       <td className="py-3 px-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">VALID (Ready to commit)</span>
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">VALID (Ready to commit)</span>
                       </td>
                     </tr>
                   </tbody>
@@ -504,11 +504,11 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
                       <span>Total Deposit in Trust Account:</span>
                       <span className="text-ink font-bold">KES {securityDeposit.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-rose-400">
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
                       <span>Less Approved Work Order:</span>
                       <span>- KES {paintRepairs.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-rose-400">
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
                       <span>Less Unpaid Submeter Apportionment:</span>
                       <span>- KES {unpaidWater.toLocaleString()}</span>
                     </div>
@@ -516,7 +516,7 @@ export const InteractiveShowcase: React.FC<InteractiveShowcaseProps> = ({ onStar
 
                   <div className="pt-2 flex justify-between items-center text-sm font-bold font-sans">
                     <span className="text-ink">Net Derived Refund to Tenant:</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-mono text-lg">KES {netRefund.toLocaleString()}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 font-mono text-lg">KES {netRefund.toLocaleString()}</span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-surface border border-line text-[11px] text-ink-subtle font-sans leading-relaxed">Once signed off by the letting manager, the settlement voucher is recorded and the general ledger is updated with the net refund.</div>

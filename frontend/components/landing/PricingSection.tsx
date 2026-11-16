@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { PRICING_PLANS, PRICING_CURRENCIES, type PricingCurrency } from './data/landingData';
+import { PRICING_PLANS, PRICING_CURRENCIES, ENTERPRISE_PLAN, type PricingCurrency } from './data/landingData';
 import { Check, ArrowRight } from 'lucide-react';
 
 interface PlanPrice {
@@ -40,6 +40,13 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [currency, setCurrency] = useState<PricingCurrency>(PRICING_CURRENCIES[0]);
   const [plans, setPlans] = useState<DisplayPlan[]>([]);
+
+  /**
+   * Enterprise is deliberately not part of the priced grid: it has no
+   * self-serve amount and no trial button, because it is quoted per portfolio.
+   * It is rendered as its own card below the priced plans.
+   */
+  const enterprisePlan = ENTERPRISE_PLAN;
 
   /**
    * The plan catalogue is priced in two currencies, so both are always offered.
@@ -84,12 +91,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
               cta: 'Start free trial',
             };
           });
-        const enterprise = PRICING_PLANS.find((pl) => pl.name.toLowerCase() === 'enterprise');
-        if (enterprise)
-          mapped.push({
-            ...enterprise,
-            id: 'enterprise',
-          } as unknown as DisplayPlan);
+        // Enterprise is rendered separately and never priced here.
         setPlans(mapped.length ? mapped : (PRICING_PLANS as unknown as DisplayPlan[]));
       } catch {
         if (!cancelled) setPlans(PRICING_PLANS as unknown as DisplayPlan[]);
@@ -109,7 +111,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-ink font-display tracking-tight">Predictable plans for growing portfolios.</h2>
           <p className="mt-4 text-base sm:text-lg text-ink-muted">
-            Every plan includes our <strong>14-day free trial, no card required</strong>. Complete access from day one.
+            Both self-serve plans include our <strong>14-day free trial, no card required</strong>. Enterprise is
+            scoped and quoted with our team.
           </p>
         </div>
 
@@ -134,7 +137,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
           )}
         </div>
 
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div
+          className={`mt-12 grid grid-cols-1 gap-8 ${
+            plans.length === 1 ? 'max-w-xl mx-auto' : plans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3'
+          }`}
+        >
           {plans.map((plan, idx) => {
             const planPricing = plan.pricing[activeCurrency] ?? plan.pricing.USD ?? { monthly: 0, annual: 0 };
             const price = billingCycle === 'annual' ? planPricing.annual : planPricing.monthly;
@@ -181,6 +188,53 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onStartTrial }) 
             );
           })}
         </div>
+
+        {enterprisePlan && (
+          <div className="relative mt-8 overflow-hidden rounded-2xl border border-line-strong bg-gradient-to-br from-brand-500/10 via-surface to-surface">
+            <div
+              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-600 via-brand-400 to-brand-600"
+              aria-hidden="true"
+            />
+            <div className="grid gap-8 p-8 lg:grid-cols-12 lg:p-10">
+              <div className="lg:col-span-7">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">
+                  {enterprisePlan.badge}
+                </span>
+                <h3 className="mt-2 text-2xl font-extrabold text-ink font-display tracking-tight">{enterprisePlan.name}</h3>
+                <p className="mt-2 text-sm text-ink-muted">{enterprisePlan.description}</p>
+                <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
+                  {enterprisePlan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2.5 text-xs text-ink-muted">
+                      <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400" />
+                      </div>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="lg:col-span-5 flex flex-col justify-center">
+                <div className="rounded-xl border border-line bg-surface/80 p-6">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-ink-subtle">
+                    Custom pricing
+                  </span>
+                  <p className="mt-2 text-sm text-ink-muted leading-relaxed">
+                    There is no self-serve amount for Enterprise. Ceilings, entities, migration and SLA are scoped with
+                    our team, then quoted per portfolio.
+                  </p>
+                  <Link
+                    href="/contact"
+                    className="mt-5 w-full py-3.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 text-white shadow-sm cursor-pointer"
+                  >
+                    <span>Talk to our team</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <p className="mt-2 text-center text-[10px] text-ink-subtle font-mono">No card, no self-serve checkout</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <p className="mt-10 text-center text-xs text-ink-subtle">
           Buying through procurement, or need an invoice rather than a card?{' '}

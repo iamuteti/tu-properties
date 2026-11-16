@@ -1205,29 +1205,31 @@ export const PRICING_PLANS: {
     ],
     highlighted: true,
     cta: 'Start 14-Day Free Trial'
-  },
-  {
-    name: 'Enterprise',
-    badge: 'Institutional Portfolios & Multi-Entity Firms',
-    description: 'Bespoke infrastructure for property groups running several organizations across Kenya and the United States.',
-    pricing: {
-      KES: { monthly: 39000, annual: 32000 },
-      USD: { monthly: 299, annual: 249 }
-    },
-    features: [
-      'High unit and property ceilings, set per organization',
-      'All Professional features included',
-      'Payroll rules for any regime, added as dated configuration rows',
-      'Dedicated organization tenant database partitioning',
-      'Bulk CSV import with dry-run validation in every module',
-      'Contractual SLA with a named response target',
-      'Dedicated account manager & migration engineer',
-      'Security review and audit support on request'
-    ],
-    highlighted: false,
-    cta: 'Start 14-Day Free Trial'
   }
 ];
+
+/**
+ * Enterprise is not part of the priced catalogue: no amount, no trial, no
+ * self-serve checkout. It is scoped with the sales team and quoted per
+ * portfolio, so it lives outside `PRICING_PLANS`, where every tier must carry
+ * an amount in every priced currency.
+ */
+export const ENTERPRISE_PLAN = {
+  name: 'Enterprise',
+  badge: 'Institutional Portfolios & Multi-Entity Firms',
+  description:
+    'Bespoke infrastructure for property groups running several organizations and jurisdictions from one platform.',
+  features: [
+    'High unit and property ceilings, set per organization',
+    'All Professional features included',
+    'Payroll rules for any regime, added as dated configuration rows',
+    'Dedicated organization tenant database partitioning',
+    'Bulk CSV import with dry-run validation in every module',
+    'Contractual SLA with a named response target',
+    'Dedicated account manager & migration engineer',
+    'Security review and audit support on request'
+  ]
+} as const;
 
 export const FAQS = [
   {
