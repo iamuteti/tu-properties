@@ -262,6 +262,12 @@ Legend: `[x]` verified done · `[ ]` open · `[~]` partly done (sub-tasks carry 
 
 ## 7. Changelog
 
+- **2026-11-15 — watch-mode compiler OOM fixed.** `nest start --watch` died at ~2 GB after ~18 minutes of file
+  changes. Root cause was the TypeScript program, not the server: `declaration: true` forced a full symbol graph
+  per rebuild over the Prisma 7 client's 16 MB `index.d.ts`, under Node's default 2 GB old-space limit.
+  Fixes: `declaration: false`, `dist` excluded from `tsconfig.json`, dev/build scripts launched with
+  `--max-old-space-size=6144/4096`, `*.tsbuildinfo` ignored, and the unused `process.on('beforeExit')` listener
+  removed from `PrismaService`.
 - **2026-11-15 — docs consolidation; pricing-currency boundary.**
   - Deleted 24 module/architecture docs and the package READMEs; created `GUIDE.md` and this roadmap.
   - `backend/src/common/supported-markets.ts` → `pricing-currencies.ts` (`PRICED_CURRENCIES`,

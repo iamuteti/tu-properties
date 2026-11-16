@@ -18,6 +18,18 @@ npm run start          # or: npm run start:dev  (watch mode)
 npm run dev
 ```
 
+### Watch mode and compiler memory
+- `start`, `start:dev` and `build` invoke the Nest CLI through
+  `node --max-old-space-size=6144` (4096 for build) instead of the bare `nest` binary. The default V8 heap is
+  ~2 GB, and this project needs more: the Prisma 7 client's generated `index.d.ts` is ~16 MB for 112 models.
+- `tsconfig.json` no longer emits declarations (`"declaration": false`). With declarations on, every watch
+  rebuild retained a full symbol graph for `.d.ts` emit and the compiler died with
+  `FATAL ERROR: Ineffective mark-compacts near heap limit` after ~20 minutes of file changes. Nothing in the
+  repo consumes backend `.d.ts` files, so this costs nothing.
+- `tsconfig.json` excludes `dist`, so `tsc --noEmit` no longer re-typechecks emitted declaration files.
+- If you run the compiler another way (bare `nest start --watch`, an IDE, CI), set
+  `NODE_OPTIONS=--max-old-space-size=6144`. Typecheck-only: `npm run typecheck`.
+
 ## Auth transport (`AUTH_MODE`)
 - The session credential is an httpOnly cookie **or** a bearer token, and which one is a **deployment switch**,
   not a code change: `AUTH_MODE=cookie` (default) or `AUTH_MODE=bearer` in `backend/.env`.
