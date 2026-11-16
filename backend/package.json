@@ -21,17 +21,18 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "prisma generate",
-    "db:drop": "ts-node -r tsconfig-paths/register scripts/db-admin.ts drop",
-    "db:create": "ts-node -r tsconfig-paths/register scripts/db-admin.ts create",
+    "db:drop": "ts-node -T -r tsconfig-paths/register scripts/db-admin.ts drop",
+    "db:create": "ts-node -T -r tsconfig-paths/register scripts/db-admin.ts create",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:undo:all": "prisma migrate reset --force",
-    "db:seed": "prisma db seed",
-    "db:seed:demo": "ts-node -r tsconfig-paths/register src/prisma/demo-data.ts",
-    "db:seed:jedan": "ts-node -r tsconfig-paths/register src/prisma/jedan-apartments-seed.ts",
-    "db:seed:roles": "ts-node -r tsconfig-paths/register src/prisma/seed-system-roles.ts",
-    "db:backfill:unit-types": "ts-node -r tsconfig-paths/register src/prisma/backfill-unit-types.ts",
-    "db:reset:demo": "npm run db:drop && npm run db:create && npm run db:migrate && npm run db:seed && npm run db:seed:demo",
-    "smtp:sink": "ts-node -r tsconfig-paths/register scripts/smtp-sink.ts"
+    "db:seed": "ts-node -T -r tsconfig-paths/register src/prisma/seed.ts",
+    "db:seed:demo": "ts-node -T -r tsconfig-paths/register src/prisma/demo-data.ts",
+    "db:seed:jedan": "ts-node -T -r tsconfig-paths/register src/prisma/jedan-apartments-seed.ts",
+    "db:seed:roles": "ts-node -T -r tsconfig-paths/register src/prisma/seed-system-roles.ts",
+    "db:backfill:unit-types": "ts-node -T -r tsconfig-paths/register src/prisma/backfill-unit-types.ts",
+    "db:reset": "npm run db:drop && npm run db:create && npm run db:migrate",
+    "db:reset:demo": "npm run db:reset && npm run db:seed",
+    "smtp:sink": "ts-node -T -r tsconfig-paths/register scripts/smtp-sink.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
@@ -113,8 +114,5 @@
     "transformIgnorePatterns": [
       "/node_modules/(?!@nestjs/schedule)"
     ]
-  },
-  "prisma": {
-    "seed": "ts-node -r tsconfig-paths/register src/prisma/seed.ts"
   }
 }

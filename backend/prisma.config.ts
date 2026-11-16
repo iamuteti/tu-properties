@@ -7,7 +7,10 @@ export default defineConfig({
     schema: "src/prisma/schema.prisma",
     migrations: {
         path: "src/prisma/migrations",
-        seed: "ts-node -r tsconfig-paths/register src/prisma/seed.ts",
+        // `-T` (transpile-only) matters on small hosts: type-checking loads the
+        // generated Prisma client's ~16 MB index.d.ts and is what gets a 1 GB box
+        // killed. Types are still checked by `npm run typecheck` / `npm run build`.
+        seed: "ts-node -T -r tsconfig-paths/register src/prisma/seed.ts",
     },
     datasource: {
         url: process.env["DATABASE_URL"],

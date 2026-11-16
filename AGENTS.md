@@ -86,6 +86,18 @@ npm run dev
   logs a Quill "Cannot register" error.
 - Apply schema changes → `npx prisma db push --accept-data-loss` (dev workflow; regenerates the client).
 - Seed demo data → `npm run db:seed:demo` (ts-node demo-data script).
+- **`npm run db:reset:demo` drops, recreates, migrates and seeds the demo once** (`db:reset` then `db:seed`).
+  Do not chain `db:seed:demo` after `db:seed` — `seed.ts` already calls `seedDemoData()`, so both together
+  wiped and rebuilt the entire dataset twice and left NULL-org suppliers/accounts behind.
+- **Every ts-node script runs with `-T` (transpile-only), and `db:seed` calls `seed.ts` directly instead of
+  `prisma db seed`.** Type-checking loads the generated client's ~16 MB `index.d.ts`, which is what gets a
+  1 GB host killed while seeding; `npm run typecheck` / `npm run build` still check these files. Keep
+  `prisma.config.ts`'s seed command in sync for `prisma migrate reset`.
+- **A tenant-scoped table whose `organizationId` is `onDelete: SetNull` must be deleted explicitly** in
+  `seedDemoData()`'s clean block. `organization.deleteMany()` only nils the column, so anything skipped
+  survives as a NULL-org orphan on every re-seed (`supplier` and `account` did). `demo-data.seed.spec.ts`
+  re-seeds and fails on NULL-org suppliers/accounts or a supplier sequence that does not restart at
+  `SUP-0001`.
 - Seed the role matrix only → `npm run db:seed:roles`. **A permission change is not live until this runs** — the
   matrix lives in `backend/src/prisma/roles-seed.ts` and the twelve system roles are rows in the `roles` table.
   `backend/src/security/permission-keys.spec.ts` fails the build if a controller asks for a permission module the
@@ -96,6 +108,7 @@ npm run dev
   `PropertyUnitType` existed.
 - The demo seed's default markets are **Kenya and the United States** (`DEMO_COUNTRIES` defaults to `KE,US`). The other jurisdiction profiles still seed when asked for by code — `DEMO_COUNTRY=XX` makes XX the primary market (Rohi + Westhill); `DEMO_COUNTRIES=KE,ZA,IN` seeds a subset. Both take ISO-3166-1 alpha-2 codes and an unknown code fails the seed loudly. Market data comes from `backend/src/prisma/jurisdictions.ts` — add a country there, not as a constant in the seeder.
 - **Hand-maintained indexes are invisible to Prisma and `migrate dev` will try to DROP them.** `notifications_landlordId_readAt_idx` and `utility_charges_no_double_bill_bulk` (partial unique) exist only as raw SQL in their own migrations — the schema cannot express the partial predicate, so every generated migration proposes both DROPs. 2026-10-11: a generated migration was applied with the DROPs in it and both guards silently vanished (restored same day, no violating rows). Always delete those two DROP statements from a generated migration before applying, and verify with `SELECT indexname FROM pg_indexes WHERE indexname IN (...)` afterwards.
+- **The migration history can build a working schema from empty — keep it that way.** 2026-11-16: `db:reset:demo` on an empty database died twice. `20261101000000_sync_schema_with_db_push` used `ALTER TABLE … ADD CONSTRAINT IF NOT EXISTS`, which Postgres rejects (it now uses a `DO $$ … pg_constraint` guard), and the history was missing `organizations.stripeCustomerId`/`stripeSubscriptionId`, the plain `subscriptions.planId` index and JSONB types on `subscription_plans.prices`/`features`. The latter are captured by `20261116000000_sync_organization_stripe_and_plan_drift`. The dev database had been kept in line by `db push`, which is why only a fresh reset exposed it — run `db:reset:demo` against an empty database after schema work, and check `prisma migrate diff --from-config-datasource --to-schema src/prisma/schema.prisma --script` shows nothing but the two index DROPs.
 
 ## Public landing page
 - The landing page (`frontend/app/page.tsx` + `frontend/components/landing/*`) is the only public face of the product.

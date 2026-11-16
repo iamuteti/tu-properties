@@ -5,7 +5,7 @@
 -- 2. Add TERMINATED variant to TenantStatus enum
 -- 3. Add planId column + FK + indexes to subscriptions table
 -- 4. Add indexes to subscription_plans table
--- 5. Remove index from notifications table
+-- 5. Keep the hand-maintained index on notifications (re-created idempotently)
 -- 6. Remove unique index from utility_charges table
 
 -- Add TERMINATED variant to TenantStatus enum
@@ -46,10 +46,23 @@ CREATE INDEX IF NOT EXISTS "subscription_plans_isActive_sortOrder_idx" ON "subsc
 -- Add planId column to subscriptions
 ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "planId" TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_planId_key" ON "subscriptions"("planId");
-ALTER TABLE "subscriptions" ADD CONSTRAINT IF NOT EXISTS "subscriptions_planId_fkey" FOREIGN KEY ("planId") REFERENCES "subscription_plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- Postgres has no `ADD CONSTRAINT IF NOT EXISTS`, so this is the idempotent form.
+-- Without it this migration fails on every fresh database and `db:reset:demo`
+-- (and `prisma migrate deploy`) cannot get past it.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'subscriptions_planId_fkey'
+    ) THEN
+        ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_planId_fkey" FOREIGN KEY ("planId") REFERENCES "subscription_plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+END $$;
 
--- Remove index from notifications table
-DROP INDEX IF EXISTS "notifications_landlordId_readAt_idx";
+-- Keep the hand-maintained read-marker index. `migrate dev` proposes dropping it
+-- because the schema cannot express it, and this file used to apply that drop on
+-- every fresh database — it must exist (see AGENTS.md). Re-creating it here is
+-- idempotent on databases that already have it.
+CREATE INDEX IF NOT EXISTS "notifications_landlordId_readAt_idx" ON "notifications"("landlordId", "readAt");
 
 -- Remove unique index from utility_charges table
 DROP INDEX IF EXISTS "utility_charges_meterId_billingPeriod_key";

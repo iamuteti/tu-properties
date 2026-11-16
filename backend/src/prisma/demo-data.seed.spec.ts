@@ -161,9 +161,34 @@ describe('demo data seed', () => {
         },
       });
       expect(dangling.length).toBe(0);
+
+      // ── Re-seeding leaves no NULL-org rows behind ───────────────────
+      // `Supplier.organizationId` and `Account.organizationId` are
+      // `onDelete: SetNull`, so unless the clean block deletes them the
+      // organizations delete strands the previous run's rows as orphans — and
+      // `Supplier.code` (globally unique, numbered from whatever exists) keeps
+      // climbing past SUP-0001. Run the seed a second time and prove the
+      // supplier register and the chart of accounts restart clean.
+      await seedDemoData();
+
+      const orphanSuppliers = await prisma.supplier.count({
+        where: { organizationId: null },
+      });
+      const orphanAccounts = await prisma.account.count({
+        where: { organizationId: null },
+      });
+      expect(orphanSuppliers).toBe(0);
+      expect(orphanAccounts).toBe(0);
+
+      const suppliers = await prisma.supplier.findMany({
+        select: { code: true },
+        orderBy: { code: 'asc' },
+      });
+      expect(suppliers.length).toBeGreaterThan(0);
+      expect(suppliers[0].code).toBe('SUP-0001');
     } finally {
       process.env.DATABASE_URL = previousUrl;
       await prisma?.$disconnect();
     }
-  }, 300_000);
+  }, 600_000);
 });

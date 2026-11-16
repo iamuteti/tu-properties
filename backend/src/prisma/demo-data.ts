@@ -4066,8 +4066,7 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
     await prisma.tenant.deleteMany();
     // Module 10: procurement runs request → RFQ → quote → order → receipt, and
     // every one of those tables points at the one before it, so they are cleared
-    // child-first. Suppliers themselves survive (nothing above clears them), which
-    // is why their codes keep counting up rather than restarting at SUP-0001.
+    // child-first.
     // Module 11's movements are cleared first of all: they are the only table
     // that references purchase-order lines *and* work orders *and* goods-receipt
     // lines, so they must go before any of the three.
@@ -4135,6 +4134,22 @@ export async function seedDemoData(options: SeedDemoDataOptions = {}) {
         },
       },
     });
+    // The ledger and the supplier register are the two things whose
+    // `organizationId` is `onDelete: SetNull` and which nothing above clears.
+    // Without these deletes, `organization.deleteMany()` below does not remove
+    // them: it nils their `organizationId`, so every run strands the previous
+    // run's rows as NULL-org orphans, and `Supplier.code` (globally unique, and
+    // numbered from whatever is already in the table) keeps climbing past
+    // SUP-0001. `SupplierBill.supplierId` is `onDelete: Restrict`, so bills are
+    // cleared before the suppliers they belong to.
+    await prisma.supplierCreditApplication.deleteMany();
+    await prisma.supplierCredit.deleteMany();
+    await prisma.billPayment.deleteMany();
+    await prisma.supplierBill.deleteMany();
+    await prisma.journalLine.deleteMany();
+    await prisma.journalEntry.deleteMany();
+    await prisma.account.deleteMany();
+    await prisma.supplier.deleteMany();
     await prisma.organization.deleteMany();
 
     // Item 6 — Clean contract scans written to disk by a previous seed run.
